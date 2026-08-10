@@ -89,7 +89,7 @@ async function concurrentMap<T, R>(
   fn: (item: T, index: number) => Promise<R>,
   concurrency: number,
 ): Promise<R[]> {
-  const results: R[] = new Array(items.length);
+  const results = Array.from({ length: items.length }) as R[];
   let nextIndex = 0;
   const limit = Math.max(1, concurrency);
 

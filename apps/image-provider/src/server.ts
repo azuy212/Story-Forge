@@ -21,6 +21,14 @@ interface MediaPayload {
   base64: string;
 }
 
+function buildMediaPayload(result: GenerationResult): MediaPayload[] {
+  return result.assets.map((asset) => ({
+    filename: asset.filename,
+    mime: extToMime(detectMediaExt(asset.buffer, result.assetType)),
+    base64: asset.buffer.toString('base64'),
+  }));
+}
+
 export async function startServer(config: Config, port: number): Promise<void> {
   const logger = new Logger(config.logLevel);
 
@@ -80,14 +88,6 @@ export async function startServer(config: Config, port: number): Promise<void> {
       return { status: 'ok', authenticated: browserReady, browserReady };
     },
   );
-
-  const buildMediaPayload = (result: GenerationResult): MediaPayload[] => {
-    return result.assets.map((asset) => ({
-      filename: asset.filename,
-      mime: extToMime(detectMediaExt(asset.buffer, result.assetType)),
-      base64: asset.buffer.toString('base64'),
-    }));
-  };
 
   app.post<{ Body: GenerateRequest }>('/generate', async (request, reply) => {
     const result = GenerateRequestSchema.safeParse(request.body);

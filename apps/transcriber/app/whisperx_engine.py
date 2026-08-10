@@ -48,7 +48,12 @@ class WhisperXEngine:
 
     def _get_asr_model(self):
         if self._model is None:
-            logger.info("Loading ASR model=%s device=%s compute_type=%s", self.config.model, self.asr_device, self.config.compute_type)
+            logger.info(
+                "Loading ASR model=%s device=%s compute_type=%s",
+                self.config.model,
+                self.asr_device,
+                self.config.compute_type,
+            )
             self._model = whisperx.load_model(
                 self.config.model,
                 device=self.asr_device,
@@ -73,7 +78,11 @@ class WhisperXEngine:
                 device=self.device,
             )
             self._align_models[language] = (model, metadata)
-            logger.info("Alignment model loaded language=%s device=%s", language, self.device)
+            logger.info(
+                "Alignment model loaded language=%s device=%s",
+                language,
+                self.device,
+            )
         return self._align_models[language]
 
     def align_audio(self, audio_path: str, text: str | None) -> dict:
@@ -173,7 +182,9 @@ class WhisperXEngine:
             "words": words,
         }
 
-    def _validate(self, words: list[dict], duration: float, transcript_text: str | None) -> dict:
+    def _validate(
+        self, words: list[dict], duration: float, transcript_text: str | None
+    ) -> dict:
         if not words:
             raise AlignmentError("no word timestamps produced")
 

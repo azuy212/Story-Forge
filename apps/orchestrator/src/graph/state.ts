@@ -30,8 +30,8 @@ function mergeDiagnostics(
   return {
     errors: [...(current.errors ?? []), ...(update.errors ?? [])],
     warnings: [...(current.warnings ?? []), ...(update.warnings ?? [])],
-    scores: { ...(current.scores ?? {}), ...(update.scores ?? {}) },
-    telemetry: { ...(current.telemetry ?? {}), ...(update.telemetry ?? {}) },
+    scores: { ...current.scores, ...update.scores },
+    telemetry: { ...current.telemetry, ...update.telemetry },
   };
 }
 

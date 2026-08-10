@@ -86,11 +86,11 @@ function splitNarrationProportional(
   proportions: number[],
 ): string[] {
   const total = proportions.reduce((a, b) => a + b, 0);
-  if (total <= 0) return Array(proportions.length).fill("");
+  if (total <= 0) return Array.from({ length: proportions.length }, () => "");
   const words = narration.match(/\S+\s*/g) ?? [];
-  if (words.length === 0) return Array(proportions.length).fill("");
+  if (words.length === 0) return Array.from({ length: proportions.length }, () => "");
 
-  const targets = new Array(proportions.length);
+  const targets = Array.from({ length: proportions.length }, () => 0);
   let acc = 0;
   for (let i = 0; i < proportions.length; i++) {
     acc += proportions[i];

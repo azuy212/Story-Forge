@@ -82,22 +82,22 @@ def align(
             result = engine.align_audio(path, text)
         except AudioDecodeError as error:
             logger.warning("audio decode failed: %s", error)
-            raise HTTPException(status_code=422, detail=str(error))
+            raise HTTPException(status_code=422, detail=str(error)) from error
         except LanguageRequiredError as error:
             logger.warning("language required: %s", error)
-            raise HTTPException(status_code=400, detail=str(error))
+            raise HTTPException(status_code=400, detail=str(error)) from error
         except AlignmentError as error:
             logger.error("alignment failed: %s", error)
             raise HTTPException(
                 status_code=500,
                 detail=f"alignment failed: {error}",
-            )
-        except Exception:
+            ) from error
+        except Exception as error:
             logger.exception("WhisperX processing failed")
             raise HTTPException(
                 status_code=500,
                 detail="WhisperX processing failed",
-            )
+            ) from error
 
         logger.info(
             "request_complete duration=%.2fs words=%d "

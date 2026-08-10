@@ -70,7 +70,7 @@ class ChatterboxEngine:
             merged = merged[1:]
         return merged
 
-    def generate(self, text: str, voice: str = None):
+    def generate(self, text: str, voice: str | None = None):
         voice_name = voice or "narrator"
         voice_path = os.path.join("app/voices", f"{voice_name}.wav")
         if not os.path.exists(voice_path):

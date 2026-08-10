@@ -141,6 +141,20 @@ Model lifecycle:
 - **`/align` with known text + language, `FORCE_TRANSCRIBE=0`** — alignment model only; Whisper ASR remains unloaded.
 - **`/align` without text (or forced)** — Whisper ASR loads lazily on first use, then stays resident.
 
+## Linting
+
+Run Ruff from the repository root:
+
+```bash
+pnpm lint:python
+```
+
+Or run the service-local check directly:
+
+```bash
+venv/bin/ruff check .
+```
+
 ## Tests
 
 Generate a sample narration WAV (macOS `say` TTS → 24 kHz mono float32):
