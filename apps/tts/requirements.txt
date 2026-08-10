@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-multipart
+python-dotenv
+torch
+torchaudio
+chatterbox-tts
+soundfile
+resemble-perth @ git+https://github.com/resemble-ai/perth.git@ce86c49d029f42272c1902eccb675556b9ed2330
