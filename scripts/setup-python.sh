@@ -31,5 +31,6 @@ ensure_env_file "apps/transcriber"
 setup_service "apps/tts" requirements.txt
 "$ROOT_DIR/apps/tts/venv/bin/python" -m pip install -r "$ROOT_DIR/apps/tts/dev-requirements.txt"
 setup_service "apps/transcriber" requirements.txt
+"$ROOT_DIR/apps/transcriber/venv/bin/python" -m pip install -r "$ROOT_DIR/apps/transcriber/dev-requirements.txt"
 
 printf '%s\n' "Python environments ready. Set OPENROUTER_API_KEY in apps/orchestrator/.env."

@@ -43,6 +43,7 @@ export async function probe(input: string): Promise<FfprobeResult> {
   } catch (err) {
     throw new Error(
       `FFprobe failed for input "${input}": ${(err as Error)?.message ?? String(err)}`,
+      { cause: err },
     );
   }
 
@@ -165,13 +166,14 @@ export async function runFfmpeg(opts: RunFfmpegOptions): Promise<void> {
     await proc;
   } catch (err) {
     if (signal?.aborted || (err as { isCanceled?: boolean })?.isCanceled) {
-      throw new Error("FFmpeg operation cancelled");
+      throw new Error("FFmpeg operation cancelled", { cause: err });
     }
     const exitCode = proc.exitCode ?? "unknown";
     throw new Error(
       `FFmpeg ${description} failed (exit ${exitCode})\n` +
         `Command: ffmpeg ${args.join(" ")}\n` +
         `Stderr (last 2000 chars):\n${stderr.slice(-2000)}`,
+      { cause: err },
     );
   } finally {
     if (signal) {

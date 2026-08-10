@@ -12,7 +12,8 @@
     "dev:transcriber": "cd apps/transcriber && venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8030 --env-file .env",
     "build": "pnpm --filter youtube-shorts-orchestrator build && pnpm --filter gemini-image-automation build",
     "test": "pnpm --filter youtube-shorts-orchestrator test",
-    "lint": "pnpm --filter youtube-shorts-orchestrator lint && pnpm --filter youtube-shorts-orchestrator lint:langgraph-json && pnpm --filter gemini-image-automation lint"
+    "lint": "pnpm --filter youtube-shorts-orchestrator lint && pnpm --filter youtube-shorts-orchestrator lint:langgraph-json && pnpm --filter gemini-image-automation lint && pnpm lint:python",
+    "lint:python": "bash scripts/lint-python.sh"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

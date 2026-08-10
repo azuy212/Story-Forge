@@ -271,9 +271,9 @@ pnpm lint
 pnpm build
 ```
 
-`pnpm test` runs orchestrator unit tests. `pnpm lint` runs orchestrator ESLint,
-LangGraph path validation, and image-provider ESLint. `pnpm build` builds both
-JavaScript workspace applications.
+`pnpm test` runs orchestrator unit tests. `pnpm lint` runs strict Oxlint checks,
+LangGraph path validation, and Ruff checks for both Python services. `pnpm build`
+builds both JavaScript workspace applications.
 
 Orchestrator commands:
 
@@ -293,11 +293,18 @@ pnpm --filter gemini-image-automation format
 pnpm --filter gemini-image-automation format:check
 ```
 
-TTS formatting and linting tools are installed by setup:
+Python formatting and linting tools are installed by setup:
 
 ```bash
 apps/tts/venv/bin/python -m black --check apps/tts
 apps/tts/venv/bin/python -m ruff check apps/tts
+apps/transcriber/venv/bin/python -m ruff check apps/transcriber
+```
+
+Run all JavaScript and Python lint checks from the repository root:
+
+```bash
+pnpm lint
 ```
 
 The transcriber has shell smoke tests rather than a pytest suite:

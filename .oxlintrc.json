@@ -1,0 +1,36 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "env": {
+    "node": true
+  },
+  "plugins": ["typescript", "import", "unicorn", "oxc", "promise"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "ignorePatterns": [
+    "node_modules/**",
+    "dist/**",
+    "dist-cjs/**",
+    "scripts/**",
+    "**/*.d.ts"
+  ],
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "typescript/no-unused-vars": ["error", { "args": "none" }],
+    "typescript/no-use-before-define": ["error", "nofunc"],
+    "import/no-duplicates": "error",
+    "no-shadow": "off",
+    "no-underscore-dangle": "off",
+    "unicorn/no-array-sort": "off",
+    "unicorn/prefer-add-event-listener": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts"],
+      "env": {
+        "jest": true
+      }
+    }
+  ]
+}

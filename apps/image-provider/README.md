@@ -184,7 +184,7 @@ the browser for a cache hit.
 | `pnpm build` | Compile TypeScript to dist/ |
 | `pnpm start` | Run the CLI via tsx |
 | `pnpm serve` | Run the HTTP API server directly |
-| `pnpm lint` | Run ESLint |
+| `pnpm lint` | Run strict Oxlint checks |
 | `pnpm format` | Format with Prettier |
 
 Installed as a package, the CLI binary is exposed as `gemini-image`.

@@ -1,5 +1,3 @@
-/* eslint-disable no-process-env */
-
 function read(name: string): string | undefined {
   return process.env[name];
 }

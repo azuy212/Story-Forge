@@ -1,4 +1,3 @@
-/* eslint-disable no-process-env */
 import { mkdir, writeFile, readFile, rename, readdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
