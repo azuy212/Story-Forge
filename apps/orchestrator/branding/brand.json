@@ -1,5 +1,9 @@
 {
-  "channel": "Universe Decoded",
-  "creator": "Zain",
-  "cta": "Follow for more."
+  "channel": "Universe Decoded by Zain",
+  "creator": "Ali Zain",
+  "cta": "Follow for more.",
+  "style": "Cinematic",
+  "colorPalette": "Cosmic dark",
+  "logo": "../../assets/branding/logo-without-background.png",
+  "platforms": ["youtube"]
 }
