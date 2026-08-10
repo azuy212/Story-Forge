@@ -1,0 +1,39 @@
+{
+  "name": "gemini-image-automation",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "gemini-image": "./bin/gemini-image.mjs"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "cli": "tsx src/cli.ts",
+    "build": "tsc",
+    "serve": "tsx src/server.ts",
+    "start": "tsx src/cli.ts",
+    "lint": "eslint src/ --ext .ts",
+    "lint:fix": "eslint src/ --ext .ts --fix",
+    "format": "prettier --write 'src/**/*.ts'",
+    "format:check": "prettier --check 'src/**/*.ts'",
+    "postinstall": "playwright install chromium 2>/dev/null || true"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.7.0",
+    "@fastify/cors": "^11.3.0",
+    "commander": "^15.0.0",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.10.0",
+    "playwright": "^1.52.0",
+    "tsx": "^4.23.5",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.1",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3"
+  }
+}

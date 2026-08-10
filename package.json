@@ -1,0 +1,29 @@
+{
+  "name": "ai-series-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.34.3",
+  "scripts": {
+    "setup:all": "pnpm install && bash scripts/setup-python.sh",
+    "dev": "concurrently --kill-others-on-fail --names orchestrator,image-provider,tts,transcriber --prefix-colors blue,green,magenta,yellow \"pnpm dev:orchestrator\" \"pnpm dev:image-provider\" \"pnpm dev:tts\" \"pnpm dev:transcriber\"",
+    "dev:orchestrator": "pnpm --filter youtube-shorts-orchestrator dev",
+    "dev:image-provider": "pnpm --filter gemini-image-automation serve",
+    "dev:tts": "cd apps/tts && venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8010",
+    "dev:transcriber": "cd apps/transcriber && venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8030 --env-file .env",
+    "build": "pnpm --filter youtube-shorts-orchestrator build && pnpm --filter gemini-image-automation build",
+    "test": "pnpm --filter youtube-shorts-orchestrator test",
+    "lint": "pnpm --filter youtube-shorts-orchestrator lint && pnpm --filter youtube-shorts-orchestrator lint:langgraph-json && pnpm --filter gemini-image-automation lint"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "playwright"
+    ],
+    "overrides": {
+      "filelist>minimatch": "5.1.8"
+    }
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

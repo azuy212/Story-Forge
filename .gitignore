@@ -1,0 +1,46 @@
+# Root environment files and local secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+apps/**/.env
+
+# JavaScript
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.pnpm-store/
+.turbo/
+.eslintcache
+
+# Python
+venv/
+**/venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.ruff_cache/
+
+# Local service state and generated assets
+outputs/
+**/outputs/
+cache/
+**/cache/
+browser-profile/
+**/browser-profile/
+generated/
+output/
+runs/
+.langgraph_api/
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Local agent state
+/.agents/
+/.augment/
+/.qwen/
+/skills-lock.json
