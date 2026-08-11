@@ -19,12 +19,12 @@ const mockLoadPrompt = jest
   });
 
 const SCENE_NARRATIONS = [
-  "What if a country officially was not real, a land on every map that has no borders?",
-  "The nation has no formal territory and no legal standing in the eyes of the international community.",
-  "It is one of the most isolated places on the planet, surrounded by open ocean for thousands of miles.",
-  "No one lives here permanently, and the few who visit each year need special approval to come ashore.",
-  "Its ecosystem is highly unique, with plant and animal species found nowhere else in the world.",
-  "Access requires special permission, and even then the journey across the open sea takes several days.",
+  "What if a country officially was not real? This land appears on every map. Yet it has no borders.",
+  "The nation has no formal territory. It has no legal standing in the international community.",
+  "It is one of the most isolated places on Earth. Open ocean surrounds it for thousands of miles.",
+  "No one lives here permanently. The few visitors who come each year need special approval to come ashore.",
+  "Its ecosystem is unique. It has plant and animal species found nowhere else in the world.",
+  "Access requires special permission. Even then, the journey across the open sea takes several days.",
 ];
 
 const STORY_BEATS = [

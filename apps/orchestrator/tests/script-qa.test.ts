@@ -20,7 +20,7 @@ const BASE_CONTENT = {
   script:
     "[What if a country officially wasn't real?] The nation has no borders...",
   narration:
-    "What if a country officially wasn't real? The nation has no borders... It is one of the most isolated places. No one lives here permanently. Its ecosystem is highly unique. Access requires special permission. Follow @UniverseDecoded for more.",
+    "What if a country officially wasn't real? The nation has no borders. It is one of the most isolated places. No one lives there all year. Its ecosystem, or community of plants and animals, is unique. Visitors need special permission. Follow @UniverseDecoded for more.",
   callToAction: "Follow @UniverseDecoded for more.",
   estimatedDurationSeconds: 42,
 };
@@ -113,6 +113,77 @@ describe("scriptQANode", () => {
     expect(result.scriptQA?.status).toBe("approved");
     expect(result.execution?.currentNode).toBe("ScriptQA");
     expect(result.diagnostics?.telemetry?.ScriptQA).toBeDefined();
+  });
+
+  it("rejects long narration before LLM QA", async () => {
+    const longSentence = Array.from(
+      { length: 30 },
+      (_, index) => `word${index + 1}`,
+    ).join(" ");
+    const { promise } = runNode({
+      content: { ...BASE_CONTENT, narration: `${longSentence}.` },
+    } as any);
+    const result = await promise;
+
+    expect(result.scriptQA?.status).toBe("minor_revision");
+    expect(result.scriptQA?.issues).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("Longest sentence is 30 words"),
+      ]),
+    );
+    expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
+  it("keeps deterministic validation active when LLM QA is disabled", async () => {
+    const previous = process.env.ENABLE_SCRIPT_QA;
+    process.env.ENABLE_SCRIPT_QA = "false";
+    try {
+      const { promise } = runNode({
+        content: {
+          ...BASE_CONTENT,
+          narration:
+            "Astronomers were perplexed by this celestial object. It was a piece of cake to understand.",
+        },
+      } as any);
+      const result = await promise;
+
+      expect(result.scriptQA?.status).toBe("minor_revision");
+      expect(mockGenerate).not.toHaveBeenCalled();
+    } finally {
+      if (previous === undefined) delete process.env.ENABLE_SCRIPT_QA;
+      else process.env.ENABLE_SCRIPT_QA = previous;
+    }
+  });
+
+  it("rejects missing narration even when LLM QA is disabled", async () => {
+    const previous = process.env.ENABLE_SCRIPT_QA;
+    process.env.ENABLE_SCRIPT_QA = "false";
+    try {
+      const { promise } = runNode({ content: {} } as any);
+      const result = await promise;
+
+      expect(result.scriptQA?.status).toBe("minor_revision");
+      expect(result.scriptQA?.issues).toContain("Missing script or narration");
+      expect(mockGenerate).not.toHaveBeenCalled();
+    } finally {
+      if (previous === undefined) delete process.env.ENABLE_SCRIPT_QA;
+      else process.env.ENABLE_SCRIPT_QA = previous;
+    }
+  });
+
+  it("keeps explained technical terms eligible for LLM QA", async () => {
+    mockGenerate.mockResolvedValue(buildResponse());
+    const { promise } = runNode({
+      content: {
+        ...BASE_CONTENT,
+        narration:
+          "A black hole has an event horizon. Once something crosses it, it cannot escape. No one can visit this place.",
+      },
+    } as any);
+    const result = await promise;
+
+    expect(result.scriptQA?.status).toBe("approved");
+    expect(mockGenerate).toHaveBeenCalled();
   });
 
   it("returns minor_revision with feedback for invalid script", async () => {
