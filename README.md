@@ -154,6 +154,7 @@ Important variables in `apps/orchestrator/.env.example`:
 | `ENABLE_VIDEO_ASSETS` | Enables video asset generation when supported |
 | `ARTIFACT_STORE_ENABLED` | Enables persisted run artifacts |
 | `ARTIFACT_STORE_DIR` | Artifact directory; default `runs` |
+| `NARRATIVE_HOLD_SECONDS` | Final narrative visual hold before outro; default `0.5` |
 
 ### TTS
 

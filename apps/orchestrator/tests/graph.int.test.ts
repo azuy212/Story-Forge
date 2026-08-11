@@ -472,7 +472,7 @@ describe("Graph", () => {
     expect(result.content.script).toBe("Script text.");
     expect(result.content.narration).toBe(SCENE_NARRATIONS.join(" "));
     expect(result.content.callToAction).toBe(
-      "Follow @UniverseDecoded for more.",
+      "Follow for more mysteries of the universe.",
     );
     expect(result.content.estimatedDurationSeconds).toBe(42);
 
@@ -729,7 +729,9 @@ describe("Graph", () => {
     expect(result.execution.currentNode).toBe("ScriptQA");
 
     expect(result.production?.scenes).toHaveLength(0);
-    expect(result.content?.callToAction).toBe("Subscribe.");
+    expect(result.content?.callToAction).toBe(
+      "Follow for more mysteries of the universe.",
+    );
   }, 30000);
 
   it("promptQA revise loops back to ImagePromptGenerator then proceeds on approval", async () => {
@@ -1703,7 +1705,7 @@ describe("Graph", () => {
     expect(result.content?.hook).toBe("What if a country wasn't real?");
     expect(result.content?.script).toBe("Script body.");
     expect(result.content?.narration).toBe(NARRATIONS.join(" "));
-    expect(result.content?.callToAction).toBe("Subscribe!");
+    expect(result.content?.callToAction).toBe("Subscribe");
     expect(result.content?.estimatedDurationSeconds).toBe(50);
 
     expect(result.research?.summary).toBe("Remote island in Pacific.");

@@ -10,6 +10,7 @@ import { runAgent, type AgentInject } from "./run-agent.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { ScriptWriterOutputSchema } from "../schemas/script-writer-output.js";
 import type { ScriptWriterOutput } from "../schemas/script-writer-output.js";
+import { resolveBranding } from "../utils/branding.js";
 
 function serializeFacts(
   facts:
@@ -110,7 +111,7 @@ export async function scriptWriterNode(
     };
   }
 
-  const { channel, cta } = state.branding ?? {};
+  const branding = resolveBranding(state.branding);
 
   const scriptQA = state.scriptQA;
   const qaFeedback =
@@ -135,8 +136,8 @@ export async function scriptWriterNode(
       storyType: storyPlan.storyType ?? "",
       storySummary: storyPlan.storySummary ?? "",
       storyBeats: serializeBeats(storyPlan.storyBeats),
-      channel: channel ?? "",
-      cta: cta ?? "",
+      channel: branding.channel,
+      cta: branding.outroCta,
       qaFeedback,
     },
     inject,
@@ -168,8 +169,18 @@ export async function scriptWriterNode(
     content: {
       script: content.script.trim(),
       narration: content.narration.trim(),
-      callToAction: content.callToAction.trim(),
+      // CTA is configuration-owned. Never trust model-generated CTA text.
+      callToAction: branding.outroCta,
       estimatedDurationSeconds: content.estimatedDurationSeconds,
+      ...(content.ending
+        ? {
+            ending: {
+              ...content.ending,
+              narration: content.ending.narration.trim(),
+              visualDirection: content.ending.visualDirection?.trim(),
+            },
+          }
+        : {}),
     },
     diagnostics: {
       telemetry: { [AgentModel.ScriptWriter]: result.telemetry },

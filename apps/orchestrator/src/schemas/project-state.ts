@@ -16,6 +16,7 @@ import { MetadataOutputSchema } from "./metadata-output.js";
 import { ThumbnailSchema } from "./thumbnail.js";
 import { PublishingSchema } from "./publishing.js";
 import { ResearchQAOutputSchema } from "./research-qa-output.js";
+import { DEFAULT_BRANDING } from "../utils/branding.js";
 export const ProjectStateSchema = z.object({
   project: ProjectSchema,
   content: ContentSchema.optional().default({}),
@@ -28,11 +29,7 @@ export const ProjectStateSchema = z.object({
   }),
   scriptQA: ScriptQAOutputSchema.optional(),
   production: ProductionSchema.optional().default({ scenes: [] }),
-  branding: BrandingSchema.optional().default({
-    channel: "",
-    creator: "",
-    cta: "",
-  }),
+  branding: BrandingSchema.optional().default(DEFAULT_BRANDING),
   diagnostics: DiagnosticsSchema.optional().default({
     errors: [],
     warnings: [],

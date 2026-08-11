@@ -87,15 +87,23 @@ Given input `{ pillar: "Geography", topic: "Unrecognized Countries" }`, the pipe
 |---|---|---|---|---|
 | `project.pillar` | yes | string | `"Geography"` | High-level category |
 | `project.topic` | yes | string | `"Unrecognized Countries"` | Specific angle |
-| `branding.channel` | yes | string | `"GeoFacts"` | Channel name |
-| `branding.creator` | yes | string | `""` | Creator name |
-| `branding.cta` | yes | string | `"Subscribe"` | Call-to-action |
+| `branding.channel` | no | string | `"Universe Decoded by Zain"` | Channel name |
+| `branding.handle` | no | string | `"@UniverseDecodedByZain"` | Channel handle |
+| `branding.creator` | no | string | `"Ali Zain"` | Creator name |
+| `branding.cta` | no | string | `"Follow for more mysteries of the universe."` | Deterministic CTA configuration |
+| `branding.enabled` | no | boolean | `true` | Enable canonical outro |
+| `branding.outroAsset` | no | string | `"assets/branding/outro.mp4"` | Relative repository asset path |
+| `branding.ctaEnabled` | no | boolean | `true` | Render CTA when outro lacks one |
 | `branding.style` | no | string | `"Documentary"` | Visual style guide |
 | `branding.colorPalette` | no | string | `"Cold blue"` | Color theme |
 | `branding.logo` | no | string | `"UD logo"` | Logo reference |
 | `branding.voice` | no | string | `"en-US-Neural2-F"` | TTS voice |
 | `branding.platforms` | no | string[] | `["youtube"]` | Target publish platforms |
 | `execution.version` | yes | string | `"0.1.0"` | Pipeline version |
+
+`branding/brand.json` owns default branding values. Relative media paths are
+resolved centrally by walking from process working directory toward repository
+root; commands must run from orchestrator package or workspace root.
 
 ### Implemented
 

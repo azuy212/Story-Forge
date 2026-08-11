@@ -130,6 +130,65 @@ describe("visualDirectorNode", () => {
     );
   });
 
+  it("requires final scene to carry explicit narrative ending", async () => {
+    const scenes = makeScenes([
+      "Alpha beta gamma delta.",
+      "Epsilon zeta eta theta.",
+      "Iota kappa lambda mu.",
+      "Nu xi omicron pi.",
+    ]);
+    (scenes[3] as any).emotionalBeat = "payoff";
+    mockGenerate.mockResolvedValue(
+      buildResponse({ scenes, visualPlans: makePlans(4) }),
+    );
+
+    const { promise } = runNode({
+      content: {
+        title: "Title",
+        narration: NARRATION,
+        estimatedDurationSeconds: 50,
+        ending: {
+          type: "open_question",
+          narration: "Nu xi omicron pi!",
+          visualDirection: "Hold on the final evidence.",
+        },
+      },
+    });
+    const result = await promise;
+
+    expect(result.production?.scenes).toHaveLength(4);
+    expect(result.production?.scenes?.at(-1)?.emotionalBeat).toBe("payoff");
+  });
+
+  it("rejects ending that is not represented by final scene", async () => {
+    const scenes = makeScenes([
+      "Alpha beta gamma delta.",
+      "Epsilon zeta eta theta.",
+      "Iota kappa lambda mu.",
+      "Nu xi omicron pi.",
+    ]);
+    (scenes[3] as any).emotionalBeat = "mystery";
+    mockGenerate.mockResolvedValue(
+      buildResponse({ scenes, visualPlans: makePlans(4) }),
+    );
+
+    const { promise } = runNode({
+      content: {
+        title: "Title",
+        narration: NARRATION,
+        estimatedDurationSeconds: 50,
+        ending: {
+          type: "open_question",
+          narration: "A different final sentence.",
+        },
+      },
+    });
+    const result = await promise;
+
+    expect(result.production?.scenes).toEqual([]);
+    expect(result.production?.directorReview?.status).toBe("minor_revision");
+  });
+
   it("repairs paraphrased narration by re-segmenting in code", async () => {
     // Scene narration adds a word ("extra") that is not in the original.
     const scenes = makeScenes([
@@ -197,9 +256,9 @@ describe("visualDirectorNode", () => {
     const { promise } = runNode();
     const result = await promise;
 
-    expect(result.production?.scenes?.every((s) => s.cameraShot === "medium")).toBe(
-      true,
-    );
+    expect(
+      result.production?.scenes?.every((s) => s.cameraShot === "medium"),
+    ).toBe(true);
   });
 
   it("reports incomplete model responses instead of dereferencing choices", async () => {
@@ -210,7 +269,9 @@ describe("visualDirectorNode", () => {
       "Nu xi omicron pi.",
     ]).map((scene) => ({ ...scene, cameraShot: "unsupported-shot" }));
     mockGenerate
-      .mockResolvedValueOnce(buildResponse({ scenes, visualPlans: makePlans(4) }))
+      .mockResolvedValueOnce(
+        buildResponse({ scenes, visualPlans: makePlans(4) }),
+      )
       .mockResolvedValue({ usage: {}, model: "test-model" });
 
     const { promise } = runNode();

@@ -1,6 +1,10 @@
 export type { ProjectState, ProjectStateOutput } from "../schemas/project-state.js";
 export type { ProjectInfo } from "../schemas/project.js";
-export type { Content } from "../schemas/content.js";
+export type {
+  Content,
+  NarrativeEnding,
+  NarrativeEndingType,
+} from "../schemas/content.js";
 export type { Research } from "../schemas/research.js";
 export type { Production, Scene, Provider, GenerationMode } from "../schemas/production.js";
 export type { Branding } from "../schemas/branding.js";

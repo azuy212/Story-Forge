@@ -1,7 +1,14 @@
 import { jest, describe, it, expect, beforeEach } from "@jest/globals";
-import { videoComposerNode, scaleSceneDurations } from "../src/agents/video-composer.node.js";
+import {
+  videoComposerNode,
+  scaleSceneDurations,
+} from "../src/agents/video-composer.node.js";
 import type { ProjectState } from "../src/types/index.js";
-import type { ComposerProvider, ComposeOptions, ComposeResult } from "../src/providers/composer-provider.js";
+import type {
+  ComposerProvider,
+  ComposeOptions,
+  ComposeResult,
+} from "../src/providers/composer-provider.js";
 
 const mockCompose = jest.fn<(...args: any[]) => Promise<any>>();
 
@@ -46,13 +53,22 @@ function runNode(state?: Partial<ProjectState>, provider?: ComposerProvider) {
       project: { pillar: "Geography", topic: "Test" },
       content: { estimatedDurationSeconds: 10 },
       production: { scenes: [DEFAULT_SCENE] },
-      audio: { narrationUrl: "https://placeholder.local/narration.wav", narrationDurationMs: 10000 },
-      subtitles: { srt: "1\n00:00:00,000 --> 00:00:10,000\nHello world", wordTimestamps: [], ass: "" },
+      audio: {
+        narrationUrl: "https://placeholder.local/narration.wav",
+        narrationDurationMs: 10000,
+      },
+      subtitles: {
+        srt: "1\n00:00:00,000 --> 00:00:10,000\nHello world",
+        wordTimestamps: [],
+        ass: "",
+      },
       branding: { channel: "TestChannel", creator: "", cta: "" },
       execution: { version: "0.1.0" },
       ...state,
     } as ProjectState,
-    { configurable: { composerProvider: provider ?? mockComposerProvider } } as any,
+    {
+      configurable: { composerProvider: provider ?? mockComposerProvider },
+    } as any,
   );
 }
 
@@ -73,7 +89,9 @@ describe("videoComposerNode", () => {
     const result = await runNode({ production: {} } as any);
 
     expect(result.diagnostics?.errors).toBeDefined();
-    expect(result.diagnostics?.errors![0]).toContain("No production scenes found");
+    expect(result.diagnostics?.errors![0]).toContain(
+      "No production scenes found",
+    );
     expect(mockCompose).not.toHaveBeenCalled();
   });
 
@@ -81,12 +99,16 @@ describe("videoComposerNode", () => {
     const result = await runNode({ production: { scenes: [] } } as any);
 
     expect(result.diagnostics?.errors).toBeDefined();
-    expect(result.diagnostics?.errors![0]).toContain("No production scenes found");
+    expect(result.diagnostics?.errors![0]).toContain(
+      "No production scenes found",
+    );
     expect(mockCompose).not.toHaveBeenCalled();
   });
 
   it("returns error when scene lacks assetUrl", async () => {
-    const result = await runNode({ production: { scenes: [{ ...DEFAULT_SCENE, assetUrl: undefined }] } } as any);
+    const result = await runNode({
+      production: { scenes: [{ ...DEFAULT_SCENE, assetUrl: undefined }] },
+    } as any);
 
     expect(result.diagnostics?.errors).toBeDefined();
     expect(result.diagnostics?.errors![0]).toContain("missing assetUrl");
@@ -105,7 +127,9 @@ describe("videoComposerNode", () => {
     const result = await runNode({ subtitles: {} } as any);
 
     expect(result.diagnostics?.errors).toBeDefined();
-    expect(result.diagnostics?.errors![0]).toContain("SRT subtitles are missing");
+    expect(result.diagnostics?.errors![0]).toContain(
+      "SRT subtitles are missing",
+    );
     expect(mockCompose).not.toHaveBeenCalled();
   });
 
@@ -115,7 +139,9 @@ describe("videoComposerNode", () => {
     const result = await runNode();
 
     expect(result.diagnostics?.errors).toBeDefined();
-    expect(result.diagnostics?.errors![0]).toContain("Composition service unavailable");
+    expect(result.diagnostics?.errors![0]).toContain(
+      "Composition service unavailable",
+    );
     expect(result.video.videoUrl).toBeUndefined();
   });
 
@@ -179,17 +205,34 @@ describe("videoComposerNode", () => {
     mockCompose.mockImplementation(async (opts: ComposeOptions) => {
       expect(opts.scenes).toHaveLength(1);
       expect(opts.scenes[0].sceneId).toBe(1);
-      expect(opts.scenes[0].assetUrl).toBe("https://placeholder.local/scene-001.mp4");
+      expect(opts.scenes[0].assetUrl).toBe(
+        "https://placeholder.local/scene-001.mp4",
+      );
       expect(opts.scenes[0].startSecond).toBe(0);
       expect(opts.narrationUrl).toBe("https://placeholder.local/narration.wav");
       expect(opts.srt).toContain("Hello world");
       expect(opts.totalDurationSeconds).toBe(10);
+      expect(opts.narrativeHoldSeconds).toBe(0.5);
       expect(opts.branding.channel).toBe("TestChannel");
+      expect(opts.branding.outroAsset).toBe("assets/branding/outro.mp4");
+      expect(opts.branding.ctaEnabled).toBe(true);
+      expect(opts.branding.outroContainsCta).toBe(false);
       return DEFAULT_RESULT;
     });
 
     await runNode();
     expect(mockCompose).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes branding disabled through to composer", async () => {
+    mockCompose.mockResolvedValue(DEFAULT_RESULT);
+
+    await runNode({
+      branding: { channel: "C", creator: "", cta: "", enabled: false },
+    });
+
+    const opts = mockCompose.mock.calls[0][0] as ComposeOptions;
+    expect(opts.branding.enabled).toBe(false);
   });
 
   it("scales scene durations to the actual narration duration", async () => {
@@ -219,7 +262,10 @@ describe("videoComposerNode", () => {
     const result = await runNode({
       content: { estimatedDurationSeconds: 55 },
       production: { scenes },
-      audio: { narrationUrl: "https://placeholder.local/narration.wav", narrationDurationMs },
+      audio: {
+        narrationUrl: "https://placeholder.local/narration.wav",
+        narrationDurationMs,
+      },
     });
 
     expect(mockCompose).toHaveBeenCalledTimes(1);
@@ -242,13 +288,22 @@ describe("videoComposerNode", () => {
 
   it("fails with diagnostics when scaling factor is out of range", async () => {
     const scenes = [
-      { ...DEFAULT_SCENE, sceneId: 1, startSecond: 0, endSecond: 10, durationSeconds: 10 },
+      {
+        ...DEFAULT_SCENE,
+        sceneId: 1,
+        startSecond: 0,
+        endSecond: 10,
+        durationSeconds: 10,
+      },
     ];
 
     const result = await runNode({
       content: { estimatedDurationSeconds: 10 },
       production: { scenes },
-      audio: { narrationUrl: "https://placeholder.local/narration.wav", narrationDurationMs: 100000 },
+      audio: {
+        narrationUrl: "https://placeholder.local/narration.wav",
+        narrationDurationMs: 100000,
+      },
     });
 
     expect(mockCompose).not.toHaveBeenCalled();
@@ -264,7 +319,9 @@ describe("scaleSceneDurations", () => {
     return { ...DEFAULT_SCENE, sceneId, durationSeconds };
   }
 
-  function totalMs(scaled: Awaited<ReturnType<typeof scaleSceneDurations>>): number {
+  function totalMs(
+    scaled: Awaited<ReturnType<typeof scaleSceneDurations>>,
+  ): number {
     return scaled.reduce((acc, s) => acc + (s.durationSeconds ?? 0) * 1000, 0);
   }
 
@@ -272,9 +329,18 @@ describe("scaleSceneDurations", () => {
     const scaled = scaleSceneDurations([scene(5), scene(9), scene(11)], 30000);
 
     for (const s of scaled) {
-      expect((s.durationSeconds ?? 0) * FRAME_RATE).toBeCloseTo(Math.round((s.durationSeconds ?? 0) * FRAME_RATE), 8);
-      expect((s.startSecond ?? 0) * FRAME_RATE).toBeCloseTo(Math.round((s.startSecond ?? 0) * FRAME_RATE), 8);
-      expect((s.endSecond ?? 0) * FRAME_RATE).toBeCloseTo(Math.round((s.endSecond ?? 0) * FRAME_RATE), 8);
+      expect((s.durationSeconds ?? 0) * FRAME_RATE).toBeCloseTo(
+        Math.round((s.durationSeconds ?? 0) * FRAME_RATE),
+        8,
+      );
+      expect((s.startSecond ?? 0) * FRAME_RATE).toBeCloseTo(
+        Math.round((s.startSecond ?? 0) * FRAME_RATE),
+        8,
+      );
+      expect((s.endSecond ?? 0) * FRAME_RATE).toBeCloseTo(
+        Math.round((s.endSecond ?? 0) * FRAME_RATE),
+        8,
+      );
     }
   });
 
@@ -302,7 +368,10 @@ describe("scaleSceneDurations", () => {
   it("final scene endSecond equals the scaled total", () => {
     const scaled = scaleSceneDurations([scene(5), scene(9), scene(11)], 30000);
 
-    const totalSeconds = scaled.reduce((acc, s) => acc + (s.durationSeconds ?? 0), 0);
+    const totalSeconds = scaled.reduce(
+      (acc, s) => acc + (s.durationSeconds ?? 0),
+      0,
+    );
     expect(scaled.at(-1)?.endSecond).toBeCloseTo(totalSeconds, 8);
   });
 
@@ -318,8 +387,12 @@ describe("scaleSceneDurations", () => {
   });
 
   it("throws when target duration is not positive", () => {
-    expect(() => scaleSceneDurations([scene(10)], 0)).toThrow(/narration duration is 0ms/);
-    expect(() => scaleSceneDurations([scene(10)], -1000)).toThrow(/narration duration is -1000ms/);
+    expect(() => scaleSceneDurations([scene(10)], 0)).toThrow(
+      /narration duration is 0ms/,
+    );
+    expect(() => scaleSceneDurations([scene(10)], -1000)).toThrow(
+      /narration duration is -1000ms/,
+    );
   });
 
   it("throws when planned scene durations sum to zero", () => {

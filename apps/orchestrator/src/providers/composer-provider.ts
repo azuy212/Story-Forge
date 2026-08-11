@@ -11,9 +11,15 @@ export interface ComposeOptions {
   narrationUrl: string;
   srt: string;
   totalDurationSeconds: number;
+  narrativeHoldSeconds?: number;
   branding: {
     channel?: string;
     logo?: string;
+    enabled?: boolean;
+    outroAsset?: string;
+    ctaEnabled?: boolean;
+    outroCta?: string;
+    outroContainsCta?: boolean;
   };
   runId?: string;
 }
@@ -22,6 +28,12 @@ export interface ComposeResult {
   videoUrl: string;
   durationMs: number;
   resolution: string;
+  timeline?: {
+    narrativeDurationMs: number;
+    narrativeHoldMs: number;
+    outroDurationMs: number;
+    durationMs: number;
+  };
 }
 
 export interface ComposerProvider {
