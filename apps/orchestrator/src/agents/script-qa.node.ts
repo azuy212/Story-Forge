@@ -10,6 +10,10 @@ import { runAgent, type AgentInject } from "./run-agent.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { ScriptQAOutputSchema } from "../schemas/script-qa-output.js";
 import { config as configUtils } from "../utils/config.js";
+import {
+  formatScriptComplexityReport,
+  validateScriptComplexity,
+} from "../utils/script-complexity.js";
 
 function serializeFacts(
   facts:
@@ -72,14 +76,6 @@ export async function scriptQANode(
     retryCount: { ...state.execution?.retryCount, ScriptQA: retryCount },
   });
 
-  if (!configUtils.enableScriptQA()) {
-    return {
-      scriptQA: { status: "approved" } as ScriptQAOutput,
-      diagnostics: {},
-      execution: {},
-    };
-  }
-
   if (!script || !narration) {
     return {
       scriptQA: {
@@ -89,6 +85,32 @@ export async function scriptQANode(
       },
       diagnostics: {},
       execution: execution(AgentModel.ScriptQA),
+    };
+  }
+
+  const complexityReport = validateScriptComplexity(narration);
+  const complexityFeedback = formatScriptComplexityReport(complexityReport);
+
+  // Language complexity is a deterministic pipeline invariant. LLM QA can be
+  // disabled to save cost, but explicit sentence and language limits still
+  // apply before narration reaches TTS.
+  if (!complexityReport.passed) {
+    return {
+      scriptQA: {
+        status: "minor_revision",
+        feedback: `Script QA: simplify narration for global listening comprehension.\n${complexityFeedback}`,
+        issues: complexityReport.issues.map((issue) => issue.message),
+      },
+      diagnostics: {},
+      execution: execution(AgentModel.ScriptQA),
+    };
+  }
+
+  if (!configUtils.enableScriptQA()) {
+    return {
+      scriptQA: { status: "approved" } as ScriptQAOutput,
+      diagnostics: {},
+      execution: {},
     };
   }
 
@@ -103,6 +125,7 @@ export async function scriptQANode(
       estimatedDurationSeconds: String(estimatedDurationSeconds ?? 50),
       researchFacts: serializeFacts(research?.facts),
       storyBeats: serializeBeats(state.storyPlan?.storyBeats),
+      complexityReport: complexityFeedback,
     },
     inject,
     configurable: config.configurable as Record<string, unknown>,

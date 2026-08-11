@@ -16,6 +16,7 @@ const MOCK_PROMPT = [
   "Story Beats: {{storyBeats}}",
   "Channel: {{channel}}",
   "Call to Action: {{cta}}",
+  "QA Feedback: {{qaFeedback}}",
 ].join("\n");
 
 const MOCK_GUIDELINES = "Editorial guidelines for testing.";
@@ -266,6 +267,29 @@ describe("scriptWriterNode", () => {
     expect(userMsg!.content).toContain("Beat 1");
     expect(userMsg!.content).toContain("GeoFacts");
     expect(userMsg!.content).toContain("Subscribe");
+  });
+
+  it("passes language revision feedback while preserving research inputs", async () => {
+    mockGenerate.mockResolvedValue(buildResponse());
+
+    const { promise } = runNode({
+      scriptQA: {
+        status: "minor_revision",
+        feedback:
+          "Simplify narration: longest sentence is 29 words; explain event horizon.",
+        issues: ["Longest sentence is 29 words"],
+      },
+    });
+    await promise;
+
+    const messages = mockGenerate.mock.calls[0][0] as {
+      role: string;
+      content: string;
+    }[];
+    const userMsg = messages.find((m) => m.role === "user");
+    expect(userMsg!.content).toContain("Simplify narration");
+    expect(userMsg!.content).toContain("fact-001");
+    expect(userMsg!.content).toContain("Beat 1");
   });
 
   it("uses configured CTA instead of model CTA", async () => {
