@@ -27,6 +27,8 @@ export const config = {
   artifactStoreEnabled: (): boolean =>
     read("ARTIFACT_STORE_ENABLED") === "true",
   artifactStoreDir: (): string => read("ARTIFACT_STORE_DIR") ?? "runs",
+  sourceAssetCacheDir: (): string =>
+    read("SOURCE_ASSET_CACHE_DIR") ?? "cache/source-assets",
   enableScriptQA: (): boolean =>
     read("ENABLE_SCRIPT_QA") === "true" || read("ENABLE_QA") === "true",
   enableResearchQA: (): boolean =>

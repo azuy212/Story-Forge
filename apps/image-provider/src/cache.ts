@@ -2,12 +2,14 @@ import { createHash } from 'crypto';
 import { readFile, writeFile, mkdir, stat, rename, rm, readdir } from 'fs/promises';
 import path from 'path';
 import type { Logger } from './logger';
-import type { AssetType, MediaAsset } from './types';
+import type { AssetType, GenerationOptions, MediaAsset } from './types';
 import { detectMediaExt } from './asset-downloader';
 
 export interface CacheEntry {
   prompt: string;
   assetType: AssetType;
+  mode?: string;
+  referenceHash?: string;
   timestamp: string;
   assets: MediaAsset[];
 }
@@ -18,6 +20,8 @@ interface CacheMetadata {
   timestamp: string;
   assetCount: number;
   assetFilenames: string[];
+  mode?: string;
+  referenceHash?: string;
 }
 
 export class AssetCache {
@@ -28,20 +32,52 @@ export class AssetCache {
     void this.cleanupStale().catch(() => {});
   }
 
-  key(prompt: string, assetType: AssetType): string {
-    return createHash('sha256').update(prompt).update('\0').update(assetType).digest('hex');
+  key(prompt: string, assetType: AssetType, options: GenerationOptions = {}): string {
+    if (
+      (options.mode ?? 'text_to_image') === 'text_to_image' &&
+      (options.referenceImages?.length ?? 0) === 0
+    ) {
+      return createHash('sha256').update(prompt).update('\0').update(assetType).digest('hex');
+    }
+    return createHash('sha256')
+      .update(prompt)
+      .update('\0')
+      .update(assetType)
+      .update('\0')
+      .update(options.mode ?? 'text_to_image')
+      .update('\0')
+      .update(this.referenceHash(options))
+      .digest('hex');
   }
 
-  private entryDir(prompt: string, assetType: AssetType): string {
-    return path.join(this.dir, this.key(prompt, assetType));
+  private referenceHash(options: GenerationOptions): string {
+    return createHash('sha256')
+      .update(
+        JSON.stringify(
+          (options.referenceImages ?? []).map((reference) => ({
+            id: reference.id,
+            mime: reference.mime,
+            base64: reference.base64,
+          })),
+        ),
+      )
+      .digest('hex');
   }
 
-  async has(prompt: string, assetType: AssetType): Promise<boolean> {
+  private entryDir(prompt: string, assetType: AssetType, options: GenerationOptions = {}): string {
+    return path.join(this.dir, this.key(prompt, assetType, options));
+  }
+
+  async has(
+    prompt: string,
+    assetType: AssetType,
+    options: GenerationOptions = {},
+  ): Promise<boolean> {
     try {
-      const meta = await this.readMetadata(prompt, assetType);
+      const meta = await this.readMetadata(prompt, assetType, options);
       if (!meta) return false;
       for (const f of meta.assetFilenames) {
-        const st = await stat(path.join(this.entryDir(prompt, assetType), f));
+        const st = await stat(path.join(this.entryDir(prompt, assetType, options), f));
         if (!st.isFile()) return false;
       }
       return true;
@@ -50,14 +86,18 @@ export class AssetCache {
     }
   }
 
-  async get(prompt: string, assetType: AssetType): Promise<CacheEntry | null> {
+  async get(
+    prompt: string,
+    assetType: AssetType,
+    options: GenerationOptions = {},
+  ): Promise<CacheEntry | null> {
     try {
-      const meta = await this.readMetadata(prompt, assetType);
+      const meta = await this.readMetadata(prompt, assetType, options);
       if (!meta) return null;
 
       const assets: MediaAsset[] = [];
       for (const f of meta.assetFilenames) {
-        const buffer = await readFile(path.join(this.entryDir(prompt, assetType), f));
+        const buffer = await readFile(path.join(this.entryDir(prompt, assetType, options), f));
         assets.push({ filename: f.replace(/\.[^.]+$/, ''), buffer });
       }
 
@@ -66,6 +106,8 @@ export class AssetCache {
         assetType: meta.assetType,
         timestamp: meta.timestamp,
         assets,
+        mode: meta.mode,
+        referenceHash: meta.referenceHash,
       };
     } catch (error) {
       this.logger.debug('Cache read failed', {
@@ -77,8 +119,13 @@ export class AssetCache {
     }
   }
 
-  async put(prompt: string, assetType: AssetType, assets: MediaAsset[]): Promise<void> {
-    const dir = this.entryDir(prompt, assetType);
+  async put(
+    prompt: string,
+    assetType: AssetType,
+    assets: MediaAsset[],
+    options: GenerationOptions = {},
+  ): Promise<void> {
+    const dir = this.entryDir(prompt, assetType, options);
     const tmp = `${dir}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const bak = `${dir}.bak`;
     await mkdir(tmp, { recursive: true });
@@ -98,6 +145,8 @@ export class AssetCache {
         timestamp: new Date().toISOString(),
         assetCount: assets.length,
         assetFilenames,
+        mode: options.mode ?? 'text_to_image',
+        referenceHash: this.referenceHash(options),
       };
 
       await writeFile(path.join(tmp, 'metadata.json'), JSON.stringify(metadata, null, 2));
@@ -140,9 +189,13 @@ export class AssetCache {
     }
   }
 
-  private async readMetadata(prompt: string, assetType: AssetType): Promise<CacheMetadata | null> {
+  private async readMetadata(
+    prompt: string,
+    assetType: AssetType,
+    options: GenerationOptions = {},
+  ): Promise<CacheMetadata | null> {
     const raw = await readFile(
-      path.join(this.entryDir(prompt, assetType), 'metadata.json'),
+      path.join(this.entryDir(prompt, assetType, options), 'metadata.json'),
       'utf-8',
     );
     const meta = JSON.parse(raw) as Partial<CacheMetadata>;
@@ -151,6 +204,8 @@ export class AssetCache {
       typeof meta.prompt !== 'string' ||
       meta.prompt !== prompt ||
       meta.assetType !== assetType ||
+      (meta.mode ?? 'text_to_image') !== (options.mode ?? 'text_to_image') ||
+      (meta.referenceHash ?? this.referenceHash({})) !== this.referenceHash(options) ||
       !Array.isArray(meta.assetFilenames) ||
       meta.assetCount !== meta.assetFilenames.length ||
       meta.assetCount < 1

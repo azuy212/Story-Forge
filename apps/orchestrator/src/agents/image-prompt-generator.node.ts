@@ -55,6 +55,9 @@ export async function imagePromptGeneratorNode(
       return {
         sceneId: s.sceneId,
         sceneType: s.sceneType,
+        assetMode: s.assetMode ?? "generated",
+        entities: s.entities,
+        sourceAssetIds: s.sourceAssetIds,
         visualDescription: s.visualDescription,
         narration: s.narration,
         renderStyle: plan?.renderStyle,

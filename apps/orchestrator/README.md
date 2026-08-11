@@ -496,7 +496,7 @@ tests/
   fs-artifact-store.test.ts
   normalize.test.ts
   chatterbox-tts-provider.test.ts
-  comfyui-asset-provider.test.ts
+  image-provider-asset-provider.test.ts
 ```
 
 ## Key Design Decisions

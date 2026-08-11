@@ -8,6 +8,7 @@ import { scriptQANode } from "../agents/script-qa.node.js";
 import { metadataGeneratorNode } from "../agents/metadata-generator.node.js";
 import { thumbnailGeneratorNode } from "../agents/thumbnail-generator.node.js";
 import { visualDirectorNode } from "../agents/visual-director.node.js";
+import { assetStrategyNode } from "../agents/asset-strategy.node.js";
 import { imagePromptGeneratorNode } from "../agents/image-prompt-generator.node.js";
 import { promptQANode } from "../agents/prompt-qa.node.js";
 import { assetGeneratorNode } from "../agents/asset-generator.node.js";
@@ -181,7 +182,7 @@ const promptRouter = (state: typeof StateAnnotation.State) => {
  * instead of silently ending the pipeline.
  */
 const visualDirectorRouter = (state: typeof StateAnnotation.State) => {
-  if (hasScenes(state)) return "ImagePromptGenerator";
+  if (hasScenes(state)) return "AssetStrategy";
   const review = state.production?.directorReview;
   const retries = retryCount(state, "VisualDirector");
   if (review?.status === "minor_revision" && retries < PROMPT_MAX_RETRIES) {
@@ -222,6 +223,7 @@ const builder = new StateGraph(StateAnnotation)
   .addNode("MetadataGenerator", metadataGeneratorNode)
   .addNode("ThumbnailGenerator", thumbnailGeneratorNode)
   .addNode("VisualDirector", visualDirectorNode)
+  .addNode("AssetStrategy", assetStrategyNode)
   .addNode("ImagePromptGenerator", imagePromptGeneratorNode)
   .addNode("PromptQA", promptQANode)
   .addNode("AssetGenerator", assetGeneratorNode)
@@ -257,6 +259,10 @@ builder
     guard(hasThumbnail, "PublishReady"),
   )
   .addConditionalEdges("VisualDirector", visualDirectorRouter)
+  .addConditionalEdges(
+    "AssetStrategy",
+    guard(hasScenes, "ImagePromptGenerator"),
+  )
   .addConditionalEdges(
     "ImagePromptGenerator",
     guard(hasScenePrompts, "PromptQA"),

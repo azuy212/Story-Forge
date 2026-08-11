@@ -1,32 +1,53 @@
-import { jest, describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import {
+  jest,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from "@jest/globals";
 import { PipelineError } from "../src/utils/errors.js";
 
-const mockMkdir = jest.fn<(...args: any[]) => Promise<void>>().mockResolvedValue(undefined);
-const mockWriteFile = jest.fn<(...args: any[]) => Promise<void>>().mockResolvedValue(undefined);
+const mockMkdir = jest
+  .fn<(...args: any[]) => Promise<void>>()
+  .mockResolvedValue(undefined);
+const mockReadFile = jest
+  .fn<(...args: any[]) => Promise<Buffer>>()
+  .mockResolvedValue(Buffer.from("source"));
+const mockWriteFile = jest
+  .fn<(...args: any[]) => Promise<void>>()
+  .mockResolvedValue(undefined);
 
 jest.unstable_mockModule("node:fs/promises", () => ({
   mkdir: mockMkdir,
+  readFile: mockReadFile,
   writeFile: mockWriteFile,
 }));
 
-const { ComfyUIAssetProvider } = await import("../src/providers/comfyui-asset-provider.js");
+const { ImageProviderAssetProvider } =
+  await import("../src/providers/image-provider-asset-provider.js");
 
 let fetchSpy: jest.Spied<typeof globalThis.fetch>;
 
 beforeEach(() => {
   mockMkdir.mockClear();
+  mockReadFile.mockClear();
   mockWriteFile.mockClear();
   mockWriteFile.mockResolvedValue(undefined);
-  fetchSpy = jest.spyOn(globalThis, "fetch").mockImplementation(
-    jest.fn() as unknown as typeof globalThis.fetch,
-  );
+  fetchSpy = jest
+    .spyOn(globalThis, "fetch")
+    .mockImplementation(jest.fn() as unknown as typeof globalThis.fetch);
 });
 
 afterEach(() => {
   fetchSpy.mockRestore();
 });
 
-function mockImageResponse(status: number, body: ArrayBuffer, contentType: string): Response {
+function mockImageResponse(
+  status: number,
+  body: ArrayBuffer,
+  contentType: string,
+): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
@@ -36,14 +57,18 @@ function mockImageResponse(status: number, body: ArrayBuffer, contentType: strin
   } as Response;
 }
 
-describe("ComfyUIAssetProvider", () => {
-  const provider = new ComfyUIAssetProvider();
+describe("ImageProviderAssetProvider", () => {
+  const provider = new ImageProviderAssetProvider();
 
   it("sends prompt to image provider endpoint", async () => {
     const pngBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]).buffer;
     fetchSpy.mockResolvedValue(mockImageResponse(200, pngBytes, "image/png"));
 
-    await provider.generateImage({ prompt: "a cat", sceneId: 1, filename: "scene-001.png" });
+    await provider.generateImage({
+      prompt: "a cat",
+      sceneId: 1,
+      filename: "scene-001.png",
+    });
 
     expect(fetchSpy).toHaveBeenCalledWith(
       "http://localhost:8020/generate",
@@ -59,7 +84,11 @@ describe("ComfyUIAssetProvider", () => {
     const pngBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]).buffer;
     fetchSpy.mockResolvedValue(mockImageResponse(200, pngBytes, "image/png"));
 
-    await provider.generateImage({ prompt: "a cat", sceneId: 1, filename: "scene-001.png" });
+    await provider.generateImage({
+      prompt: "a cat",
+      sceneId: 1,
+      filename: "scene-001.png",
+    });
 
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.any(String),
@@ -69,11 +98,56 @@ describe("ComfyUIAssetProvider", () => {
     );
   });
 
+  it("passes reference images to image-provider", async () => {
+    const pngBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]).buffer;
+    fetchSpy.mockResolvedValue(mockImageResponse(200, pngBytes, "image/png"));
+
+    await provider.generateImage({
+      prompt: "Place subject in a study",
+      sceneId: 1,
+      filename: "scene-001.png",
+      referenceImages: [
+        { id: "source-1", path: "/tmp/source-1.png", mimeType: "image/png" },
+      ],
+      mode: "image_to_image",
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://localhost:8020/generate",
+      expect.objectContaining({
+        body: JSON.stringify({
+          prompt: "Place subject in a study",
+          type: "image",
+          mode: "image_to_image",
+          referenceImages: [
+            {
+              id: "source-1",
+              filename: "source-1.png",
+              mime: "image/png",
+              base64: Buffer.from("source").toString("base64"),
+            },
+          ],
+        }),
+      }),
+    );
+  });
+
+  it("declares reference capability explicitly", () => {
+    expect(provider.capabilities).toEqual({
+      referenceImages: true,
+      imageEditing: true,
+    });
+  });
+
   it("saves image to generated/assets directory", async () => {
     const pngBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]).buffer;
     fetchSpy.mockResolvedValue(mockImageResponse(200, pngBytes, "image/png"));
 
-    await provider.generateImage({ prompt: "a cat", sceneId: 1, filename: "scene-001.png" });
+    await provider.generateImage({
+      prompt: "a cat",
+      sceneId: 1,
+      filename: "scene-001.png",
+    });
 
     expect(mockMkdir).toHaveBeenCalledWith(
       expect.stringContaining("generated/assets"),
@@ -89,7 +163,11 @@ describe("ComfyUIAssetProvider", () => {
     const pngBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]).buffer;
     fetchSpy.mockResolvedValue(mockImageResponse(200, pngBytes, "image/png"));
 
-    const result = await provider.generateImage({ prompt: "a cat", sceneId: 1, filename: "scene-001.png" });
+    const result = await provider.generateImage({
+      prompt: "a cat",
+      sceneId: 1,
+      filename: "scene-001.png",
+    });
 
     expect(result.url).toMatch(/generated\/assets\/scene-001\.png$/);
   });
@@ -98,7 +176,10 @@ describe("ComfyUIAssetProvider", () => {
     const pngBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]).buffer;
     fetchSpy.mockResolvedValue(mockImageResponse(200, pngBytes, "image/png"));
 
-    const result = await provider.generateImage({ prompt: "a cat", sceneId: 2 });
+    const result = await provider.generateImage({
+      prompt: "a cat",
+      sceneId: 2,
+    });
 
     expect(result.url).toMatch(/scene-002\.png$/);
     expect(mockWriteFile).toHaveBeenCalledWith(
@@ -108,7 +189,9 @@ describe("ComfyUIAssetProvider", () => {
   });
 
   it("throws PipelineError on non-200 response", async () => {
-    fetchSpy.mockResolvedValue(mockImageResponse(500, new ArrayBuffer(0), "text/plain"));
+    fetchSpy.mockResolvedValue(
+      mockImageResponse(500, new ArrayBuffer(0), "text/plain"),
+    );
 
     await expect(
       provider.generateImage({ prompt: "a cat", sceneId: 1 }),
@@ -116,7 +199,9 @@ describe("ComfyUIAssetProvider", () => {
   });
 
   it("throws PipelineError on non-image content type", async () => {
-    fetchSpy.mockResolvedValue(mockImageResponse(200, new ArrayBuffer(8), "text/plain"));
+    fetchSpy.mockResolvedValue(
+      mockImageResponse(200, new ArrayBuffer(8), "text/plain"),
+    );
 
     await expect(
       provider.generateImage({ prompt: "a cat", sceneId: 1 }),
@@ -124,7 +209,9 @@ describe("ComfyUIAssetProvider", () => {
   });
 
   it("throws PipelineError on empty response body", async () => {
-    fetchSpy.mockResolvedValue(mockImageResponse(200, new ArrayBuffer(0), "image/png"));
+    fetchSpy.mockResolvedValue(
+      mockImageResponse(200, new ArrayBuffer(0), "image/png"),
+    );
 
     await expect(
       provider.generateImage({ prompt: "a cat", sceneId: 1 }),
