@@ -18,6 +18,7 @@ export const ArtifactTypeSchema = z.enum([
   "scriptQA",
   "metadata",
   "thumbnail",
+  "thumbnailImage",
   "visualDirector",
   "prompts",
   "promptQA",
@@ -81,7 +82,9 @@ export const ArtifactRecordSchema = z.object({
   data: z.unknown(),
 });
 
-export type ArtifactRecord<T = unknown> = z.infer<typeof ArtifactRecordSchema> & {
+export type ArtifactRecord<T = unknown> = z.infer<
+  typeof ArtifactRecordSchema
+> & {
   data: T;
 };
 
@@ -95,10 +98,13 @@ export const ManifestEntrySchema = z.object({
 
 export type ManifestEntry = z.infer<typeof ManifestEntrySchema>;
 
-export const ManifestSchema = z.record(ArtifactTypeSchema, z.object({
-  latest: z.string(),
-  versions: z.array(ManifestEntrySchema),
-}));
+export const ManifestSchema = z.record(
+  ArtifactTypeSchema,
+  z.object({
+    latest: z.string(),
+    versions: z.array(ManifestEntrySchema),
+  }),
+);
 
 export type Manifest = z.infer<typeof ManifestSchema>;
 

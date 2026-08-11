@@ -70,6 +70,8 @@ export { ThumbnailSchema } from "./thumbnail.js";
 export type { Thumbnail } from "./thumbnail.js";
 export { ThumbnailOutputSchema } from "./thumbnail-output.js";
 export type { ThumbnailOutput } from "./thumbnail-output.js";
+export { ThumbnailImageOutputSchema } from "./thumbnail-image.js";
+export type { ThumbnailImageOutput } from "./thumbnail-image.js";
 
 export { PublishingSchema, PublishResultSchema } from "./publishing.js";
 export type { Publishing, PublishResult } from "./publishing.js";
