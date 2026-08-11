@@ -5,6 +5,8 @@ import {
   CameraMotionEnum,
   TransitionEnum,
   AssetTypeEnum,
+  AssetModeEnum,
+  SceneEntitySchema,
 } from "./production.js";
 import { VisualPlanEntrySchema } from "./visual-planner-output.js";
 
@@ -20,7 +22,7 @@ const CAMERA_SHOT_ALIASES: Record<string, z.infer<typeof CameraShotEnum>> = {
   "close-up-shot": "close-up",
   "extreme-close-up": "extreme-close",
   "bird-eye": "top-down",
-  "birdseye": "top-down",
+  birdseye: "top-down",
   "bird's-eye": "top-down",
   overhead: "top-down",
   "isometric-view": "isometric",
@@ -28,7 +30,10 @@ const CAMERA_SHOT_ALIASES: Record<string, z.infer<typeof CameraShotEnum>> = {
 
 const CameraShotInput = z.preprocess((value) => {
   if (typeof value !== "string") return value;
-  const normalized = value.trim().toLowerCase().replace(/[\s_]+/g, "-");
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-");
   return CAMERA_SHOT_ALIASES[normalized] ?? value;
 }, CameraShotEnum);
 
@@ -57,6 +62,8 @@ const ScenePlanSchema = z.object({
   emphasis: EmphasisEnum.optional(),
   emotionalBeat: EmotionalBeatEnum,
   assetType: AssetTypeEnum.optional(),
+  assetMode: AssetModeEnum.optional(),
+  entities: z.array(SceneEntitySchema).optional(),
   references: z.array(z.string()).optional(),
 });
 

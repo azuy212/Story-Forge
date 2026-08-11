@@ -222,7 +222,15 @@ function normalizeOutput(
         `VisualDirector: dropped ${dropped} hallucinated fact reference(s) in scene ${s.sceneId}`,
       );
     }
-    return { ...s, references: known };
+    return {
+      ...s,
+      references: known,
+      entities: s.entities?.map((entity) => ({
+        ...entity,
+        requiresSourceImage:
+          entity.requiresSourceImage || entity.type === "person",
+      })),
+    };
   });
 
   // Reindex visual plans against the renumbered scenes; drop extras.
@@ -449,6 +457,8 @@ export async function visualDirectorNode(
     emphasis: s.emphasis,
     emotionalBeat: s.emotionalBeat,
     assetType: s.assetType ?? "image",
+    assetMode: s.assetMode,
+    entities: s.entities,
     references: s.references,
   }));
 

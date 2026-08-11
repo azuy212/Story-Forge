@@ -22,8 +22,22 @@ export type { ResearchOutput } from "./research-output.js";
 export { ScriptPlannerOutputSchema } from "./script-planner-output.js";
 export type { ScriptPlannerOutput } from "./script-planner-output.js";
 
-export { ProductionSchema, SceneSchema } from "./production.js";
-export type { Production, Scene } from "./production.js";
+export {
+  ProductionSchema,
+  SceneSchema,
+  AssetModeEnum,
+  AssetKindEnum,
+  SceneEntitySchema,
+  SourceAssetSchema,
+} from "./production.js";
+export type {
+  Production,
+  Scene,
+  AssetMode,
+  AssetKind,
+  SceneEntity,
+  SourceAsset,
+} from "./production.js";
 
 export { BrandingSchema } from "./branding.js";
 export type { Branding } from "./branding.js";

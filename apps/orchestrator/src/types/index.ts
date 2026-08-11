@@ -14,6 +14,10 @@ export type {
   Scene,
   Provider,
   GenerationMode,
+  AssetMode,
+  AssetKind,
+  SceneEntity,
+  SourceAsset,
 } from "../schemas/production.js";
 export type { Branding } from "../schemas/branding.js";
 export type {

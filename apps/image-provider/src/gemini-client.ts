@@ -4,7 +4,13 @@ import type { Logger } from './logger';
 import { retry, RetryError } from './retry';
 import { AssetDownloader } from './asset-downloader';
 import { AssetCache } from './cache';
-import type { AssetType, GenerationResult, MediaAsset } from './types';
+import type {
+  AssetType,
+  GenerationOptions,
+  GenerationResult,
+  MediaAsset,
+  ReferenceImage,
+} from './types';
 
 export class GeminiClient {
   private context: BrowserContext | null = null;
@@ -90,8 +96,12 @@ export class GeminiClient {
     }
   }
 
-  async isCached(prompt: string, assetType: AssetType): Promise<boolean> {
-    return this.cache.has(prompt, assetType);
+  async isCached(
+    prompt: string,
+    assetType: AssetType,
+    options: GenerationOptions = {},
+  ): Promise<boolean> {
+    return this.cache.has(prompt, assetType, options);
   }
 
   async processAllPrompts(prompts: string[], assetType: AssetType): Promise<void> {
@@ -174,13 +184,18 @@ export class GeminiClient {
   private _queue: Array<{
     prompt: string;
     assetType: AssetType;
+    options: GenerationOptions;
     resolve: (result: GenerationResult) => void;
     reject: (error: Error) => void;
   }> = [];
   private _inflight = new Map<string, Promise<GenerationResult>>();
 
-  async generate(prompt: string, assetType: AssetType): Promise<GenerationResult> {
-    const key = this.cache.key(prompt, assetType);
+  async generate(
+    prompt: string,
+    assetType: AssetType,
+    options: GenerationOptions = {},
+  ): Promise<GenerationResult> {
+    const key = this.cache.key(prompt, assetType, options);
 
     const existing = this._inflight.get(key);
     if (existing) {
@@ -191,15 +206,19 @@ export class GeminiClient {
       return existing;
     }
 
-    const promise = this._generate(prompt, assetType);
+    const promise = this._generate(prompt, assetType, options);
     this._inflight.set(key, promise);
     promise.finally(() => this._inflight.delete(key)).catch(() => {});
 
     return promise;
   }
 
-  private async _generate(prompt: string, assetType: AssetType): Promise<GenerationResult> {
-    const cached = await this.cache.get(prompt, assetType);
+  private async _generate(
+    prompt: string,
+    assetType: AssetType,
+    options: GenerationOptions = {},
+  ): Promise<GenerationResult> {
+    const cached = await this.cache.get(prompt, assetType, options);
     if (cached) {
       this.logger.info('Cache hit, serving from cache', {
         prompt: prompt.substring(0, 60),
@@ -210,7 +229,7 @@ export class GeminiClient {
     }
 
     return new Promise((resolve, reject) => {
-      this._queue.push({ prompt, assetType, resolve, reject });
+      this._queue.push({ prompt, assetType, options, resolve, reject });
       void this._processQueue();
     });
   }
@@ -222,7 +241,7 @@ export class GeminiClient {
     try {
       const assets = await retry(
         async () => {
-          return this.executeGeneration(item.prompt, item.assetType);
+          return this.executeGeneration(item.prompt, item.assetType, item.options);
         },
         {
           maxAttempts: this.config.retryMaxAttempts,
@@ -232,7 +251,7 @@ export class GeminiClient {
         },
       );
       try {
-        await this.cache.put(item.prompt, item.assetType, assets);
+        await this.cache.put(item.prompt, item.assetType, assets, item.options);
       } catch (error) {
         this.logger.warn('Failed to write cache', {
           error: error instanceof Error ? error.message : String(error),
@@ -247,7 +266,11 @@ export class GeminiClient {
     }
   }
 
-  private async executeGeneration(prompt: string, assetType: AssetType): Promise<MediaAsset[]> {
+  private async executeGeneration(
+    prompt: string,
+    assetType: AssetType,
+    options: GenerationOptions = {},
+  ): Promise<MediaAsset[]> {
     if (!this.page) throw new Error('Page closed');
     const page = this.page;
 
@@ -266,6 +289,9 @@ export class GeminiClient {
 
     try {
       await this.selectCreateMode(assetType);
+      if (options.referenceImages?.length) {
+        await uploadReferenceImages(page, options.referenceImages);
+      }
 
       const oldSrcs =
         assetType === 'video' ? await this.snapshotVideoSrcs() : await this.snapshotImageSrcs();
@@ -706,5 +732,37 @@ export class GeminiClient {
       this.context = null;
       this.page = null;
     }
+  }
+}
+
+/** Upload references through Gemini's Upload & tools control. */
+export async function uploadReferenceImages(
+  page: Page,
+  references: ReferenceImage[],
+): Promise<void> {
+  const plusButton = page.locator('button[aria-label="Upload & tools"]').first();
+  await plusButton.click();
+
+  const fileInput = page.locator('input[type="file"]').first();
+  await fileInput.waitFor({ state: 'attached', timeout: 15000 });
+  await fileInput.setInputFiles(
+    references.map((reference) => ({
+      name: reference.filename,
+      mimeType: reference.mime,
+      buffer: Buffer.from(reference.base64, 'base64'),
+    })),
+  );
+  const uploadedCount = await fileInput.evaluate(
+    (input) => (input as HTMLInputElement).files?.length ?? 0,
+  );
+  assertReferenceUploadCount(uploadedCount, references.length);
+  await page.keyboard.press('Escape').catch(() => {});
+}
+
+export function assertReferenceUploadCount(uploadedCount: number, expectedCount: number): void {
+  if (uploadedCount !== expectedCount) {
+    throw new Error(
+      `Gemini reference upload accepted ${uploadedCount} of ${expectedCount} image(s)`,
+    );
   }
 }

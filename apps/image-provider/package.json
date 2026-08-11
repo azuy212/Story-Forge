@@ -10,6 +10,7 @@
     "dev": "tsx src/index.ts",
     "cli": "tsx src/cli.ts",
     "build": "tsc",
+    "test:integration": "tsx --test tests/reference-upload.integration.test.ts",
     "serve": "tsx src/server.ts",
     "start": "tsx src/cli.ts",
     "lint": "oxlint src --config ../../.oxlintrc.json --import-plugin --deny-warnings",

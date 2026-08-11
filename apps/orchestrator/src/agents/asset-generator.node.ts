@@ -6,13 +6,17 @@ import type {
   Scene,
 } from "../types/index.js";
 import { AgentModel } from "../models/agent-model.js";
-import type { AssetProvider } from "../providers/asset-provider.js";
+import type {
+  AssetProvider,
+  AssetReference,
+} from "../providers/asset-provider.js";
 import { createDefaultAssetProvider } from "../providers/asset-provider.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
 import { getArtifactNamespace } from "../artifacts/context.js";
-import type { Provider } from "../schemas/production.js";
+import type { Provider, SourceAsset } from "../schemas/production.js";
 import { padSceneId } from "../utils/scene-id.js";
 import { config as appConfig } from "../utils/config.js";
+import { logger } from "../utils/logger.js";
 
 const DEFAULT_PROVIDER = createDefaultAssetProvider();
 
@@ -42,13 +46,18 @@ function resolveAssetType(assetType: Scene["assetType"]): Scene["assetType"] {
 
 function buildPlan(scenes: Scene[]): Scene[] {
   return scenes.map((scene) => {
-    const assetType = resolveAssetType(scene.assetType);
+    const mode = scene.assetMode ?? "generated";
+    const assetType =
+      mode === "source" || mode === "source_composite" || mode === "source_edit"
+        ? "image"
+        : resolveAssetType(scene.assetType);
     const cfg = configFor(assetType);
     const padded = padSceneId(scene.sceneId);
 
     return {
       ...scene,
       assetType,
+      assetMode: mode,
       assetId: scene.assetId ?? `asset-scene-${padded}`,
       provider: scene.provider ?? cfg.provider,
       generationMode: scene.generationMode ?? "generate",
@@ -65,6 +74,27 @@ function getAssetProvider(config: RunnableConfig): AssetProvider {
 
 function allScenesGenerated(scenes: Scene[]): boolean {
   return scenes.filter((s) => s.generationPrompt).every((s) => !!s.assetUrl);
+}
+
+interface AssetArtifact {
+  scenes: Scene[];
+  sourceAssets: SourceAsset[];
+}
+
+function sourceAssetsFor(
+  scene: Scene,
+  sourceAssets: SourceAsset[],
+): SourceAsset[] {
+  const ids = new Set(scene.sourceAssetIds ?? []);
+  return sourceAssets.filter((asset) => ids.has(asset.id));
+}
+
+function referencesFor(assets: SourceAsset[]): AssetReference[] {
+  return assets.flatMap((asset) =>
+    asset.localPath
+      ? [{ id: asset.id, path: asset.localPath, mimeType: asset.mimeType }]
+      : [],
+  );
 }
 
 async function mapWithConcurrency<T, R>(
@@ -97,6 +127,7 @@ export async function assetGeneratorNode(
   execution: Partial<Execution>;
 }> {
   const scenes = state.production?.scenes ?? [];
+  const sourceAssets = state.production?.sourceAssets ?? [];
   const provider = getAssetProvider(config);
 
   if (scenes.length === 0) {
@@ -114,7 +145,7 @@ export async function assetGeneratorNode(
 
   const plannedScenes = buildPlan(scenes);
 
-  const result = await cacheNodeResult<Scene[]>(
+  const result = await cacheNodeResult<AssetArtifact>(
     {
       type: "assets",
       node: AgentModel.AssetGenerator,
@@ -124,17 +155,29 @@ export async function assetGeneratorNode(
           sceneId: s.sceneId,
           generationPrompt: s.generationPrompt,
           assetType: s.assetType,
+          assetMode: s.assetMode,
+          sourceAssetIds: s.sourceAssetIds,
+          sourceAssets: sourceAssets.map((asset) => ({
+            id: asset.id,
+            url: asset.url,
+            source: asset.source,
+            license: asset.license,
+            licenseUrl: asset.licenseUrl,
+            attribution: asset.attribution,
+            sourcePageUrl: asset.sourcePageUrl,
+            localPath: asset.localPath,
+          })),
           filename: s.filename,
         })),
       },
-      validate: allScenesGenerated,
+      validate: (artifact) => allScenesGenerated(artifact.scenes),
     },
     async () => {
       const errors: string[] = [];
       const withAsset = await mapWithConcurrency(
         plannedScenes,
         3,
-        async (scene) => {
+        async (scene): Promise<Scene> => {
           if (!scene.generationPrompt || !scene.filename) {
             errors.push(
               `${AgentModel.AssetGenerator}: Scene ${scene.sceneId} missing generationPrompt or filename, skipping`,
@@ -145,6 +188,85 @@ export async function assetGeneratorNode(
           try {
             const assetType = scene.assetType ?? "image";
             const runId = getArtifactNamespace(config, state);
+            const mode = scene.assetMode ?? "generated";
+            const selectedSourceAssets = sourceAssetsFor(scene, sourceAssets);
+            const references = referencesFor(selectedSourceAssets);
+
+            if (
+              assetType === "image" &&
+              mode === "source" &&
+              references.length > 0
+            ) {
+              return {
+                ...scene,
+                assetKind: "source-image" as const,
+                assetUrl: references[0].path,
+                assetGeneratedAt: new Date().toISOString(),
+              } as Scene;
+            }
+
+            if (
+              assetType === "image" &&
+              (mode === "source_composite" || mode === "source_edit") &&
+              references.length > 0
+            ) {
+              const supportsReferenceMode =
+                provider.capabilities?.referenceImages === true &&
+                (mode !== "source_edit" ||
+                  provider.capabilities.imageEditing === true);
+              if (!supportsReferenceMode) {
+                logger.info(
+                  "AssetGenerator reference capability unavailable; using source image",
+                  {
+                    sceneId: scene.sceneId,
+                    mode,
+                  },
+                );
+                return {
+                  ...scene,
+                  assetKind: "source-image" as const,
+                  assetUrl: references[0].path,
+                  assetGeneratedAt: new Date().toISOString(),
+                } as Scene;
+              }
+
+              try {
+                const assetResult = await provider.generateImage({
+                  prompt: scene.generationPrompt,
+                  sceneId: scene.sceneId,
+                  filename: scene.filename,
+                  runId,
+                  referenceImages: references,
+                  mode: mode === "source_edit" ? "edit" : "image_to_image",
+                });
+                return {
+                  ...scene,
+                  assetKind:
+                    mode === "source_edit"
+                      ? ("source-edit" as const)
+                      : ("source-composite" as const),
+                  assetUrl: assetResult.url,
+                  assetGeneratedAt: new Date().toISOString(),
+                } as Scene;
+              } catch (error) {
+                logger.info(
+                  "AssetGenerator reference generation failed; using source image",
+                  {
+                    sceneId: scene.sceneId,
+                    mode,
+                    error:
+                      error instanceof Error ? error.message : String(error),
+                  },
+                );
+                return {
+                  ...scene,
+                  assetKind: "source-image" as const,
+                  assetUrl: references[0].path,
+                  assetGeneratedAt: new Date().toISOString(),
+                } as Scene;
+              }
+            }
+
             const assetResult =
               assetType === "video"
                 ? await provider.generateVideo({
@@ -162,6 +284,9 @@ export async function assetGeneratorNode(
 
             return {
               ...scene,
+              ...(assetType === "image"
+                ? { assetKind: "generated-image" as const }
+                : {}),
               assetUrl: assetResult.url,
               assetGeneratedAt: new Date().toISOString(),
             };
@@ -175,7 +300,7 @@ export async function assetGeneratorNode(
       );
 
       return {
-        data: errors.length > 0 ? null : withAsset,
+        data: errors.length > 0 ? null : { scenes: withAsset, sourceAssets },
         error: errors.length > 0 ? errors.join("\n") : undefined,
       };
     },
@@ -183,8 +308,9 @@ export async function assetGeneratorNode(
   );
 
   if (result.error) {
+    const artifact = result.data ?? { scenes: plannedScenes, sourceAssets };
     return {
-      production: { scenes: result.data ?? plannedScenes },
+      production: artifact,
       diagnostics: {
         errors: [result.error],
       },
@@ -195,7 +321,7 @@ export async function assetGeneratorNode(
   }
 
   return {
-    production: { scenes: result.data ?? plannedScenes },
+    production: result.data ?? { scenes: plannedScenes, sourceAssets },
     diagnostics: {},
     execution: {
       currentNode: AgentModel.AssetGenerator,

@@ -6,6 +6,7 @@ export enum AgentModel {
   ScriptWriter = "ScriptWriter",
   ScriptQA = "ScriptQA",
   VisualDirector = "VisualDirector",
+  AssetStrategy = "AssetStrategy",
   ImagePromptGenerator = "ImagePromptGenerator",
   PromptEngineer = "PromptEngineer",
   NarrationPlanner = "NarrationPlanner",

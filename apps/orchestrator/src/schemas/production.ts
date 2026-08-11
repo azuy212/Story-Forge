@@ -63,6 +63,54 @@ export const TransitionEnum = z.enum([
 
 export const AssetTypeEnum = z.enum(["image", "video"]);
 
+export const AssetModeEnum = z.enum([
+  "generated",
+  "source",
+  "source_composite",
+  "source_edit",
+]);
+
+export const SceneEntityTypeEnum = z.enum([
+  "person",
+  "place",
+  "object",
+  "organization",
+  "product",
+  "document",
+  "landmark",
+  "other",
+]);
+
+export const SceneEntitySchema = z.object({
+  type: SceneEntityTypeEnum,
+  name: z.string().min(1),
+  canonicalId: z.string().optional(),
+  requiresSourceImage: z.boolean().optional().default(false),
+});
+
+export const SourceAssetSchema = z.object({
+  id: z.string().min(1),
+  entityId: z.string().optional(),
+  url: z.string().url(),
+  source: z.string().min(1),
+  license: z.string().optional(),
+  licenseUrl: z.string().url().optional(),
+  attribution: z.string().optional(),
+  sourcePageUrl: z.string().url().optional(),
+  width: z.number().int().positive().optional(),
+  height: z.number().int().positive().optional(),
+  mimeType: z.string().optional(),
+  title: z.string().optional(),
+  localPath: z.string().optional(),
+});
+
+export const AssetKindEnum = z.enum([
+  "source-image",
+  "generated-image",
+  "source-composite",
+  "source-edit",
+]);
+
 export const SceneSchema = z.object({
   sceneId: z.number().int().positive(),
   startSecond: z.number().optional(),
@@ -88,6 +136,10 @@ export const SceneSchema = z.object({
     ])
     .optional(),
   assetType: AssetTypeEnum.optional(),
+  assetMode: AssetModeEnum.optional(),
+  assetKind: AssetKindEnum.optional(),
+  entities: z.array(SceneEntitySchema).optional(),
+  sourceAssetIds: z.array(z.string()).optional(),
   references: z.array(z.string()).optional(),
   generationPrompt: z.string().optional(),
   assetId: z.string().optional(),
@@ -107,6 +159,11 @@ export type CameraShot = z.input<typeof CameraShotEnum>;
 export type CameraMotion = z.input<typeof CameraMotionEnum>;
 export type Transition = z.input<typeof TransitionEnum>;
 export type AssetType = z.input<typeof AssetTypeEnum>;
+export type AssetMode = z.input<typeof AssetModeEnum>;
+export type SceneEntityType = z.input<typeof SceneEntityTypeEnum>;
+export type SceneEntity = z.input<typeof SceneEntitySchema>;
+export type SourceAsset = z.input<typeof SourceAssetSchema>;
+export type AssetKind = z.input<typeof AssetKindEnum>;
 
 export type Scene = z.input<typeof SceneSchema>;
 
@@ -118,6 +175,7 @@ export const DirectorReviewSchema = z.object({
 export const ProductionSchema = z.object({
   scenes: z.array(SceneSchema).optional(),
   plannedScenes: z.array(SceneSchema).optional(),
+  sourceAssets: z.array(SourceAssetSchema).optional(),
   visualPlan: z.array(VisualPlanEntrySchema).optional(),
   promptQA: PromptQAOutputSchema.optional(),
   directorReview: DirectorReviewSchema.optional(),

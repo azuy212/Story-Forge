@@ -10,8 +10,30 @@ import type { PublisherProvider } from "../providers/publisher-provider.js";
 import { StubPublisherProvider } from "../providers/stub-publisher-provider.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
 import { getErrorMessage } from "../utils/errors.js";
+import type { SourceAsset } from "../schemas/production.js";
 
 const DEFAULT_PROVIDER = new StubPublisherProvider();
+
+function sourceCredits(state: ProjectState): string {
+  const scenes = state.production?.scenes ?? [];
+  const assets = state.production?.sourceAssets ?? [];
+  const usedIds = new Set(
+    scenes.flatMap((scene) => scene.sourceAssetIds ?? []),
+  );
+  const usedAssets = assets.filter((asset) => usedIds.has(asset.id));
+  if (usedAssets.length === 0) return "";
+
+  const lines = usedAssets.map((asset: SourceAsset) => {
+    const label =
+      asset.title?.trim() || asset.attribution?.trim() || asset.source;
+    const sourceUrl = asset.sourcePageUrl ?? asset.url;
+    const license = asset.license
+      ? ` (${asset.license}${asset.licenseUrl ? `: ${asset.licenseUrl}` : ""})`
+      : "";
+    return `- ${label}: ${sourceUrl}${license}`;
+  });
+  return `\n\nSource credits:\n${lines.join("\n")}`;
+}
 
 function getPublisherProvider(config: RunnableConfig): PublisherProvider {
   const inject = (config.configurable ?? {}) as Record<string, unknown>;
@@ -28,7 +50,7 @@ export async function publisherNode(
 }> {
   const videoUrl = state.video?.videoUrl;
   const title = state.metadataOutput?.title;
-  const description = state.metadataOutput?.description ?? "";
+  const description = `${state.metadataOutput?.description ?? ""}${sourceCredits(state)}`;
   const tags = state.metadataOutput?.tags ?? [];
   const hashtags = state.metadataOutput?.hashtags ?? [];
   const category = state.metadataOutput?.category ?? "";

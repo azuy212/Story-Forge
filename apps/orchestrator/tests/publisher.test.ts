@@ -103,6 +103,34 @@ describe("publisherNode", () => {
     expect(mockPublish).toHaveBeenCalledTimes(2);
   });
 
+  it("includes source credits in published description", async () => {
+    mockPublish.mockResolvedValueOnce(buildPublishResponse("youtube"));
+
+    const { promise } = runNode({
+      production: {
+        scenes: [{ sceneId: 1, sourceAssetIds: ["source-1"] }],
+        sourceAssets: [
+          {
+            id: "source-1",
+            url: "https://upload.wikimedia.org/source.png",
+            source: "Wikimedia Commons",
+            sourcePageUrl: "https://commons.wikimedia.org/wiki/File:Source.png",
+            license: "CC BY-SA 4.0",
+            licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0/",
+            title: "Source portrait",
+          },
+        ],
+      } as any,
+    });
+    await promise;
+
+    expect(mockPublish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: expect.stringContaining("Source credits:"),
+      }),
+    );
+  });
+
   it("missing videoUrl silently no-ops", async () => {
     const { promise } = runNode({ video: {} } as any);
     const result = await promise;

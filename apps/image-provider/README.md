@@ -70,6 +70,11 @@ pnpm cli server --port 3000
 ```
 
 - `type`: `image` (default) or `video`.
+- `mode`: `text_to_image` (default), `image_to_image`, or `edit`.
+- `referenceImages`: optional image references as `{ id, filename, mime, base64 }`;
+  maximum 4 images and 10 MiB decoded bytes per image. Request body limit is 64 MiB.
+- Reference images are uploaded through Gemini's `Upload & tools` control and are
+  included in the generation cache key.
 - Send `Accept: application/json` for a structured response, otherwise the first
   generated asset is returned with the correct content type.
 
@@ -150,8 +155,9 @@ outputs/
 ## Caching
 
 Generated assets are cached under `CACHE_DIR` (default `./cache`), keyed by a
-hash of the exact prompt and asset type. If a request matches a cached entry
-(validated by exact prompt **and** asset type), the stored assets are returned
+hash of the exact prompt, asset type, generation mode, and reference image
+contents. If a request matches a cached entry (validated by exact prompt,
+asset type, mode, and references), the stored assets are returned
 instead of regenerating — in both CLI and server mode. The server never starts
 the browser for a cache hit.
 
@@ -198,7 +204,7 @@ src/
   retry.ts            Async retry with exponential backoff
   prompt-reader.ts    Read prompts from file
   asset-downloader.ts Save images/videos + metadata.json
-  cache.ts            Persistent asset cache (exact prompt + type match)
+  cache.ts            Persistent asset cache (exact request match)
   types.ts            Shared types (asset type, assets, generation result)
   gemini-client.ts    Playwright automation logic
   cli.ts              Commander-based CLI entry point
@@ -211,10 +217,12 @@ Key design decisions:
 - **Persistent browser profile** — sign into Gemini once; session survives restarts.
 - **Create-mode selection** — image/video requests toggle the matching option
   (`Create image` / `Create video`) in Gemini's "+" menu before submitting.
+- Reference images are uploaded through the same menu before the prompt is sent.
 - **No arbitrary sleep() calls** — all waits use locators, DOM mutation observers, or network events.
 - **Network response interception** — captures image and video binaries as they load, avoiding re-downloads.
 - **Blob URL support** — if Gemini serves assets as blob: URLs, fetches them via page context.
-- **Exact-match caching** — cache keys hash the exact prompt + asset type; validation rejects mismatched metadata.
+- **Exact-match caching** — cache keys hash the exact prompt, asset type, mode,
+  and reference image contents; validation rejects mismatched metadata.
 - **Lazy browser startup** — the server only launches the browser when a request misses the cache.
 - **Error detection** — scans for content policy, rate limit, and generation failure messages.
 - **Graceful shutdown** — SIGINT/SIGTERM closes browser cleanly.

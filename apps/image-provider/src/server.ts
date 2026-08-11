@@ -6,12 +6,55 @@ import { Logger } from './logger';
 import { loadConfig, type Config } from './config';
 import { GeminiClient } from './gemini-client';
 import { detectMediaExt, extToMime } from './asset-downloader';
-import type { AssetType, GenerationResult } from './types';
+import type { AssetType, GenerationOptions, GenerationResult } from './types';
 
-const GenerateRequestSchema = z.object({
-  prompt: z.string().min(1, 'Prompt is required').max(1000, 'Prompt too long'),
-  type: z.enum(['image', 'video']).optional().default('image'),
+export const MAX_REFERENCE_IMAGE_BYTES = 10 * 1024 * 1024;
+export const MAX_REFERENCE_REQUEST_BYTES = 64 * 1024 * 1024;
+
+function decodeBase64(value: string): Buffer | null {
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value)) return null;
+
+  const unpadded = value.replace(/=+$/, '');
+  if (unpadded.length % 4 === 1) return null;
+
+  const normalized = unpadded + '='.repeat((4 - (unpadded.length % 4)) % 4);
+  const decoded = Buffer.from(normalized, 'base64');
+  const canonical = decoded.toString('base64').replace(/=+$/, '');
+  return canonical === unpadded && decoded.length > 0 ? decoded : null;
+}
+
+const ReferenceImageSchema = z.object({
+  id: z.string().min(1),
+  filename: z.string().min(1),
+  mime: z.string().regex(/^image\//),
+  base64: z.string().min(1),
 });
+
+export const GenerateRequestSchema = z
+  .object({
+    prompt: z.string().min(1, 'Prompt is required').max(1000, 'Prompt too long'),
+    type: z.enum(['image', 'video']).optional().default('image'),
+    mode: z.enum(['text_to_image', 'image_to_image', 'edit']).optional().default('text_to_image'),
+    referenceImages: z.array(ReferenceImageSchema).max(4).optional().default([]),
+  })
+  .superRefine((request, ctx) => {
+    request.referenceImages.forEach((reference, index) => {
+      const decoded = decodeBase64(reference.base64);
+      if (!decoded) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['referenceImages', index, 'base64'],
+          message: 'Reference image must contain valid Base64 data',
+        });
+      } else if (decoded.byteLength > MAX_REFERENCE_IMAGE_BYTES) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['referenceImages', index, 'base64'],
+          message: `Reference image exceeds ${MAX_REFERENCE_IMAGE_BYTES} raw bytes`,
+        });
+      }
+    });
+  });
 
 type GenerateRequest = z.infer<typeof GenerateRequestSchema>;
 
@@ -32,7 +75,10 @@ function buildMediaPayload(result: GenerationResult): MediaPayload[] {
 export async function startServer(config: Config, port: number): Promise<void> {
   const logger = new Logger(config.logLevel);
 
-  const app = Fastify({ logger: false });
+  const app = Fastify({
+    logger: false,
+    bodyLimit: MAX_REFERENCE_REQUEST_BYTES,
+  });
 
   await app.register(cors, {
     origin: true,
@@ -102,15 +148,16 @@ export async function startServer(config: Config, port: number): Promise<void> {
       });
     }
 
-    const { prompt, type } = result.data;
+    const { prompt, type, mode, referenceImages } = result.data;
     const assetType: AssetType = type;
+    const options: GenerationOptions = { mode, referenceImages };
 
     logger.info('Generating asset', {
       prompt: prompt.substring(0, 60),
       assetType,
     });
 
-    if (!(await client.isCached(prompt, assetType))) {
+    if (!(await client.isCached(prompt, assetType, options))) {
       try {
         await ensureBrowser();
       } catch (error) {
@@ -120,7 +167,7 @@ export async function startServer(config: Config, port: number): Promise<void> {
       }
     }
 
-    const generation = await client.generate(prompt, assetType);
+    const generation = await client.generate(prompt, assetType, options);
 
     if (generation.assets.length === 0) {
       return reply.status(500).send({ error: 'No assets generated' });
@@ -164,7 +211,9 @@ export async function startServer(config: Config, port: number): Promise<void> {
   logger.info(`API server ready at http://localhost:${port}`);
   logger.info('Endpoints:');
   logger.info('  GET  /health');
-  logger.info('  POST /generate  body: { "prompt": "...", "type": "image|video" }');
+  logger.info(
+    '  POST /generate  body: { "prompt": "...", "type": "image|video", "mode": "text_to_image|image_to_image|edit", "referenceImages": [] }',
+  );
 }
 
 async function main(): Promise<void> {
