@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type {
   ProjectState,
@@ -14,12 +15,32 @@ import type {
 import { FfmpegComposerProvider } from "../providers/composer/ffmpeg-composer.provider.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
 import { getArtifactNamespace } from "../artifacts/context.js";
+import {
+  resolveBranding,
+  resolveBrandingAssetPath,
+  type ResolvedBranding,
+} from "../utils/branding.js";
+import { config as appConfig } from "../utils/config.js";
 
 const DEFAULT_PROVIDER = new FfmpegComposerProvider();
 
 const FRAME_RATE = 30;
 const MIN_SCALE_FACTOR = 0.5;
 const MAX_SCALE_FACTOR = 2.0;
+
+async function brandingAssetFingerprint(
+  branding: ResolvedBranding,
+): Promise<string> {
+  if (!branding.enabled) return "disabled";
+
+  try {
+    const assetPath = resolveBrandingAssetPath(branding.outroAsset);
+    const stat = await fs.stat(assetPath);
+    return `${assetPath}:${stat.size}:${stat.mtimeMs}`;
+  } catch {
+    return `${branding.outroAsset}:missing`;
+  }
+}
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -170,6 +191,9 @@ export async function videoComposerNode(
     durationSeconds: s.durationSeconds ?? 0,
   }));
   const totalDurationSeconds = targetMs / 1000;
+  const branding = resolveBranding(state.branding);
+  const narrativeHoldSeconds = appConfig.narrativeHoldSeconds();
+  const outroAssetFingerprint = await brandingAssetFingerprint(branding);
 
   const provider = getComposerProvider(config);
 
@@ -186,10 +210,11 @@ export async function videoComposerNode(
         narrationUrl: state.audio!.narrationUrl!,
         srt: state.subtitles!.srt!,
         totalDurationSeconds,
+        narrativeHoldSeconds,
         narrationDurationMs: targetMs,
         branding: {
-          channel: state.branding?.channel,
-          logo: state.branding?.logo,
+          ...branding,
+          outroAssetFingerprint,
         },
       },
     },
@@ -200,9 +225,15 @@ export async function videoComposerNode(
           narrationUrl: state.audio!.narrationUrl!,
           srt: state.subtitles!.srt!,
           totalDurationSeconds,
+          narrativeHoldSeconds,
           branding: {
-            channel: state.branding?.channel,
+            channel: branding.channel,
             logo: state.branding?.logo,
+            enabled: branding.enabled,
+            outroAsset: branding.outroAsset,
+            ctaEnabled: branding.ctaEnabled,
+            outroCta: branding.outroCta,
+            outroContainsCta: branding.outroContainsCta,
           },
           runId: getArtifactNamespace(config, state),
         });
@@ -212,6 +243,12 @@ export async function videoComposerNode(
             videoUrl: composeResult.videoUrl,
             durationMs: composeResult.durationMs,
             resolution: composeResult.resolution,
+            timeline: composeResult.timeline ?? {
+              narrativeDurationMs: targetMs,
+              narrativeHoldMs: narrativeHoldSeconds * 1000,
+              outroDurationMs: 0,
+              durationMs: composeResult.durationMs,
+            },
             composedAt: new Date().toISOString(),
           },
         };

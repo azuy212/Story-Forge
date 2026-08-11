@@ -195,6 +195,11 @@ function buildResponse(overrides?: {
                   "What if a country officially wasn't real? The nation has no borders...",
                 callToAction: "Follow @UniverseDecoded for more.",
                 estimatedDurationSeconds: 42,
+                ending: {
+                  type: "open_question",
+                  narration: "The nation has no borders...",
+                  visualDirection: "Hold on the empty map.",
+                },
               },
             }),
         },
@@ -226,9 +231,8 @@ describe("scriptWriterNode", () => {
     expect(result.content?.narration).toContain(
       "What if a country officially wasn't real?",
     );
-    expect(result.content?.callToAction).toBe(
-      "Follow @UniverseDecoded for more.",
-    );
+    expect(result.content?.callToAction).toBe("Subscribe");
+    expect(result.content?.ending?.type).toBe("open_question");
     expect(result.content?.estimatedDurationSeconds).toBe(42);
     expect(result.execution?.currentNode).toBe("ScriptWriter");
     expect(result.diagnostics?.telemetry?.ScriptWriter).toBeDefined();
@@ -262,6 +266,18 @@ describe("scriptWriterNode", () => {
     expect(userMsg!.content).toContain("Beat 1");
     expect(userMsg!.content).toContain("GeoFacts");
     expect(userMsg!.content).toContain("Subscribe");
+  });
+
+  it("uses configured CTA instead of model CTA", async () => {
+    mockGenerate.mockResolvedValue(buildResponse());
+
+    const { promise } = runNode();
+    const result = await promise;
+
+    expect(result.content?.callToAction).toBe("Subscribe");
+    expect(result.content?.callToAction).not.toBe(
+      "Follow @UniverseDecoded for more.",
+    );
   });
 
   it("uses json_object response format", async () => {

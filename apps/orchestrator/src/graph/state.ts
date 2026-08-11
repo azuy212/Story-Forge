@@ -18,6 +18,7 @@ import type {
   Publishing,
   ResearchQAOutput,
 } from "../types/index.js";
+import { DEFAULT_BRANDING } from "../utils/branding.js";
 
 function merge<T>(current: T, update: Partial<T>): T {
   return { ...current, ...update };
@@ -38,7 +39,7 @@ function mergeDiagnostics(
 const defaultContent: Content = {};
 const defaultResearch: Research = {};
 const defaultProduction: Production = { scenes: [] };
-const defaultBranding: Branding = { channel: "", creator: "", cta: "" };
+const defaultBranding: Branding = DEFAULT_BRANDING;
 const defaultDiagnostics: Diagnostics = {
   errors: [],
   warnings: [],

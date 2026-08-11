@@ -36,4 +36,8 @@ export const config = {
   enableReleaseQA: (): boolean =>
     read("ENABLE_RELEASE_QA") === "true" || read("ENABLE_QA") === "true",
   supportsVideoAssets: (): boolean => read("ENABLE_VIDEO_ASSETS") === "true",
+  narrativeHoldSeconds: (): number => {
+    const value = Number(read("NARRATIVE_HOLD_SECONDS") ?? "0.5");
+    return Number.isFinite(value) && value >= 0 ? value : 0.5;
+  },
 };

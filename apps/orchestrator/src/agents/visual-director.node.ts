@@ -43,6 +43,18 @@ function tokenize(s: string): string[] {
     .filter(Boolean);
 }
 
+function endsWithTokens(source: string, suffix: string): boolean {
+  const sourceTokens = tokenize(source);
+  const suffixTokens = tokenize(suffix);
+  if (suffixTokens.length === 0 || suffixTokens.length > sourceTokens.length) {
+    return false;
+  }
+  return suffixTokens.every(
+    (word, index) =>
+      sourceTokens[sourceTokens.length - suffixTokens.length + index] === word,
+  );
+}
+
 /**
  * Fraction of `target` words found, in order, as a subsequence of `source`.
  * forward(source, concat) ~ 1 means nothing was dropped;
@@ -88,7 +100,8 @@ function splitNarrationProportional(
   const total = proportions.reduce((a, b) => a + b, 0);
   if (total <= 0) return Array.from({ length: proportions.length }, () => "");
   const words = narration.match(/\S+\s*/g) ?? [];
-  if (words.length === 0) return Array.from({ length: proportions.length }, () => "");
+  if (words.length === 0)
+    return Array.from({ length: proportions.length }, () => "");
 
   const targets = Array.from({ length: proportions.length }, () => 0);
   let acc = 0;
@@ -253,6 +266,7 @@ export async function visualDirectorNode(
   execution: Partial<Execution>;
 }> {
   const { title, narration, estimatedDurationSeconds } = state.content ?? {};
+  const ending = state.content?.ending;
   const researchSummary = state.research?.summary;
   const approvedFacts = state.research?.facts;
   const channel = state.branding?.channel;
@@ -306,6 +320,8 @@ export async function visualDirectorNode(
     variables: {
       title: title ?? "",
       narration: narration ?? "",
+      endingNarration: ending?.narration ?? "",
+      endingVisualDirection: ending?.visualDirection ?? "",
       estimatedDurationSeconds: String(estimatedDurationSeconds ?? 50),
       researchSummary: researchSummary ?? "",
       approvedFacts: formatFacts(approvedFacts),
@@ -388,6 +404,35 @@ export async function visualDirectorNode(
     normalized.map((s) => s.narration),
     estimatedDurationSeconds ?? 50,
   );
+
+  if (
+    ending &&
+    (!endsWithTokens(normalized.at(-1)?.narration ?? "", ending.narration) ||
+      !["payoff", "reflection"].includes(
+        normalized.at(-1)?.emotionalBeat ?? "",
+      ))
+  ) {
+    const feedback =
+      "Final visual scene must contain exact narrative ending and use emotionalBeat payoff or reflection.";
+    return {
+      production: {
+        scenes: [],
+        directorReview: { status: "minor_revision", feedback },
+      },
+      diagnostics: {
+        errors: [`${AgentModel.VisualDirector}: ${feedback}`],
+        warnings,
+        telemetry: { [AgentModel.VisualDirector]: result.telemetry },
+      },
+      execution: {
+        currentNode: AgentModel.VisualDirector,
+        retryCount: {
+          ...state.execution?.retryCount,
+          VisualDirector: retryCount,
+        },
+      },
+    };
+  }
 
   const scenes: Scene[] = normalized.map((s, i) => ({
     sceneId: s.sceneId,

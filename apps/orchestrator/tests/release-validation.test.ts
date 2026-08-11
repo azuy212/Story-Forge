@@ -111,6 +111,30 @@ describe("releaseValidationNode", () => {
     expect(result.execution?.currentNode).toBe("ReleaseValidation");
   });
 
+  it("validates final media against composer timeline duration", async () => {
+    const result = await runNode(
+      {
+        video: {
+          videoUrl: "https://placeholder.local/final.mp4",
+          durationMs: 20505,
+          resolution: "1080x1920",
+          timeline: {
+            narrativeDurationMs: 10000,
+            narrativeHoldMs: 500,
+            outroDurationMs: 10005,
+            durationMs: 20505,
+          },
+        },
+      },
+      async () => ({ ...GOOD_PROBE, duration: 20.505 }),
+    );
+
+    expect(result.releaseValidation.status).toBe("approved");
+    expect(result.releaseValidation.validations).toContain(
+      "Video duration matches composer timeline",
+    );
+  });
+
   it("fatal when videoUrl missing", async () => {
     const result = await runNode({ video: {} } as any);
     expect(result.releaseValidation.status).toBe("fatal");

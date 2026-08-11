@@ -4,8 +4,16 @@ export type { ProjectState, ProjectStateOutput } from "./project-state.js";
 export { ProjectSchema } from "./project.js";
 export type { ProjectInfo } from "./project.js";
 
-export { ContentSchema } from "./content.js";
-export type { Content } from "./content.js";
+export {
+  ContentSchema,
+  NarrativeEndingSchema,
+  NarrativeEndingTypeEnum,
+} from "./content.js";
+export type {
+  Content,
+  NarrativeEnding,
+  NarrativeEndingType,
+} from "./content.js";
 
 export { ResearchSchema } from "./research.js";
 export type { Research } from "./research.js";
@@ -20,7 +28,11 @@ export type { Production, Scene } from "./production.js";
 export { BrandingSchema } from "./branding.js";
 export type { Branding } from "./branding.js";
 
-export { DiagnosticsSchema, ScoresSchema, NodeTelemetrySchema } from "./diagnostics.js";
+export {
+  DiagnosticsSchema,
+  ScoresSchema,
+  NodeTelemetrySchema,
+} from "./diagnostics.js";
 export type { Diagnostics, Scores, NodeTelemetry } from "./diagnostics.js";
 
 export { ScriptQAOutputSchema } from "./script-qa-output.js";

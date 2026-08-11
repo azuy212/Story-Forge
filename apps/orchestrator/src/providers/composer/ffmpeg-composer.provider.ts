@@ -28,6 +28,7 @@ import type {
 import { logger } from "../../utils/logger.js";
 import { DEFAULT_MAX_RETRIES } from "../../utils/constants.js";
 import { hashObject } from "../../artifacts/hash.js";
+import { resolveBrandingAssetPath } from "../../utils/branding.js";
 
 export interface VideoConfig {
   width: number;
@@ -83,6 +84,7 @@ type ResolvedConfig = {
 };
 
 const DEFAULT_ENCODER = ENCODERS.libx264;
+const OUTRO_CTA_SAFE_AREA_Y = 0.86;
 
 async function concurrentMap<T, R>(
   items: T[],
@@ -112,6 +114,14 @@ async function concurrentMap<T, R>(
   const failed = settled.find((r) => r.status === "rejected");
   if (failed) throw (failed as PromiseRejectedResult).reason;
   return results;
+}
+
+function escapeDrawtextText(text: string): string {
+  return text
+    .replace(/\\/g, "\\\\")
+    .replace(/:/g, "\\:")
+    .replace(/'/g, "\\'")
+    .replace(/%/g, "\\%");
 }
 
 export class FfmpegComposerProvider implements ComposerProvider {
@@ -183,8 +193,8 @@ export class FfmpegComposerProvider implements ComposerProvider {
       const srtPath = opts.srt
         ? await this.prepareSrt(opts.srt, workDir)
         : null;
-      const logoPath = opts.branding?.logo
-        ? await this.prepareLogo(opts.branding.logo, workDir)
+      const branding = opts.branding?.enabled
+        ? await this.prepareBranding(opts, workDir, signal)
         : null;
 
       updateProgress("Normalizing", 10, `${opts.scenes.length} scenes`);
@@ -198,52 +208,52 @@ export class FfmpegComposerProvider implements ComposerProvider {
       updateProgress("Concatenating", 30);
       const concatVideo = await this.buildConcatVideo(sceneVideos, signal);
 
-      const concatInfo = await probe(concatVideo);
+      const narrativeVideo = await this.addNarrativeHold(
+        concatVideo,
+        opts.narrativeHoldSeconds ?? 0,
+        workDir,
+        signal,
+      );
+
+      const concatInfo = await probe(narrativeVideo);
       const totalDurationMs = concatInfo.duration * 1000;
 
       updateProgress("Audio", 45);
       const audioVideo = await this.addAudio(
-        concatVideo,
+        narrativeVideo,
         opts.narrationUrl,
         workDir,
         signal,
         totalDurationMs,
       );
 
+      const finalBaseVideo = branding
+        ? await this.appendOutro(audioVideo, branding.path, workDir, signal)
+        : audioVideo;
+      const finalBaseInfo = await probe(finalBaseVideo);
+      const finalDurationMs = finalBaseInfo.duration * 1000;
+
       if (srtPath) {
         updateProgress("Subtitles", 60);
       }
       const subbedVideo = srtPath
         ? await this.burnSubtitlesStep(
-            audioVideo,
+            finalBaseVideo,
             srtPath,
             workDir,
             signal,
-            totalDurationMs,
+            finalDurationMs,
           )
-        : audioVideo;
-
-      if (logoPath) {
-        updateProgress("Watermark", 75);
-      }
-      const watermarkedVideo = logoPath
-        ? await this.watermarkStep(
-            subbedVideo,
-            logoPath,
-            workDir,
-            signal,
-            totalDurationMs,
-          )
-        : subbedVideo;
+        : finalBaseVideo;
 
       updateProgress("Exporting", 90);
       const exportDir = opts.runId
         ? path.join(this.config.outputDir, opts.runId)
         : this.config.outputDir;
       const finalVideo = await this.exportVideo(
-        watermarkedVideo,
+        subbedVideo,
         signal,
-        totalDurationMs,
+        finalDurationMs,
         exportDir,
       );
 
@@ -253,7 +263,19 @@ export class FfmpegComposerProvider implements ComposerProvider {
 
       const { durationMs, resolution } = await this.getOutputInfo(finalVideo);
 
-      return { videoUrl: finalVideo, durationMs, resolution };
+      return {
+        videoUrl: finalVideo,
+        durationMs,
+        resolution,
+        timeline: {
+          narrativeDurationMs: Math.round(
+            (opts.totalDurationSeconds ?? 0) * 1000,
+          ),
+          narrativeHoldMs: Math.round((opts.narrativeHoldSeconds ?? 0) * 1000),
+          outroDurationMs: branding?.durationMs ?? 0,
+          durationMs,
+        },
+      };
     } finally {
       try {
         await cleanupTempDir(workDir);
@@ -316,8 +338,28 @@ export class FfmpegComposerProvider implements ComposerProvider {
       );
     }
 
-    if (opts.branding?.logo) {
-      fileChecks.push(this.requireFileExists(opts.branding.logo, "Logo file"));
+    if (opts.branding?.enabled) {
+      if (!opts.branding.outroAsset) {
+        errors.push("Branding is enabled but branding.outroAsset is missing");
+      } else {
+        fileChecks.push(
+          (async () => {
+            try {
+              const outroPath = resolveBrandingAssetPath(
+                opts.branding!.outroAsset!,
+              );
+              const outroInfo = await probe(outroPath);
+              if (!outroInfo.hasVideo || outroInfo.duration <= 0) {
+                errors.push(`Branding outro has no usable video: ${outroPath}`);
+              }
+            } catch (err) {
+              errors.push(
+                `Branding outro validation failed: ${(err as Error)?.message ?? String(err)}`,
+              );
+            }
+          })(),
+        );
+      }
     }
 
     if (this.config.backgroundMusicPath) {
@@ -369,14 +411,134 @@ export class FfmpegComposerProvider implements ComposerProvider {
     return srtPath;
   }
 
-  private async prepareLogo(
-    logoPath: string,
+  private async prepareBranding(
+    opts: ComposeOptions,
     workDir: string,
+    signal?: AbortSignal,
+  ): Promise<{ path: string; durationMs: number }> {
+    const configuredAsset = opts.branding?.outroAsset;
+    if (!configuredAsset) {
+      throw new Error("Branding is enabled but branding.outroAsset is missing");
+    }
+
+    const sourcePath = resolveBrandingAssetPath(configuredAsset);
+    const sourceInfo = await probe(sourcePath);
+    const durationSeconds = sourceInfo.duration;
+    const outputPath = path.join(workDir, "branding-outro.mp4");
+    const videoFilter = [
+      `scale=${this.config.video.width}:${this.config.video.height}:force_original_aspect_ratio=decrease`,
+      `pad=${this.config.video.width}:${this.config.video.height}:(ow-iw)/2:(oh-ih)/2`,
+      "setsar=1",
+      `fps=${this.config.video.fps}`,
+      "format=yuv420p",
+      ...(opts.branding?.ctaEnabled &&
+      !opts.branding.outroContainsCta &&
+      opts.branding.outroCta
+        ? [
+            // CTA is deterministic, centered in lower safe area, and below
+            // the supplied animation's existing "by Zain" lockup. Never add
+            // channel name or handle here; outro animation owns branding.
+            `drawtext=font='${this.config.subtitleFontName}':text='${escapeDrawtextText(opts.branding.outroCta)}':fontsize=${Math.max(18, this.config.subtitleFontSize)}:fontcolor=white:borderw=2:bordercolor=black@0.8:box=1:boxcolor=black@0.35:boxborderw=12:x=(w-text_w)/2:y=h*${OUTRO_CTA_SAFE_AREA_Y}`,
+          ]
+        : []),
+    ].join(",");
+
+    const args = [
+      "-y",
+      "-i",
+      sourcePath,
+      ...(sourceInfo.hasAudio
+        ? []
+        : [
+            "-f",
+            "lavfi",
+            "-t",
+            String(durationSeconds),
+            "-i",
+            "anullsrc=channel_layout=stereo:sample_rate=48000",
+          ]),
+      "-filter_complex",
+      `[0:v]${videoFilter}[outv]`,
+      "-map",
+      "[outv]",
+      "-map",
+      sourceInfo.hasAudio ? "0:a:0" : "1:a:0",
+      "-t",
+      String(durationSeconds),
+      "-c:v",
+      this.config.encoder.encoder,
+      "-crf",
+      String(this.config.encoder.crf),
+      "-preset",
+      this.config.encoder.preset,
+      "-c:a",
+      "aac",
+      "-ar",
+      "48000",
+      "-ac",
+      "2",
+      "-pix_fmt",
+      "yuv420p",
+    ];
+    if (this.config.encoder.extraArgs)
+      args.push(...this.config.encoder.extraArgs);
+    args.push(outputPath);
+
+    await runFfmpegWithRetry(
+      args,
+      "prepare canonical branding outro",
+      DEFAULT_MAX_RETRIES,
+      undefined,
+      signal,
+      durationSeconds * 1000,
+    );
+
+    const normalizedInfo = await probe(outputPath);
+    return {
+      path: outputPath,
+      durationMs: Math.round(normalizedInfo.duration * 1000),
+    };
+  }
+
+  private async addNarrativeHold(
+    videoPath: string,
+    holdSeconds: number,
+    workDir: string,
+    signal?: AbortSignal,
   ): Promise<string> {
-    const ext = path.extname(logoPath) || ".png";
-    const dest = path.join(workDir, `logo${ext}`);
-    await fs.copyFile(logoPath, dest);
-    return dest;
+    if (holdSeconds <= 0) return videoPath;
+    const inputInfo = await probe(videoPath);
+    const outputPath = path.join(workDir, "narrative-hold.mp4");
+    const args = [
+      "-y",
+      "-i",
+      videoPath,
+      "-vf",
+      `tpad=stop_mode=clone:stop_duration=${holdSeconds}`,
+      "-t",
+      String(inputInfo.duration + holdSeconds),
+      "-c:v",
+      this.config.encoder.encoder,
+      "-crf",
+      String(this.config.encoder.crf),
+      "-preset",
+      this.config.encoder.preset,
+      "-pix_fmt",
+      "yuv420p",
+      "-an",
+    ];
+    if (this.config.encoder.extraArgs)
+      args.push(...this.config.encoder.extraArgs);
+    args.push(outputPath);
+    await runFfmpegWithRetry(
+      args,
+      "hold final narrative visual",
+      DEFAULT_MAX_RETRIES,
+      undefined,
+      signal,
+      inputInfo.duration * 1000,
+    );
+    return outputPath;
   }
 
   private async normalizeAssets(
@@ -478,15 +640,16 @@ export class FfmpegComposerProvider implements ComposerProvider {
     if (this.config.backgroundMusicPath) {
       const bgmVolume = this.config.bgmVolume;
       const mode = this.config.audioDurationMode;
-      const mixDuration = this.config.audioMixDuration;
 
-      const amixFilter = `[narr][music]amix=inputs=2:duration=${mixDuration}${mode === "pad" ? ",apad" : ""}[outa]`;
+      const amixFilter = `[narr][music]amix=inputs=2:duration=longest:dropout_transition=2${mode === "pad" ? ",apad" : ""}[outa]`;
       const args = [
         "-y",
         "-i",
         videoPath,
         "-i",
         narrationUrl,
+        "-stream_loop",
+        "-1",
         "-i",
         this.config.backgroundMusicPath,
         "-filter_complex",
@@ -532,12 +695,8 @@ export class FfmpegComposerProvider implements ComposerProvider {
         "1:a:0",
       ];
 
-      // Properly handle padding vs shortest
-      if (this.config.audioDurationMode === "pad") {
-        args.push("-af", "apad");
-      }
-      // We must use -shortest in both cases. If pad is used, apad makes audio infinite, so -shortest cuts it to video length.
-      // If shortest is used, it cuts to whichever is shorter (video or narration).
+      // Pad narration through the hold so -shortest ends with video, not voice.
+      args.push("-af", "apad");
       args.push("-shortest", outputPath);
 
       await runFfmpegWithRetry(
@@ -550,6 +709,60 @@ export class FfmpegComposerProvider implements ComposerProvider {
       );
     }
 
+    return outputPath;
+  }
+
+  private async appendOutro(
+    narrativeVideoPath: string,
+    outroPath: string,
+    workDir: string,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const outputPath = path.join(workDir, "timeline-with-outro.mp4");
+    const enc = this.config.encoder;
+    const args = [
+      "-y",
+      "-i",
+      narrativeVideoPath,
+      "-i",
+      outroPath,
+      "-filter_complex",
+      [
+        "[0:v]settb=AVTB,setpts=PTS-STARTPTS[v0]",
+        "[1:v]settb=AVTB,setpts=PTS-STARTPTS[v1]",
+        "[0:a]aresample=48000[a0]",
+        "[1:a]aresample=48000[a1]",
+        "[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
+      ].join(";"),
+      "-map",
+      "[outv]",
+      "-map",
+      "[outa]",
+      "-c:v",
+      enc.encoder,
+      "-crf",
+      String(enc.crf),
+      "-preset",
+      enc.preset,
+      "-c:a",
+      "aac",
+      "-ar",
+      "48000",
+      "-ac",
+      "2",
+      "-pix_fmt",
+      "yuv420p",
+    ];
+    if (enc.extraArgs) args.push(...enc.extraArgs);
+    args.push(outputPath);
+
+    await runFfmpegWithRetry(
+      args,
+      "append canonical branding outro",
+      DEFAULT_MAX_RETRIES,
+      undefined,
+      signal,
+    );
     return outputPath;
   }
 
@@ -597,55 +810,6 @@ export class FfmpegComposerProvider implements ComposerProvider {
     await runFfmpegWithRetry(
       args,
       "burn subtitles",
-      DEFAULT_MAX_RETRIES,
-      undefined,
-      signal,
-      totalDurationMs,
-    );
-    return outputPath;
-  }
-
-  private async watermarkStep(
-    videoPath: string,
-    logoPath: string,
-    workDir: string,
-    signal?: AbortSignal,
-    totalDurationMs?: number,
-  ): Promise<string> {
-    const outputPath = path.join(workDir, "watermarked.mp4");
-    const enc = this.config.encoder;
-
-    const args = [
-      "-y",
-      "-i",
-      videoPath,
-      "-i",
-      logoPath,
-      "-filter_complex",
-      `[1:v]scale='min(iw,150)':'min(ih,150)':force_original_aspect_ratio=decrease,format=rgba[logo];[0:v][logo]overlay=main_w-overlay_w-20:main_h-overlay_h-20[outv]`,
-      "-map",
-      "[outv]",
-      // Explicitly map audio (optional flag ? so it doesn't fail if somehow missing)
-      "-map",
-      "0:a:0?",
-      "-c:v",
-      enc.encoder,
-      "-crf",
-      String(enc.crf),
-      "-preset",
-      enc.preset,
-      "-c:a",
-      "copy",
-      "-pix_fmt",
-      "yuv420p",
-    ];
-
-    if (enc.extraArgs) args.push(...enc.extraArgs);
-    args.push(outputPath);
-
-    await runFfmpegWithRetry(
-      args,
-      "apply watermark",
       DEFAULT_MAX_RETRIES,
       undefined,
       signal,

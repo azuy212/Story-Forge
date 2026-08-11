@@ -39,6 +39,7 @@ export async function validatePackage(
   const scenes = state.production?.scenes ?? [];
   const estimated = state.content?.estimatedDurationSeconds;
   const narrationMs = state.audio?.narrationDurationMs;
+  const timeline = state.video?.timeline;
 
   // --- Artifact existence ---
   check(!!state.video?.videoUrl, "Final video exists");
@@ -210,7 +211,21 @@ export async function validatePackage(
         );
       }
 
-      if (narrationMs) {
+      if (timeline) {
+        check(
+          timeline.durationMs > 0 &&
+            timeline.narrativeDurationMs >= 0 &&
+            timeline.narrativeHoldMs >= 0 &&
+            timeline.outroDurationMs >= 0,
+          "Composer timeline metadata present",
+        );
+        const actualMs = Math.round(info.duration * 1000);
+        check(
+          Math.abs(actualMs - timeline.durationMs) <= PROBE_TOLERANCE_MS,
+          "Video duration matches composer timeline",
+          `${actualMs}ms vs timeline ${timeline.durationMs}ms`,
+        );
+      } else if (narrationMs) {
         const actualMs = Math.round(info.duration * 1000);
         check(
           Math.abs(actualMs - narrationMs) <= PROBE_TOLERANCE_MS,
