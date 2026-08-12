@@ -64,6 +64,7 @@ export interface FfmpegComposerConfig {
   fastSeek?: boolean;
   encoder?: EncoderConfig | string;
   outputDir?: string;
+  outroTransitionDuration?: number;
 }
 
 type ResolvedConfig = {
@@ -81,6 +82,7 @@ type ResolvedConfig = {
   fastSeek: boolean;
   encoder: EncoderConfig;
   outputDir: string;
+  outroTransitionDuration: number;
 };
 
 const DEFAULT_ENCODER = ENCODERS.libx264;
@@ -162,6 +164,7 @@ export class FfmpegComposerProvider implements ComposerProvider {
       encoder,
       outputDir:
         config?.outputDir ?? path.join(process.cwd(), "output", "composed"),
+      outroTransitionDuration: config?.outroTransitionDuration ?? 0.5,
     };
   }
 
@@ -227,9 +230,10 @@ export class FfmpegComposerProvider implements ComposerProvider {
         totalDurationMs,
       );
 
-      const finalBaseVideo = branding
+      const finalBase = branding
         ? await this.appendOutro(audioVideo, branding.path, workDir, signal)
-        : audioVideo;
+        : null;
+      const finalBaseVideo = finalBase?.path ?? audioVideo;
       const finalBaseInfo = await probe(finalBaseVideo);
       const finalDurationMs = finalBaseInfo.duration * 1000;
 
@@ -238,12 +242,12 @@ export class FfmpegComposerProvider implements ComposerProvider {
       }
       const subbedVideo = srtPath
         ? await this.burnSubtitlesStep(
-            finalBaseVideo,
-            srtPath,
-            workDir,
-            signal,
-            finalDurationMs,
-          )
+          finalBaseVideo,
+          srtPath,
+          workDir,
+          signal,
+          finalDurationMs,
+        )
         : finalBaseVideo;
 
       updateProgress("Exporting", 90);
@@ -273,6 +277,7 @@ export class FfmpegComposerProvider implements ComposerProvider {
           ),
           narrativeHoldMs: Math.round((opts.narrativeHoldSeconds ?? 0) * 1000),
           outroDurationMs: branding?.durationMs ?? 0,
+          outroTransitionMs: finalBase?.transitionDurationMs ?? 0,
           durationMs,
         },
       };
@@ -432,14 +437,14 @@ export class FfmpegComposerProvider implements ComposerProvider {
       `fps=${this.config.video.fps}`,
       "format=yuv420p",
       ...(opts.branding?.ctaEnabled &&
-      !opts.branding.outroContainsCta &&
-      opts.branding.outroCta
+        !opts.branding.outroContainsCta &&
+        opts.branding.outroCta
         ? [
-            // CTA is deterministic, centered in lower safe area, and below
-            // the supplied animation's existing "by Zain" lockup. Never add
-            // channel name or handle here; outro animation owns branding.
-            `drawtext=font='${this.config.subtitleFontName}':text='${escapeDrawtextText(opts.branding.outroCta)}':fontsize=${Math.max(18, this.config.subtitleFontSize)}:fontcolor=white:borderw=2:bordercolor=black@0.8:box=1:boxcolor=black@0.35:boxborderw=12:x=(w-text_w)/2:y=h*${OUTRO_CTA_SAFE_AREA_Y}`,
-          ]
+          // CTA is deterministic, centered in lower safe area, and below
+          // the supplied animation's existing "by Zain" lockup. Never add
+          // channel name or handle here; outro animation owns branding.
+          `drawtext=font='${this.config.subtitleFontName}':text='${escapeDrawtextText(opts.branding.outroCta)}':fontsize=${Math.max(18, this.config.subtitleFontSize)}:fontcolor=white:borderw=2:bordercolor=black@0.8:box=1:boxcolor=black@0.35:boxborderw=12:x=(w-text_w)/2:y=h*${OUTRO_CTA_SAFE_AREA_Y}`,
+        ]
         : []),
     ].join(",");
 
@@ -450,13 +455,13 @@ export class FfmpegComposerProvider implements ComposerProvider {
       ...(sourceInfo.hasAudio
         ? []
         : [
-            "-f",
-            "lavfi",
-            "-t",
-            String(durationSeconds),
-            "-i",
-            "anullsrc=channel_layout=stereo:sample_rate=48000",
-          ]),
+          "-f",
+          "lavfi",
+          "-t",
+          String(durationSeconds),
+          "-i",
+          "anullsrc=channel_layout=stereo:sample_rate=48000",
+        ]),
       "-filter_complex",
       `[0:v]${videoFilter}[outv]`,
       "-map",
@@ -717,53 +722,125 @@ export class FfmpegComposerProvider implements ComposerProvider {
     outroPath: string,
     workDir: string,
     signal?: AbortSignal,
-  ): Promise<string> {
+  ): Promise<{
+    path: string;
+    transitionDurationMs: number;
+  }> {
     const outputPath = path.join(workDir, "timeline-with-outro.mp4");
     const enc = this.config.encoder;
+
+    const narrativeInfo = await probe(narrativeVideoPath);
+    const outroInfo = await probe(outroPath);
+
+    const transitionDuration = Math.min(
+      this.config.outroTransitionDuration,
+      narrativeInfo.duration,
+      outroInfo.duration,
+    );
+
+    if (transitionDuration <= 0) {
+      throw new Error(
+        `Invalid outro transition duration: ${transitionDuration}s`,
+      );
+    }
+
+    // xfade's offset is relative to the beginning of the first input.
+    // Starting it transitionDuration before the end means the transition
+    // happens during the final part of the narrative/hold.
+    const offset = Math.max(
+      0,
+      narrativeInfo.duration - transitionDuration,
+    );
+
     const args = [
       "-y",
       "-i",
       narrativeVideoPath,
       "-i",
       outroPath,
+
       "-filter_complex",
       [
-        "[0:v]settb=AVTB,setpts=PTS-STARTPTS[v0]",
-        "[1:v]settb=AVTB,setpts=PTS-STARTPTS[v1]",
-        "[0:a]aresample=48000[a0]",
-        "[1:a]aresample=48000[a1]",
-        "[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
+        // Normalize video timestamps and formats for xfade.
+        `[0:v]`
+        + `settb=AVTB,`
+        + `setpts=PTS-STARTPTS,`
+        + `fps=${this.config.video.fps},`
+        + `format=yuv420p`
+        + `[v0]`,
+
+        `[1:v]`
+        + `settb=AVTB,`
+        + `setpts=PTS-STARTPTS,`
+        + `fps=${this.config.video.fps},`
+        + `format=yuv420p`
+        + `[v1]`,
+
+        // Normalize audio before acrossfade.
+        `[0:a]`
+        + `aresample=48000,`
+        + `aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,`
+        + `asetpts=PTS-STARTPTS`
+        + `[a0]`,
+
+        `[1:a]`
+        + `aresample=48000,`
+        + `aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,`
+        + `asetpts=PTS-STARTPTS`
+        + `[a1]`,
+
+        // Visual crossfade.
+        `[v0][v1]`
+        + `xfade=transition=fade:duration=${transitionDuration}:offset=${offset}`
+        + `[outv]`,
+
+        // Audio crossfade aligned with the visual transition.
+        `[a0][a1]`
+        + `acrossfade=d=${transitionDuration}:curve1=tri:curve2=tri`
+        + `[outa]`,
       ].join(";"),
+
       "-map",
       "[outv]",
       "-map",
       "[outa]",
+
       "-c:v",
       enc.encoder,
       "-crf",
       String(enc.crf),
       "-preset",
       enc.preset,
+
       "-c:a",
       "aac",
       "-ar",
       "48000",
       "-ac",
       "2",
+
       "-pix_fmt",
       "yuv420p",
     ];
-    if (enc.extraArgs) args.push(...enc.extraArgs);
+
+    if (enc.extraArgs) {
+      args.push(...enc.extraArgs);
+    }
+
     args.push(outputPath);
 
     await runFfmpegWithRetry(
       args,
-      "append canonical branding outro",
+      "crossfade into canonical branding outro",
       DEFAULT_MAX_RETRIES,
       undefined,
       signal,
     );
-    return outputPath;
+
+    return {
+      path: outputPath,
+      transitionDurationMs: Math.round(transitionDuration * 1000),
+    };
   }
 
   private async burnSubtitlesStep(
