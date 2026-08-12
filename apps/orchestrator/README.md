@@ -27,7 +27,7 @@ AssetGenerator       — provider: calls image/video generation provider (stub)
   ↓
 NarrationGenerator   — provider: TTS synthesis (stub → ElevenLabs)
   ↓
-SubtitleGenerator    — provider: WhisperX word-level alignment of the narration WAV → SRT/ASS (stub fallback)
+SubtitleGenerator    — scene-bounded caption timing from scene narration + measured durations
   ↓
 VideoComposer        — provider: final video assembly with audio + subtitles (stub → PalmierPro)
   ↓
@@ -172,47 +172,55 @@ cp .env.example .env
 # Edit .env — add OPENROUTER_API_KEY
 ```
 
-### Transcriber Subtitle Alignment
+### Scene-Bounded Narration and Subtitles
 
-Subtitle timing comes from the actual narration WAV, not word counts or LLM
-duration estimates. The SubtitleGenerator sends the TTS-generated
-`narration.wav` to a separately-run transcriber service and builds
-SRT/ASS cues from the returned word timestamps (3–5 words per cue, preferring
-punctuation/timing-gap boundaries).
+`production.scenes[].narration` is authoritative. NarrationGenerator creates
+one TTS artifact per scene, preserves numeric scene ordering, then concatenates
+those files with FFmpeg without inserting silence or changing playback speed.
+SubtitleGenerator creates cues from the same scene narration and measured scene
+audio durations. Cues never cross scene boundaries.
+
+> Note: subtitle timing is scene-bounded **proportional caption timing** — words
+> are distributed uniformly across the measured scene duration. It is
+> deterministic and needs no alignment service, but it is not waveform word
+> alignment.
+
+> Note: scene-audio cache identity includes the TTS provider's
+> `cacheFingerprint()`. Chatterbox's fingerprint is a **deployment contract**:
+> bump `CHATTERBOX_CACHE_VERSION` in `chatterbox-tts-provider.ts` whenever the
+> server-side model/voice pipeline changes, or cached scene audio can go stale.
 
 ```text
-NarrationGenerator (TTS)
-   ↓ narration.wav
-Transcriber service :8030
-   ↓ word timestamps
-Transcriber-backed SubtitleProvider → SRT / ASS
+VisualDirector / AssetGenerator
+   ↓ production.scenes[].narration
+NarrationGenerator
+   ↓ scene-001.wav, scene-002.wav, ...
+FFmpeg ordered concat → combined narration.wav
+   ↓
+SceneSubtitleProvider → SRT / ASS
    ↓
 VideoComposer
 ```
 
-The service runs outside the LangGraph process:
-
-```bash
-# Local development
-TRANSCRIBER_URL=http://localhost:8030
-```
-
-HTTP contract (`POST {TRANSCRIBER_URL}/align`, multipart/form-data):
-
-- `file` — the actual narration WAV (required)
-- `text` — known transcript hint (optional, improves alignment)
-
-Response JSON:
+Audio state contains both scene and combined artifacts:
 
 ```json
-{ "segments": [{ "start": 0.0, "end": 10.2, "text": "...",
-    "words": [{ "word": "In", "start": 0.17, "end": 0.25 }] }] }
+{
+  "version": 2,
+  "scenes": [
+    { "sceneId": 1, "artifactId": "...", "narration": "...", "durationMs": 4520, "url": "..." }
+  ],
+  "combinedAudio": {
+    "artifactId": "...",
+    "durationMs": 54910,
+    "url": "...",
+    "sourceSceneArtifactIds": ["..."]
+  }
+}
 ```
 
-If alignment fails in real-provider mode the orchestrator fails closed at
-SubtitleGenerator rather than silently producing mis-timed subtitles. When
-`USE_REAL_PROVIDERS=false` the stub provider keeps a heuristic fallback for
-tests/development.
+The standalone transcriber service remains available for independent alignment
+experiments, but is not invoked by the production LangGraph narration path.
 
 ### Run Tests
 
@@ -294,16 +302,18 @@ Step  9 — AssetGenerator (provider)
           extension, assetUrl, assetGeneratedAt}
 
 Step 10 — NarrationGenerator (provider TTS)
-  Reads:  content.narration
-  Writes: audio.{narrationUrl, narrationDurationMs, voice, generatedAt}
+  Reads:  production.scenes[].{sceneId, narration}
+  Writes: audio.{version, scenes[], combinedAudio, narrationUrl,
+          narrationDurationMs, voice, generatedAt}
 
 Step 11 — SubtitleGenerator (provider)
-  Reads:  audio.narrationUrl, content.narration
+  Reads:  audio.scenes[], audio.combinedAudio, production.scenes[]
   Writes: subtitles.{srt, ass, wordTimestamps, generatedAt}
 
 Step 12 — VideoComposer (provider)
   Reads:  production.scenes[].{assetUrl, startSecond, endSecond, durationSeconds},
-          audio.narrationUrl, subtitles.srt, content.estimatedDurationSeconds, branding
+          audio.combinedAudio, audio.scenes[], subtitles.srt,
+          content.estimatedDurationSeconds, branding
   Writes: video.{videoUrl, durationMs, resolution, composedAt}
 
 Step 13 — ReleaseValidation (deterministic gate)
@@ -408,8 +418,8 @@ src/
     image-prompt-generator.node.ts   — generation prompts per scene
     prompt-qa.node.ts                — prompt quality gate
     asset-generator.node.ts          — image/video generation provider
-    narration-generator.node.ts      — TTS synthesis provider
-    subtitle-generator.node.ts       — WhisperX subtitle alignment provider
+    narration-generator.node.ts      — per-scene TTS synthesis + FFmpeg ordered concat
+    subtitle-generator.node.ts       — scene-bounded deterministic caption timing
     video-composer.node.ts           — final video assembly provider
     release-validation.node.ts       — deterministic structural & media gate
     release-review.node.ts           — LLM release review (text metadata)
@@ -441,10 +451,11 @@ src/
     composer-provider.ts             — ComposerProvider interface
     stub-composer-provider.ts        — stub for tests
     palmierpro-composer-provider.ts  — PalmierPro MCP adapter
-    subtitle-provider.ts             — SubtitleProvider interface
+    subtitle-provider.ts             — SubtitleProvider interface (legacy)
     stub-subtitle-provider.ts        — stub for tests
-    whisperx-provider.ts             — WhisperX HTTP client (:8030 /align)
-    whisperx-subtitle-provider.ts    — WhisperX-backed SubtitleProvider (real)
+    scene-subtitle-provider.ts       — DeterministicSceneSubtitleProvider (production)
+    whisperx-provider.ts             — WhisperX HTTP client (:8030 /align, standalone experiments)
+    whisperx-subtitle-provider.ts    — WhisperX-backed SubtitleProvider (not used by production graph)
     asset-provider.ts                — AssetProvider interface
     stub-asset-provider.ts           — stub for tests
     tts-provider.ts                  — TTS provider interface

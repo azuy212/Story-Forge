@@ -2,6 +2,7 @@ import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 import {
   videoComposerNode,
   scaleSceneDurations,
+  alignSceneDurationsToAudio,
 } from "../src/agents/video-composer.node.js";
 import type { ProjectState } from "../src/types/index.js";
 import type {
@@ -43,6 +44,36 @@ const DEFAULT_RESULT: ComposeResult = {
   resolution: "1080x1920",
 };
 
+function audioManifest(
+  scenes: Array<{ sceneId: number; durationSeconds?: number }> = [
+    DEFAULT_SCENE,
+  ],
+) {
+  const sceneAudio = scenes.map((scene) => ({
+    sceneId: scene.sceneId,
+    artifactId: `audio-${scene.sceneId}`,
+    narration: `Scene ${scene.sceneId}`,
+    durationMs: Math.round((scene.durationSeconds ?? 10) * 1000),
+    url: `scene-${scene.sceneId}.wav`,
+  }));
+  const durationMs = sceneAudio.reduce(
+    (sum, scene) => sum + scene.durationMs,
+    0,
+  );
+  return {
+    version: 2 as const,
+    scenes: sceneAudio,
+    combinedAudio: {
+      artifactId: "combined",
+      durationMs,
+      url: "https://placeholder.local/narration.wav",
+      sourceSceneArtifactIds: sceneAudio.map((scene) => scene.artifactId),
+    },
+    narrationUrl: "https://placeholder.local/narration.wav",
+    narrationDurationMs: durationMs,
+  };
+}
+
 beforeEach(() => {
   mockCompose.mockReset();
 });
@@ -53,10 +84,7 @@ function runNode(state?: Partial<ProjectState>, provider?: ComposerProvider) {
       project: { pillar: "Geography", topic: "Test" },
       content: { estimatedDurationSeconds: 10 },
       production: { scenes: [DEFAULT_SCENE] },
-      audio: {
-        narrationUrl: "https://placeholder.local/narration.wav",
-        narrationDurationMs: 10000,
-      },
+      audio: audioManifest(),
       subtitles: {
         srt: "1\n00:00:00,000 --> 00:00:10,000\nHello world",
         wordTimestamps: [],
@@ -119,7 +147,7 @@ describe("videoComposerNode", () => {
     const result = await runNode({ audio: {} } as any);
 
     expect(result.diagnostics?.errors).toBeDefined();
-    expect(result.diagnostics?.errors![0]).toContain("narrationUrl is missing");
+    expect(result.diagnostics?.errors![0]).toContain("scene audio manifest");
     expect(mockCompose).not.toHaveBeenCalled();
   });
 
@@ -159,7 +187,7 @@ describe("videoComposerNode", () => {
         project: { pillar: "Geography", topic: "Test" },
         content: { estimatedDurationSeconds: 10 },
         production: { scenes: [DEFAULT_SCENE] },
-        audio: { narrationUrl: "https://placeholder.local/narration.wav" },
+        audio: audioManifest(),
         subtitles: { srt: "1\n00:00:00,000 --> 00:00:10,000\nHello" },
         branding: { channel: "C", creator: "", cta: "" },
         execution: { version: "0.1.0" },
@@ -235,7 +263,7 @@ describe("videoComposerNode", () => {
     expect(opts.branding.enabled).toBe(false);
   });
 
-  it("scales scene durations to the actual narration duration", async () => {
+  it("uses actual scene audio durations and preserves planned scenes", async () => {
     const durations = [5, 9, 11, 10, 8, 12];
     const ends = durations.reduce<number[]>((acc, d) => {
       acc.push((acc.at(-1) ?? 0) + d);
@@ -249,13 +277,23 @@ describe("videoComposerNode", () => {
       durationSeconds: d,
     }));
 
-    const narrationDurationMs = 57840;
+    const audioScenes = scenes.map((scene, i) => ({
+      sceneId: scene.sceneId,
+      artifactId: `audio-${scene.sceneId}`,
+      narration: `Scene ${scene.sceneId}`,
+      durationMs: [4000, 7000, 12000, 9000, 6000, 11000][i],
+      url: `scene-${scene.sceneId}.wav`,
+    }));
+    const narrationDurationMs = audioScenes.reduce(
+      (sum, scene) => sum + scene.durationMs,
+      0,
+    );
 
     mockCompose.mockImplementation(async (opts: ComposeOptions) => {
-      expect(opts.totalDurationSeconds).toBeCloseTo(57.84, 1);
+      expect(opts.totalDurationSeconds).toBeCloseTo(49, 1);
       expect(opts.scenes).toHaveLength(6);
       const total = opts.scenes.reduce((acc, s) => acc + s.durationSeconds, 0);
-      expect(total).toBeGreaterThanOrEqual(57.84);
+      expect(total).toBeGreaterThanOrEqual(narrationDurationMs / 1000);
       return DEFAULT_RESULT;
     });
 
@@ -263,7 +301,13 @@ describe("videoComposerNode", () => {
       content: { estimatedDurationSeconds: 55 },
       production: { scenes },
       audio: {
-        narrationUrl: "https://placeholder.local/narration.wav",
+        ...audioManifest(),
+        scenes: audioScenes,
+        combinedAudio: {
+          ...audioManifest().combinedAudio,
+          durationMs: narrationDurationMs,
+          sourceSceneArtifactIds: audioScenes.map((scene) => scene.artifactId),
+        },
         narrationDurationMs,
       },
     });
@@ -274,19 +318,18 @@ describe("videoComposerNode", () => {
     expect(scaled).toHaveLength(6);
     expect(result.production?.plannedScenes).toEqual(scenes);
 
-    const scale = narrationDurationMs / 1000 / 55;
-    expect(scaled[0].durationSeconds).toBeGreaterThanOrEqual(5 * scale);
+    expect(scaled[0].durationSeconds).toBeGreaterThanOrEqual(4);
     expect(scaled[0].startSecond).toBe(0);
 
     const total = scaled.reduce((acc, s) => acc + (s.durationSeconds ?? 0), 0);
-    expect(total).toBeGreaterThanOrEqual(57.84);
+    expect(total).toBeGreaterThanOrEqual(narrationDurationMs / 1000);
 
     for (let i = 1; i < scaled.length; i++) {
       expect(scaled[i].startSecond).toBeCloseTo(scaled[i - 1].endSecond!, 2);
     }
   });
 
-  it("fails with diagnostics when scaling factor is out of range", async () => {
+  it("fails with diagnostics when scene audio is missing", async () => {
     const scenes = [
       {
         ...DEFAULT_SCENE,
@@ -300,15 +343,44 @@ describe("videoComposerNode", () => {
     const result = await runNode({
       content: { estimatedDurationSeconds: 10 },
       production: { scenes },
-      audio: {
-        narrationUrl: "https://placeholder.local/narration.wav",
-        narrationDurationMs: 100000,
-      },
+      audio: audioManifest([]),
     });
 
     expect(mockCompose).not.toHaveBeenCalled();
     expect(result.video.videoUrl).toBeUndefined();
-    expect(result.diagnostics?.errors?.[0]).toContain("Cannot scale scenes");
+    expect(result.diagnostics?.errors?.[0]).toContain("scene audio manifest");
+  });
+});
+
+describe("alignSceneDurationsToAudio", () => {
+  it("uses cumulative actual audio boundaries instead of global scaling", () => {
+    const scenes = [
+      { ...DEFAULT_SCENE, sceneId: 1, durationSeconds: 10 },
+      { ...DEFAULT_SCENE, sceneId: 2, durationSeconds: 10 },
+    ];
+    const audio = [
+      {
+        sceneId: 1,
+        artifactId: "a1",
+        narration: "One",
+        durationMs: 4500,
+        url: "1.wav",
+      },
+      {
+        sceneId: 2,
+        artifactId: "a2",
+        narration: "Two",
+        durationMs: 6500,
+        url: "2.wav",
+      },
+    ];
+
+    const result = alignSceneDurationsToAudio(scenes, audio);
+
+    expect(result[0].startSecond).toBe(0);
+    expect(result[0].durationSeconds).toBe(4.5);
+    expect(result[1].startSecond).toBe(result[0].endSecond);
+    expect(result[1].durationSeconds).toBeCloseTo(6.5, 2);
   });
 });
 

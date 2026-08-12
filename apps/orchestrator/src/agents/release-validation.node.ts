@@ -7,6 +7,7 @@ import {
   probe as defaultProbe,
   type FfprobeResult,
 } from "../providers/composer/ffmpeg/ffmpeg.js";
+import { AUDIO_DURATION_TOLERANCE_MS } from "../utils/constants.js";
 
 const PROBE_TOLERANCE_MS = 250;
 const FIRST_CUE_START_MAX_MS = 1000;
@@ -38,7 +39,8 @@ export async function validatePackage(
 
   const scenes = state.production?.scenes ?? [];
   const estimated = state.content?.estimatedDurationSeconds;
-  const narrationMs = state.audio?.narrationDurationMs;
+  const narrationMs =
+    state.audio?.combinedAudio?.durationMs ?? state.audio?.narrationDurationMs;
   const timeline = state.video?.timeline;
 
   // --- Artifact existence ---
@@ -48,6 +50,65 @@ export async function validatePackage(
     !!state.subtitles?.srt && state.subtitles.srt.trim().length > 0,
     "SRT subtitles present",
   );
+
+  // --- Scene audio manifest ---
+  const audioScenes = state.audio?.scenes ?? [];
+  const combinedAudio = state.audio?.combinedAudio;
+  check(
+    state.audio?.version === 2,
+    "Audio manifest version is 2",
+    `received ${state.audio?.version ?? "missing"}`,
+  );
+  if (audioScenes.length > 0 || combinedAudio) {
+    const productionIds = scenes.map((scene) => scene.sceneId);
+    const audioIds = audioScenes.map((scene) => scene.sceneId);
+    const artifactIds = audioScenes.map((scene) => scene.artifactId);
+    const sourceIds = combinedAudio?.sourceSceneArtifactIds ?? [];
+    const uniqueAudioIds = new Set(audioIds);
+    const uniqueProductionIds = new Set(productionIds);
+
+    check(
+      audioScenes.length === scenes.length,
+      "Scene audio count matches production",
+      `audio ${audioScenes.length} vs production ${scenes.length}`,
+    );
+    check(
+      uniqueAudioIds.size === audioIds.length,
+      "Scene audio IDs are unique",
+    );
+    check(
+      uniqueProductionIds.size === productionIds.length,
+      "Production scene IDs are unique",
+    );
+    check(
+      productionIds.every((id, index) => id === audioIds[index]),
+      "Scene audio order matches production",
+    );
+    check(
+      artifactIds.every(
+        (id): id is string => typeof id === "string" && id.length > 0,
+      ),
+      "Scene audio artifact IDs present",
+    );
+    check(
+      sourceIds.length === artifactIds.length &&
+        sourceIds.every((id, index) => id === artifactIds[index]),
+      "Combined audio sources match scene artifacts",
+    );
+
+    if (combinedAudio) {
+      const sceneDurationMs = audioScenes.reduce(
+        (sum, scene) => sum + scene.durationMs,
+        0,
+      );
+      check(
+        Math.abs(combinedAudio.durationMs - sceneDurationMs) <=
+          AUDIO_DURATION_TOLERANCE_MS,
+        "Combined audio duration matches scene audio",
+        `combined ${combinedAudio.durationMs}ms vs scenes ${sceneDurationMs}ms`,
+      );
+    }
+  }
   check(!!state.content?.title, "Title present");
 
   const meta = state.metadataOutput;

@@ -1,6 +1,11 @@
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type { ArtifactType } from "./store.js";
-import { getArtifactStore, getRunId, completeArtifact, recordExecutionRefs } from "./context.js";
+import {
+  getArtifactStore,
+  getRunId,
+  completeArtifact,
+  recordExecutionRefs,
+} from "./context.js";
 import { hashObject, hashPrompt } from "./hash.js";
 import { loadPrompt as defaultLoadPrompt } from "../utils/load-prompt.js";
 
@@ -43,7 +48,7 @@ export interface ComputeResult<T> {
 export async function runWithArtifactCache<T>(
   options: CacheOptions<T>,
   compute: () => Promise<ComputeResult<T>>,
-  config?: RunnableConfig
+  config?: RunnableConfig,
 ): Promise<ComputeResult<T>> {
   const store = getArtifactStore(config);
   const runId = getRunId(config);
@@ -71,7 +76,11 @@ export async function runWithArtifactCache<T>(
 
   const latest = await store.latest<T>(runId, options.type);
 
-  if (latest && latest.meta.inputHash === inputHash && latest.status === "complete") {
+  if (
+    latest &&
+    latest.meta.inputHash === inputHash &&
+    latest.status === "complete"
+  ) {
     const valid = options.validate ? options.validate(latest.data) : true;
     if (valid) {
       const artifactRef = {
@@ -125,7 +134,13 @@ export async function runWithArtifactCache<T>(
   const status = options.deferComplete ? "pending" : "complete";
 
   try {
-    const ref = await store.save(runId, options.type, result.data, meta, status);
+    const ref = await store.save(
+      runId,
+      options.type,
+      result.data,
+      meta,
+      status,
+    );
     await recordExecutionRefs(config ?? {}, [ref]);
     return {
       ...result,
@@ -148,9 +163,13 @@ export async function runWithArtifactCache<T>(
 export async function completeArtifactForNode(
   config: RunnableConfig,
   nodeName: string,
-  state?: { execution?: { runId?: string } }
+  state?: { execution?: { runId?: string } },
 ): Promise<void> {
-  await completeArtifact(config, nodeName, state as Parameters<typeof completeArtifact>[2]);
+  await completeArtifact(
+    config,
+    nodeName,
+    state as Parameters<typeof completeArtifact>[2],
+  );
 }
 
 export interface NodeCacheResult<T> {
@@ -167,12 +186,13 @@ export interface CacheNodeOptions<T> {
   key: Record<string, unknown>;
   deferComplete?: boolean;
   validate?: (artifact: T) => boolean;
+  lookupAllVersions?: boolean;
 }
 
 export async function cacheNodeResult<T>(
   options: CacheNodeOptions<T>,
   compute: () => Promise<{ data: T | null; error?: string }>,
-  config?: RunnableConfig
+  config?: RunnableConfig,
 ): Promise<NodeCacheResult<T>> {
   const store = getArtifactStore(config);
   const runId = getRunId(config);
@@ -185,16 +205,23 @@ export async function cacheNodeResult<T>(
   const key = { node: options.node, ...options.key };
   const inputHash = hashObject(key);
 
-  const latest = await store.latest<T>(runId, options.type);
+  const cached = options.lookupAllVersions
+    ? await store.findCompleteByInputHash<T>(runId, options.type, inputHash)
+    : null;
+  const latest = cached?.record ?? (await store.latest<T>(runId, options.type));
 
-  if (latest && latest.meta.inputHash === inputHash && latest.status === "complete") {
+  if (
+    latest &&
+    latest.meta.inputHash === inputHash &&
+    latest.status === "complete"
+  ) {
     const valid = options.validate ? options.validate(latest.data) : true;
     if (valid) {
       return {
         data: latest.data,
         fromCache: true,
         ref: {
-          artifactId: latest.artifactId,
+          artifactId: cached?.ref.artifactId ?? latest.artifactId,
           type: latest.type,
           version: latest.version,
           runId,
@@ -220,7 +247,13 @@ export async function cacheNodeResult<T>(
   const status = options.deferComplete ? "pending" : "complete";
 
   try {
-    const ref = await store.save(runId, options.type, result.data, meta, status);
+    const ref = await store.save(
+      runId,
+      options.type,
+      result.data,
+      meta,
+      status,
+    );
     await recordExecutionRefs(config ?? {}, [ref]);
     return {
       data: result.data,

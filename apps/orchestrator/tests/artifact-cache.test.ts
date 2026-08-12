@@ -1,4 +1,11 @@
-import { jest, describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import {
+  jest,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from "@jest/globals";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -26,10 +33,15 @@ afterEach(() => {
 });
 
 function makeConfig(extra: Record<string, unknown> = {}): RunnableConfig {
-  return { configurable: { runId: "run-cache", artifactStore: store, ...extra } } as RunnableConfig;
+  return {
+    configurable: { runId: "run-cache", artifactStore: store, ...extra },
+  } as RunnableConfig;
 }
 
-function computeResult(data: unknown, overrides: Partial<ComputeResult<unknown>["telemetry"]> = {}): ComputeResult<unknown> {
+function computeResult(
+  data: unknown,
+  overrides: Partial<ComputeResult<unknown>["telemetry"]> = {},
+): ComputeResult<unknown> {
   return {
     data,
     telemetry: {
@@ -48,7 +60,9 @@ function computeResult(data: unknown, overrides: Partial<ComputeResult<unknown>[
 }
 
 const PROMPT = "You are a script writer.\n---\n{{title}}";
-const loadPromptMock = jest.fn<(...args: any[]) => Promise<string>>().mockResolvedValue(PROMPT);
+const loadPromptMock = jest
+  .fn<(...args: any[]) => Promise<string>>()
+  .mockResolvedValue(PROMPT);
 
 describe("runWithArtifactCache", () => {
   beforeEach(() => {
@@ -57,11 +71,19 @@ describe("runWithArtifactCache", () => {
   });
 
   it("saves on miss and returns fromCache false", async () => {
-    const compute = jest.fn<() => Promise<ComputeResult<unknown>>>().mockResolvedValue(computeResult({ title: "T" }));
+    const compute = jest
+      .fn<() => Promise<ComputeResult<unknown>>>()
+      .mockResolvedValue(computeResult({ title: "T" }));
     const config = makeConfig();
 
     const result = await runWithArtifactCache(
-      { type: "script", agent: "ScriptWriter", promptPath: "prompts/script.md", variables: { title: "T" }, loadPrompt: loadPromptMock },
+      {
+        type: "script",
+        agent: "ScriptWriter",
+        promptPath: "prompts/script.md",
+        variables: { title: "T" },
+        loadPrompt: loadPromptMock,
+      },
       compute,
       config,
     );
@@ -73,17 +95,31 @@ describe("runWithArtifactCache", () => {
   });
 
   it("returns fromCache true and skips compute on a hash-identical hit", async () => {
-    const compute = jest.fn<() => Promise<ComputeResult<unknown>>>().mockResolvedValue(computeResult({ title: "T" }));
+    const compute = jest
+      .fn<() => Promise<ComputeResult<unknown>>>()
+      .mockResolvedValue(computeResult({ title: "T" }));
     const config = makeConfig();
 
     await runWithArtifactCache(
-      { type: "script", agent: "ScriptWriter", promptPath: "prompts/script.md", variables: { title: "T" }, loadPrompt: loadPromptMock },
+      {
+        type: "script",
+        agent: "ScriptWriter",
+        promptPath: "prompts/script.md",
+        variables: { title: "T" },
+        loadPrompt: loadPromptMock,
+      },
       compute,
       config,
     );
 
     const second = await runWithArtifactCache(
-      { type: "script", agent: "ScriptWriter", promptPath: "prompts/script.md", variables: { title: "T" }, loadPrompt: loadPromptMock },
+      {
+        type: "script",
+        agent: "ScriptWriter",
+        promptPath: "prompts/script.md",
+        variables: { title: "T" },
+        loadPrompt: loadPromptMock,
+      },
       compute,
       config,
     );
@@ -95,18 +131,30 @@ describe("runWithArtifactCache", () => {
   });
 
   it("recomputes (new version) when a variable changes the hash", async () => {
-    const compute = jest.fn<() => Promise<ComputeResult<unknown>>>().mockImplementation(
-      async () => computeResult({ title: "T" }),
-    );
+    const compute = jest
+      .fn<() => Promise<ComputeResult<unknown>>>()
+      .mockImplementation(async () => computeResult({ title: "T" }));
     const config = makeConfig();
 
     await runWithArtifactCache(
-      { type: "script", agent: "ScriptWriter", promptPath: "prompts/script.md", variables: { title: "A" }, loadPrompt: loadPromptMock },
+      {
+        type: "script",
+        agent: "ScriptWriter",
+        promptPath: "prompts/script.md",
+        variables: { title: "A" },
+        loadPrompt: loadPromptMock,
+      },
       compute,
       config,
     );
     const second = await runWithArtifactCache(
-      { type: "script", agent: "ScriptWriter", promptPath: "prompts/script.md", variables: { title: "B" }, loadPrompt: loadPromptMock },
+      {
+        type: "script",
+        agent: "ScriptWriter",
+        promptPath: "prompts/script.md",
+        variables: { title: "B" },
+        loadPrompt: loadPromptMock,
+      },
       compute,
       config,
     );
@@ -117,18 +165,32 @@ describe("runWithArtifactCache", () => {
   });
 
   it("recomputes when the prompt file content changes", async () => {
-    const compute = jest.fn<() => Promise<ComputeResult<unknown>>>().mockResolvedValue(computeResult({ title: "T" }));
+    const compute = jest
+      .fn<() => Promise<ComputeResult<unknown>>>()
+      .mockResolvedValue(computeResult({ title: "T" }));
     const config = makeConfig();
 
     await runWithArtifactCache(
-      { type: "script", agent: "ScriptWriter", promptPath: "prompts/script.md", variables: { title: "T" }, loadPrompt: loadPromptMock },
+      {
+        type: "script",
+        agent: "ScriptWriter",
+        promptPath: "prompts/script.md",
+        variables: { title: "T" },
+        loadPrompt: loadPromptMock,
+      },
       compute,
       config,
     );
 
     loadPromptMock.mockResolvedValue("A different prompt entirely.");
     const second = await runWithArtifactCache(
-      { type: "script", agent: "ScriptWriter", promptPath: "prompts/script.md", variables: { title: "T" }, loadPrompt: loadPromptMock },
+      {
+        type: "script",
+        agent: "ScriptWriter",
+        promptPath: "prompts/script.md",
+        variables: { title: "T" },
+        loadPrompt: loadPromptMock,
+      },
       compute,
       config,
     );
@@ -138,7 +200,9 @@ describe("runWithArtifactCache", () => {
   });
 
   it("does not hit cache when latest artifact is pending", async () => {
-    const compute = jest.fn<() => Promise<ComputeResult<unknown>>>().mockResolvedValue(computeResult({ title: "T" }));
+    const compute = jest
+      .fn<() => Promise<ComputeResult<unknown>>>()
+      .mockResolvedValue(computeResult({ title: "T" }));
     const config = makeConfig();
 
     await runWithArtifactCache(
@@ -155,7 +219,13 @@ describe("runWithArtifactCache", () => {
     );
 
     await runWithArtifactCache(
-      { type: "script", agent: "ScriptWriter", promptPath: "prompts/script.md", variables: { title: "T" }, loadPrompt: loadPromptMock },
+      {
+        type: "script",
+        agent: "ScriptWriter",
+        promptPath: "prompts/script.md",
+        variables: { title: "T" },
+        loadPrompt: loadPromptMock,
+      },
       compute,
       config,
     );
@@ -164,7 +234,9 @@ describe("runWithArtifactCache", () => {
   });
 
   it("completeArtifactForNode flips a deferred artifact to complete and enables cache hits", async () => {
-    const compute = jest.fn<() => Promise<ComputeResult<unknown>>>().mockResolvedValue(computeResult({ title: "T" }));
+    const compute = jest
+      .fn<() => Promise<ComputeResult<unknown>>>()
+      .mockResolvedValue(computeResult({ title: "T" }));
     const config = makeConfig();
 
     await runWithArtifactCache(
@@ -183,7 +255,13 @@ describe("runWithArtifactCache", () => {
     await completeArtifactForNode(config, "ScriptWriter");
 
     const second = await runWithArtifactCache(
-      { type: "script", agent: "ScriptWriter", promptPath: "prompts/script.md", variables: { title: "T" }, loadPrompt: loadPromptMock },
+      {
+        type: "script",
+        agent: "ScriptWriter",
+        promptPath: "prompts/script.md",
+        variables: { title: "T" },
+        loadPrompt: loadPromptMock,
+      },
       compute,
       config,
     );
@@ -193,18 +271,34 @@ describe("runWithArtifactCache", () => {
   });
 
   it("calls the semantic validate hook and recomputes when it rejects", async () => {
-    const compute = jest.fn<() => Promise<ComputeResult<unknown>>>().mockResolvedValue(computeResult({ scenes: [] }));
+    const compute = jest
+      .fn<() => Promise<ComputeResult<unknown>>>()
+      .mockResolvedValue(computeResult({ scenes: [] }));
     const config = makeConfig();
     const validate = jest.fn<(a: unknown) => boolean>().mockReturnValue(false);
 
     await runWithArtifactCache(
-      { type: "visualDirector", agent: "VisualDirector", promptPath: "prompts/visual-director.md", variables: {}, loadPrompt: loadPromptMock, validate },
+      {
+        type: "visualDirector",
+        agent: "VisualDirector",
+        promptPath: "prompts/visual-director.md",
+        variables: {},
+        loadPrompt: loadPromptMock,
+        validate,
+      },
       compute,
       config,
     );
 
     const second = await runWithArtifactCache(
-      { type: "visualDirector", agent: "VisualDirector", promptPath: "prompts/visual-director.md", variables: {}, loadPrompt: loadPromptMock, validate },
+      {
+        type: "visualDirector",
+        agent: "VisualDirector",
+        promptPath: "prompts/visual-director.md",
+        variables: {},
+        loadPrompt: loadPromptMock,
+        validate,
+      },
       compute,
       config,
     );
@@ -214,22 +308,30 @@ describe("runWithArtifactCache", () => {
   });
 
   it("does not persist or cache when compute fails", async () => {
-    const failing = jest.fn<() => Promise<ComputeResult<unknown>>>().mockResolvedValue({
-      data: null,
-      error: "LLM failed",
-      telemetry: {
-        model: "test-model",
-        durationMs: 50,
-        retries: 2,
-        promptVersion: "prompts/script",
-        agentVersion: "1.0.0",
-        fromCache: false,
-      },
-    });
+    const failing = jest
+      .fn<() => Promise<ComputeResult<unknown>>>()
+      .mockResolvedValue({
+        data: null,
+        error: "LLM failed",
+        telemetry: {
+          model: "test-model",
+          durationMs: 50,
+          retries: 2,
+          promptVersion: "prompts/script",
+          agentVersion: "1.0.0",
+          fromCache: false,
+        },
+      });
     const config = makeConfig();
 
     const result = await runWithArtifactCache(
-      { type: "script", agent: "ScriptWriter", promptPath: "prompts/script.md", variables: { title: "T" }, loadPrompt: loadPromptMock },
+      {
+        type: "script",
+        agent: "ScriptWriter",
+        promptPath: "prompts/script.md",
+        variables: { title: "T" },
+        loadPrompt: loadPromptMock,
+      },
       failing,
       config,
     );
@@ -241,11 +343,21 @@ describe("runWithArtifactCache", () => {
   });
 
   it("runs compute directly when the store is disabled", async () => {
-    const compute = jest.fn<() => Promise<ComputeResult<unknown>>>().mockResolvedValue(computeResult({ title: "T" }));
-    const config = { configurable: { runId: "run-nostore", artifactStore: null } } as RunnableConfig;
+    const compute = jest
+      .fn<() => Promise<ComputeResult<unknown>>>()
+      .mockResolvedValue(computeResult({ title: "T" }));
+    const config = {
+      configurable: { runId: "run-nostore", artifactStore: null },
+    } as RunnableConfig;
 
     const result = await runWithArtifactCache(
-      { type: "script", agent: "ScriptWriter", promptPath: "prompts/script.md", variables: { title: "T" }, loadPrompt: loadPromptMock },
+      {
+        type: "script",
+        agent: "ScriptWriter",
+        promptPath: "prompts/script.md",
+        variables: { title: "T" },
+        loadPrompt: loadPromptMock,
+      },
       compute,
       config,
     );
@@ -255,11 +367,19 @@ describe("runWithArtifactCache", () => {
   });
 
   it("runs compute directly when there is no runId", async () => {
-    const compute = jest.fn<() => Promise<ComputeResult<unknown>>>().mockResolvedValue(computeResult({ title: "T" }));
+    const compute = jest
+      .fn<() => Promise<ComputeResult<unknown>>>()
+      .mockResolvedValue(computeResult({ title: "T" }));
     const config = { configurable: { artifactStore: store } } as RunnableConfig;
 
     const result = await runWithArtifactCache(
-      { type: "script", agent: "ScriptWriter", promptPath: "prompts/script.md", variables: { title: "T" }, loadPrompt: loadPromptMock },
+      {
+        type: "script",
+        agent: "ScriptWriter",
+        promptPath: "prompts/script.md",
+        variables: { title: "T" },
+        loadPrompt: loadPromptMock,
+      },
       compute,
       config,
     );
@@ -271,7 +391,9 @@ describe("runWithArtifactCache", () => {
 
 describe("cacheNodeResult", () => {
   it("caches provider results and serves hits by input hash", async () => {
-    const compute = jest.fn<() => Promise<{ data: unknown; error?: string }>>().mockResolvedValue({ data: { urls: ["a.mp4"] } });
+    const compute = jest
+      .fn<() => Promise<{ data: unknown; error?: string }>>()
+      .mockResolvedValue({ data: { urls: ["a.mp4"] } });
     const config = makeConfig();
 
     const first = await cacheNodeResult(
@@ -293,13 +415,65 @@ describe("cacheNodeResult", () => {
   });
 
   it("recomputes when the key differs", async () => {
-    const compute = jest.fn<() => Promise<{ data: unknown; error?: string }>>().mockResolvedValue({ data: { n: 1 } });
+    const compute = jest
+      .fn<() => Promise<{ data: unknown; error?: string }>>()
+      .mockResolvedValue({ data: { n: 1 } });
     const config = makeConfig();
 
-    await cacheNodeResult({ type: "assets", node: "AssetGenerator", key: { scene: 1 } }, compute, config);
-    await cacheNodeResult({ type: "assets", node: "AssetGenerator", key: { scene: 2 } }, compute, config);
+    await cacheNodeResult(
+      { type: "assets", node: "AssetGenerator", key: { scene: 1 } },
+      compute,
+      config,
+    );
+    await cacheNodeResult(
+      { type: "assets", node: "AssetGenerator", key: { scene: 2 } },
+      compute,
+      config,
+    );
 
     expect(compute).toHaveBeenCalledTimes(2);
+  });
+
+  it("finds unchanged scene artifacts in older versions", async () => {
+    const compute = jest
+      .fn<() => Promise<{ data: unknown; error?: string }>>()
+      .mockImplementation(async () => ({ data: { audio: true } }));
+    const config = makeConfig();
+
+    await cacheNodeResult(
+      {
+        type: "audio",
+        node: "NarrationGenerator",
+        lookupAllVersions: true,
+        key: { kind: "scene", sceneId: 1, narration: "one" },
+      },
+      compute,
+      config,
+    );
+    await cacheNodeResult(
+      {
+        type: "audio",
+        node: "NarrationGenerator",
+        lookupAllVersions: true,
+        key: { kind: "scene", sceneId: 2, narration: "two" },
+      },
+      compute,
+      config,
+    );
+    const reused = await cacheNodeResult(
+      {
+        type: "audio",
+        node: "NarrationGenerator",
+        lookupAllVersions: true,
+        key: { kind: "scene", sceneId: 1, narration: "one" },
+      },
+      compute,
+      config,
+    );
+
+    expect(compute).toHaveBeenCalledTimes(2);
+    expect(reused.fromCache).toBe(true);
+    expect(reused.ref?.version).toBe(1);
   });
 
   it("preserves compute errors when provider data is non-null", async () => {

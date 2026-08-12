@@ -68,7 +68,36 @@ const hasScenePrompts = (s: GuardState) =>
   hasScenes(s) && s.production!.scenes!.every((sc) => !!sc.generationPrompt);
 const hasSceneAssets = (s: GuardState) =>
   hasScenes(s) && s.production!.scenes!.every((sc) => !!sc.assetUrl);
-const hasNarration = (s: GuardState) => !!s.audio?.narrationUrl;
+const hasNarration = (s: GuardState) => {
+  const scenes = s.production?.scenes ?? [];
+  const audioScenes = s.audio?.scenes ?? [];
+  const combined = s.audio?.combinedAudio;
+  if (
+    scenes.length === 0 ||
+    audioScenes.length !== scenes.length ||
+    !combined
+  ) {
+    return false;
+  }
+
+  const sceneIds = scenes.map((scene) => scene.sceneId);
+  const audioIds = audioScenes.map((scene) => scene.sceneId);
+  const artifactIds = audioScenes.map((scene) => scene.artifactId);
+  return (
+    artifactIds.every(
+      (id): id is string => typeof id === "string" && id.length > 0,
+    ) &&
+    typeof combined.artifactId === "string" &&
+    combined.artifactId.length > 0 &&
+    sceneIds.every((id, index) => id === audioIds[index]) &&
+    combined.sourceSceneArtifactIds.length === artifactIds.length &&
+    combined.sourceSceneArtifactIds.every(
+      (id, index) => id === artifactIds[index],
+    ) &&
+    !!s.audio?.narrationUrl &&
+    !!s.audio?.narrationDurationMs
+  );
+};
 const hasSubtitles = (s: GuardState) => !!s.subtitles?.srt;
 const hasVideo = (s: GuardState) => !!s.video?.videoUrl;
 const hasPassedValidation = (s: GuardState) =>

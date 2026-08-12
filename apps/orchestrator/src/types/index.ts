@@ -37,7 +37,7 @@ export type {
   SceneResult,
 } from "../schemas/prompt-qa-output.js";
 export type { ImagePromptOutput } from "../schemas/image-prompt-output.js";
-export type { Audio } from "../schemas/audio.js";
+export type { Audio, SceneAudio, CombinedAudio } from "../schemas/audio.js";
 export type { Subtitles, WordTimestamp } from "../schemas/subtitles.js";
 export type { Video } from "../schemas/video.js";
 export type { ReleaseValidationOutput } from "../schemas/release-validation-output.js";

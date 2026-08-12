@@ -1,13 +1,30 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { TTSProvider, SynthesizeOptions, SynthesizeResult } from "./tts-provider.js";
+import type {
+  TTSProvider,
+  SynthesizeOptions,
+  SynthesizeResult,
+} from "./tts-provider.js";
 import { config } from "../utils/config.js";
 import { PipelineError } from "../utils/errors.js";
 
 const REQUEST_TIMEOUT_MS = 600_000;
 const AUDIO_DIR = resolve("generated", "audio");
 
+// Manual cache version. This is a DEPLOYMENT CONTRACT: whenever the
+// server-side model/voice/audio pipeline changes in a way that alters audio
+// for identical inputs, bump this constant at the same time as the deployment.
+// Forgetting the bump risks serving stale cached audio for new outputs.
+const CHATTERBOX_CACHE_VERSION = "v2";
+
 export class ChatterboxTTSProvider implements TTSProvider {
+  cacheFingerprint(): string {
+    // Output-affecting configuration is the endpoint (deployment) plus the
+    // manual version above. Voice and text are already part of the canonical
+    // TTS fingerprint, so different voices never collide.
+    return `chatterbox-http-${CHATTERBOX_CACHE_VERSION}:${config.ttsUrl()}`;
+  }
+
   async synthesize(opts: SynthesizeOptions): Promise<SynthesizeResult> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -17,7 +34,10 @@ export class ChatterboxTTSProvider implements TTSProvider {
       response = await fetch(`${config.ttsUrl()}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: opts.text }),
+        body: JSON.stringify({
+          text: opts.text,
+          ...(opts.voice ? { voice: opts.voice } : {}),
+        }),
         signal: controller.signal,
       });
     } catch (err) {
@@ -76,9 +96,10 @@ export class ChatterboxTTSProvider implements TTSProvider {
       );
     }
 
-    const remoteFilename = typeof data.file === "string" && data.file.length > 0
-      ? data.file
-      : "narration.wav";
+    const remoteFilename =
+      typeof data.file === "string" && data.file.length > 0
+        ? data.file
+        : "narration.wav";
     const filename = opts.filename ?? remoteFilename;
     const dir = opts.runId ? resolve(AUDIO_DIR, opts.runId) : AUDIO_DIR;
     const filePath = resolve(dir, filename);
@@ -86,11 +107,16 @@ export class ChatterboxTTSProvider implements TTSProvider {
     const audioUrl = new URL(data.url, config.ttsUrl()).toString();
 
     const downloadController = new AbortController();
-    const downloadTimeoutId = setTimeout(() => downloadController.abort(), REQUEST_TIMEOUT_MS);
+    const downloadTimeoutId = setTimeout(
+      () => downloadController.abort(),
+      REQUEST_TIMEOUT_MS,
+    );
 
     let audioResponse: Response;
     try {
-      audioResponse = await fetch(audioUrl, { signal: downloadController.signal });
+      audioResponse = await fetch(audioUrl, {
+        signal: downloadController.signal,
+      });
     } catch (err) {
       clearTimeout(downloadTimeoutId);
       if ((err as Error)?.name === "AbortError") {
@@ -192,7 +218,12 @@ function getWavDurationMs(buffer: Buffer): number {
     return Math.round(buffer.length / 160);
   }
 
-  if (sampleRate === 0 || numChannels === 0 || bitsPerSample === 0 || dataSize === 0) {
+  if (
+    sampleRate === 0 ||
+    numChannels === 0 ||
+    bitsPerSample === 0 ||
+    dataSize === 0
+  ) {
     return Math.round(buffer.length / 160);
   }
 
