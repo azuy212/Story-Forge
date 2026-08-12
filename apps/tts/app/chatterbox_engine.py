@@ -84,9 +84,28 @@ class ChatterboxEngine:
             print(f"Chunk {i + 1}/{len(chunks)}: {len(chunk)} chars")
             print(chunk[:80])
             try:
-                wav = self.model.generate(chunk, audio_prompt_path=voice_path).squeeze(
-                    0
+                wav = self.model.generate(
+                    chunk,
+                    audio_prompt_path=voice_path,
+                ).squeeze(0)
+
+                print(f"[tts] Voice path: {os.path.abspath(voice_path)}")
+                print(f"[tts] Voice exists: {os.path.exists(voice_path)}")
+                print(f"[tts] Voice size: {os.path.getsize(voice_path)} bytes")
+
+                print(f"[tts] Sample rate: {self.model.sr}")
+                print(f"[tts] Tensor shape: {tuple(wav.shape)}")
+
+                duration = wav.shape[-1] / self.model.sr
+                words = len(re.findall(r"\b[\w'-]+\b", chunk))
+                wpm = words / (duration / 60)
+
+                print(
+                    f"[tts] Chunk duration: {duration:.3f}s | "
+                    f"Words: {words} | "
+                    f"WPM: {wpm:.1f}"
                 )
+
             except Exception as e:
                 raise RuntimeError(
                     f"TTS generation failed on chunk {i + 1}/{len(chunks)}"
@@ -103,6 +122,13 @@ class ChatterboxEngine:
                 combined_parts.append(silence_gap)
             combined_parts.append(wav)
         combined = torch.cat(combined_parts).unsqueeze(0)
+
+        final_duration = combined.shape[-1] / self.model.sr
+
+        print(
+            f"Final narration duration: {final_duration:.3f}s"
+        )
+
         filename = f"{uuid.uuid4()}.wav"
         filepath = os.path.join(OUTPUT_DIR, filename)
         ta.save(filepath, combined, self.model.sr)
