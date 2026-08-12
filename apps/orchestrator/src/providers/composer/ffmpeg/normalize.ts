@@ -28,12 +28,12 @@ export interface NormalizeOptions {
 
 const PAN_PRESETS: { x: string; y: string }[] = [
   { x: "iw/2-(iw/zoom/2)", y: "ih/2-(ih/zoom/2)" },
-  { x: "(iw-iw/zoom)*(on/{n})", y: "ih/2-(ih/zoom/2)" },
-  { x: "(iw-iw/zoom)*(1-on/{n})", y: "ih/2-(ih/zoom/2)" },
-  { x: "iw/2-(iw/zoom/2)", y: "(ih-ih/zoom)*(on/{n})" },
-  { x: "iw/2-(iw/zoom/2)", y: "(ih-ih/zoom)*(1-on/{n})" },
-  { x: "(iw-iw/zoom)*(on/{n})", y: "(ih-ih/zoom)*(on/{n})" },
-  { x: "(iw-iw/zoom)*(1-on/{n})", y: "(ih-ih/zoom)*(on/{n})" },
+  { x: "(iw-iw/zoom)*{progress}", y: "ih/2-(ih/zoom/2)" },
+  { x: "(iw-iw/zoom)*(1-{progress})", y: "ih/2-(ih/zoom/2)" },
+  { x: "iw/2-(iw/zoom/2)", y: "(ih-ih/zoom)*{progress}" },
+  { x: "iw/2-(iw/zoom/2)", y: "(ih-ih/zoom)*(1-{progress})" },
+  { x: "(iw-iw/zoom)*{progress}", y: "(ih-ih/zoom)*{progress}" },
+  { x: "(iw-iw/zoom)*(1-{progress})", y: "(ih-ih/zoom)*{progress}" },
 ];
 
 export const PAN_PRESET_COUNT = PAN_PRESETS.length;
@@ -82,16 +82,24 @@ function kenBurnsFilter(
   opts: NormalizeOptions,
   durationSeconds: number,
 ): string {
-  const totalFrames = Math.max(1, Math.round(durationSeconds * opts.fps));
-  const zoomStep = (opts.kenBurnsMaxZoom - 1) / totalFrames;
+  const totalFrames = Math.max(2, Math.round(durationSeconds * opts.fps));
   const pan = PAN_PRESETS[(opts.panVariant ?? 0) % PAN_PRESET_COUNT];
 
-  const zoomExpr = `if(eq(on,1),1,min(zoom+${zoomStep},${opts.kenBurnsMaxZoom}))`;
-  const panX = pan.x.replace("{n}", String(totalFrames));
-  const panY = pan.y.replace("{n}", String(totalFrames));
+  // Exact 0 -> 1 progress across the generated frames.
+  const t = `(on-1)/(${totalFrames}-1)`;
+
+  // Smoothstep interpolation gives the camera gentle acceleration/deceleration.
+  const progress = `(3*pow(${t},2)-2*pow(${t},3))`;
+
+  const zoomExpr =
+    `1+(${opts.kenBurnsMaxZoom}-1)*${progress}`;
+
+  const panX = pan.x.replaceAll("{progress}", progress);
+  const panY = pan.y.replaceAll("{progress}", progress);
 
   return [
-    coverCropFilter(opts),
+    `scale=${opts.width * 2}:${opts.height * 2}:force_original_aspect_ratio=increase`,
+    "setsar=1",
     `zoompan=z='${zoomExpr}':x='${panX}':y='${panY}':d=${totalFrames}:s=${opts.width}x${opts.height}:fps=${opts.fps}`,
     "format=yuv420p",
   ].join(",");
@@ -107,17 +115,21 @@ async function normalizeImage(
   const enc = opts.encoder;
 
   if (opts.kenBurnsEnabled) {
-    // Canonical zoompan: feed the single image frame, let zoompan emit all
-    // output frames (d = totalFrames). The zoom step is derived from the clip
-    // length so every clip reaches maxZoom exactly on its last frame.
+    const totalFrames = Math.max(
+      2,
+      Math.round(durationSeconds * opts.fps),
+    );
+
     const args = [
       "-y",
+      "-loop",
+      "1",
       "-i",
       inputPath,
-      "-t",
-      String(durationSeconds),
       "-vf",
       kenBurnsFilter(opts, durationSeconds),
+      "-frames:v",
+      String(totalFrames),
       "-c:v",
       enc.encoder,
       "-crf",
