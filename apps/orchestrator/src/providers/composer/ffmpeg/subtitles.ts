@@ -25,7 +25,7 @@ export function buildSubtitleStyle(fontSize: number, fontName: string): string {
     'OutlineColour=&H00000000',
     'BorderStyle=1',
     'Outline=2',
-    'MarginV=60',
+    'MarginV=40',
     'Alignment=2',
   ];
 
@@ -41,7 +41,7 @@ export async function burnSubtitles(
   opts: BurnSubtitlesOptions,
   outputPath: string,
 ): Promise<void> {
-  const fontSize = opts.fontSize ?? 24;
+  const fontSize = opts.fontSize ?? 20;
   const fontName = opts.fontName;
   const enc = opts.encoder;
 

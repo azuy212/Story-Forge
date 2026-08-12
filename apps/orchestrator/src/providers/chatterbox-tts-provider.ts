@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile, rename, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import type {
   TTSProvider,
@@ -7,22 +7,27 @@ import type {
 } from "./tts-provider.js";
 import { config } from "../utils/config.js";
 import { PipelineError } from "../utils/errors.js";
+import { runFfmpeg } from "./composer/ffmpeg/ffmpeg.js";
 
 const REQUEST_TIMEOUT_MS = 600_000;
 const AUDIO_DIR = resolve("generated", "audio");
+
+const MIN_ATEMPO = 0.85;
+const MAX_ATEMPO = 1.15;
 
 // Manual cache version. This is a DEPLOYMENT CONTRACT: whenever the
 // server-side model/voice/audio pipeline changes in a way that alters audio
 // for identical inputs, bump this constant at the same time as the deployment.
 // Forgetting the bump risks serving stale cached audio for new outputs.
-const CHATTERBOX_CACHE_VERSION = "v2";
+const CHATTERBOX_CACHE_VERSION = "v3";
 
 export class ChatterboxTTSProvider implements TTSProvider {
   cacheFingerprint(): string {
-    // Output-affecting configuration is the endpoint (deployment) plus the
-    // manual version above. Voice and text are already part of the canonical
-    // TTS fingerprint, so different voices never collide.
-    return `chatterbox-http-${CHATTERBOX_CACHE_VERSION}:${config.ttsUrl()}`;
+    return [
+      `chatterbox-http-${CHATTERBOX_CACHE_VERSION}`,
+      config.ttsUrl(),
+      `targetWpm=${config.narrationTargetWpm() ?? "none"}`,
+    ].join(":");
   }
 
   async synthesize(opts: SynthesizeOptions): Promise<SynthesizeResult> {
@@ -167,7 +172,57 @@ export class ChatterboxTTSProvider implements TTSProvider {
       );
     }
 
-    const durationMs = getWavDurationMs(Buffer.from(audioBuffer));
+    let durationMs = getWavDurationMs(Buffer.from(audioBuffer));
+
+    const targetWpm = config.narrationTargetWpm();
+    if (targetWpm) {
+      const actualWpm = calculateWpm(opts.text, durationMs);
+
+      if (actualWpm > 0) {
+        const requestedSpeed = targetWpm / actualWpm;
+        const speed = clampSpeed(requestedSpeed);
+
+        console.log(
+          `[tts] WPM normalization: ${actualWpm.toFixed(1)} -> ${targetWpm} WPM | ` +
+            `speed=${speed.toFixed(3)}x`,
+        );
+
+        if (Math.abs(speed - 1) > 0.001) {
+          const tempPath = `${filePath}.speed.wav`;
+
+          try {
+            await runFfmpeg({
+              args: [
+                "-y",
+                "-i",
+                filePath,
+                "-filter:a",
+                `atempo=${speed}`,
+                "-c:a",
+                "pcm_s16le",
+                tempPath,
+              ],
+              description: "normalize narration WPM",
+            });
+
+            const normalizedBuffer = await readFile(tempPath);
+
+            await rename(tempPath, filePath);
+
+            durationMs = getWavDurationMs(normalizedBuffer);
+
+            const finalWpm = calculateWpm(opts.text, durationMs);
+
+            console.log(
+              `[tts] Normalized duration: ${(durationMs / 1000).toFixed(3)}s | ` +
+                `WPM: ${finalWpm.toFixed(1)}`,
+            );
+          } finally {
+            await rm(tempPath, { force: true }).catch(() => {});
+          }
+        }
+      }
+    }
 
     return {
       audioUrl: filePath,
@@ -233,4 +288,22 @@ function getWavDurationMs(buffer: Buffer): number {
   }
 
   return Math.round((dataSize / bytesPerSecond) * 1000);
+}
+
+function countWords(text: string): number {
+  return (text.match(/\b[\w'-]+\b/g) ?? []).length;
+}
+
+function calculateWpm(text: string, durationMs: number): number {
+  const words = countWords(text);
+
+  if (words === 0 || durationMs <= 0) {
+    return 0;
+  }
+
+  return words / (durationMs / 60_000);
+}
+
+function clampSpeed(speed: number): number {
+  return Math.min(MAX_ATEMPO, Math.max(MIN_ATEMPO, speed));
 }

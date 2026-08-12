@@ -42,4 +42,10 @@ export const config = {
     const value = Number(read("NARRATIVE_HOLD_SECONDS") ?? "0.5");
     return Number.isFinite(value) && value >= 0 ? value : 0.5;
   },
+  narrationTargetWpm: (): number | undefined => {
+    const value = read("NARRATION_TARGET_WPM");
+    if (!value) return undefined;
+    const wpm = Number(value);
+    return Number.isFinite(wpm) && wpm > 0 ? wpm : undefined;
+  },
 };

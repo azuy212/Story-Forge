@@ -147,7 +147,7 @@ export class FfmpegComposerProvider implements ComposerProvider {
       },
       transitionDuration: config?.transitionDuration ?? 0,
       transitionType: config?.transitionType ?? "fade",
-      subtitleFontSize: config?.subtitleFontSize ?? 24,
+      subtitleFontSize: config?.subtitleFontSize ?? 20,
       subtitleFontName: config?.subtitleFontName ?? "Noto Sans",
       backgroundMusicPath: config?.backgroundMusicPath ?? "",
       bgmVolume: config?.bgmVolume ?? 0.15,

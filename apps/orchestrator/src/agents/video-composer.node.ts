@@ -23,7 +23,7 @@ import {
 } from "../utils/branding.js";
 import { config as appConfig } from "../utils/config.js";
 
-const DEFAULT_PROVIDER = new FfmpegComposerProvider();
+const DEFAULT_PROVIDER = new FfmpegComposerProvider({ subtitleFontSize: 16 });
 
 const FRAME_RATE = 30;
 const MIN_SCALE_FACTOR = 0.5;
