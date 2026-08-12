@@ -15,6 +15,7 @@ export class StubComposerProvider implements ComposerProvider {
         narrativeHoldMs: (opts.narrativeHoldSeconds ?? 0) * 1000,
         outroDurationMs: 0,
         durationMs: opts.totalDurationSeconds * 1000,
+        outroTransitionMs: 0,
       },
     };
   }
