@@ -33,6 +33,7 @@ export interface ComposeResult {
     narrativeHoldMs: number;
     outroDurationMs: number;
     durationMs: number;
+    outroTransitionMs: number;
   };
 }
 
