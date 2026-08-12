@@ -70,14 +70,6 @@ export async function normalizeAsset(
  * center. Unlike contain+pad there are no black bars, so the Ken Burns motion
  * zooms through picture rather than bars.
  */
-function coverCropFilter(opts: NormalizeOptions): string {
-  return [
-    `scale=${opts.width}:${opts.height}:force_original_aspect_ratio=increase`,
-    `crop=${opts.width}:${opts.height}`,
-    "setsar=1",
-  ].join(",");
-}
-
 function kenBurnsFilter(
   opts: NormalizeOptions,
   durationSeconds: number,
