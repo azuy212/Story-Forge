@@ -31,7 +31,7 @@ import { config } from "../utils/config.js";
 const DEFAULT_PROVIDER = config.useRealProviders()
   ? new ChatterboxTTSProvider()
   : new StubTTSProvider();
-const DEFAULT_VOICE = "en-US-Neural2-F";
+const DEFAULT_VOICE = "narrator";
 const AUDIO_CACHE_VERSION = 3;
 const CONCAT_VERSION = 1;
 

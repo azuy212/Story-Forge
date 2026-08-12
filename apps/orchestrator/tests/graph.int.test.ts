@@ -558,7 +558,7 @@ describe("Graph", () => {
       "https://placeholder.local/narration.wav",
     );
     expect(result.audio?.narrationDurationMs).toBe(42000);
-    expect(result.audio?.voice).toBe("en-US-Neural2-F");
+    expect(result.audio?.voice).toBe("narrator");
     expect(result.audio?.generatedAt).toBeDefined();
 
     expect(result.subtitles?.srt).toContain("1");
@@ -1760,7 +1760,7 @@ describe("Graph", () => {
       "https://placeholder.local/narration.wav",
     );
     expect(result.audio?.narrationDurationMs).toBe(42000);
-    expect(result.audio?.voice).toBe("en-US-Neural2-F");
+    expect(result.audio?.voice).toBe("narrator");
     expect(result.audio?.generatedAt).toBeDefined();
 
     expect(result.subtitles?.srt).toContain("1");
