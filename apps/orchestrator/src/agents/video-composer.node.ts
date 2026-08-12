@@ -5,6 +5,7 @@ import type {
   Diagnostics,
   Execution,
   Scene,
+  SceneAudio,
 } from "../types/index.js";
 import type { Video } from "../schemas/video.js";
 import { AgentModel } from "../models/agent-model.js";
@@ -109,6 +110,34 @@ export function scaleSceneDurations(
   });
 }
 
+/** Align visual scene boundaries to natural duration of matching scene audio. */
+export function alignSceneDurationsToAudio(
+  scenes: Scene[],
+  audioScenes: SceneAudio[],
+): Scene[] {
+  const audioById = new Map(audioScenes.map((audio) => [audio.sceneId, audio]));
+  let accumulatedFrames = 0;
+
+  return scenes.map((scene) => {
+    const audio = audioById.get(scene.sceneId);
+    if (!audio) {
+      throw new Error(`Missing scene audio for scene ${scene.sceneId}`);
+    }
+    const frameCount = Math.max(
+      1,
+      Math.ceil((audio.durationMs / 1000) * FRAME_RATE),
+    );
+    const startFrames = accumulatedFrames;
+    accumulatedFrames += frameCount;
+    return {
+      ...scene,
+      startSecond: startFrames / FRAME_RATE,
+      endSecond: accumulatedFrames / FRAME_RATE,
+      durationSeconds: frameCount / FRAME_RATE,
+    };
+  });
+}
+
 function getComposerProvider(config: RunnableConfig): ComposerProvider {
   const inject = (config.configurable ?? {}) as Record<string, unknown>;
   return (inject.composerProvider as ComposerProvider) ?? DEFAULT_PROVIDER;
@@ -130,8 +159,14 @@ function collectErrors(state: ProjectState): string[] {
     );
   }
 
-  if (!state.audio?.narrationUrl) {
-    errors.push(`${AgentModel.VideoComposer}: narrationUrl is missing`);
+  if (
+    !state.audio?.combinedAudio ||
+    !state.audio.scenes ||
+    state.audio.scenes.length !== scenes.length
+  ) {
+    errors.push(
+      `${AgentModel.VideoComposer}: complete scene audio manifest is missing`,
+    );
   }
 
   if (!state.subtitles?.srt) {
@@ -161,15 +196,18 @@ export async function videoComposerNode(
 
   const baseScenes =
     state.production?.plannedScenes ?? state.production!.scenes!;
-  const narrationDurationMs = state.audio?.narrationDurationMs;
+  const narrationDurationMs = state.audio?.combinedAudio?.durationMs;
   const targetMs =
     narrationDurationMs && narrationDurationMs > 0
       ? narrationDurationMs
       : (state.content?.estimatedDurationSeconds ?? 0) * 1000;
 
-  let scaledScenes: Scene[];
+  let timedScenes: Scene[];
   try {
-    scaledScenes = scaleSceneDurations(baseScenes, targetMs);
+    timedScenes = alignSceneDurationsToAudio(
+      baseScenes,
+      state.audio?.scenes ?? [],
+    );
   } catch (err) {
     return {
       production: {},
@@ -183,7 +221,7 @@ export async function videoComposerNode(
     };
   }
 
-  const scenes: ComposeSceneInput[] = scaledScenes.map((s) => ({
+  const scenes: ComposeSceneInput[] = timedScenes.map((s) => ({
     sceneId: s.sceneId,
     assetUrl: s.assetUrl!,
     startSecond: s.startSecond ?? 0,
@@ -275,7 +313,7 @@ export async function videoComposerNode(
   return {
     production: {
       plannedScenes: baseScenes,
-      scenes: scaledScenes,
+      scenes: timedScenes,
     },
     video: result.data ?? {},
     diagnostics: {},

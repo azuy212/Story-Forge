@@ -1,25 +1,28 @@
 import type { RunnableConfig } from "@langchain/core/runnables";
-import type { ProjectState, Diagnostics, Execution } from "../types/index.js";
+import type {
+  ProjectState,
+  Diagnostics,
+  Execution,
+  Scene,
+} from "../types/index.js";
 import type { Subtitles } from "../schemas/subtitles.js";
+import type { SceneAudio } from "../schemas/audio.js";
 import { AgentModel } from "../models/agent-model.js";
-import type { SubtitleProvider } from "../providers/subtitle-provider.js";
-import { StubSubtitleProvider } from "../providers/stub-subtitle-provider.js";
-import { WhisperXSubtitleProvider } from "../providers/whisperx-subtitle-provider.js";
-import { HttpWhisperXProvider } from "../providers/whisperx-provider.js";
+import type { SceneSubtitleProvider } from "../providers/scene-subtitle-provider.js";
+import { DeterministicSceneSubtitleProvider } from "../providers/scene-subtitle-provider.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
-import { config } from "../utils/config.js";
 
-// Bump when subtitle alignment implementation changes (v1 was the
-// 300ms/word heuristic; v2 is WhisperX word timestamps).
-const SUBTITLE_ALIGNMENT_VERSION = 2;
+const SUBTITLE_ALIGNMENT_VERSION = 3;
 
-const DEFAULT_PROVIDER = config.useRealProviders()
-  ? new WhisperXSubtitleProvider(new HttpWhisperXProvider())
-  : new StubSubtitleProvider();
+const DEFAULT_PROVIDER = new DeterministicSceneSubtitleProvider();
 
-function getSubtitleProvider(config: RunnableConfig): SubtitleProvider {
+function getSceneSubtitleProvider(
+  config: RunnableConfig,
+): SceneSubtitleProvider {
   const inject = (config.configurable ?? {}) as Record<string, unknown>;
-  return (inject.subtitleProvider as SubtitleProvider) ?? DEFAULT_PROVIDER;
+  return (
+    (inject.sceneSubtitleProvider as SceneSubtitleProvider) ?? DEFAULT_PROVIDER
+  );
 }
 
 export async function subtitleGeneratorNode(
@@ -30,16 +33,43 @@ export async function subtitleGeneratorNode(
   diagnostics: Partial<Diagnostics>;
   execution: Partial<Execution>;
 }> {
+  const scenes = state.production?.scenes ?? [];
+  const audioScenes = state.audio?.scenes ?? [];
+  const combinedAudio = state.audio?.combinedAudio;
   const narration = state.content?.narration;
-  const audioUrl = state.audio?.narrationUrl;
-  const durationMs = state.audio?.narrationDurationMs;
+  const audioUrl = combinedAudio?.url ?? state.audio?.narrationUrl;
+  const durationMs =
+    combinedAudio?.durationMs ?? state.audio?.narrationDurationMs;
 
-  if (!narration || narration.trim().length === 0) {
+  if (
+    scenes.length === 0 ||
+    audioScenes.length !== scenes.length ||
+    !combinedAudio
+  ) {
     return {
       subtitles: {},
       diagnostics: {
         errors: [
-          `${AgentModel.SubtitleGenerator}: Narration text is missing or empty`,
+          `${AgentModel.SubtitleGenerator}: Complete scene audio manifest is required`,
+        ],
+      },
+      execution: { currentNode: AgentModel.SubtitleGenerator },
+    };
+  }
+
+  // Positional, not set, equality: scene audio order must match production
+  // scene order. Scene audio is only meaningful when aligned to its scene.
+  const productionIds = scenes.map((scene) => scene.sceneId);
+  const audioIds = audioScenes.map((scene) => scene.sceneId);
+  if (
+    productionIds.length !== audioIds.length ||
+    productionIds.some((id, index) => id !== audioIds[index])
+  ) {
+    return {
+      subtitles: {},
+      diagnostics: {
+        errors: [
+          `${AgentModel.SubtitleGenerator}: Scene audio IDs do not match production scenes`,
         ],
       },
       execution: { currentNode: AgentModel.SubtitleGenerator },
@@ -58,30 +88,27 @@ export async function subtitleGeneratorNode(
     };
   }
 
-  const provider = getSubtitleProvider(config);
+  const provider = getSceneSubtitleProvider(config);
+  const providerName = provider.constructor.name;
 
   const result = await cacheNodeResult<Partial<Subtitles>>(
     {
       type: "subtitles",
       node: AgentModel.SubtitleGenerator,
-      // Subtitle timing must follow the actual narration WAV: provider
-      // identity (stub vs WhisperX) plus the audio artifact URL determine the
-      // resulting timestamps. The alignment version invalidates artifacts
-      // produced by the old 300ms/word heuristic. A different WAV always
-      // yields a different audioUrl, so it can never reuse old timestamps.
+      // Scene audio identity and alignment version determine subtitle timing.
       key: {
-        provider: provider.constructor.name,
+        provider: providerName,
         narration,
         audioUrl,
+        sceneAudio: audioScenes,
         subtitleAlignmentVersion: SUBTITLE_ALIGNMENT_VERSION,
       },
     },
     async () => {
       try {
-        const providerResult = await provider.generateSubtitles(
-          audioUrl,
-          narration,
-          durationMs,
+        const providerResult = await provider.generateSceneSubtitles(
+          scenes as Scene[],
+          audioScenes as SceneAudio[],
         );
         return {
           data: {

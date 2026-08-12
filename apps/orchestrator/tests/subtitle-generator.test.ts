@@ -1,224 +1,246 @@
 import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 import { subtitleGeneratorNode } from "../src/agents/subtitle-generator.node.js";
-import type { ProjectState } from "../src/types/index.js";
+import type { ProjectState, Scene } from "../src/types/index.js";
 import type {
   SubtitleProvider,
   GenerateSubtitlesResult,
 } from "../src/providers/subtitle-provider.js";
-import { WhisperXSubtitleProvider } from "../src/providers/whisperx-subtitle-provider.js";
+import type { SceneSubtitleProvider } from "../src/providers/scene-subtitle-provider.js";
+import { parseSrtCues } from "../src/utils/srt.js";
 
 const mockGenerateSubtitles = jest.fn<(...args: any[]) => Promise<any>>();
-
-const mockSubtitleProvider: SubtitleProvider = {
+const mockLegacyProvider: SubtitleProvider = {
   generateSubtitles: mockGenerateSubtitles,
 };
 
-const DEFAULT_AUDIO = {
-  narrationUrl: "https://placeholder.local/narration.wav",
-  narrationDurationMs: 6000,
+const mockGenerateSceneSubtitles = jest.fn<(...args: any[]) => Promise<any>>();
+const mockSceneProvider: SceneSubtitleProvider = {
+  generateSceneSubtitles: mockGenerateSceneSubtitles,
 };
 
-const DEFAULT_RESULT: GenerateSubtitlesResult = {
-  srt: "1\n00:00:00,000 --> 00:00:03,000\nHello world",
-  ass: "Dialogue: 0,0:00:00.00,0:00:03.00,Default,,0,0,0,,Hello world",
-  wordTimestamps: [
-    { word: "Hello", start: 0.0, end: 1.5 },
-    { word: "world", start: 1.5, end: 3.0 },
-  ],
+const SCENES: Scene[] = [
+  { sceneId: 1, narration: "First scene has words." },
+  { sceneId: 2, narration: "Second scene has words." },
+];
+const AUDIO_SCENES = [
+  {
+    sceneId: 1,
+    artifactId: "a1",
+    narration: SCENES[0].narration!,
+    durationMs: 2000,
+    url: "scene-001.wav",
+  },
+  {
+    sceneId: 2,
+    artifactId: "a2",
+    narration: SCENES[1].narration!,
+    durationMs: 3000,
+    url: "scene-002.wav",
+  },
+];
+const DEFAULT_AUDIO = {
+  version: 2 as const,
+  scenes: AUDIO_SCENES,
+  combinedAudio: {
+    artifactId: "combined",
+    durationMs: 5000,
+    url: "combined.wav",
+    sourceSceneArtifactIds: ["a1", "a2"],
+  },
+  narrationUrl: "combined.wav",
+  narrationDurationMs: 5000,
 };
 
 beforeEach(() => {
   mockGenerateSubtitles.mockReset();
+  mockGenerateSceneSubtitles.mockReset();
 });
 
-function runNode(state?: Partial<ProjectState>, provider?: SubtitleProvider) {
+function runNode(
+  state: Partial<ProjectState> = {},
+  inject?: {
+    subtitleProvider?: SubtitleProvider;
+    sceneSubtitleProvider?: SceneSubtitleProvider;
+  },
+) {
   return subtitleGeneratorNode(
     {
       project: { pillar: "Geography", topic: "Test" },
-      content: { narration: "Hello world." },
-      audio: { ...DEFAULT_AUDIO },
+      content: { narration: "First scene has words. Second scene has words." },
+      production: { scenes: SCENES },
+      audio: DEFAULT_AUDIO,
       execution: { version: "0.1.0" },
       ...state,
     } as ProjectState,
     {
-      configurable: { subtitleProvider: provider ?? mockSubtitleProvider },
+      configurable: {
+        ...(inject?.subtitleProvider
+          ? { subtitleProvider: inject.subtitleProvider }
+          : {}),
+        ...(inject?.sceneSubtitleProvider
+          ? { sceneSubtitleProvider: inject.sceneSubtitleProvider }
+          : {}),
+      },
     } as any,
   );
 }
 
 describe("subtitleGeneratorNode", () => {
-  it("successful generation sets srt, ass, and wordTimestamps", async () => {
-    mockGenerateSubtitles.mockResolvedValue(DEFAULT_RESULT);
-
+  it("creates scene-bounded subtitles without alignment service", async () => {
     const result = await runNode();
-
-    expect(result.subtitles.srt).toBe(DEFAULT_RESULT.srt);
-    expect(result.subtitles.ass).toBe(DEFAULT_RESULT.ass);
-    expect(result.subtitles.wordTimestamps).toHaveLength(2);
-    expect(result.subtitles.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    expect(result.execution?.currentNode).toBe("SubtitleGenerator");
-  });
-
-  it("returns error when narration is missing", async () => {
-    const result = await runNode({ content: {} } as any);
-
-    expect(result.diagnostics?.errors).toBeDefined();
-    expect(result.diagnostics?.errors![0]).toContain("missing or empty");
-    expect(result.subtitles.srt).toBeUndefined();
-    expect(mockGenerateSubtitles).not.toHaveBeenCalled();
-  });
-
-  it("returns error when narration is empty", async () => {
-    const result = await runNode({ content: { narration: "" } } as any);
-
-    expect(result.diagnostics?.errors).toBeDefined();
-    expect(result.diagnostics?.errors![0]).toContain("missing or empty");
-    expect(mockGenerateSubtitles).not.toHaveBeenCalled();
-  });
-
-  it("returns error when audioUrl is missing", async () => {
-    const result = await runNode({
-      audio: { narrationDurationMs: 6000 },
-    } as any);
-
-    expect(result.diagnostics?.errors).toBeDefined();
-    expect(result.diagnostics?.errors![0]).toContain(
-      "Audio URL or duration missing",
-    );
-    expect(mockGenerateSubtitles).not.toHaveBeenCalled();
-  });
-
-  it("returns error when durationMs is missing", async () => {
-    const result = await runNode({
-      audio: { narrationUrl: "https://local/audio.wav" },
-    } as any);
-
-    expect(result.diagnostics?.errors).toBeDefined();
-    expect(result.diagnostics?.errors![0]).toContain(
-      "Audio URL or duration missing",
-    );
-    expect(mockGenerateSubtitles).not.toHaveBeenCalled();
-  });
-
-  it("returns error on provider failure", async () => {
-    mockGenerateSubtitles.mockRejectedValue(
-      new Error("TTS service unavailable"),
-    );
-
-    const result = await runNode();
-
-    expect(result.diagnostics?.errors).toBeDefined();
-    expect(result.diagnostics?.errors![0]).toContain("TTS service unavailable");
-    expect(result.subtitles.srt).toBeUndefined();
-  });
-
-  it("uses stub provider when no provider injected", async () => {
-    const result = await subtitleGeneratorNode(
-      {
-        project: { pillar: "Geography", topic: "Test" },
-        content: { narration: "Short test." },
-        audio: {
-          narrationUrl: "https://local/audio.wav",
-          narrationDurationMs: 2000,
-        },
-        execution: { version: "0.1.0" },
-      } as ProjectState,
-      { configurable: {} } as any,
-    );
 
     expect(result.subtitles.srt).toBeDefined();
-    expect(result.subtitles.srt!.length).toBeGreaterThan(0);
     expect(result.subtitles.ass).toBeDefined();
-    expect(result.subtitles.ass!.length).toBeGreaterThan(0);
     expect(result.subtitles.wordTimestamps).toBeDefined();
-    expect(result.subtitles.wordTimestamps!.length).toBeGreaterThan(0);
+    expect(result.subtitles.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+    const cues = parseSrtCues(result.subtitles.srt!);
+    expect(cues.length).toBeGreaterThan(0);
+    expect(cues.every((cue) => cue.endMs <= 5000)).toBe(true);
+    expect(cues.some((cue) => cue.startMs < 2000 && cue.endMs > 2000)).toBe(
+      false,
+    );
   });
 
-  it("uses injected provider over stub", async () => {
-    const customResult: GenerateSubtitlesResult = {
-      srt: "1\n00:00:00,000 --> 00:00:02,000\nCustom",
-      ass: "Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,Custom",
-      wordTimestamps: [{ word: "Custom", start: 0.0, end: 2.0 }],
-    };
-    mockGenerateSubtitles.mockResolvedValue(customResult);
-
+  it("starts scene 2 exactly at cumulative scene 1 duration", async () => {
     const result = await runNode();
 
-    expect(result.subtitles.srt).toContain("Custom");
-    expect(result.subtitles.wordTimestamps![0].word).toBe("Custom");
+    const cues = parseSrtCues(result.subtitles.srt!);
+    const sceneTwoCue = cues.find((cue) => cue.text.includes("Second"));
+    expect(sceneTwoCue).toBeDefined();
+    expect(sceneTwoCue!.startMs).toBe(2000);
+    expect(cues.every((cue) => cue.endMs <= 5000)).toBe(true);
   });
 
-  it("passes narration duration to the provider", async () => {
-    mockGenerateSubtitles.mockResolvedValue(DEFAULT_RESULT);
+  it("never lets a cue cross a scene boundary", async () => {
+    const longScenes = [
+      { sceneId: 1, narration: "one two three four five six seven eight" },
+      { sceneId: 2, narration: "nine ten eleven twelve thirteen" },
+    ] as Scene[];
+    const longAudio = [
+      {
+        sceneId: 1,
+        artifactId: "a1",
+        narration: longScenes[0].narration!,
+        durationMs: 4000,
+        url: "scene-001.wav",
+      },
+      {
+        sceneId: 2,
+        artifactId: "a2",
+        narration: longScenes[1].narration!,
+        durationMs: 5000,
+        url: "scene-002.wav",
+      },
+    ];
 
     const result = await runNode({
+      production: { scenes: longScenes },
       audio: {
-        narrationUrl: "https://placeholder.local/narration.wav",
-        narrationDurationMs: 7500,
+        ...DEFAULT_AUDIO,
+        scenes: longAudio,
+        combinedAudio: {
+          ...DEFAULT_AUDIO.combinedAudio!,
+          durationMs: 9000,
+          sourceSceneArtifactIds: ["a1", "a2"],
+        },
+        narrationDurationMs: 9000,
       },
-    });
+    } as any);
 
-    expect(result.subtitles.srt).toBe(DEFAULT_RESULT.srt);
-    expect(mockGenerateSubtitles).toHaveBeenCalledWith(
-      "https://placeholder.local/narration.wav",
-      "Hello world.",
-      7500,
+    const cues = parseSrtCues(result.subtitles.srt!);
+    expect(cues.some((cue) => cue.startMs < 4000 && cue.endMs > 4000)).toBe(
+      false,
     );
   });
 
-  it("passes through whisperx word timestamps into subtitles", async () => {
-    const align = jest
-      .fn<(...args: any[]) => Promise<any>>()
-      .mockResolvedValue({
-        wordTimestamps: [
-          { word: "Hello", start: 0.1, end: 0.5 },
-          { word: "world.", start: 0.5, end: 0.9 },
-        ],
-      });
-    const whisperxProvider = new WhisperXSubtitleProvider({ align } as any);
+  it("requires complete scene audio manifest", async () => {
+    const result = await runNode({
+      audio: { narrationUrl: "legacy.wav" },
+    } as any);
 
-    const result = await runNode(undefined, whisperxProvider);
-
-    expect(align).toHaveBeenCalledWith(
-      "https://placeholder.local/narration.wav",
-      "Hello world.",
-    );
-    expect(result.subtitles.srt).toContain("00:00:00,100 --> 00:00:00,900");
-    expect(result.subtitles.srt).toContain("Hello world.");
-    expect(result.subtitles.wordTimestamps).toEqual([
-      { word: "Hello", start: 0.1, end: 0.5 },
-      { word: "world.", start: 0.5, end: 0.9 },
-    ]);
-  });
-
-  it("surfaces whisperx alignment failure as an error, no silent fallback", async () => {
-    const align = jest
-      .fn<(...args: any[]) => Promise<any>>()
-      .mockRejectedValue(new Error("WhisperX alignment failed: HTTP 500"));
-    const whisperxProvider = new WhisperXSubtitleProvider({ align } as any);
-
-    const result = await runNode(undefined, whisperxProvider);
-
-    expect(result.diagnostics?.errors).toBeDefined();
-    expect(result.diagnostics?.errors![0]).toContain(
-      "WhisperX alignment failed",
+    expect(result.diagnostics.errors?.[0]).toContain(
+      "Complete scene audio manifest is required",
     );
     expect(result.subtitles.srt).toBeUndefined();
   });
 
-  it("sets execution.currentNode", async () => {
-    mockGenerateSubtitles.mockResolvedValue(DEFAULT_RESULT);
+  it("rejects mismatched scene audio IDs", async () => {
+    const result = await runNode({
+      audio: {
+        ...DEFAULT_AUDIO,
+        scenes: [
+          { ...AUDIO_SCENES[0] },
+          { ...AUDIO_SCENES[1], sceneId: 99 },
+        ],
+      },
+    } as any);
 
-    const result = await runNode();
-
-    expect(result.execution?.currentNode).toBe("SubtitleGenerator");
+    expect(result.diagnostics.errors?.[0]).toContain(
+      "Scene audio IDs do not match production scenes",
+    );
+    expect(result.subtitles.srt).toBeUndefined();
   });
 
-  it("generatedAt is valid ISO timestamp", async () => {
-    mockGenerateSubtitles.mockResolvedValue(DEFAULT_RESULT);
+  it("rejects reordered scene audio (positional, not set, equality)", async () => {
+    const result = await runNode({
+      audio: {
+        ...DEFAULT_AUDIO,
+        scenes: [AUDIO_SCENES[1], AUDIO_SCENES[0]],
+        combinedAudio: {
+          ...DEFAULT_AUDIO.combinedAudio!,
+          sourceSceneArtifactIds: ["a2", "a1"],
+        },
+      },
+    } as any);
 
-    const result = await runNode();
+    expect(result.diagnostics.errors?.[0]).toContain(
+      "Scene audio IDs do not match production scenes",
+    );
+    expect(result.subtitles.srt).toBeUndefined();
+  });
 
-    expect(result.subtitles.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  it("ignores legacy subtitleProvider injection (no WhisperX path)", async () => {
+    mockGenerateSubtitles.mockResolvedValue({
+      srt: "1\n00:00:00,000 --> 00:00:01,000\nLegacy",
+      ass: "Legacy",
+      wordTimestamps: [{ word: "Legacy", start: 0, end: 1 }],
+    } satisfies GenerateSubtitlesResult);
+
+    const result = await runNode({}, { subtitleProvider: mockLegacyProvider });
+
+    expect(mockGenerateSubtitles).not.toHaveBeenCalled();
+    expect(result.subtitles.srt).toBeDefined();
+    expect(result.subtitles.srt).not.toContain("Legacy");
+  });
+
+  it("uses the scene subtitle provider", async () => {
+    mockGenerateSceneSubtitles.mockResolvedValue({
+      srt: "1\n00:00:00,000 --> 00:00:01,000\nScene",
+      ass: "Scene",
+      wordTimestamps: [{ word: "Scene", start: 0, end: 1 }],
+    });
+
+    const result = await runNode(
+      {},
+      { sceneSubtitleProvider: mockSceneProvider },
+    );
+
+    expect(mockGenerateSceneSubtitles).toHaveBeenCalledWith(
+      SCENES,
+      AUDIO_SCENES,
+    );
+    expect(result.subtitles.srt).toContain("Scene");
+  });
+
+  it("does not generate subtitles when scene count is incomplete", async () => {
+    const result = await runNode({
+      audio: { ...DEFAULT_AUDIO, scenes: AUDIO_SCENES.slice(0, 1) },
+    } as any);
+
+    expect(result.diagnostics.errors?.[0]).toContain(
+      "Complete scene audio manifest",
+    );
+    expect(mockGenerateSubtitles).not.toHaveBeenCalled();
   });
 });

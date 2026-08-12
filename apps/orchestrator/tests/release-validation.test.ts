@@ -53,6 +53,22 @@ function baseState(): ProjectState {
     },
     production: { scenes: [DEFAULT_SCENE] },
     audio: {
+      version: 2,
+      scenes: [
+        {
+          sceneId: 1,
+          artifactId: "scene-audio-1",
+          narration: NARRATION,
+          durationMs: 10000,
+          url: "https://placeholder.local/scene-001.wav",
+        },
+      ],
+      combinedAudio: {
+        artifactId: "combined-audio",
+        durationMs: 10000,
+        url: "https://placeholder.local/narration.wav",
+        sourceSceneArtifactIds: ["scene-audio-1"],
+      },
       narrationUrl: "https://placeholder.local/narration.wav",
       narrationDurationMs: 10000,
     },
@@ -204,6 +220,225 @@ describe("releaseValidationNode", () => {
     expect(
       result.releaseValidation.issues!.some((i) =>
         i.includes("Scene durations sum"),
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects combined audio with wrong source identity or duration", async () => {
+    const result = await runNode({
+      audio: {
+        ...baseState().audio,
+        combinedAudio: {
+          ...baseState().audio!.combinedAudio!,
+          durationMs: 11000,
+          sourceSceneArtifactIds: ["wrong-scene-artifact"],
+        },
+      },
+    } as any);
+
+    expect(result.releaseValidation.status).toBe("fatal");
+    expect(result.releaseValidation.issues).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("Combined audio sources match scene artifacts"),
+        expect.stringContaining("Combined audio duration matches scene audio"),
+      ]),
+    );
+  });
+
+  function twoSceneState() {
+    return {
+      production: {
+        scenes: [
+          { ...DEFAULT_SCENE, sceneId: 1, durationSeconds: 5 },
+          {
+            ...DEFAULT_SCENE,
+            sceneId: 2,
+            startSecond: 5,
+            endSecond: 10,
+            durationSeconds: 5,
+          },
+        ],
+      },
+      audio: {
+        version: 2,
+        scenes: [
+          {
+            sceneId: 1,
+            artifactId: "a1",
+            narration: NARRATION,
+            durationMs: 5000,
+            url: "scene-001.wav",
+          },
+          {
+            sceneId: 2,
+            artifactId: "a2",
+            narration: NARRATION,
+            durationMs: 5000,
+            url: "scene-002.wav",
+          },
+        ],
+        combinedAudio: {
+          artifactId: "combined",
+          durationMs: 10000,
+          url: "narration.wav",
+          sourceSceneArtifactIds: ["a1", "a2"],
+        },
+        narrationUrl: "narration.wav",
+        narrationDurationMs: 10000,
+      },
+    } as const;
+  }
+
+  it("fatal when audio manifest version is not 2", async () => {
+    const result = await runNode({
+      audio: { ...baseState().audio, version: 1 },
+    } as any);
+
+    expect(result.releaseValidation.status).toBe("fatal");
+    expect(
+      result.releaseValidation.issues!.some((i) =>
+        i.includes("Audio manifest version is 2"),
+      ),
+    ).toBe(true);
+  });
+
+  it("fatal when audio manifest version is missing", async () => {
+    const { version, ...audioWithoutVersion } = baseState().audio!;
+    const result = await runNode({ audio: audioWithoutVersion } as any);
+
+    expect(result.releaseValidation.status).toBe("fatal");
+    expect(
+      result.releaseValidation.issues!.some((i) =>
+        i.includes("Audio manifest version is 2"),
+      ),
+    ).toBe(true);
+  });
+
+  it("fatal when production scene IDs are duplicated", async () => {
+    const state = twoSceneState();
+    const result = await runNode({
+      production: {
+        scenes: [
+          { ...DEFAULT_SCENE, sceneId: 1, durationSeconds: 5 },
+          {
+            ...DEFAULT_SCENE,
+            sceneId: 1,
+            startSecond: 5,
+            endSecond: 10,
+            durationSeconds: 5,
+          },
+        ],
+      },
+      audio: state.audio,
+    } as any);
+
+    expect(result.releaseValidation.status).toBe("fatal");
+    expect(
+      result.releaseValidation.issues!.some((i) =>
+        i.includes("Production scene IDs are unique"),
+      ),
+    ).toBe(true);
+  });
+
+  it("fatal when a scene audio entry is missing", async () => {
+    const state = twoSceneState();
+    const result = await runNode({
+      production: state.production,
+      audio: {
+        ...state.audio,
+        scenes: [state.audio.scenes[0]],
+        combinedAudio: {
+          ...state.audio.combinedAudio,
+          durationMs: 5000,
+          sourceSceneArtifactIds: ["a1"],
+        },
+        narrationDurationMs: 5000,
+      },
+    } as any);
+
+    expect(result.releaseValidation.status).toBe("fatal");
+    expect(
+      result.releaseValidation.issues!.some((i) =>
+        i.includes("Scene audio count matches production"),
+      ),
+    ).toBe(true);
+  });
+
+  it("fatal when an extra scene audio entry exists", async () => {
+    const state = twoSceneState();
+    const result = await runNode({
+      production: { scenes: [state.production.scenes[0]] },
+      audio: state.audio,
+    } as any);
+
+    expect(result.releaseValidation.status).toBe("fatal");
+    expect(
+      result.releaseValidation.issues!.some((i) =>
+        i.includes("Scene audio count matches production"),
+      ),
+    ).toBe(true);
+  });
+
+  it("fatal when scene audio order is reordered", async () => {
+    const state = twoSceneState();
+    const result = await runNode({
+      production: state.production,
+      audio: {
+        ...state.audio,
+        scenes: [state.audio.scenes[1], state.audio.scenes[0]],
+        combinedAudio: {
+          ...state.audio.combinedAudio,
+          sourceSceneArtifactIds: ["a2", "a1"],
+        },
+      },
+    } as any);
+
+    expect(result.releaseValidation.status).toBe("fatal");
+    expect(
+      result.releaseValidation.issues!.some((i) =>
+        i.includes("Scene audio order matches production"),
+      ),
+    ).toBe(true);
+  });
+
+  it("fatal when combined source artifact order mismatches", async () => {
+    const state = twoSceneState();
+    const result = await runNode({
+      production: state.production,
+      audio: {
+        ...state.audio,
+        combinedAudio: {
+          ...state.audio.combinedAudio,
+          sourceSceneArtifactIds: ["a2", "a1"],
+        },
+      },
+    } as any);
+
+    expect(result.releaseValidation.status).toBe("fatal");
+    expect(
+      result.releaseValidation.issues!.some((i) =>
+        i.includes("Combined audio sources match scene artifacts"),
+      ),
+    ).toBe(true);
+  });
+
+  it("fatal when combined duration differs from scene sum beyond 50ms", async () => {
+    const state = twoSceneState();
+    const result = await runNode({
+      production: state.production,
+      audio: {
+        ...state.audio,
+        combinedAudio: {
+          ...state.audio.combinedAudio,
+          durationMs: 10051,
+        },
+      },
+    } as any);
+
+    expect(result.releaseValidation.status).toBe("fatal");
+    expect(
+      result.releaseValidation.issues!.some((i) =>
+        i.includes("Combined audio duration matches scene audio"),
       ),
     ).toBe(true);
   });

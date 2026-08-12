@@ -62,8 +62,8 @@ export type { PromptQAOutput, SceneResult } from "./prompt-qa-output.js";
 export { ExecutionSchema } from "./execution.js";
 export type { Execution } from "./execution.js";
 
-export { AudioSchema } from "./audio.js";
-export type { Audio } from "./audio.js";
+export { AudioSchema, SceneAudioSchema, CombinedAudioSchema } from "./audio.js";
+export type { Audio, SceneAudio, CombinedAudio } from "./audio.js";
 
 export { SubtitlesSchema, WordTimestampSchema } from "./subtitles.js";
 export type { Subtitles, WordTimestamp } from "./subtitles.js";

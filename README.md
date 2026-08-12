@@ -2,7 +2,7 @@
 
 AI Series generates short-form educational videos from a topic. The LangGraph
 orchestrator researches a topic, plans and writes a script, creates visual and
-narration assets, aligns narration words for subtitles, validates the resulting
+narration assets, generates scene-bounded subtitles, validates the resulting
 media, and prepares publishing metadata.
 
 This repository contains four independently runnable applications. They keep
@@ -16,19 +16,17 @@ flowchart LR
     U[Developer or client] --> O[orchestrator\nLangGraph :2024]
     O -->|HTTP POST /generate| T[tts\nFastAPI :8010]
     O -->|HTTP POST /generate| I[image-provider\nFastify :8020]
-    O -->|HTTP multipart /align| X[transcriber\nFastAPI :8030]
     T -->|audio URL| O
     I -->|media response| O
-    X -->|word timestamps| O
 ```
 
-`orchestrator` is the only application that coordinates the workflow. It
-calls `tts`, `image-provider`, and `transcriber` over HTTP using:
+`orchestrator` is the only application that coordinates the workflow. It calls
+`tts` and `image-provider` over HTTP. `transcriber` remains independently
+available, but production narration does not invoke it.
 
 ```text
 TTS_URL=http://localhost:8010
 IMAGE_PROVIDER_URL=http://localhost:8020
-TRANSCRIBER_URL=http://localhost:8030
 ```
 
 Supporting services do not call each other. Each can be started, tested, and

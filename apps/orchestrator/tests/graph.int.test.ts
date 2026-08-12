@@ -228,15 +228,26 @@ const ASSET_PROVIDER = {
 };
 
 const TTS_PROVIDER = {
-  synthesize: () =>
+  synthesize: (opts: { filename?: string }) =>
     Promise.resolve({
-      audioUrl: "https://placeholder.local/narration.wav",
-      durationMs: 42000,
+      audioUrl: `https://placeholder.local/${opts.filename ?? "scene.wav"}`,
+      durationMs: 7000,
     }),
 };
 
-const SUBTITLE_PROVIDER = {
-  generateSubtitles: () =>
+const AUDIO_CONCATENATOR = {
+  concat: (inputs: Array<{ durationMs?: number }>) =>
+    Promise.resolve({
+      audioPath: "https://placeholder.local/narration.wav",
+      durationMs: inputs.reduce(
+        (sum, input) => sum + (input.durationMs ?? 0),
+        0,
+      ),
+    }),
+};
+
+const SCENE_SUBTITLE_PROVIDER = {
+  generateSceneSubtitles: () =>
     Promise.resolve({
       srt: `1\n00:00:00,000 --> 00:00:42,000\n${SCENE_NARRATIONS.join(" ")}`,
       ass: "Dialogue: 0,0:00:00.00,0:00:42.00,Default,,0,0,0,,What if",
@@ -441,7 +452,8 @@ describe("Graph", () => {
           loadPrompt: mockLoadPrompt,
           assetProvider: ASSET_PROVIDER,
           ttsProvider: TTS_PROVIDER,
-          subtitleProvider: SUBTITLE_PROVIDER,
+          audioConcatenator: AUDIO_CONCATENATOR.concat,
+          sceneSubtitleProvider: SCENE_SUBTITLE_PROVIDER,
           composerProvider: COMPOSER_PROVIDER,
           probe: () => Promise.resolve(RELEASE_PROBE),
         },
@@ -928,7 +940,8 @@ describe("Graph", () => {
           loadPrompt: mockLoadPrompt,
           assetProvider: ASSET_PROVIDER,
           ttsProvider: TTS_PROVIDER,
-          subtitleProvider: SUBTITLE_PROVIDER,
+          audioConcatenator: AUDIO_CONCATENATOR.concat,
+          sceneSubtitleProvider: SCENE_SUBTITLE_PROVIDER,
           composerProvider: COMPOSER_PROVIDER,
           probe: () => Promise.resolve(RELEASE_PROBE),
         },
@@ -1141,7 +1154,8 @@ describe("Graph", () => {
           loadPrompt: mockLoadPrompt,
           assetProvider: ASSET_PROVIDER,
           ttsProvider: TTS_PROVIDER,
-          subtitleProvider: SUBTITLE_PROVIDER,
+          audioConcatenator: AUDIO_CONCATENATOR.concat,
+          sceneSubtitleProvider: SCENE_SUBTITLE_PROVIDER,
           composerProvider: COMPOSER_PROVIDER,
           probe: () => Promise.resolve(RELEASE_PROBE),
         },
@@ -1682,7 +1696,8 @@ describe("Graph", () => {
           loadPrompt: mockLoadPrompt,
           assetProvider: ASSET_PROVIDER,
           ttsProvider: TTS_PROVIDER,
-          subtitleProvider: SUBTITLE_PROVIDER,
+          audioConcatenator: AUDIO_CONCATENATOR.concat,
+          sceneSubtitleProvider: SCENE_SUBTITLE_PROVIDER,
           composerProvider: COMPOSER_PROVIDER,
           probe: () => Promise.resolve(RELEASE_PROBE),
           publisherProvider: {
@@ -1970,7 +1985,8 @@ describe("Graph", () => {
           loadPrompt: mockLoadPrompt,
           assetProvider: ASSET_PROVIDER,
           ttsProvider: TTS_PROVIDER,
-          subtitleProvider: SUBTITLE_PROVIDER,
+          audioConcatenator: AUDIO_CONCATENATOR.concat,
+          sceneSubtitleProvider: SCENE_SUBTITLE_PROVIDER,
           composerProvider: COMPOSER_PROVIDER,
           publisherProvider: {
             publish: () =>

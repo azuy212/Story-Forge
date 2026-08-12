@@ -8,3 +8,5 @@ export const PROMPT_MAX_RETRIES = DEFAULT_MAX_RETRIES;
 export const RESEARCH_QA_MAX_RETRIES = 2;
 export const SCRIPT_QA_MAX_RETRIES = 2;
 export const PROMPT_QA_MAX_RETRIES = 2;
+// WAV/ffprobe duration precision varies slightly between codecs and headers.
+export const AUDIO_DURATION_TOLERANCE_MS = 50;

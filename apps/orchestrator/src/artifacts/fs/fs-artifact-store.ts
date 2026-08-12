@@ -218,6 +218,35 @@ export class FilesystemArtifactStore implements ArtifactStore {
     return this.load(ref);
   }
 
+  async findCompleteByInputHash<T>(
+    runId: string,
+    type: ArtifactType,
+    inputHash: string,
+  ): Promise<{ record: ArtifactRecord<T>; ref: ArtifactReference } | null> {
+    const versions = await this.listVersions(runId, type);
+    for (const entry of [...versions].sort((a, b) => b.version - a.version)) {
+      if (entry.status !== "complete" || entry.inputHash !== inputHash) {
+        continue;
+      }
+
+      const ref: ArtifactReference = {
+        artifactId: entry.artifactId,
+        type,
+        version: entry.version,
+        location: artifactPath(runId, type, entry.version),
+        runId,
+      };
+      const record = await this.load<T>(ref);
+      if (
+        record?.status === "complete" &&
+        record.meta.inputHash === inputHash
+      ) {
+        return { record, ref };
+      }
+    }
+    return null;
+  }
+
   async listVersions(
     runId: string,
     type: ArtifactType,
