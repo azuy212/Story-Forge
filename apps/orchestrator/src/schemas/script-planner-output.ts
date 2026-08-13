@@ -25,18 +25,10 @@ const ScriptBeatSchema = z.object({
     .number()
     .int("beatId must be whole number")
     .positive("beatId must be positive"),
-  purpose: z
-    .string()
-    .min(1, "purpose must not be empty"),
-  viewerQuestion: z
-    .string()
-    .min(1, "viewerQuestion must not be empty"),
-  curiosityQuestion: z
-    .string()
-    .min(1, "curiosityQuestion must not be empty"),
-  keyMessage: z
-    .string()
-    .min(1, "keyMessage must not be empty"),
+  purpose: z.string().min(1, "purpose must not be empty"),
+  viewerQuestion: z.string().min(1, "viewerQuestion must not be empty"),
+  curiosityQuestion: z.string().min(1, "curiosityQuestion must not be empty"),
+  keyMessage: z.string().min(1, "keyMessage must not be empty"),
   referencedFacts: z
     .array(z.string())
     .min(1, "every beat must reference at least one fact"),
@@ -46,16 +38,27 @@ const ScriptBeatSchema = z.object({
     .positive("estimatedDurationSeconds must be positive"),
 });
 
+const ScriptBeatsSchema = z
+  .array(ScriptBeatSchema)
+  .min(6, "must have at least 6 story beats")
+  .max(10, "must have at most 10 story beats")
+  .superRefine((beats, ctx) => {
+    beats.forEach((beat, index) => {
+      if (beat.beatId !== index + 1) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, "beatId"],
+          message: `beatId must be sequential; expected ${index + 1}, received ${beat.beatId}`,
+        });
+      }
+    });
+  });
+
 export const ScriptPlannerOutputSchema = z.object({
   content: ScriptPlannerContentSchema,
   storyType: StoryTypeEnum,
-  storySummary: z
-    .string()
-    .min(1, "storySummary must not be empty"),
-  storyBeats: z
-    .array(ScriptBeatSchema)
-    .min(6, "must have at least 6 story beats")
-    .max(10, "must have at most 10 story beats"),
+  storySummary: z.string().min(1, "storySummary must not be empty"),
+  storyBeats: ScriptBeatsSchema,
 });
 
 export type ScriptPlannerOutput = z.input<typeof ScriptPlannerOutputSchema>;

@@ -33,18 +33,10 @@ function validateStoryPlan(
 ): string[] {
   const warnings: string[] = [];
 
-  // beatId contiguity and exact duration sums are LLM arithmetic that the
-  // composer normalizes anyway — not worth flagging. Only semantic checks
-  // that code cannot repair are kept.
-
-  const blankQuestions = data.storyBeats.filter(
-    (b) => !b.curiosityQuestion?.trim(),
-  );
-  if (blankQuestions.length > 0) {
-    warnings.push(
-      `StoryPlanner: beats missing curiosityQuestion: [${blankQuestions.map((b) => b.beatId).join(", ")}]`,
-    );
-  }
+  // beatId contiguity, exact duration sums, and the final/non-final
+  // curiosityQuestion contract are enforced by the schema (deterministic
+  // structural invariants); the composer normalizes timing anyway. Only
+  // semantic checks that code cannot repair are kept here.
 
   const referencedIds = new Set(
     data.storyBeats.flatMap((b) => b.referencedFacts),

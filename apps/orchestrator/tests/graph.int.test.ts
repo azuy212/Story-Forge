@@ -82,7 +82,8 @@ const STORY_BEATS = [
     beatId: 6,
     purpose: "Deliver final payoff",
     viewerQuestion: "Can I visit?",
-    curiosityQuestion: "What's the one thing you'd remember?",
+    curiosityQuestion:
+      "And there's still one mystery left: what would you see there today?",
     keyMessage: "Access requires special permission.",
     referencedFacts: ["fact-007"],
     priority: "high",

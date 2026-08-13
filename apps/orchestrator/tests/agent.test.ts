@@ -210,10 +210,9 @@ describe("scriptPlannerNode", () => {
     expect(result.diagnostics?.telemetry?.ScriptPlanner.retries).toBe(3);
   });
 
-  it("tolerates non-contiguous beatIds without warnings", async () => {
-    // beatId arithmetic is a code concern, not a quality signal: exact
-    // contiguity used to be flagged even though nothing downstream depends on
-    // beatId ordering.
+  it("rejects non-contiguous beatIds as a schema failure", async () => {
+    // beatId must be 1-based sequential: a skipped ID breaks the structural
+    // contract consumed by downstream agents, so it is a hard schema error.
     const beats = storyBeats().map((b, i) =>
       i === 3 ? { ...b, beatId: 9 } : b,
     );
@@ -231,10 +230,12 @@ describe("scriptPlannerNode", () => {
     const { promise } = runNode();
     const result = await promise;
 
-    expect(
-      result.diagnostics?.warnings?.some((w) => w.includes("beatIds")) ?? false,
-    ).toBe(false);
-    expect(result.diagnostics?.errors ?? []).toHaveLength(0);
+    expect(result.storyPlan?.storyBeats).toEqual([]);
+    expect(result.diagnostics?.errors).toBeDefined();
+    expect(result.diagnostics?.errors![0]).toContain(
+      "beatId must be sequential",
+    );
+    expect(result.diagnostics?.telemetry?.ScriptPlanner.retries).toBe(3);
   });
 
   it("warns when a beat references an unknown fact", async () => {
@@ -258,6 +259,63 @@ describe("scriptPlannerNode", () => {
     expect(
       result.diagnostics?.warnings!.some((w) => w.includes("fact-999")),
     ).toBe(true);
+  });
+
+  it("accepts an ending-hook curiosityQuestion on the final beat without warnings", async () => {
+    const beats = storyBeats().map((b, i) => ({
+      ...b,
+      curiosityQuestion:
+        i === 5
+          ? "And the deeper mystery remains: researchers still can't explain how it got that way."
+          : b.curiosityQuestion,
+    }));
+    mockGenerate.mockResolvedValue(
+      buildResponse({
+        content: JSON.stringify({
+          content: { title: "T", hook: "H?" },
+          storyType: "mystery",
+          storySummary: "S.",
+          storyBeats: beats,
+        }),
+      }),
+    );
+
+    const { promise } = runNode();
+    const result = await promise;
+
+    expect(result.diagnostics?.errors ?? []).toHaveLength(0);
+    expect(
+      result.diagnostics?.warnings?.some((w) =>
+        w.includes("curiosityQuestion"),
+      ) ?? false,
+    ).toBe(false);
+  });
+
+  it("rejects a null curiosityQuestion on any beat as a schema failure", async () => {
+    const beats = storyBeats().map((b, i) => ({
+      ...b,
+      curiosityQuestion: i === 2 ? null : b.curiosityQuestion,
+    }));
+    mockGenerate.mockResolvedValue(
+      buildResponse({
+        content: JSON.stringify({
+          content: { title: "T", hook: "H?" },
+          storyType: "mystery",
+          storySummary: "S.",
+          storyBeats: beats,
+        }),
+      }),
+    );
+
+    const { promise } = runNode();
+    const result = await promise;
+
+    expect(result.storyPlan?.storyBeats).toEqual([]);
+    expect(result.diagnostics?.errors).toBeDefined();
+    expect(result.diagnostics?.errors![0]).toContain(
+      "expected string, received null",
+    );
+    expect(result.diagnostics?.telemetry?.ScriptPlanner.retries).toBe(3);
   });
 
   it("requires research before planning", async () => {

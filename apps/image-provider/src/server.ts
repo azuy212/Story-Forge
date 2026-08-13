@@ -32,7 +32,7 @@ const ReferenceImageSchema = z.object({
 
 export const GenerateRequestSchema = z
   .object({
-    prompt: z.string().min(1, 'Prompt is required').max(1000, 'Prompt too long'),
+    prompt: z.string().min(1, 'Prompt is required').max(4000, 'Prompt too long'),
     type: z.enum(['image', 'video']).optional().default('image'),
     mode: z.enum(['text_to_image', 'image_to_image', 'edit']).optional().default('text_to_image'),
     referenceImages: z.array(ReferenceImageSchema).max(4).optional().default([]),
