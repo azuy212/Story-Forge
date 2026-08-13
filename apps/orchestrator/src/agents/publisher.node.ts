@@ -9,6 +9,7 @@ import { AgentModel } from "../types/index.js";
 import type { PublisherProvider } from "../providers/publisher-provider.js";
 import { StubPublisherProvider } from "../providers/stub-publisher-provider.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
+import { withTopic } from "../artifacts/context.js";
 import { getErrorMessage } from "../utils/errors.js";
 import type { SourceAsset } from "../schemas/production.js";
 
@@ -148,7 +149,7 @@ export async function publisherNode(
         },
       };
     },
-    config,
+    withTopic(config, state),
   );
 
   return {

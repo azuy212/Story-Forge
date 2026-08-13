@@ -8,6 +8,7 @@ import type {
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
 import { completeArtifactForNode } from "../artifacts/cache.js";
+import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { ImagePromptOutputSchema } from "../schemas/image-prompt-output.js";
 import type { ImagePromptOutput } from "../schemas/image-prompt-output.js";
@@ -125,7 +126,7 @@ export async function imagePromptGeneratorNode(
         qaFeedback: `${qaFeedback}${missingHint}`,
       },
       inject,
-      configurable: config.configurable as Record<string, unknown>,
+      configurable: withTopic(config, state).configurable,
       deferComplete: true,
     });
     if (result.error || !result.data) {

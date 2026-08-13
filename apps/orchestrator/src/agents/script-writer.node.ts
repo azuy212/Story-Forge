@@ -7,6 +7,7 @@ import type {
 } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
+import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { ScriptWriterOutputSchema } from "../schemas/script-writer-output.js";
 import type { ScriptWriterOutput } from "../schemas/script-writer-output.js";
@@ -141,7 +142,7 @@ export async function scriptWriterNode(
       qaFeedback,
     },
     inject,
-    configurable: config.configurable as Record<string, unknown>,
+    configurable: withTopic(config, state).configurable,
   });
 
   if (result.error || !result.data) {

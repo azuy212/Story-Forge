@@ -7,6 +7,7 @@ import type {
 } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
+import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { VisualDirectorOutputSchema } from "../schemas/visual-director-output.js";
 import type {
@@ -337,7 +338,7 @@ export async function visualDirectorNode(
       qaFeedback,
     },
     inject,
-    configurable: config.configurable as Record<string, unknown>,
+    configurable: withTopic(config, state).configurable,
     generateOptions: {
       temperature: 0.5,
       responseFormat: { type: "json_object" },

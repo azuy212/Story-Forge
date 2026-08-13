@@ -7,6 +7,7 @@ import type {
 } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
+import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { ResearchOutputSchema } from "../schemas/research-output.js";
 import type { ResearchOutput } from "../schemas/research-output.js";
@@ -44,7 +45,7 @@ export async function researchAgentNode(
     schema: ResearchOutputSchema,
     variables: { pillar, topic, qaFeedback },
     inject,
-    configurable: config.configurable as Record<string, unknown>,
+    configurable: withTopic(config, state).configurable,
   });
 
   if (result.error || !result.data) {

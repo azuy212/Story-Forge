@@ -11,6 +11,7 @@ import { AgentModel } from "../models/agent-model.js";
 import type { SceneSubtitleProvider } from "../providers/scene-subtitle-provider.js";
 import { DeterministicSceneSubtitleProvider } from "../providers/scene-subtitle-provider.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
+import { withTopic } from "../artifacts/context.js";
 
 const SUBTITLE_ALIGNMENT_VERSION = 3;
 
@@ -125,7 +126,7 @@ export async function subtitleGeneratorNode(
         };
       }
     },
-    config,
+    withTopic(config, state),
   );
 
   if (result.error) {

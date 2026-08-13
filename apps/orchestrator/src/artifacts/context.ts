@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { FilesystemArtifactStore } from "./fs/fs-artifact-store.js";
 import { getArtifactDefByNode } from "./registry.js";
 import { config as appConfig } from "../utils/config.js";
-import { slugify } from "../utils/slugify.js";
+import { resolveRunNamespace, resolveUnnamedRun } from "./namespace.js";
 
 let _artifactStore: ArtifactStore | null = null;
 
@@ -33,9 +33,29 @@ export function resetArtifactStore(): void {
 export function getRunId(config?: RunnableConfig, state?: ProjectState): string | null {
   const cfg = config?.configurable as Record<string, unknown> | undefined;
   if (cfg?.runId && typeof cfg.runId === "string") return cfg.runId;
-  if (cfg?.thread_id && typeof cfg.thread_id === "string") return cfg.thread_id;
+  if (cfg?.thread_id && typeof cfg.thread_id === "string") {
+    const topic =
+      state?.project?.topic ??
+      (typeof cfg.topic === "string" ? cfg.topic : undefined);
+    return resolveRunNamespace(cfg.thread_id, topic);
+  }
   if (state?.execution?.runId) return state.execution.runId;
   return null;
+}
+
+/**
+ * RunnableConfig with the project topic threaded into `configurable.topic`.
+ * Cached nodes resolve the run namespace through config only (no state), so
+ * topic must travel with the config for the directory name to be readable.
+ */
+export function withTopic(
+  config: RunnableConfig,
+  state?: { project?: { topic?: string } },
+): RunnableConfig & { configurable: Record<string, unknown> } {
+  return {
+    ...config,
+    configurable: { ...config.configurable, topic: state?.project?.topic },
+  };
 }
 
 export function ensureRunId(config?: RunnableConfig, state?: ProjectState): string {
@@ -43,7 +63,7 @@ export function ensureRunId(config?: RunnableConfig, state?: ProjectState): stri
 }
 
 export function getArtifactNamespace(config?: RunnableConfig, state?: ProjectState): string {
-  return getRunId(config, state) ?? slugify(state?.project?.topic ?? "untitled");
+  return getRunId(config, state) ?? resolveUnnamedRun(state?.project?.topic);
 }
 
 export async function completeArtifact(
