@@ -1705,7 +1705,8 @@ describe("Graph", () => {
             publish: () =>
               Promise.resolve({
                 platform: "youtube",
-                publishUrl: "https://youtube.com/watch?v=abc123",
+                platformVideoId: "abc123",
+                url: "https://youtube.com/watch?v=abc123",
                 status: "published",
                 publishedAt: new Date().toISOString(),
               }),
@@ -1790,7 +1791,7 @@ describe("Graph", () => {
     expect(result.publishing?.results).toBeDefined();
     expect(result.publishing?.results).toHaveLength(1);
     expect(result.publishing?.results![0].platform).toBe("youtube");
-    expect(result.publishing?.results![0].publishUrl).toBe(
+    expect(result.publishing?.results![0].url).toBe(
       "https://youtube.com/watch?v=abc123",
     );
     expect(result.publishing?.results![0].status).toBe("published");
@@ -1993,7 +1994,8 @@ describe("Graph", () => {
             publish: () =>
               Promise.resolve({
                 platform: "youtube",
-                publishUrl: "https://youtube.com/watch?v=abc123",
+                platformVideoId: "abc123",
+                url: "https://youtube.com/watch?v=abc123",
                 status: "published",
                 publishedAt: new Date().toISOString(),
               }),
