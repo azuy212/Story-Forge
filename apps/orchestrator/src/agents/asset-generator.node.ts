@@ -12,7 +12,7 @@ import type {
 } from "../providers/asset-provider.js";
 import { createDefaultAssetProvider } from "../providers/asset-provider.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
-import { getArtifactNamespace } from "../artifacts/context.js";
+import { getArtifactNamespace, withTopic } from "../artifacts/context.js";
 import type { Provider, SourceAsset } from "../schemas/production.js";
 import { padSceneId } from "../utils/scene-id.js";
 import { config as appConfig } from "../utils/config.js";
@@ -304,7 +304,7 @@ export async function assetGeneratorNode(
         error: errors.length > 0 ? errors.join("\n") : undefined,
       };
     },
-    config,
+    withTopic(config, state),
   );
 
   if (result.error) {

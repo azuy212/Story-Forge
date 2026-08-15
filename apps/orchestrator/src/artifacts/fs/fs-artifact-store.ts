@@ -10,12 +10,7 @@ import type {
   ManifestEntry,
 } from "../types.js";
 import type { ArtifactStore } from "../store.js";
-
-const DEFAULT_RUNS_DIR = join(process.cwd(), "runs");
-
-function getRunsDir(): string {
-  return process.env.ARTIFACT_STORE_DIR ?? DEFAULT_RUNS_DIR;
-}
+import { getRunsDir, resolveRunNamespace } from "../namespace.js";
 
 function runDir(runId: string): string {
   return join(getRunsDir(), runId);
@@ -338,11 +333,15 @@ export class FilesystemArtifactStore implements ArtifactStore {
 
   getRunId(
     config: Record<string, unknown>,
-    state?: { execution?: { runId?: string } },
+    state?: { execution?: { runId?: string }; project?: { topic?: string } },
   ): string | null {
     if (config.runId && typeof config.runId === "string") return config.runId;
-    if (config.thread_id && typeof config.thread_id === "string")
-      return config.thread_id;
+    if (config.thread_id && typeof config.thread_id === "string") {
+      const topic =
+        state?.project?.topic ??
+        (typeof config.topic === "string" ? config.topic : undefined);
+      return resolveRunNamespace(config.thread_id, topic);
+    }
     if (state?.execution?.runId) return state.execution.runId;
     return null;
   }

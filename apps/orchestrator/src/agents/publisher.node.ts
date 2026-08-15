@@ -6,13 +6,12 @@ import type {
   Publishing,
 } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
-import type { PublisherProvider } from "../providers/publisher-provider.js";
-import { StubPublisherProvider } from "../providers/stub-publisher-provider.js";
+import type { PublisherProvider } from "../providers/publisher/publisher-provider.js";
+import { publishForPlatforms } from "../providers/publisher/publisher-service.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
-import { getErrorMessage } from "../utils/errors.js";
+import { withTopic } from "../artifacts/context.js";
 import type { SourceAsset } from "../schemas/production.js";
-
-const DEFAULT_PROVIDER = new StubPublisherProvider();
+import { config as configUtils } from "../utils/config.js";
 
 function sourceCredits(state: ProjectState): string {
   const scenes = state.production?.scenes ?? [];
@@ -35,9 +34,11 @@ function sourceCredits(state: ProjectState): string {
   return `\n\nSource credits:\n${lines.join("\n")}`;
 }
 
-function getPublisherProvider(config: RunnableConfig): PublisherProvider {
+function getInjectedProvider(
+  config: RunnableConfig,
+): PublisherProvider | undefined {
   const inject = (config.configurable ?? {}) as Record<string, unknown>;
-  return (inject.publisherProvider as PublisherProvider) ?? DEFAULT_PROVIDER;
+  return inject.publisherProvider as PublisherProvider | undefined;
 }
 
 export async function publisherNode(
@@ -48,13 +49,13 @@ export async function publisherNode(
   diagnostics: Partial<Diagnostics>;
   execution: Partial<Execution>;
 }> {
-  const videoUrl = state.video?.videoUrl;
+  const videoPath = state.video?.videoUrl;
   const title = state.metadataOutput?.title;
   const description = `${state.metadataOutput?.description ?? ""}${sourceCredits(state)}`;
   const tags = state.metadataOutput?.tags ?? [];
   const hashtags = state.metadataOutput?.hashtags ?? [];
   const category = state.metadataOutput?.category ?? "";
-  const thumbnailUrl = state.thumbnail?.imageUrl ?? "";
+  const thumbnailPath = state.thumbnail?.imageUrl ?? "";
   const platforms = state.branding?.platforms ?? ["youtube"];
 
   // Publisher only runs after the PublishReady join/barrier, which gates it on
@@ -62,7 +63,7 @@ export async function publisherNode(
   // are therefore defensive only — a missing artifact here means a guard or the
   // PublishReady gate was bypassed. Publisher must not invent its own
   // "videoUrl is missing" error on top of the already-recorded upstream one.
-  if (!videoUrl) {
+  if (!videoPath) {
     return {
       publishing: {},
       diagnostics: {},
@@ -80,22 +81,45 @@ export async function publisherNode(
     };
   }
 
-  const provider = getPublisherProvider(config);
+  const publishAt = configUtils.youtubePublishAt();
+  const privacyStatus = configUtils.youtubePrivacyStatus();
+  if (publishAt && privacyStatus !== "private") {
+    return {
+      publishing: { results: [] },
+      diagnostics: {
+        errors: [
+          `${AgentModel.Publisher}: publishAt requires privacyStatus "private"`,
+        ],
+      },
+      execution: { currentNode: AgentModel.Publisher },
+    };
+  }
+
+  const request = {
+    videoPath,
+    title,
+    description,
+    tags,
+    hashtags,
+    category,
+    thumbnailPath: thumbnailPath || undefined,
+    publishAt,
+    privacyStatus,
+    madeForKids: configUtils.youtubeMadeForKids(),
+    containsSyntheticMedia: configUtils.youtubeContainsSyntheticMedia(),
+    language: configUtils.youtubeLanguage(),
+    playlistIds: configUtils.youtubePlaylistIds(),
+  };
+
+  const provider = getInjectedProvider(config);
 
   const result = await cacheNodeResult<Partial<Publishing>>(
     {
       type: "publish",
       node: AgentModel.Publisher,
       key: {
-        provider: provider.constructor.name,
-        videoUrl,
-        title,
-        description,
-        tags,
-        hashtags,
-        category,
-        thumbnailUrl,
-        platforms,
+        provider: provider?.constructor.name ?? "registry",
+        ...request,
       },
       // Legacy artifacts may hold partial results (some platforms failed).
       // Only a complete publish for every requested platform is a valid hit.
@@ -104,51 +128,29 @@ export async function publisherNode(
         artifact.results.length === platforms.length,
     },
     async () => {
-      const settled = await Promise.allSettled(
-        platforms.map((platform) =>
-          provider.publish({
-            videoUrl,
-            title,
-            description,
-            tags,
-            hashtags,
-            category,
-            thumbnailUrl,
-            platform,
-          }),
-        ),
-      );
-
-      const results: Publishing["results"] = [];
-      const errors: string[] = [];
-      settled.forEach((s, i) => {
-        if (s.status === "fulfilled") {
-          results.push(s.value);
-        } else {
-          errors.push(
-            `${AgentModel.Publisher}: Publish to ${platforms[i]} failed: ${getErrorMessage(s.reason)}`,
-          );
-        }
+      const execution = await publishForPlatforms({
+        config,
+        state,
+        platforms,
+        request,
+        injectedProvider: provider,
       });
 
-      // Fail-closed: a partial publish is never cached as success. Returning
-      // data:null skips caching, so a retry re-attempts the failed platforms
-      // and diagnostics keep the error instead of silently looking clean.
-      if (errors.length > 0) {
-        const succeeded = results.map((r) => r.platform);
+      if (execution.errors.length > 0) {
+        const succeeded = execution.results.map((r) => r.platform);
         const note =
           succeeded.length > 0 ? `\nSucceeded: ${succeeded.join(", ")}` : "";
-        return { data: null, error: `${errors.join("\n")}${note}` };
+        return { data: null, error: `${execution.errors.join("\n")}${note}` };
       }
 
       return {
         data: {
-          results,
+          results: execution.results,
           publishedAt: new Date().toISOString(),
         },
       };
     },
-    config,
+    withTopic(config, state),
   );
 
   return {

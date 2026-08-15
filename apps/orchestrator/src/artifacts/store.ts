@@ -64,6 +64,6 @@ export interface ArtifactStore {
 
   getRunId(
     config: Record<string, unknown>,
-    state?: { execution?: { runId?: string } },
+    state?: { execution?: { runId?: string }; project?: { topic?: string } },
   ): string | null;
 }

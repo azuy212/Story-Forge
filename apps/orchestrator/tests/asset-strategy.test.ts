@@ -258,7 +258,8 @@ describe("asset strategy", () => {
       .fn<(...args: any[]) => Promise<any>>()
       .mockResolvedValue({
         platform: "youtube",
-        publishUrl: "https://example.test/published",
+        platformVideoId: "abc",
+        url: "https://example.test/published",
         status: "published",
         publishedAt: new Date().toISOString(),
       });

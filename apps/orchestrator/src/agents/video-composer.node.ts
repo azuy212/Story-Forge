@@ -15,7 +15,7 @@ import type {
 } from "../providers/composer-provider.js";
 import { FfmpegComposerProvider } from "../providers/composer/ffmpeg-composer.provider.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
-import { getArtifactNamespace } from "../artifacts/context.js";
+import { getArtifactNamespace, withTopic } from "../artifacts/context.js";
 import {
   resolveBranding,
   resolveBrandingAssetPath,
@@ -297,7 +297,7 @@ export async function videoComposerNode(
         };
       }
     },
-    config,
+    withTopic(config, state),
   );
 
   if (result.error) {

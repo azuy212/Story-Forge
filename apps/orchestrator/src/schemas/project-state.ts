@@ -15,6 +15,7 @@ import { ReleaseValidationOutputSchema } from "./release-validation-output.js";
 import { MetadataOutputSchema } from "./metadata-output.js";
 import { ThumbnailSchema } from "./thumbnail.js";
 import { PublishingSchema } from "./publishing.js";
+import { PublishReadyStatusSchema } from "./publish-ready.js";
 import { ResearchQAOutputSchema } from "./research-qa-output.js";
 import { DEFAULT_BRANDING } from "../utils/branding.js";
 export const ProjectStateSchema = z.object({
@@ -45,6 +46,7 @@ export const ProjectStateSchema = z.object({
   metadataOutput: MetadataOutputSchema.optional(),
   thumbnail: ThumbnailSchema.optional().default({}),
   publishing: PublishingSchema.optional().default({}),
+  publishReady: PublishReadyStatusSchema.optional().default({}),
   execution: ExecutionSchema,
 });
 

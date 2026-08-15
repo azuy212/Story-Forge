@@ -8,6 +8,7 @@ import type {
 } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
+import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { ResearchQAOutputSchema } from "../schemas/research-qa-output.js";
 import { config as configUtils } from "../utils/config.js";
@@ -88,7 +89,7 @@ export async function researchQANode(
       facts: serializeFacts(facts),
     },
     inject,
-    configurable: config.configurable as Record<string, unknown>,
+    configurable: withTopic(config, state).configurable,
     generateOptions: {
       temperature: 0.1,
       responseFormat: { type: "json_object" },

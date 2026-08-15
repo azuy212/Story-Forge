@@ -115,6 +115,10 @@ const hasThumbnail = (s: GuardState) => !!s.thumbnail?.imageUrl;
 // only advance to Publisher once the full release package is present.
 const hasPublishablePackage = (s: GuardState) =>
   hasVideo(s) && hasMetadata(s) && hasThumbnail(s);
+// PublishReady doubles as a hard operational gate (files exist, lengths valid,
+// credentials present). A "ready" verdict is required on top of the package so
+// a blocked publication cannot reach Publisher.
+const hasPublishReady = (s: GuardState) => s.publishReady?.status === "ready";
 
 // Fail-closed QA routing: an explicit "approved" is the ONLY verdict that
 // advances the pipeline. A missing decision (node produced no status) is
@@ -276,11 +280,12 @@ builder
 // All three branches converge at PublishReady, the join/barrier before
 // Publisher. LangGraph triggers a fan-in node when ANY incoming edge fires, so
 // PublishReady may run before the spine finishes; its conditional edge gates
-// Publisher on hasPublishablePackage (video + metadata + thumbnail), so a
-// premature run falls through to __end__ and publishing only happens once the
-// full release package exists. A branch that fails routes to __end__ via its
-// guard, so Publisher can never fire with a partial package. The spine guards
-// remain: a node only advances when it produced the output the next node needs.
+// Publisher on hasPublishablePackage AND a "ready" PublishReady verdict, so a
+// premature run (or a blocked one) falls through to __end__ and publishing
+// only happens once the full release package exists and passes the operational
+// gate. A branch that fails routes to __end__ via its guard, so Publisher can
+// never fire with a partial package. The spine guards remain: a node only
+// advances when it produced the output the next node needs.
 builder
   .addConditionalEdges("MetadataGenerator", guard(hasMetadata, "PublishReady"))
   .addConditionalEdges(
@@ -317,7 +322,7 @@ builder
   .addConditionalEdges("ReleaseReview", finalRouter)
   .addConditionalEdges(
     "PublishReady",
-    guard(hasPublishablePackage, "Publisher"),
+    guard((s) => hasPublishablePackage(s) && hasPublishReady(s), "Publisher"),
   );
 
 builder.addEdge("Publisher", "__end__");

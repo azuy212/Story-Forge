@@ -153,6 +153,16 @@ Important variables in `apps/orchestrator/.env.example`:
 | `ARTIFACT_STORE_ENABLED` | Enables persisted run artifacts |
 | `ARTIFACT_STORE_DIR` | Artifact directory; default `runs` |
 | `NARRATIVE_HOLD_SECONDS` | Final narrative visual hold before outro; default `0.5` |
+| `YOUTUBE_PUBLISHING_ENABLED` | Enables the real YouTube provider when `true`; otherwise the stub records a placeholder result |
+| `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET` | YouTube OAuth client credentials from Google Cloud Console |
+| `YOUTUBE_REFRESH_TOKEN` | One-time OAuth refresh token; obtained via `scripts/oauth-youtube.mjs` |
+| `YOUTUBE_CHANNEL_ID` | Optional channel id; not required for uploads |
+| `YOUTUBE_CATEGORY_ID` | Optional numeric YouTube category override; otherwise mapped from the metadata category label |
+| `YOUTUBE_LANGUAGE` | Default language for title, description, and audio; default `en` |
+| `YOUTUBE_MADE_FOR_KIDS`, `YOUTUBE_SYNTHETIC_MEDIA` | Set `selfDeclaredMadeForKids` / `containsSyntheticMedia` |
+| `YOUTUBE_PRIVACY_STATUS` | Upload privacy: `private`, `unlisted`, or `public`; default `private` |
+| `YOUTUBE_PUBLISH_AT` | Schedule an upload (ISO 8601); requires `YOUTUBE_PRIVACY_STATUS=private` |
+| `YOUTUBE_PLAYLIST_IDS` | Optional comma-separated playlist ids to add each upload to |
 
 ### TTS
 
@@ -186,6 +196,51 @@ Google login session.
 | `WHISPERX_COMPUTE_TYPE` | WhisperX compute type; default `int8` |
 | `WHISPERX_LANGUAGE` | Alignment language; empty means unset |
 | `WHISPERX_FORCE_TRANSCRIBE` | `1` or `true` forces ASR before alignment |
+
+## YouTube Publishing
+
+The `Publisher` node uploads the composed video to YouTube with the metadata,
+thumbnail, category, and privacy settings from `apps/orchestrator/.env`. Real
+uploads require `USE_REAL_PROVIDERS=true` and `YOUTUBE_PUBLISHING_ENABLED=true`;
+otherwise the stub provider records a placeholder result and nothing is
+uploaded.
+
+### One-time setup
+
+1. **Enable the YouTube Data API v3** for the Google Cloud project that owns the
+   OAuth client:
+   <https://console.developers.google.com/apis/api/youtube.googleapis.com/overview>.
+   Until it is enabled, uploads fail with `forbidden` ("has not been used ... or
+   it is disabled"). Allow a few minutes for propagation after enabling.
+2. **Create an OAuth client** (Desktop app) in Google Cloud Console and add
+   `http://localhost:8080/auth` as an authorized redirect URI.
+3. Add the client credentials to `apps/orchestrator/.env`:
+   `YOUTUBE_CLIENT_ID` and `YOUTUBE_CLIENT_SECRET`.
+4. Obtain a refresh token (one-time browser consent) from
+   `apps/orchestrator`:
+   ```bash
+   node scripts/oauth-youtube.mjs
+   ```
+   Authorize with the account that owns the target channel and copy the printed
+   token.
+5. Add the token and enable publishing in `apps/orchestrator/.env`:
+   ```
+   YOUTUBE_REFRESH_TOKEN=<token>
+   YOUTUBE_PUBLISHING_ENABLED=true
+   ```
+
+The pipeline never runs the browser flow itself; googleapis refreshes access
+tokens from the refresh token at runtime.
+
+### Behavior notes
+
+- Uploads are **private by default** (`YOUTUBE_PRIVACY_STATUS=private`).
+- `YOUTUBE_PUBLISH_AT` schedules an upload; it requires `private` status.
+- The provider maps the internal category label (for example `Education`) to a
+  YouTube numeric `categoryId`; `YOUTUBE_CATEGORY_ID` overrides the mapping.
+- `YOUTUBE_CHANNEL_ID` is optional and is not sent with uploads.
+- Failed publications are recorded (with the video id when the upload already
+  succeeded) so a retry resumes instead of re-uploading.
 
 ## Running Services
 
@@ -430,6 +485,15 @@ automatically; TTS follows its explicit `DEVICE` value.
 Set `OPENROUTER_API_KEY` in `apps/orchestrator/.env` for real LLM calls. Verify
 `TTS_URL`, `IMAGE_PROVIDER_URL`, and `TRANSCRIBER_URL` point to running services.
 Do not place secrets in the root `.env.example` or commit any `.env` file.
+
+### YouTube upload fails with "has not been used ... or it is disabled"
+
+The YouTube Data API v3 is not enabled for the Google Cloud project that owns
+the OAuth client. Enable it at
+<https://console.developers.google.com/apis/api/youtube.googleapis.com/overview>,
+wait a few minutes, and re-run. The error is recorded in the run's
+`publication` artifact, and the publication is marked `failed` so a retry
+resumes rather than re-uploading.
 
 ### Slow first request
 
