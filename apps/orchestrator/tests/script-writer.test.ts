@@ -17,6 +17,7 @@ const MOCK_PROMPT = [
   "Channel: {{channel}}",
   "Call to Action: {{cta}}",
   "QA Feedback: {{qaFeedback}}",
+  "Previous Script: {{previousScript}}",
 ].join("\n");
 
 const MOCK_GUIDELINES = "Editorial guidelines for testing.";
@@ -290,6 +291,52 @@ describe("scriptWriterNode", () => {
     expect(userMsg!.content).toContain("Simplify narration");
     expect(userMsg!.content).toContain("fact-001");
     expect(userMsg!.content).toContain("Beat 1");
+  });
+
+  it("attaches the previous script on minor_revision", async () => {
+    mockGenerate.mockResolvedValue(buildResponse());
+
+    const { promise } = runNode({
+      content: {
+        title: "The Country That Doesn't Exist",
+        hook: "What if a country officially wasn't real?",
+        script: "[OLD SCRIPT CONTENT] previous draft script with visual cues.",
+        narration: "OLD SCRIPT CONTENT previous draft narration.",
+        callToAction: "Subscribe",
+        estimatedDurationSeconds: 45,
+      },
+      scriptQA: {
+        status: "minor_revision",
+        feedback: "Simplify narration.",
+        issues: ["Longest sentence is 29 words"],
+      },
+    });
+    await promise;
+
+    const messages = mockGenerate.mock.calls[0][0] as {
+      role: string;
+      content: string;
+    }[];
+    const userMsg = messages.find((m) => m.role === "user");
+    expect(userMsg!.content).toContain("[OLD SCRIPT CONTENT]");
+    expect(userMsg!.content).toContain("previous draft script");
+    expect(userMsg!.content).toContain(
+      "OLD SCRIPT CONTENT previous draft narration.",
+    );
+  });
+
+  it("does not attach the previous script on a fresh run", async () => {
+    mockGenerate.mockResolvedValue(buildResponse());
+
+    const { promise } = runNode();
+    await promise;
+
+    const messages = mockGenerate.mock.calls[0][0] as {
+      role: string;
+      content: string;
+    }[];
+    const userMsg = messages.find((m) => m.role === "user");
+    expect(userMsg!.content).not.toContain("OLD SCRIPT CONTENT");
   });
 
   it("uses configured CTA instead of model CTA", async () => {

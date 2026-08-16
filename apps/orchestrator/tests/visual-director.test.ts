@@ -10,6 +10,7 @@ const MOCK_PROMPT = [
   "Narration: {{narration}}",
   "Facts: {{approvedFacts}}",
   "QA Feedback: {{qaFeedback}}",
+  "Previous Visual Plan: {{previousVisualPlan}}",
 ].join("\n");
 
 const MOCK_GUIDELINES = "Editorial guidelines for testing.";
@@ -187,6 +188,104 @@ describe("visualDirectorNode", () => {
 
     expect(result.production?.scenes).toEqual([]);
     expect(result.production?.directorReview?.status).toBe("minor_revision");
+  });
+
+  it("attaches the previous visual plan on promptQA major_revision", async () => {
+    mockGenerate.mockResolvedValue(
+      buildResponse({
+        scenes: makeScenes([
+          "Alpha beta gamma delta.",
+          "Epsilon zeta eta theta.",
+          "Iota kappa lambda mu.",
+          "Nu xi omicron pi.",
+        ]),
+        visualPlans: makePlans(4),
+      }),
+    );
+
+    const prevScenes = makeScenes([
+      "OLD VISUAL CONTENT scene one.",
+      "OLD VISUAL CONTENT scene two.",
+    ]).map((s, i) =>
+      i === 0
+        ? {
+            ...s,
+            sceneType: "portrait",
+            assetMode: "source",
+            visualDescription: "OLD DESCRIPTION aerial establishing shot",
+          }
+        : s,
+    );
+    const prevPlans = makePlans(2).map((p, i) =>
+      i === 0
+        ? {
+            ...p,
+            renderStyle: "illustration",
+            colorMood: "warm amber",
+            lighting: "golden hour",
+            composition: "centered",
+            visualNotes: "OLD NOTE accent the border",
+          }
+        : p,
+    );
+
+    const { promise } = runNode({
+      production: {
+        scenes: prevScenes,
+        visualPlan: prevPlans,
+        promptQA: {
+          status: "major_revision",
+          globalFeedback: "Revise the visual plan.",
+          issues: ["Style mismatch"],
+          sceneResults: [],
+        },
+      },
+    } as any);
+    await promise;
+
+    const messages = mockGenerate.mock.calls[0][0] as {
+      role: string;
+      content: string;
+    }[];
+    const userMsg = messages.find((m) => m.role === "user");
+    expect(userMsg!.content).toContain("OLD VISUAL CONTENT scene one.");
+    expect(userMsg!.content).toContain("OLD VISUAL CONTENT scene two.");
+    expect(userMsg!.content).toContain(
+      "OLD DESCRIPTION aerial establishing shot",
+    );
+    expect(userMsg!.content).toContain('"sceneType": "portrait"');
+    expect(userMsg!.content).toContain('"assetMode": "source"');
+    expect(userMsg!.content).toContain('"renderStyle": "illustration"');
+    expect(userMsg!.content).toContain('"colorMood": "warm amber"');
+    expect(userMsg!.content).toContain('"lighting": "golden hour"');
+    expect(userMsg!.content).toContain('"composition": "centered"');
+    expect(userMsg!.content).toContain(
+      '"visualNotes": "OLD NOTE accent the border"',
+    );
+  });
+
+  it("does not attach a previous visual plan on a fresh run", async () => {
+    mockGenerate.mockResolvedValue(
+      buildResponse({
+        scenes: makeScenes([
+          "Alpha beta gamma delta.",
+          "Epsilon zeta eta theta.",
+          "Iota kappa lambda mu.",
+          "Nu xi omicron pi.",
+        ]),
+        visualPlans: makePlans(4),
+      }),
+    );
+
+    const { promise } = runNode();
+    await promise;
+
+    const messages = mockGenerate.mock.calls[0][0] as {
+      role: string;
+      content: string;
+    }[];
+    const userMsg = messages.find((m) => m.role === "user");
+    expect(userMsg!.content).not.toContain("OLD VISUAL CONTENT");
   });
 
   it("repairs paraphrased narration by re-segmenting in code", async () => {

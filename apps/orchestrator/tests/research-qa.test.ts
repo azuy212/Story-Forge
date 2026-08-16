@@ -248,7 +248,9 @@ describe("researchQANode", () => {
 
   it("skips when disabled", async () => {
     const prev = process.env.ENABLE_RESEARCH_QA;
+    const prevAll = process.env.ENABLE_QA;
     process.env.ENABLE_RESEARCH_QA = "false";
+    process.env.ENABLE_QA = "false";
     try {
       const { promise } = runNode();
       const result = await promise;
@@ -257,6 +259,8 @@ describe("researchQANode", () => {
     } finally {
       if (prev === undefined) delete process.env.ENABLE_RESEARCH_QA;
       else process.env.ENABLE_RESEARCH_QA = prev;
+      if (prevAll === undefined) delete process.env.ENABLE_QA;
+      else process.env.ENABLE_QA = prevAll;
     }
   });
 

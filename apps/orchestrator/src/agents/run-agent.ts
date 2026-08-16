@@ -38,12 +38,7 @@ function backoffMs(attempt: number): number {
   );
 }
 
-type FailureClass =
-  | "parse"
-  | "schema"
-  | "timeout"
-  | "transient"
-  | "permanent";
+type FailureClass = "parse" | "schema" | "timeout" | "transient" | "permanent";
 
 /**
  * Classify a failed LLM attempt so the retry can change the request instead
@@ -53,6 +48,28 @@ type FailureClass =
  * - transient: network/API failure — retry with backoff, no feedback needed.
  * - permanent: no point retrying the same request.
  */
+/**
+ * Build the feedback message sent back to the model when a parse/schema
+ * rejection needs a corrected retry. The rejected raw output is attached
+ * verbatim so the model can see exactly what it produced. When no raw output
+ * is available (e.g. timeout/transient failure) only the rejection reason is
+ * returned; stale content is never attached.
+ */
+export function buildRetryFeedback(
+  lastError: string,
+  rawContent?: string | null,
+): string {
+  const rawBlock =
+    rawContent != null && rawContent.length > 0
+      ? `\n\nPrevious response:\n"""\n${rawContent}\n"""`
+      : "";
+  return (
+    `Your previous response was rejected:\n${lastError}${rawBlock}\n` +
+    `Return ONLY corrected valid JSON matching the required schema. ` +
+    `No markdown, no commentary, no backticks.`
+  );
+}
+
 export function classifyError(err: unknown, message: string): FailureClass {
   if (
     message.startsWith("Empty response") ||
@@ -217,12 +234,20 @@ export async function runAgent<T>({
           ? [...messages, { role: "user", content: retryFeedback }]
           : messages;
 
+      // Reset per attempt so the catch block can attach the rejected output
+      // verbatim to the parse/schema retry feedback. Stays undefined (so no
+      // stale content is attached) for timeout/transient failures.
+      let rawContent: string | undefined;
+
       try {
         const response = await model.generate(attemptMessages, opts);
 
-        const rawContent = response?.choices?.[0]?.message?.content;
+        rawContent = response?.choices?.[0]?.message?.content as
+          string | undefined;
         if (!rawContent) {
-          throw new LLMError("Empty response from model: missing choices or content");
+          throw new LLMError(
+            "Empty response from model: missing choices or content",
+          );
         }
 
         let parsed: unknown;
@@ -273,10 +298,7 @@ export async function runAgent<T>({
         const failureClass = classifyError(err, lastError);
 
         if (failureClass === "parse" || failureClass === "schema") {
-          retryFeedback =
-            `Your previous response was rejected:\n${lastError}\n` +
-            `Return ONLY corrected valid JSON matching the required schema. ` +
-            `No markdown, no commentary, no backticks.`;
+          retryFeedback = buildRetryFeedback(lastError, rawContent);
         }
 
         if (

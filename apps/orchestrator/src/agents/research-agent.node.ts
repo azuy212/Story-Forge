@@ -12,6 +12,21 @@ import { PromptPaths } from "../models/prompt-paths.js";
 import { ResearchOutputSchema } from "../schemas/research-output.js";
 import type { ResearchOutput } from "../schemas/research-output.js";
 
+function serializePreviousResearch(research: Research | undefined): string {
+  if (!research) return "";
+  const facts = research.facts ?? [];
+  if (!research.summary && facts.length === 0) return "";
+  const factLines = facts
+    .map((f) => {
+      const cls = f.classification
+        ? ` (classification: ${f.classification})`
+        : "";
+      return `- ${f.id} (confidence: ${f.confidence})${cls}: ${f.fact}`;
+    })
+    .join("\n");
+  return `Summary:\n${research.summary}\n\nFacts:\n${factLines}`;
+}
+
 export async function researchAgentNode(
   state: ProjectState,
   config: RunnableConfig,
@@ -26,24 +41,31 @@ export async function researchAgentNode(
   const retryCount = (state.execution?.retryCount?.ResearchAgent ?? 0) + 1;
 
   const qa = state.researchQA;
-  const qaFeedback =
-    qa?.status === "minor_revision"
-      ? [
-          ...(qa.feedback ? [`Feedback: ${qa.feedback}`] : []),
-          ...(qa.factsToRegenerate
-            ? [`Replacements needed: ${qa.factsToRegenerate}`]
-            : []),
-          ...(qa.issues?.length
-            ? [`Issues:\n${qa.issues.map((i) => `- ${i}`).join("\n")}`]
-            : []),
-        ].join("\n")
-      : "";
+  const needsRevision = qa?.status === "minor_revision";
+  const qaFeedback = needsRevision
+    ? [
+        ...(qa.feedback ? [`Feedback: ${qa.feedback}`] : []),
+        ...(qa.factsToRegenerate
+          ? [`Replacements needed: ${qa.factsToRegenerate}`]
+          : []),
+        ...(qa.issues?.length
+          ? [`Issues:\n${qa.issues.map((i) => `- ${i}`).join("\n")}`]
+          : []),
+      ].join("\n")
+    : "";
 
   const result = await runAgent<ResearchOutput>({
     agent: AgentModel.ResearchAgent,
     promptPath: PromptPaths.ResearchAgent,
     schema: ResearchOutputSchema,
-    variables: { pillar, topic, qaFeedback },
+    variables: {
+      pillar,
+      topic,
+      qaFeedback,
+      previousResearch: needsRevision
+        ? serializePreviousResearch(state.research)
+        : "",
+    },
     inject,
     configurable: withTopic(config, state).configurable,
   });

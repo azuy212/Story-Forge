@@ -259,6 +259,32 @@ function normalizeOutput(
   return { scenes: filtered, visualPlans, warnings };
 }
 
+function serializePreviousVisualPlan(
+  scenes: Scene[],
+  visualPlan: VisualPlanEntry[],
+): string {
+  const planMap = new Map(visualPlan.map((p) => [p.sceneId, p]));
+  return JSON.stringify(
+    scenes.map((s) => {
+      const plan = planMap.get(s.sceneId);
+      return {
+        sceneId: s.sceneId,
+        sceneType: s.sceneType,
+        assetMode: s.assetMode ?? "generated",
+        visualDescription: s.visualDescription,
+        narration: s.narration,
+        renderStyle: plan?.renderStyle,
+        colorMood: plan?.colorMood,
+        lighting: plan?.lighting,
+        composition: plan?.composition,
+        visualNotes: plan?.visualNotes,
+      };
+    }),
+    null,
+    2,
+  );
+}
+
 export async function visualDirectorNode(
   state: ProjectState,
   config: RunnableConfig,
@@ -322,6 +348,21 @@ export async function visualDirectorNode(
           ].join("\n")
         : "";
 
+  const needsRevision =
+    directorReview?.status === "minor_revision" ||
+    promptQA?.status === "major_revision";
+
+  // Snapshot the previous scenes/visual plan from state BEFORE any destructive
+  // handling in this run so a revision re-prompt can see (and modify) what it
+  // produced previously rather than regenerating from scratch. Only populated
+  // when a revision was requested.
+  const previousVisualPlan = needsRevision
+    ? serializePreviousVisualPlan(
+        state.production?.scenes ?? [],
+        state.production?.visualPlan ?? [],
+      )
+    : "";
+
   const result = await runAgent<VisualDirectorOutput>({
     agent: AgentModel.VisualDirector,
     promptPath: PromptPaths.VisualDirector,
@@ -336,6 +377,7 @@ export async function visualDirectorNode(
       approvedFacts: formatFacts(approvedFacts),
       channel: channel ?? "",
       qaFeedback,
+      previousVisualPlan,
     },
     inject,
     configurable: withTopic(config, state).configurable,

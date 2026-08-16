@@ -87,6 +87,22 @@ export async function imagePromptGeneratorNode(
         )
       : "";
 
+  // Snapshot the previous attempt's prompts BEFORE the wipe below so a
+  // revision run can see what it produced before (the QA verdicts reference
+  // these prompts). Only populated when a revision actually occurred.
+  const previousPrompts = needsRevise
+    ? JSON.stringify(
+        scenes
+          .filter((s) => s.generationPrompt)
+          .map((s) => ({
+            sceneId: s.sceneId,
+            generationPrompt: s.generationPrompt,
+          })),
+        null,
+        2,
+      )
+    : "";
+
   const expectedIds = new Set(scenes.map((s) => s.sceneId));
   const maxAttempts = 2;
 
@@ -124,6 +140,7 @@ export async function imagePromptGeneratorNode(
         logo: logo ?? "",
         scenes: scenesJson,
         qaFeedback: `${qaFeedback}${missingHint}`,
+        previousPrompts,
       },
       inject,
       configurable: withTopic(config, state).configurable,

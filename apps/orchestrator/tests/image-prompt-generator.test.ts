@@ -11,6 +11,8 @@ const MOCK_PROMPT = [
   "Topic: {{topic}}",
   "Style: {{style}}",
   "Palette: {{colorPalette}}",
+  "QA Feedback: {{qaFeedback}}",
+  "Previous Prompts: {{previousPrompts}}",
   "Scenes: {{scenes}}",
 ].join("\n");
 
@@ -166,6 +168,56 @@ describe("imagePromptGeneratorNode", () => {
     expect(userMsg!.content).toContain("Documentary");
     expect(userMsg!.content).toContain("Cold blue");
     expect(userMsg!.content).toContain("Satellite view");
+  });
+
+  it("attaches the previous prompts on minor_revision", async () => {
+    mockGenerate.mockResolvedValue(buildResponse());
+
+    const { promise } = runNode({
+      production: {
+        scenes: [
+          {
+            ...BASE_SCENES[0],
+            sceneType: "landscape" as const,
+            generationPrompt: "OLD PROMPT CONTENT scene 1 portrait 9:16.",
+          },
+          {
+            ...BASE_SCENES[1],
+            sceneType: "map" as const,
+            generationPrompt: "OLD PROMPT CONTENT scene 2 portrait 9:16.",
+          },
+        ],
+        promptQA: {
+          status: "minor_revision",
+          globalFeedback: "Revise flagged scenes.",
+          issues: ["Scene 2 coverage"],
+          sceneResults: [],
+        },
+      },
+    });
+    await promise;
+
+    const messages = mockGenerate.mock.calls[0][0] as {
+      role: string;
+      content: string;
+    }[];
+    const userMsg = messages.find((m) => m.role === "user");
+    expect(userMsg!.content).toContain("OLD PROMPT CONTENT scene 1");
+    expect(userMsg!.content).toContain("OLD PROMPT CONTENT scene 2");
+  });
+
+  it("does not attach previous prompts on a fresh run", async () => {
+    mockGenerate.mockResolvedValue(buildResponse());
+
+    const { promise } = runNode();
+    await promise;
+
+    const messages = mockGenerate.mock.calls[0][0] as {
+      role: string;
+      content: string;
+    }[];
+    const userMsg = messages.find((m) => m.role === "user");
+    expect(userMsg!.content).not.toContain("OLD PROMPT CONTENT");
   });
 
   it("uses json_object response format", async () => {
