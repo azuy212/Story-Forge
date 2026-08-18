@@ -2,6 +2,13 @@ function read(name: string): string | undefined {
   return process.env[name];
 }
 
+function parsePublishAt(value: string): string | undefined {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime())
+    ? undefined
+    : new Date(parsed).toISOString();
+}
+
 export const config = {
   defaultModel: (): string => read("DEFAULT_MODEL") ?? "openai/gpt-4o-mini",
   openrouterApiKey: (): string => {
@@ -72,13 +79,13 @@ export const config = {
     if (value === "unlisted" || value === "public") return value;
     return "private";
   },
-  youtubePublishAt: (): string | undefined => {
-    const value = read("YOUTUBE_PUBLISH_AT");
+  youtubePublishAt: (state?: {
+    project?: { youtubePublishAt?: string };
+  }): string | undefined => {
+    const value =
+      state?.project?.youtubePublishAt ?? read("YOUTUBE_PUBLISH_AT");
     if (!value) return undefined;
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime())
-      ? undefined
-      : new Date(parsed).toISOString();
+    return parsePublishAt(value);
   },
   youtubePlaylistIds: (): string[] => {
     const value = read("YOUTUBE_PLAYLIST_IDS");

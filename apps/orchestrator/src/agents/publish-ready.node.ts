@@ -89,7 +89,7 @@ export async function publishReadyNode(state: ProjectState): Promise<{
     );
   }
 
-  const publishAt = configUtils.youtubePublishAt();
+  const publishAt = configUtils.youtubePublishAt(state);
   if (publishAt) {
     if (configUtils.youtubePrivacyStatus() !== "private") {
       problems.push('publishAt requires privacyStatus "private"');

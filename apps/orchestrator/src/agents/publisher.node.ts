@@ -81,7 +81,7 @@ export async function publisherNode(
     };
   }
 
-  const publishAt = configUtils.youtubePublishAt();
+  const publishAt = configUtils.youtubePublishAt(state);
   const privacyStatus = configUtils.youtubePrivacyStatus();
   if (publishAt && privacyStatus !== "private") {
     return {
