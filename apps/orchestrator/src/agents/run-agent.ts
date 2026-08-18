@@ -25,15 +25,19 @@ const DEFAULT_OPTIONS: GenerateOptions = {
 };
 const EDITORIAL_GUIDELINES_PATH = "shared/editorial-guidelines.md";
 const RETRY_BACKOFF_BASE_MS = 1000;
+const RATE_LIMIT_BACKOFF_BASE_MS = 5000;
 const RETRY_BACKOFF_MAX_MS = 8000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function backoffMs(attempt: number): number {
+function backoffMs(
+  attempt: number,
+  baseMs = RETRY_BACKOFF_BASE_MS,
+): number {
   return (
-    Math.min(RETRY_BACKOFF_MAX_MS, RETRY_BACKOFF_BASE_MS * 2 ** (attempt - 1)) +
+    Math.min(RETRY_BACKOFF_MAX_MS, baseMs * 2 ** (attempt - 1)) +
     Math.random() * 250
   );
 }
@@ -305,7 +309,14 @@ export async function runAgent<T>({
           (failureClass === "transient" || failureClass === "timeout") &&
           attempt < attempts
         ) {
-          const delay = backoffMs(attempt);
+          const status =
+            typeof err === "object" && err !== null && "status" in err
+              ? (err as { status?: unknown }).status
+              : undefined;
+          const delay = backoffMs(
+            attempt,
+            status === 429 ? RATE_LIMIT_BACKOFF_BASE_MS : undefined,
+          );
           logger.warn(`${agent} transient failure, backing off`, {
             attempt,
             delayMs: Math.round(delay),
