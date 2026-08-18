@@ -74,7 +74,12 @@ export async function runWithArtifactCache<T>(
   };
   const inputHash = hashObject(key);
 
-  const latest = await store.latest<T>(runId, options.type);
+  const matched = await store.findCompleteByInputHash<T>(
+    runId,
+    options.type,
+    inputHash,
+  );
+  const latest = matched?.record ?? (await store.latest<T>(runId, options.type));
 
   if (
     latest &&

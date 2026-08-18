@@ -333,14 +333,15 @@ export class FilesystemArtifactStore implements ArtifactStore {
 
   getRunId(
     config: Record<string, unknown>,
-    state?: { execution?: { runId?: string }; project?: { topic?: string } },
+    state?: { execution?: { runId?: string }; project?: { topic?: string; pillar?: string } },
   ): string | null {
     if (config.runId && typeof config.runId === "string") return config.runId;
     if (config.thread_id && typeof config.thread_id === "string") {
       const topic =
         state?.project?.topic ??
         (typeof config.topic === "string" ? config.topic : undefined);
-      return resolveRunNamespace(config.thread_id, topic);
+      const pillar = state?.project?.pillar;
+      return resolveRunNamespace(config.thread_id, topic, pillar);
     }
     if (state?.execution?.runId) return state.execution.runId;
     return null;

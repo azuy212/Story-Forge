@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { slugify } from "../utils/slugify.js";
+import { createOrAppendRunMeta } from "./run-meta.mjs";
 
 /**
  * Human-readable run namespace resolution.
@@ -103,7 +104,11 @@ function claimDisk(threadId: string, name: string): string {
   }
 }
 
-export function resolveRunNamespace(threadId: string, topic?: string): string {
+export function resolveRunNamespace(
+  threadId: string,
+  topic?: string,
+  pillar?: string,
+): string {
   const memoized = memo.get(threadId);
   if (memoized) return memoized;
 
@@ -115,6 +120,16 @@ export function resolveRunNamespace(threadId: string, topic?: string): string {
 
   const name = claimDisk(threadId, buildName(topic));
   memo.set(threadId, name);
+
+  // Fail closed: run.json is the durable audit record for the run namespace.
+  // A corrupt/unwritable metadata file must abort rather than silently start
+  // a run that cannot later be associated with its artifacts.
+  createOrAppendRunMeta(getRunsDir(), name, {
+    threadId,
+    topic: topic ?? "untitled",
+    pillar,
+  });
+
   return name;
 }
 

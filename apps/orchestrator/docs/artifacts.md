@@ -36,6 +36,7 @@ Store directory defaults to `<cwd>/runs`; override with `ARTIFACT_STORE_DIR`.
 
 ```
 runs/<runId>/
+  run.json                           # run metadata: threadId, topic, pillar, createdAt, threadHistory[]
   manifest.json                      # per-type index: latest version + version list
   artifacts/<type>/v1.json           # versioned artifact records
   artifacts/<type>/v2.json
@@ -43,6 +44,15 @@ runs/<runId>/
   assets/                            # (future) binary sidecars
   logs/
 ```
+
+`run.json` is written atomically on first namespace claim for a thread. It records:
+- `threadId` — the LangGraph thread UUID that created the run
+- `topic` — the original project topic (e.g., "Why Your Brain Lies to You")
+- `pillar` — the project pillar (e.g., "Geography", "History")
+- `createdAt` — ISO timestamp of first claim
+- `threadHistory` — array of all thread IDs associated with attempts to write to this run folder, including failed resume attempts (appended on each new claim)
+
+This enables resume even when the LangGraph checkpointer has lost the thread, and provides a reverse lookup from run folder to thread ID.
 
 All writes are atomic (`writeFile` to `.tmp` + `rename`). Saves never overwrite — each
 write appends a new version.
@@ -155,6 +165,36 @@ all planned scenes to have assets).
   to see exactly what changed between retries.
 - **Dashboard** — read `manifest.json` + `state/execution.json` to render run status
   without replaying the pipeline.
+
+## Resume from Artifacts
+
+A run that stopped mid-pipeline (dev server crash, thread lost, etc.) can be resumed from
+the last completed artifact without re-running prior nodes:
+
+```bash
+pnpm --filter youtube-shorts-orchestrator resume <namespace|topic> [--pillar <pillar>] [--topic <topic>]
+```
+
+The CLI (`scripts/resume.mjs`):
+1. Resolves the run folder (exact name or topic substring).
+2. Reads `run.json` for the original `project` input (pillar + topic) and original `threadId`.
+3. Reports per-stage status from `manifest.json`; refuses if `publish` is already complete.
+4. **Creates a fresh LangGraph thread**, records the new `threadId` in `run.json.threadHistory` (fail-closed: if recording fails the resume aborts before the run starts), and passes `configurable.runId=<namespace>` to replay into the same run folder.
+5. Streams the run via the dev API; all completed nodes hit the artifact cache (`fromCache: true`, zero LLM/provider cost); the first missing artifact computes fresh; the graph's guards fast-forward to it automatically.
+6. On failure, the thread stays recorded in `threadHistory` as an attempted resume.
+
+**Dry-run** (`--dry-run`): prints status without running.
+
+**Legacy runs** without `run.json` require **both** `--pillar` and `--topic` (the topic is not reliably derivable from the folder name). Without pillar, ResearchAgent cannot hit its cache and will re-generate.
+
+### Important: Dev-Server Checkpointer is Ephemeral
+
+The `langgraph dev` server uses a `MemorySaver` checkpointer synced to `.langgraph_api/.langgraphjs_api.checkpointer.json` with a **3-second debounced flush**. Threads are lost if:
+- The process dies before a flush (last checkpoints lost).
+- The file is unreadable at startup — `initialize()` silently resets to `{}` (all threads gone).
+- Multiple `langgraph dev` instances run concurrently — each has its own MemorySaver copy racing writes to the same file; last-writer-wins.
+
+**The `runs/` artifact store is the durable source of truth.** Do not run two dev servers against the same `runs/` directory. The resume CLI creates a fresh thread and replays from the last cached artifact using `configurable.runId`, making the run visible again in Studio.
 
 ## Key Files
 

@@ -37,7 +37,8 @@ export function getRunId(config?: RunnableConfig, state?: ProjectState): string 
     const topic =
       state?.project?.topic ??
       (typeof cfg.topic === "string" ? cfg.topic : undefined);
-    return resolveRunNamespace(cfg.thread_id, topic);
+    const pillar = state?.project?.pillar;
+    return resolveRunNamespace(cfg.thread_id, topic, pillar);
   }
   if (state?.execution?.runId) return state.execution.runId;
   return null;

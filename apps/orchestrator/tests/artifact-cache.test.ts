@@ -387,6 +387,58 @@ describe("runWithArtifactCache", () => {
     expect(compute).toHaveBeenCalledTimes(1);
     expect(result.telemetry.fromCache).toBe(false);
   });
+
+  it("hits cache via findCompleteByInputHash when latest version hash differs but older matches", async () => {
+    const compute = jest
+      .fn<() => Promise<ComputeResult<unknown>>>()
+      .mockImplementation(async () => computeResult({ title: "T" }));
+    const config = makeConfig();
+
+    await runWithArtifactCache(
+      {
+        type: "prompts",
+        agent: "ImagePromptGenerator",
+        promptPath: "prompts/image-prompt.md",
+        variables: { scenes: "v1" },
+        loadPrompt: loadPromptMock,
+      },
+      compute,
+      config,
+    );
+
+    loadPromptMock.mockResolvedValue("A different prompt entirely.");
+    await runWithArtifactCache(
+      {
+        type: "prompts",
+        agent: "ImagePromptGenerator",
+        promptPath: "prompts/image-prompt.md",
+        variables: { scenes: "v2" },
+        loadPrompt: loadPromptMock,
+      },
+      compute,
+      config,
+    );
+
+    expect(compute).toHaveBeenCalledTimes(2);
+
+    loadPromptMock.mockResolvedValue(PROMPT);
+    const third = await runWithArtifactCache(
+      {
+        type: "prompts",
+        agent: "ImagePromptGenerator",
+        promptPath: "prompts/image-prompt.md",
+        variables: { scenes: "v1" },
+        loadPrompt: loadPromptMock,
+      },
+      compute,
+      config,
+    );
+
+    expect(compute).toHaveBeenCalledTimes(2);
+    expect(third.telemetry.fromCache).toBe(true);
+    expect(third.data).toEqual({ title: "T" });
+    expect(third.telemetry.artifactRef?.version).toBe(1);
+  });
 });
 
 describe("cacheNodeResult", () => {

@@ -121,6 +121,41 @@ Open the LangGraph development API and playground at
 `http://localhost:2024`. First requests to TTS, transcriber, or image
 generation can take longer while models or browser state initialize.
 
+## Resuming Runs
+
+The orchestrator persists every LLM-agent and provider-node output to versioned
+artifacts under `apps/orchestrator/runs/<runId>/`. If a run stops mid-pipeline
+(dev server crash, thread lost, or manual interrupt), you can resume from the
+last completed artifact without re-running prior nodes.
+
+```bash
+# Resume by exact run folder name
+pnpm --filter youtube-shorts-orchestrator resume why-your-brain-makes-you-remember-things-that-never-happened-20260817-230021-56a1
+
+# Resume by topic substring (matches first folder containing the string)
+pnpm --filter youtube-shorts-orchestrator resume "why your brain" --pillar Psychology --topic "Why Your Brain Makes You Remember Things That Never Happened"
+
+# Dry-run: show status without running
+pnpm --filter youtube-shorts-orchestrator resume <ns> --dry-run
+```
+
+The CLI:
+1. Resolves the run folder (exact name or topic substring).
+2. Reads `run.json` for the original `project` input (pillar + topic) and original `threadId`.
+3. Reports per-stage status from `manifest.json`; refuses if `publish` is already complete.
+4. **Creates a fresh LangGraph thread**, records the new `threadId` in `run.json.threadHistory`, and passes `configurable.runId=<namespace>` to replay into the same run folder.
+5. Streams the run via the dev API; all completed nodes hit the artifact cache (`fromCache: true`, zero LLM/provider cost); the first missing artifact computes fresh; the graph's guards fast-forward to it automatically.
+6. On failure, the thread stays recorded in `threadHistory` as an attempted resume.
+
+**Legacy runs** without `run.json` require `--pillar` and `--topic` (the topic is not reliably derivable from the folder name). Without pillar, ResearchAgent cannot hit its cache and will re-generate.
+
+**Important:** The dev-server checkpointer (`.langgraph_api/.langgraphjs_api.checkpointer.json`) is ephemeral — it uses a `MemorySaver` with a **3-second debounced flush**. Threads are lost if:
+- The process dies before a flush (last checkpoints lost).
+- The file is unreadable at startup — `initialize()` silently resets to `{}` (all threads gone).
+- Multiple `langgraph dev` instances run concurrently — each has its own MemorySaver copy racing writes to the same file; last-writer-wins.
+
+**The `runs/` artifact store is the durable source of truth.** Do not run two dev servers against the same `runs/` directory.
+
 ## Environment Configuration
 
 Each application reads environment values from its own directory:
@@ -337,6 +372,7 @@ pnpm --filter youtube-shorts-orchestrator typecheck
 pnpm --filter youtube-shorts-orchestrator format
 pnpm --filter youtube-shorts-orchestrator format:check
 pnpm --filter youtube-shorts-orchestrator lint:all
+pnpm --filter youtube-shorts-orchestrator resume <namespace|topic> [--pillar X] [--topic X] [--dry-run]
 ```
 
 Image-provider commands:
