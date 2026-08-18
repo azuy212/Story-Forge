@@ -7,6 +7,7 @@ export const PromptPaths = {
   VisualDirector: "visual-director/v1.md",
   ImagePromptGenerator: "image-prompt-generator/v1.md",
   PromptQA: "prompt-qa/v1.md",
+  ImagePromptRepair: "image-prompt-repair/v1.md",
   ReleaseReview: "release-review/v1.md",
   MetadataGenerator: "metadata-generator/v1.md",
   ThumbnailGenerator: "thumbnail-generator/v1.md",

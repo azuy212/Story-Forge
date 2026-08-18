@@ -2,6 +2,7 @@ import { chromium, type Page, type BrowserContext, type Locator, type Response }
 import type { Config } from './config';
 import type { Logger } from './logger';
 import { retry, RetryError } from './retry';
+import { ProviderError, isRetryableType, classifyGeminiError } from './errors';
 import { AssetDownloader } from './asset-downloader';
 import { AssetCache } from './cache';
 import type {
@@ -166,6 +167,7 @@ export class GeminiClient {
         maxAttempts: this.config.retryMaxAttempts,
         baseDelayMs: this.config.retryBaseDelayMs,
         timeout: this.config.timeout,
+        isRetryable: (err) => !(err instanceof ProviderError) || isRetryableType(err.type),
         onRetry: (err) => this.logRetryWarnings(err),
       },
     );
@@ -247,6 +249,7 @@ export class GeminiClient {
           maxAttempts: this.config.retryMaxAttempts,
           baseDelayMs: this.config.retryBaseDelayMs,
           timeout: this.config.timeout,
+          isRetryable: (err) => !(err instanceof ProviderError) || isRetryableType(err.type),
           onRetry: (err) => this.logRetryWarnings(err),
         },
       );
@@ -312,8 +315,16 @@ export class GeminiClient {
           : await this.collectImages(responseCache, oldSrcs);
       if (buffers.length === 0) {
         const errorMsg = await this.detectGenerationError();
+        const failure = new ProviderError(
+          errorMsg || `No ${assetType} generated`,
+          classifyGeminiError(errorMsg ?? ''),
+          errorMsg || undefined,
+        );
 
-        if (errorMsg && (await this.clickGenerationRetry())) {
+        // Only a transient (retryable) failure may be re-issued against the
+        // same prompt. A policy/prompt rejection must surface as-is so the
+        // caller can repair the prompt instead of burning retries.
+        if (isRetryableType(failure.type) && (await this.clickGenerationRetry())) {
           this.logger.info('Retrying failed generation from Gemini UI');
           buffers =
             assetType === 'video'
@@ -327,7 +338,7 @@ export class GeminiClient {
             buffer: buf,
           }));
 
-        throw new Error(errorMsg || `No ${assetType} generated`);
+        throw failure;
       }
 
       const prefix = assetType === 'video' ? 'video' : 'image';

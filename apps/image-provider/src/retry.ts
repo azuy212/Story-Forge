@@ -3,6 +3,8 @@ export interface RetryOptions {
   baseDelayMs: number;
   timeout: number;
   onRetry?: (error: Error, attempt: number) => void;
+  /** When provided, a false verdict rethrows immediately instead of retrying. */
+  isRetryable?: (error: Error) => boolean;
 }
 
 export class RetryError extends Error {
@@ -16,7 +18,7 @@ export class RetryError extends Error {
 }
 
 export async function retry<T>(fn: () => Promise<T>, options: RetryOptions): Promise<T> {
-  const { maxAttempts, baseDelayMs, onRetry } = options;
+  const { maxAttempts, baseDelayMs, onRetry, isRetryable } = options;
   const errors: Error[] = [];
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -25,6 +27,10 @@ export async function retry<T>(fn: () => Promise<T>, options: RetryOptions): Pro
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       errors.push(err);
+
+      if (isRetryable && !isRetryable(err)) {
+        throw err;
+      }
 
       if (attempt === maxAttempts) {
         throw new RetryError(

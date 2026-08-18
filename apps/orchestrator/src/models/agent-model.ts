@@ -9,6 +9,7 @@ export enum AgentModel {
   AssetStrategy = "AssetStrategy",
   ImagePromptGenerator = "ImagePromptGenerator",
   PromptEngineer = "PromptEngineer",
+  ImagePromptRepair = "ImagePromptRepair",
   NarrationPlanner = "NarrationPlanner",
   PromptQA = "PromptQA",
   QAReviewer = "QAReviewer",

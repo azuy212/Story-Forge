@@ -3,6 +3,10 @@ import { assetGeneratorNode } from "../src/agents/asset-generator.node.js";
 import type { ProjectState, Scene } from "../src/types/index.js";
 import type { AssetProvider } from "../src/providers/asset-provider.js";
 import { StubAssetProvider } from "../src/providers/stub-provider.js";
+import {
+  ImageGenerationProviderError,
+  normalizeImageGenerationError,
+} from "../src/providers/image-generation-error.js";
 
 const SCENES: Scene[] = [
   {
@@ -130,22 +134,175 @@ describe("assetGeneratorNode", () => {
     expect(mockGenerateImage).not.toHaveBeenCalled();
   });
 
-  it("handles partial failure gracefully", async () => {
-    mockGenerateImage.mockResolvedValue({
-      url: "https://placeholder.local/img.png",
+  it("routes a content-policy rejection to prompt repair, other scenes still resolve", async () => {
+    const policyError = new ImageGenerationProviderError(
+      normalizeImageGenerationError({
+        provider: "gemini",
+        type: "content_policy",
+        message:
+          "There are a lot of people I can help with, but I can't depict some public figures.",
+        originalPrompt:
+          "The supplied reference likeness of an old female psychologist.",
+        sceneId: 2,
+      }),
+    );
+    mockGenerateImage.mockRejectedValue(policyError);
+    mockGenerateVideo.mockResolvedValue({
+      url: "https://placeholder.local/scene-001.mp4",
     });
-    mockGenerateVideo
-      .mockResolvedValueOnce({ url: "https://placeholder.local/scene-001.mp4" })
-      .mockRejectedValueOnce(new Error("Generation timeout"));
 
     const result = await runNode();
 
-    expect(result.production?.scenes![0].assetUrl).toBeUndefined();
-    expect(result.production?.scenes![1].assetUrl).toBeUndefined();
-    expect(result.production?.scenes![2].assetUrl).toBeUndefined();
+    const rejected = result.production?.scenes![1];
+    expect(rejected?.generationStatus).toBe("prompt_repair");
+    expect(rejected?.providerError).toMatchObject({
+      type: "content_policy",
+      provider: "gemini",
+      message:
+        "There are a lot of people I can help with, but I can't depict some public figures.",
+    });
+    expect(rejected?.originalPrompt).toBe("Detailed map.");
+    expect(rejected?.promptAttempts?.[0]).toMatchObject({
+      status: "rejected",
+      errorType: "content_policy",
+      prompt: "Detailed map.",
+    });
+    // The rejected prompt is never retried: exactly one provider call.
+    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
+    // Sibling scenes still generate; no batch-level error.
+    expect(result.production?.scenes![0].assetUrl).toBeDefined();
+    expect(result.production?.scenes![2].assetUrl).toBeDefined();
+    expect(result.diagnostics?.errors).toBeUndefined();
+  });
+
+  it("fails a scene with unresolved rejection when the repair budget is exhausted", async () => {
+    const policyError = new ImageGenerationProviderError(
+      normalizeImageGenerationError({
+        provider: "gemini",
+        type: "content_policy",
+        message: "Blocked by content policy.",
+        originalPrompt: "Detailed map.",
+        sceneId: 1,
+      }),
+    );
+    mockGenerateImage.mockRejectedValue(policyError);
+
+    const result = await runNode({
+      production: {
+        scenes: [
+          {
+            ...SCENES[1],
+            repairCount: 2,
+          },
+        ],
+      },
+    } as any);
+
+    const scene = result.production?.scenes![0];
+    expect(scene?.generationStatus).toBe("failed");
+    expect(scene?.failureType).toBe("unresolved_provider_rejection");
+    expect(scene?.providerError?.type).toBe("content_policy");
+    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
+  });
+
+  it("aborts the batch on authentication failures but preserves completed scenes", async () => {
+    const authError = new ImageGenerationProviderError(
+      normalizeImageGenerationError({
+        provider: "gemini",
+        type: "authentication",
+        message: "Sign in required.",
+        originalPrompt: "Detailed map.",
+        sceneId: 2,
+      }),
+    );
+    mockGenerateImage.mockRejectedValue(authError);
+    mockGenerateVideo.mockResolvedValue({
+      url: "https://placeholder.local/scene-001.mp4",
+    });
+
+    const result = await runNode();
+
     expect(result.diagnostics?.errors).toBeDefined();
-    expect(result.diagnostics?.errors![0]).toContain("Scene 3");
-    expect(result.diagnostics?.errors![0]).toContain("Generation timeout");
+    expect(result.diagnostics?.errors![0]).toContain("authentication");
+    // The fatal scene is marked failed with the fatal type, never retried.
+    expect(result.production?.scenes![1].generationStatus).toBe("failed");
+    expect(result.production?.scenes![1].failureType).toBe("authentication");
+    // Scenes that already generated keep their assets (partial progress
+    // survives the batch abort).
+    expect(result.production?.scenes![0].assetUrl).toBeDefined();
+    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries transient failures 4 times with stepwise backoff then marks the scene failed", async () => {
+    jest.useFakeTimers();
+    try {
+      const transient = new ImageGenerationProviderError(
+        normalizeImageGenerationError({
+          provider: "gemini",
+          type: "rate_limit",
+          message: "Rate limited.",
+          originalPrompt: "Detailed map.",
+          sceneId: 2,
+        }),
+      );
+      mockGenerateImage.mockRejectedValue(transient);
+      mockGenerateVideo.mockResolvedValue({
+        url: "https://placeholder.local/scene-001.mp4",
+      });
+
+      const promise = runNode();
+      await jest.advanceTimersByTimeAsync(2000);
+      expect(mockGenerateImage).toHaveBeenCalledTimes(2);
+      await jest.advanceTimersByTimeAsync(5000);
+      expect(mockGenerateImage).toHaveBeenCalledTimes(3);
+      await jest.advanceTimersByTimeAsync(15000);
+      const result = await promise;
+
+      const scene = result.production?.scenes![1];
+      expect(scene?.generationStatus).toBe("failed");
+      expect(scene?.failureType).toBe("provider_unavailable");
+      expect(scene?.providerError?.type).toBe("rate_limit");
+      expect(mockGenerateImage).toHaveBeenCalledTimes(4);
+      expect(scene?.promptAttempts).toHaveLength(4);
+      expect(scene?.promptAttempts?.every((a) => a.status === "rejected")).toBe(
+        true,
+      );
+      expect(result.diagnostics?.errors).toBeUndefined();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("skips scenes that already have assets", async () => {
+    const result = await runNode({
+      production: {
+        scenes: [
+          {
+            ...SCENES[1],
+            assetUrl: "https://existing.local/scene-002.png",
+            generationStatus: "complete",
+            promptAttempts: [
+              {
+                attempt: 1,
+                prompt: "Detailed map.",
+                status: "rejected",
+                errorType: "content_policy",
+              },
+              {
+                attempt: 2,
+                prompt: "A clean map without public figures.",
+                status: "success",
+              },
+            ],
+          },
+        ],
+      },
+    } as any);
+
+    expect(result.production?.scenes![0].assetUrl).toBe(
+      "https://existing.local/scene-002.png",
+    );
+    expect(mockGenerateImage).not.toHaveBeenCalled();
   });
 
   it("uses stub provider when no provider injected", async () => {
@@ -197,8 +354,14 @@ describe("assetGeneratorNode", () => {
       production: { scenes: incompleteScenes },
     } as any);
 
-    expect(result.production?.scenes![0].assetUrl).toBeUndefined();
+    // The missing-prompt scene is fatal: the batch aborts but completed
+    // scenes keep their assets (partial progress survives the abort).
+    expect(result.production?.scenes![0].assetUrl).toBe(
+      "https://placeholder.local/vid.mp4",
+    );
+    expect(result.production?.scenes![0].generationStatus).toBe("complete");
     expect(result.production?.scenes![1].assetUrl).toBeUndefined();
+    expect(result.production?.scenes![1].generationStatus).toBe("failed");
     expect(result.diagnostics?.errors).toBeDefined();
     expect(result.diagnostics?.errors![0]).toContain(
       "missing generationPrompt",
@@ -252,7 +415,7 @@ describe("assetGeneratorNode", () => {
   it("passes source image reference for supported composite provider", async () => {
     mockGenerateImage.mockResolvedValue({ url: "/tmp/composite.png" });
 
-    await runNode(
+    const result = await runNode(
       {
         production: {
           scenes: [
@@ -290,6 +453,7 @@ describe("assetGeneratorNode", () => {
         ],
       }),
     );
+    expect(result.production?.scenes![0].assetKind).toBe("source-composite");
   });
 
   it("falls back to source when provider lacks reference support", async () => {
@@ -321,8 +485,17 @@ describe("assetGeneratorNode", () => {
     expect(mockGenerateImage).not.toHaveBeenCalled();
   });
 
-  it("falls back to source when reference generation fails", async () => {
-    mockGenerateImage.mockRejectedValue(new Error("Gemini unavailable"));
+  it("routes a reference-mode content-policy rejection to repair, never source fallback", async () => {
+    const policyError = new ImageGenerationProviderError(
+      normalizeImageGenerationError({
+        provider: "gemini",
+        type: "content_policy",
+        message: "Blocked by content policy.",
+        originalPrompt: "Place subject in a study, vertical portrait 9:16.",
+        sceneId: 1,
+      }),
+    );
+    mockGenerateImage.mockRejectedValue(policyError);
 
     const result = await runNode(
       {
@@ -351,6 +524,57 @@ describe("assetGeneratorNode", () => {
       referenceAssetProvider,
     );
 
-    expect(result.production?.scenes![0].assetUrl).toBe("/tmp/source-1.png");
+    const scene = result.production?.scenes![0];
+    expect(scene?.generationStatus).toBe("prompt_repair");
+    expect(scene?.assetUrl).toBeUndefined();
+    expect(scene?.providerError?.type).toBe("content_policy");
+    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
+  });
+
+  it("aborts on a fatal reference-mode error instead of swallowing it", async () => {
+    const authError = new ImageGenerationProviderError(
+      normalizeImageGenerationError({
+        provider: "gemini",
+        type: "authentication",
+        message: "Sign in required.",
+        originalPrompt: "Place subject in a study, vertical portrait 9:16.",
+        sceneId: 1,
+      }),
+    );
+    mockGenerateImage.mockRejectedValue(authError);
+
+    const result = await runNode(
+      {
+        production: {
+          scenes: [
+            {
+              sceneId: 1,
+              generationPrompt:
+                "Place subject in a study, vertical portrait 9:16.",
+              assetType: "image",
+              assetMode: "source_edit",
+              filename: "scene-001.png",
+              sourceAssetIds: ["source-1"],
+            },
+          ],
+          sourceAssets: [
+            {
+              id: "source-1",
+              url: "https://commons.wikimedia.org/source.png",
+              source: "Wikimedia Commons",
+              localPath: "/tmp/source-1.png",
+            },
+          ],
+        },
+      } as any,
+      referenceAssetProvider,
+    );
+
+    expect(result.diagnostics?.errors).toBeDefined();
+    expect(result.diagnostics?.errors![0]).toContain("authentication");
+    const scene = result.production?.scenes![0];
+    expect(scene?.assetUrl).toBeUndefined();
+    expect(scene?.generationStatus).toBe("failed");
+    expect(scene?.failureType).toBe("authentication");
   });
 });

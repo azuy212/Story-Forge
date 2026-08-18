@@ -1,5 +1,9 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import { graph } from "../src/graph/index.js";
+import {
+  ImageGenerationProviderError,
+  normalizeImageGenerationError,
+} from "../src/providers/image-generation-error.js";
 
 const mockGenerate = jest.fn<(...args: any[]) => Promise<any>>();
 
@@ -227,6 +231,58 @@ const ASSET_PROVIDER = {
   generateVideo: () =>
     Promise.resolve({ url: "https://placeholder.local/scene.mp4" }),
 };
+
+const REPAIRED_PROMPT_1 =
+  "An original fictional elderly female psychologist, vertical portrait 9:16.";
+const REPAIRED_PROMPT_2 =
+  "A nondescript elderly woman reading in a study, vertical portrait 9:16.";
+const LONG_PROMPT =
+  "Aerial drone footage of remote island in Pacific Ocean. Endless blue water surrounding tiny landmass. Cinematic documentary style.";
+
+/**
+ * Provider that rejects the first image generation with a content-policy
+ * error (or every generation when rejectAlways), then succeeds. Tracks the
+ * number of image generation calls.
+ */
+function makeRepairProvider(options: { rejectAlways?: boolean } = {}) {
+  const provider: {
+    sceneImageCalls: number;
+    generateImage: (args?: {
+      sceneId?: number;
+      prompt?: string;
+    }) => Promise<{ url: string }>;
+    generateVideo: () => Promise<{ url: string }>;
+  } = {
+    sceneImageCalls: 0,
+    generateImage: (args) => {
+      // The thumbnail node shares this provider but calls with sceneId 0;
+      // only scene generation is counted and rejected.
+      const isSceneCall = (args?.sceneId ?? 0) >= 1;
+      if (isSceneCall) provider.sceneImageCalls += 1;
+      if (
+        isSceneCall &&
+        (options.rejectAlways || provider.sceneImageCalls === 1)
+      ) {
+        return Promise.reject(
+          new ImageGenerationProviderError(
+            normalizeImageGenerationError({
+              provider: "gemini",
+              type: "content_policy",
+              message:
+                "There are a lot of people I can help with, but I can't depict some public figures.",
+              originalPrompt: LONG_PROMPT,
+              sceneId: 1,
+            }),
+          ),
+        );
+      }
+      return Promise.resolve({ url: "https://placeholder.local/scene.png" });
+    },
+    generateVideo: () =>
+      Promise.resolve({ url: "https://placeholder.local/scene.mp4" }),
+  };
+  return provider;
+}
 
 const TTS_PROVIDER = {
   synthesize: (opts: { filename?: string }) =>
@@ -1516,8 +1572,6 @@ describe("Graph", () => {
     const NARRATIONS = SCENE_NARRATIONS;
     const SCENES = makeScenes(NARRATIONS, [8, 8, 8, 8, 8, 10]);
     const VISUAL_PLANS = makeVisualPlans(SCENES);
-    const LONG_PROMPT =
-      "Aerial drone footage of remote island in Pacific Ocean. Endless blue water surrounding tiny landmass. Cinematic documentary style.";
     const ASSETS = makeAssets(SCENES, LONG_PROMPT);
 
     mockGenerate
@@ -1800,6 +1854,678 @@ describe("Graph", () => {
     expect(result.execution.currentNode).toBe("Publisher");
     expect(result.diagnostics?.errors).toHaveLength(0);
     expect(result.diagnostics?.warnings).toHaveLength(0);
+  }, 30000);
+
+  it("repairs a provider-rejected prompt and regenerates the asset", async () => {
+    const FACTS = makeFacts(8);
+    const BEATS = makeBeats(6);
+    const NARRATIONS = SCENE_NARRATIONS;
+    const SCENES = makeScenes(NARRATIONS, [4, 6, 8, 8, 8, 8]).map((s) => ({
+      ...s,
+      assetType: "image" as const,
+    }));
+    const VISUAL_PLANS = makeVisualPlans(SCENES);
+    const ASSETS = makeAssets(SCENES, LONG_PROMPT);
+    const REPAIRED_PROMPT =
+      "An original fictional elderly female psychologist with a non-identifiable appearance, vertical portrait 9:16.";
+    const repairProvider = makeRepairProvider();
+
+    mockGenerate
+      // 1. ResearchAgent
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                summary: "Remote island in Pacific.",
+                facts: FACTS,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 11, completion_tokens: 22, total_tokens: 33 },
+        model: "test-model",
+      })
+      // 2. ResearchQA (approved)
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: { content: JSON.stringify(makeResearchQAResponse(FACTS)) },
+          },
+        ],
+        usage: { prompt_tokens: 9, completion_tokens: 6, total_tokens: 15 },
+        model: "test-model",
+      })
+      // 3. ScriptPlanner
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                content: {
+                  title: "Mystery Island",
+                  hook: "What if a country wasn't real?",
+                },
+                storyType: "mystery",
+                storySummary: "Mystery Island story.",
+                storyBeats: BEATS,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 13, completion_tokens: 26, total_tokens: 39 },
+        model: "test-model",
+      })
+      // 4. ScriptWriter
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                content: {
+                  script: "Script body.",
+                  narration: NARRATIONS.join(" "),
+                  callToAction: "Subscribe!",
+                  estimatedDurationSeconds: 8,
+                },
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 12, completion_tokens: 24, total_tokens: 36 },
+        model: "test-model",
+      })
+      // 5. ScriptQA (approved)
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({ status: "approved", feedback: "" }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
+        model: "test-model",
+      })
+      // 6. MetadataGenerator
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                title: "Mystery Island Video",
+                description: "Explore the mystery.",
+                tags: ["geography"],
+                hashtags: ["#mystery"],
+                category: "Education",
+                pinnedComment: "What do you think?",
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
+        model: "test-model",
+      })
+      // 7. ThumbnailGenerator
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                thumbnailPrompt: "Mysterious island aerial",
+                thumbnailText: "Doesn't Exist?",
+                textPosition: "bottom-third",
+                colorScheme: "cold blue",
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 16, completion_tokens: 12, total_tokens: 28 },
+        model: "test-model",
+      })
+      // 8. VisualDirector
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                scenes: SCENES,
+                visualPlans: VISUAL_PLANS,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
+        model: "test-model",
+      })
+      // 9. ImagePromptGenerator
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify({ assets: ASSETS }) } }],
+        usage: { prompt_tokens: 16, completion_tokens: 32, total_tokens: 48 },
+        model: "test-model",
+      })
+      // 10. PromptQA (approved)
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify(makePromptQAResponse("approved", SCENES)),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
+        model: "test-model",
+      })
+      // 11. ImagePromptRepair (provider rejected the original prompt)
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                repairedPrompt: REPAIRED_PROMPT,
+                changes: ["Removed reference-likeness language"],
+                reason: "Provider rejects public-figure likenesses.",
+                shouldRetry: true,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
+        model: "test-model",
+      })
+      // 12. ReleaseReview (approved)
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({ status: "approved", issues: [] }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
+        model: "test-model",
+      });
+
+    const result = await graph.invoke(
+      {
+        project: { pillar: "Geography", topic: "Mystery Island" },
+        branding: {
+          channel: "TestChannel",
+          creator: "",
+          cta: "Subscribe",
+          style: "Documentary",
+          colorPalette: "Cold blue",
+        },
+        execution: { version: "0.1.0" },
+      },
+      {
+        configurable: {
+          createModel: mockCreateModel,
+          loadPrompt: mockLoadPrompt,
+          assetProvider: repairProvider,
+          ttsProvider: TTS_PROVIDER,
+          audioConcatenator: AUDIO_CONCATENATOR.concat,
+          sceneSubtitleProvider: SCENE_SUBTITLE_PROVIDER,
+          composerProvider: COMPOSER_PROVIDER,
+          probe: () => Promise.resolve(RELEASE_PROBE),
+          publisherProvider: {
+            publish: () =>
+              Promise.resolve({
+                platform: "youtube",
+                platformVideoId: "abc123",
+                url: "https://youtube.com/watch?v=abc123",
+                status: "published",
+                publishedAt: new Date().toISOString(),
+              }),
+          },
+        },
+      } as any,
+    );
+
+    const scene = result.production?.scenes![0];
+    expect(scene?.generationStatus).toBe("complete");
+    expect(scene?.assetUrl).toBe("https://placeholder.local/scene.png");
+    expect(scene?.originalPrompt).toBe(LONG_PROMPT);
+    expect(scene?.generationPrompt).toBe(REPAIRED_PROMPT);
+    expect(scene?.repairedPrompt).toBe(REPAIRED_PROMPT);
+    expect(scene?.repairCount).toBe(1);
+    expect(scene?.promptAttempts).toHaveLength(2);
+    expect(scene?.promptAttempts?.[0]).toMatchObject({
+      attempt: 1,
+      prompt: LONG_PROMPT,
+      status: "rejected",
+      errorType: "content_policy",
+    });
+    expect(scene?.promptAttempts?.[1]).toMatchObject({
+      attempt: 2,
+      status: "success",
+    });
+    // Unaffected scenes generated on the first pass.
+    expect(result.production?.scenes![1].generationStatus).toBe("complete");
+    expect(repairProvider.sceneImageCalls).toBe(7);
+    expect(result.execution.currentNode).toBe("Publisher");
+    expect(result.diagnostics?.errors).toHaveLength(0);
+  }, 30000);
+
+  it("halts with unresolved_provider_rejection when repair budget is exhausted", async () => {
+    const FACTS = makeFacts(8);
+    const BEATS = makeBeats(6);
+    const NARRATIONS = SCENE_NARRATIONS;
+    const SCENES = makeScenes(NARRATIONS, [4, 6, 8, 8, 8, 8]).map((s) => ({
+      ...s,
+      assetType: "image" as const,
+    }));
+    const VISUAL_PLANS = makeVisualPlans(SCENES);
+    const ASSETS = makeAssets(SCENES, LONG_PROMPT);
+    const repairProvider = makeRepairProvider({ rejectAlways: true });
+
+    mockGenerate
+      // 1. ResearchAgent
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                summary: "Remote island in Pacific.",
+                facts: FACTS,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 11, completion_tokens: 22, total_tokens: 33 },
+        model: "test-model",
+      })
+      // 2. ResearchQA (approved)
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: { content: JSON.stringify(makeResearchQAResponse(FACTS)) },
+          },
+        ],
+        usage: { prompt_tokens: 9, completion_tokens: 6, total_tokens: 15 },
+        model: "test-model",
+      })
+      // 3. ScriptPlanner
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                content: {
+                  title: "Mystery Island",
+                  hook: "What if a country wasn't real?",
+                },
+                storyType: "mystery",
+                storySummary: "Mystery Island story.",
+                storyBeats: BEATS,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 13, completion_tokens: 26, total_tokens: 39 },
+        model: "test-model",
+      })
+      // 4. ScriptWriter
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                content: {
+                  script: "Script body.",
+                  narration: NARRATIONS.join(" "),
+                  callToAction: "Subscribe!",
+                  estimatedDurationSeconds: 8,
+                },
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 12, completion_tokens: 24, total_tokens: 36 },
+        model: "test-model",
+      })
+      // 5. ScriptQA (approved)
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({ status: "approved", feedback: "" }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
+        model: "test-model",
+      })
+      // 6. MetadataGenerator
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                title: "Mystery Island Video",
+                description: "Explore the mystery.",
+                tags: ["geography"],
+                hashtags: ["#mystery"],
+                category: "Education",
+                pinnedComment: "What do you think?",
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
+        model: "test-model",
+      })
+      // 7. ThumbnailGenerator
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                thumbnailPrompt: "Mysterious island aerial",
+                thumbnailText: "Doesn't Exist?",
+                textPosition: "bottom-third",
+                colorScheme: "cold blue",
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 16, completion_tokens: 12, total_tokens: 28 },
+        model: "test-model",
+      })
+      // 8. VisualDirector
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                scenes: SCENES,
+                visualPlans: VISUAL_PLANS,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
+        model: "test-model",
+      })
+      // 9. ImagePromptGenerator
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify({ assets: ASSETS }) } }],
+        usage: { prompt_tokens: 16, completion_tokens: 32, total_tokens: 48 },
+        model: "test-model",
+      })
+      // 10. PromptQA (approved)
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify(makePromptQAResponse("approved", SCENES)),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
+        model: "test-model",
+      })
+      // 11-22. ImagePromptRepair: 6 scenes × 2 repair rounds (all rejected)
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                repairedPrompt: REPAIRED_PROMPT_1,
+                changes: ["Removed likeness language"],
+                reason: "Content policy.",
+                shouldRetry: true,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
+        model: "test-model",
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                repairedPrompt: REPAIRED_PROMPT_1,
+                changes: ["Removed likeness language"],
+                reason: "Content policy.",
+                shouldRetry: true,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
+        model: "test-model",
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                repairedPrompt: REPAIRED_PROMPT_1,
+                changes: ["Removed likeness language"],
+                reason: "Content policy.",
+                shouldRetry: true,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
+        model: "test-model",
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                repairedPrompt: REPAIRED_PROMPT_1,
+                changes: ["Removed likeness language"],
+                reason: "Content policy.",
+                shouldRetry: true,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
+        model: "test-model",
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                repairedPrompt: REPAIRED_PROMPT_1,
+                changes: ["Removed likeness language"],
+                reason: "Content policy.",
+                shouldRetry: true,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
+        model: "test-model",
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                repairedPrompt: REPAIRED_PROMPT_1,
+                changes: ["Removed likeness language"],
+                reason: "Content policy.",
+                shouldRetry: true,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
+        model: "test-model",
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                repairedPrompt: REPAIRED_PROMPT_2,
+                changes: ["Further de-identification"],
+                reason: "Still rejected.",
+                shouldRetry: true,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
+        model: "test-model",
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                repairedPrompt: REPAIRED_PROMPT_2,
+                changes: ["Further de-identification"],
+                reason: "Still rejected.",
+                shouldRetry: true,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
+        model: "test-model",
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                repairedPrompt: REPAIRED_PROMPT_2,
+                changes: ["Further de-identification"],
+                reason: "Still rejected.",
+                shouldRetry: true,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
+        model: "test-model",
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                repairedPrompt: REPAIRED_PROMPT_2,
+                changes: ["Further de-identification"],
+                reason: "Still rejected.",
+                shouldRetry: true,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
+        model: "test-model",
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                repairedPrompt: REPAIRED_PROMPT_2,
+                changes: ["Further de-identification"],
+                reason: "Still rejected.",
+                shouldRetry: true,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
+        model: "test-model",
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                repairedPrompt: REPAIRED_PROMPT_2,
+                changes: ["Further de-identification"],
+                reason: "Still rejected.",
+                shouldRetry: true,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
+        model: "test-model",
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                repairedPrompt: REPAIRED_PROMPT_2,
+                changes: ["Further de-identification"],
+                reason: "Still rejected.",
+                shouldRetry: true,
+              }),
+            },
+          },
+        ],
+        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
+        model: "test-model",
+      });
+
+    const result = await graph.invoke(
+      {
+        project: { pillar: "Geography", topic: "Mystery Island" },
+        branding: {
+          channel: "TestChannel",
+          creator: "",
+          cta: "Subscribe",
+          style: "Documentary",
+          colorPalette: "Cold blue",
+        },
+        execution: { version: "0.1.0" },
+      },
+      {
+        configurable: {
+          createModel: mockCreateModel,
+          loadPrompt: mockLoadPrompt,
+          assetProvider: repairProvider,
+        },
+      } as any,
+    );
+
+    const scene = result.production?.scenes![0];
+    expect(scene?.generationStatus).toBe("failed");
+    expect(scene?.failureType).toBe("unresolved_provider_rejection");
+    expect(scene?.repairCount).toBe(2);
+    // The budget counts LLM repairs; each repaired prompt was attempted, so
+    // three distinct prompts were rejected before the scene failed.
+    expect(scene?.promptAttempts).toHaveLength(3);
+    expect(scene?.promptAttempts?.every((a) => a.status === "rejected")).toBe(
+      true,
+    );
+    // Every distinct prompt in the repair chain survives: the original
+    // (never generated), repair #1, and the final attempted prompt.
+    expect(scene?.promptAttempts?.[0].prompt).toBe(LONG_PROMPT);
+    expect(scene?.promptAttempts?.[1].prompt).toBe(REPAIRED_PROMPT_1);
+    expect(scene?.promptAttempts?.[2].prompt).toBe(REPAIRED_PROMPT_2);
+    expect(scene?.generationPrompt).toBe(REPAIRED_PROMPT_2);
+    expect(scene?.repairedPrompt).toBe(REPAIRED_PROMPT_2);
+    expect(scene?.originalPrompt).toBe(LONG_PROMPT);
+    expect(scene?.assetUrl).toBeUndefined();
+    // Every other scene also failed closed after two repairs.
+    expect(
+      result.production?.scenes?.every((s) => s.generationStatus === "failed"),
+    ).toBe(true);
+    expect(repairProvider.sceneImageCalls).toBe(18);
+    expect(result.execution.currentNode).toBe("AssetGenerator");
+    expect(result.diagnostics?.warnings).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("unresolved_provider_rejection"),
+      ]),
+    );
   }, 30000);
 
   it("retries VisualDirector on structural failure then stops when budget exhausted", async () => {

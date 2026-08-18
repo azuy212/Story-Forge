@@ -15,6 +15,7 @@ const AGENT_ROLES: Record<AgentModel, string> = {
   [AgentModel.AssetStrategy]: "SYSTEM",
   [AgentModel.ImagePromptGenerator]: "EDITORIAL",
   [AgentModel.PromptEngineer]: "EDITORIAL",
+  [AgentModel.ImagePromptRepair]: "EDITORIAL",
   [AgentModel.NarrationPlanner]: "EDITORIAL",
   [AgentModel.PromptQA]: "QA",
   [AgentModel.QAReviewer]: "QA",
