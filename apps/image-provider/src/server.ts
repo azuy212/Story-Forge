@@ -7,52 +7,9 @@ import { loadConfig, type Config } from './config';
 import { GeminiClient } from './gemini-client';
 import { detectMediaExt, extToMime } from './asset-downloader';
 import type { AssetType, GenerationOptions, GenerationResult } from './types';
-import { ProviderError, type ProviderErrorType, isRetryableType } from './errors';
 
 export const MAX_REFERENCE_IMAGE_BYTES = 10 * 1024 * 1024;
 export const MAX_REFERENCE_REQUEST_BYTES = 64 * 1024 * 1024;
-
-/** HTTP status for each normalized failure type. */
-const ERROR_STATUS: Record<ProviderErrorType, number> = {
-  content_policy: 422,
-  invalid_prompt: 422,
-  rate_limit: 429,
-  timeout: 504,
-  server_error: 503,
-  authentication: 401,
-  invalid_request: 400,
-  unknown: 500,
-};
-
-interface ProviderErrorPayload {
-  error: {
-    type: ProviderErrorType;
-    message: string;
-    rawMessage?: string;
-    provider: string;
-    model: string;
-    retryable: boolean;
-  };
-}
-
-/** Provider identification attached to every error payload. */
-const PROVIDER_INFO = { provider: 'gemini', model: 'gemini-image-model' } as const;
-
-function buildErrorPayload(
-  err: ProviderError,
-  providerInfo: { provider: string; model: string } = PROVIDER_INFO,
-): ProviderErrorPayload {
-  return {
-    error: {
-      type: err.type,
-      message: err.message,
-      rawMessage: err.rawMessage ?? err.message,
-      provider: providerInfo.provider,
-      model: providerInfo.model,
-      retryable: isRetryableType(err.type),
-    },
-  };
-}
 
 function decodeBase64(value: string): Buffer | null {
   if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value)) return null;
@@ -206,44 +163,14 @@ export async function startServer(config: Config, port: number): Promise<void> {
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         logger.error('Failed to start browser', { error: msg });
-        return reply
-          .status(503)
-          .send(
-            buildErrorPayload(
-              new ProviderError(`Browser init failed: ${msg}`, 'server_error'),
-              PROVIDER_INFO,
-            ),
-          );
+        return reply.status(500).send({ error: `Browser init failed: ${msg}` });
       }
     }
 
-    let generation: GenerationResult;
-    try {
-      generation = await client.generate(prompt, assetType, options);
-    } catch (error) {
-      if (error instanceof ProviderError) {
-        logger.error('Generation rejected by provider', {
-          type: error.type,
-          message: error.message,
-        });
-        return reply.status(ERROR_STATUS[error.type]).send(buildErrorPayload(error, PROVIDER_INFO));
-      }
-      const msg = error instanceof Error ? error.message : String(error);
-      logger.error('Generation failed', { error: msg });
-      return reply
-        .status(503)
-        .send(buildErrorPayload(new ProviderError(msg, 'server_error'), PROVIDER_INFO));
-    }
+    const generation = await client.generate(prompt, assetType, options);
 
     if (generation.assets.length === 0) {
-      return reply
-        .status(503)
-        .send(
-          buildErrorPayload(
-            new ProviderError('No assets generated', 'server_error'),
-            PROVIDER_INFO,
-          ),
-        );
+      return reply.status(500).send({ error: 'No assets generated' });
     }
 
     const media = buildMediaPayload(generation);

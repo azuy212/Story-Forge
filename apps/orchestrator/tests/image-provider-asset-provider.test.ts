@@ -7,7 +7,6 @@ import {
   afterEach,
 } from "@jest/globals";
 import { PipelineError } from "../src/utils/errors.js";
-import { ImageGenerationProviderError } from "../src/providers/image-generation-error.js";
 
 const mockMkdir = jest
   .fn<(...args: any[]) => Promise<void>>()
@@ -54,7 +53,6 @@ function mockImageResponse(
     status,
     statusText: status === 200 ? "OK" : "Error",
     headers: new Map([["content-type", contentType]]) as unknown as Headers,
-    json: () => Promise.resolve(null),
     arrayBuffer: () => Promise.resolve(body),
   } as Response;
 }
@@ -190,78 +188,14 @@ describe("ImageProviderAssetProvider", () => {
     );
   });
 
-  it("throws ImageGenerationProviderError with unknown type on unparseable error body", async () => {
+  it("throws PipelineError on non-200 response", async () => {
     fetchSpy.mockResolvedValue(
       mockImageResponse(500, new ArrayBuffer(0), "text/plain"),
     );
 
     await expect(
       provider.generateImage({ prompt: "a cat", sceneId: 1 }),
-    ).rejects.toThrow(ImageGenerationProviderError);
-    await expect(
-      provider.generateImage({ prompt: "a cat", sceneId: 1 }),
-    ).rejects.toMatchObject({ info: { type: "unknown" } });
-  });
-
-  it("propagates the provider's typed error and raw message", async () => {
-    fetchSpy.mockResolvedValue({
-      ok: false,
-      status: 400,
-      statusText: "Bad Request",
-      headers: new Map([
-        ["content-type", "application/json"],
-      ]) as unknown as Headers,
-      json: () =>
-        Promise.resolve({
-          error: {
-            type: "invalid_prompt",
-            message: "Couldn't generate an image",
-            rawMessage: "We couldn't generate an image for this prompt.",
-            provider: "gemini",
-            model: "imagen",
-          },
-        }),
-      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    } as Response);
-
-    await expect(
-      provider.generateImage({ prompt: "a cat", sceneId: 1 }),
-    ).rejects.toMatchObject({
-      info: {
-        type: "invalid_prompt",
-        message: "Couldn't generate an image",
-        rawMessage: "We couldn't generate an image for this prompt.",
-      },
-    });
-  });
-
-  it("downgrades an unrecognized provider error type to unknown (fatal)", async () => {
-    // A type the orchestrator does not know must never pass through: an
-    // unvalidated string would silently land in the transient-retry branch
-    // instead of failing closed.
-    fetchSpy.mockResolvedValue({
-      ok: false,
-      status: 500,
-      statusText: "Internal Server Error",
-      headers: new Map([
-        ["content-type", "application/json"],
-      ]) as unknown as Headers,
-      json: () =>
-        Promise.resolve({
-          error: {
-            type: "brand_new_failure_mode",
-            message: "Something new.",
-            provider: "gemini",
-          },
-        }),
-      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    } as Response);
-
-    await expect(
-      provider.generateImage({ prompt: "a cat", sceneId: 1 }),
-    ).rejects.toMatchObject({
-      info: { type: "unknown", message: "Something new." },
-    });
+    ).rejects.toThrow(PipelineError);
   });
 
   it("throws PipelineError on non-image content type", async () => {
@@ -284,12 +218,12 @@ describe("ImageProviderAssetProvider", () => {
     ).rejects.toThrow(PipelineError);
   });
 
-  it("wraps fetch failure in ImageGenerationProviderError", async () => {
+  it("wraps fetch failure in PipelineError", async () => {
     fetchSpy.mockRejectedValue(new Error("Network failure"));
 
     await expect(
       provider.generateImage({ prompt: "a cat", sceneId: 1 }),
-    ).rejects.toThrow(ImageGenerationProviderError);
+    ).rejects.toThrow(PipelineError);
   });
 
   it("wraps write failure in PipelineError", async () => {

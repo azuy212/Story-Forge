@@ -7,7 +7,6 @@ import type {
 } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
-import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { PromptQAOutputSchema } from "../schemas/prompt-qa-output.js";
 import type { PromptQAOutput } from "../schemas/prompt-qa-output.js";
@@ -106,7 +105,7 @@ export async function promptQANode(
       visualPlan: formatVisualPlan(scenes, visualPlan),
     },
     inject,
-    configurable: withTopic(config, state).configurable,
+    configurable: config.configurable as Record<string, unknown>,
     generateOptions: {
       temperature: 0.2,
       responseFormat: { type: "json_object" },

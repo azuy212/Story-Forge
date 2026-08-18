@@ -6,7 +6,6 @@ import type {
 } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
-import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { MetadataOutputSchema } from "../schemas/metadata-output.js";
 import type { MetadataOutput } from "../schemas/metadata-output.js";
@@ -42,7 +41,7 @@ export async function metadataGeneratorNode(
     schema: MetadataOutputSchema,
     variables: { script, title, hook, channel },
     inject,
-    configurable: withTopic(config, state).configurable,
+    configurable: config.configurable as Record<string, unknown>,
     generateOptions: {
       temperature: 0.3,
       responseFormat: { type: "json_object" },

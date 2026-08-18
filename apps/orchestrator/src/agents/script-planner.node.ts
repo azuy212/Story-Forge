@@ -7,7 +7,6 @@ import type {
 } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
-import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { ScriptPlannerOutputSchema } from "../schemas/script-planner-output.js";
 import type { ScriptPlannerOutput } from "../schemas/script-planner-output.js";
@@ -107,7 +106,7 @@ export async function scriptPlannerNode(
       estimatedDurationSeconds: String(estimatedDurationSeconds),
     },
     inject,
-    configurable: withTopic(config, state).configurable,
+    configurable: config.configurable as Record<string, unknown>,
     generateOptions: {
       temperature: 0.5,
       responseFormat: { type: "json_object" },

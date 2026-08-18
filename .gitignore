@@ -33,9 +33,6 @@ generated/
 output/
 runs/
 .langgraph_api/
-# Local/private app: runtime registry state (data/registry.json), dist, and
-# node_modules must never be tracked. Not a workspace package.
-apps/control-plane/
 
 # OS/editor files
 .DS_Store

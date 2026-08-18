@@ -1,3 +1,5 @@
+import { stat } from "node:fs/promises";
+import { resolve } from "node:path";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type {
   ProjectState,
@@ -12,25 +14,14 @@ import type {
 } from "../providers/asset-provider.js";
 import { createDefaultAssetProvider } from "../providers/asset-provider.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
-import { withTopic } from "../artifacts/context.js";
+import { getArtifactNamespace } from "../artifacts/context.js";
 import type { Provider, SourceAsset } from "../schemas/production.js";
-import {
-  ImageGenerationProviderError,
-  isFatalFailure,
-  isImageGenerationProviderError,
-  isRepairCandidate,
-  normalizeImageGenerationError,
-} from "../providers/image-generation-error.js";
-import {
-  IMAGE_TRANSIENT_MAX_ATTEMPTS,
-  IMAGE_TRANSIENT_RETRY_DELAYS_MS,
-  MAX_PROMPT_REPAIRS,
-} from "../utils/constants.js";
 import { padSceneId } from "../utils/scene-id.js";
 import { config as appConfig } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 
 const DEFAULT_PROVIDER = createDefaultAssetProvider();
+const GENERATED_ASSETS_DIR = resolve("generated", "assets");
 
 const ASSET_CONFIG = {
   image: { provider: "gpt-image" as Provider, extension: "png" },
@@ -84,23 +75,8 @@ function getAssetProvider(config: RunnableConfig): AssetProvider {
   return (inject.assetProvider as AssetProvider) ?? DEFAULT_PROVIDER;
 }
 
-/**
- * All scenes that have a prompt must be resolved (asset present) and none may
- * still be awaiting repair/retry/failure. Guards both artifact persistence
- * (constraint: never cache a partially-generated asset set) and graph
- * advance (the spine stays all-or-nothing / fail-closed).
- */
-function allScenesResolved(scenes: Scene[]): boolean {
-  const unresolved = scenes.some(
-    (scene) =>
-      scene.generationStatus === "prompt_repair" ||
-      scene.generationStatus === "failed" ||
-      scene.generationStatus === "retrying",
-  );
-  if (unresolved) return false;
-  return scenes
-    .filter((scene) => scene.generationPrompt)
-    .every((scene) => !!scene.assetUrl);
+function allScenesGenerated(scenes: Scene[]): boolean {
+  return scenes.filter((s) => s.generationPrompt).every((s) => !!s.assetUrl);
 }
 
 interface AssetArtifact {
@@ -127,7 +103,7 @@ function referencesFor(assets: SourceAsset[]): AssetReference[] {
 async function mapWithConcurrency<T, R>(
   items: T[],
   limit: number,
-  fn: (item: T, index: number) => Promise<R>,
+  fn: (item: T) => Promise<R>,
 ): Promise<R[]> {
   const results = Array.from({ length: items.length }) as R[];
   let next = 0;
@@ -137,296 +113,12 @@ async function mapWithConcurrency<T, R>(
       for (;;) {
         const i = next++;
         if (i >= items.length) break;
-        results[i] = await fn(items[i], i);
+        results[i] = await fn(items[i]);
       }
     },
   );
   await Promise.all(workers);
   return results;
-}
-
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
-
-function appendAttempt(
-  attempts: Scene["promptAttempts"],
-  entry: NonNullable<Scene["promptAttempts"]>[number],
-): Scene["promptAttempts"] {
-  return [...(attempts ?? []), entry];
-}
-
-function toProviderErrorInfo(
-  error: ImageGenerationProviderError,
-): Scene["providerError"] {
-  return {
-    provider: error.info.provider,
-    model: error.info.model,
-    type: error.info.type,
-    message: error.info.message,
-    rawMessage: error.info.rawMessage,
-    retryable: error.info.retryable,
-    originalPrompt: error.info.originalPrompt,
-    timestamp: error.info.timestamp,
-  };
-}
-
-function asGenerationError(
-  err: unknown,
-  scene: Scene,
-  providerName: string,
-): ImageGenerationProviderError {
-  if (isImageGenerationProviderError(err)) return err;
-  const message = err instanceof Error ? err.message : String(err);
-  return new ImageGenerationProviderError(
-    normalizeImageGenerationError({
-      provider: providerName,
-      type: "server_error",
-      message,
-      originalPrompt: scene.generationPrompt ?? "",
-      sceneId: scene.sceneId,
-    }),
-  );
-}
-
-type GenerateOutcome =
-  | { kind: "resolved"; scene: Scene }
-  | { kind: "repair"; scene: Scene }
-  | { kind: "failed"; scene: Scene }
-  | { kind: "fatal"; error: string; scene?: Scene };
-
-/**
- * Generate one scene's asset with failure classification:
- * - content_policy / invalid_prompt → prompt_repair (never retried against
- *   the same prompt; never consumes the transient budget).
- * - rate_limit / timeout / server_error → exponential backoff, then fail.
- * - authentication / invalid_request / unknown → fatal, aborts the whole batch.
- * Scenes that already have an asset (or are terminal) are skipped untouched,
- * so interrupted runs resume only the outstanding scenes.
- */
-async function generateScene(
-  scene: Scene,
-  sourceAssets: SourceAsset[],
-  provider: AssetProvider,
-): Promise<GenerateOutcome> {
-  if (scene.assetUrl) return { kind: "resolved", scene };
-  if (scene.generationStatus === "failed") return { kind: "failed", scene };
-
-  if (!scene.generationPrompt || !scene.filename) {
-    return {
-      kind: "fatal",
-      error: `${AgentModel.AssetGenerator}: Scene ${scene.sceneId} missing generationPrompt or filename, skipping`,
-    };
-  }
-  const prompt = scene.generationPrompt;
-
-  const assetType = scene.assetType ?? "image";
-  const mode = scene.assetMode ?? "generated";
-  const selectedSourceAssets = sourceAssetsFor(scene, sourceAssets);
-  const references = referencesFor(selectedSourceAssets);
-
-  if (assetType === "image" && mode === "source" && references.length > 0) {
-    return {
-      kind: "resolved",
-      scene: {
-        ...scene,
-        assetKind: "source-image" as const,
-        assetUrl: references[0].path,
-        assetGeneratedAt: new Date().toISOString(),
-        generationStatus: "complete" as const,
-      },
-    };
-  }
-
-  const referenceMode =
-    assetType === "image" &&
-    (mode === "source_composite" || mode === "source_edit") &&
-    references.length > 0;
-
-  if (referenceMode) {
-    const supportsReferenceMode =
-      provider.capabilities?.referenceImages === true &&
-      (mode !== "source_edit" || provider.capabilities.imageEditing === true);
-    if (!supportsReferenceMode) {
-      // Deliberate, capability-based fallback: this provider cannot do
-      // reference generation, so the source image is the safe substitute.
-      // A generation ERROR is never swallowed here — reference-mode errors
-      // flow through the same classification as plain generation below.
-      logger.info(
-        "AssetGenerator reference capability unavailable; using source image",
-        {
-          sceneId: scene.sceneId,
-          mode,
-        },
-      );
-      return {
-        kind: "resolved",
-        scene: {
-          ...scene,
-          assetKind: "source-image" as const,
-          assetUrl: references[0].path,
-          assetGeneratedAt: new Date().toISOString(),
-          generationStatus: "complete" as const,
-        },
-      };
-    }
-  }
-
-  const referenceImages = referenceMode ? references : undefined;
-  const referenceModeParam = referenceMode
-    ? mode === "source_edit"
-      ? ("edit" as const)
-      : ("image_to_image" as const)
-    : undefined;
-
-  let lastError: ImageGenerationProviderError | null = null;
-  let nextAttempt = (scene.promptAttempts?.length ?? 0) + 1;
-  // Durable per-scene state: a scene being generated reads as `generating`,
-  // and a scene backing off between transient retries reads as `retrying`,
-  // so an interrupted run shows where generation stopped instead of a bare
-  // `pending`. Terminal outcomes overwrite these on the way out.
-  scene = { ...scene, generationStatus: "generating" as const };
-
-  for (let attempt = 1; attempt <= IMAGE_TRANSIENT_MAX_ATTEMPTS; attempt++) {
-    try {
-      const assetResult =
-        assetType === "video"
-          ? await provider.generateVideo({
-              prompt,
-              sceneId: scene.sceneId,
-              filename: scene.filename,
-            })
-          : await provider.generateImage({
-              prompt,
-              sceneId: scene.sceneId,
-              filename: scene.filename,
-              ...(referenceImages && referenceImages.length > 0
-                ? { referenceImages, mode: referenceModeParam }
-                : {}),
-            });
-
-      return {
-        kind: "resolved",
-        scene: {
-          ...scene,
-          ...(assetType === "image"
-            ? {
-                assetKind: referenceMode
-                  ? mode === "source_edit"
-                    ? ("source-edit" as const)
-                    : ("source-composite" as const)
-                  : ("generated-image" as const),
-              }
-            : {}),
-          assetUrl: assetResult.url,
-          assetGeneratedAt: new Date().toISOString(),
-          generationStatus: "complete" as const,
-          promptAttempts: appendAttempt(scene.promptAttempts, {
-            attempt: nextAttempt++,
-            prompt,
-            status: "success",
-          }),
-        },
-      };
-    } catch (error) {
-      const genError = asGenerationError(
-        error,
-        scene,
-        scene.provider ?? "unknown",
-      );
-      lastError = genError;
-
-      if (isFatalFailure(genError.info.type)) {
-        logger.error("AssetGenerator fatal provider error", {
-          sceneId: scene.sceneId,
-          type: genError.info.type,
-          message: genError.info.message,
-        });
-        return {
-          kind: "fatal",
-          error: `${AgentModel.AssetGenerator}: Scene ${scene.sceneId} fatal provider error (${genError.info.type}): ${genError.info.message}`,
-          scene: {
-            ...scene,
-            generationStatus: "failed" as const,
-            failureType: genError.info.type,
-            providerError: toProviderErrorInfo(genError),
-          },
-        };
-      }
-
-      const rejectedAttempt = {
-        attempt: nextAttempt++,
-        prompt,
-        status: "rejected" as const,
-        errorType: genError.info.type,
-        providerMessage: genError.info.message,
-      };
-
-      if (isRepairCandidate(genError.info.type)) {
-        logger.warn(
-          "AssetGenerator provider rejected prompt; routing to repair",
-          {
-            sceneId: scene.sceneId,
-            type: genError.info.type,
-            message: genError.info.message,
-          },
-        );
-        const repairBudgetExhausted =
-          (scene.repairCount ?? 0) >= MAX_PROMPT_REPAIRS;
-        return {
-          kind: repairBudgetExhausted ? "failed" : "repair",
-          scene: {
-            ...scene,
-            generationStatus: repairBudgetExhausted
-              ? ("failed" as const)
-              : ("prompt_repair" as const),
-            failureType: repairBudgetExhausted
-              ? ("unresolved_provider_rejection" as const)
-              : undefined,
-            originalPrompt: scene.originalPrompt ?? scene.generationPrompt,
-            providerError: toProviderErrorInfo(genError),
-            promptAttempts: appendAttempt(
-              scene.promptAttempts,
-              rejectedAttempt,
-            ),
-          },
-        };
-      }
-
-      // Transient failure: record the attempt and back off before retrying
-      // the SAME prompt.
-      scene = {
-        ...scene,
-        promptAttempts: appendAttempt(scene.promptAttempts, rejectedAttempt),
-        generationStatus: "retrying" as const,
-      };
-
-      if (attempt < IMAGE_TRANSIENT_MAX_ATTEMPTS) {
-        const delay = IMAGE_TRANSIENT_RETRY_DELAYS_MS[attempt - 1];
-        logger.warn("AssetGenerator transient provider failure, backing off", {
-          sceneId: scene.sceneId,
-          type: genError.info.type,
-          attempt,
-          delayMs: delay,
-        });
-        await sleep(delay);
-      }
-    }
-  }
-
-  logger.error("AssetGenerator provider unavailable after retries", {
-    sceneId: scene.sceneId,
-    type: lastError?.info.type,
-    message: lastError?.info.message,
-  });
-  return {
-    kind: "failed",
-    scene: {
-      ...scene,
-      generationStatus: "failed" as const,
-      failureType: "provider_unavailable",
-      providerError: lastError ? toProviderErrorInfo(lastError) : undefined,
-    },
-  };
 }
 
 export async function assetGeneratorNode(
@@ -456,9 +148,6 @@ export async function assetGeneratorNode(
 
   const plannedScenes = buildPlan(scenes);
 
-  let computedArtifact: AssetArtifact | null = null;
-  let fatalError: string | undefined;
-
   const result = await cacheNodeResult<AssetArtifact>(
     {
       type: "assets",
@@ -484,67 +173,176 @@ export async function assetGeneratorNode(
           filename: s.filename,
         })),
       },
-      validate: (artifact) => allScenesResolved(artifact.scenes),
+      validate: (artifact) => allScenesGenerated(artifact.scenes),
     },
     async () => {
-      const results: Scene[] = [];
-      try {
-        // mapWithConcurrency settles every worker (Promise.all) before this
-        // block returns, so an in-flight worker's write always lands before
-        // `results` is handed to the graph — no late-write race.
-        await mapWithConcurrency(
-          plannedScenes,
-          3,
-          async (scene, index): Promise<void> => {
-            const outcome = await generateScene(scene, sourceAssets, provider);
-            switch (outcome.kind) {
-              case "fatal":
-                // Preserve the fatal scene (marked failed) and anything
-                // already generated: an auth wipe-out aborts the batch, but
-                // the finished scenes and the failure reason survive.
-                fatalError = outcome.error;
-                results[index] = outcome.scene ?? {
-                  ...scene,
-                  generationStatus: "failed" as const,
-                  failureType: "provider_error",
-                };
-                throw new Error(outcome.error);
-              case "resolved":
-              case "repair":
-              case "failed":
-                results[index] = outcome.scene;
-            }
-          },
-        );
-      } catch (error) {
-        fatalError = error instanceof Error ? error.message : String(error);
-        // Fill any scenes that never ran with their plan so downstream nodes
-        // see the complete batch, not a partial list with holes.
-        for (let i = 0; i < plannedScenes.length; i++) {
-          if (!results[i]) results[i] = plannedScenes[i];
-        }
-        computedArtifact = { scenes: results, sourceAssets };
-        return { data: null, error: fatalError };
-      }
+      const errors: string[] = [];
+      const withAsset = await mapWithConcurrency(
+        plannedScenes,
+        // The browser-backed image provider serializes work internally. Sending
+        // multiple requests at once makes later requests spend most of their
+        // HTTP timeout waiting in that queue, even when generation itself is
+        // healthy. Keep provider calls serial so each timeout measures the
+        // generation it belongs to.
+        1,
+        async (scene): Promise<Scene> => {
+          if (!scene.generationPrompt || !scene.filename) {
+            errors.push(
+              `${AgentModel.AssetGenerator}: Scene ${scene.sceneId} missing generationPrompt or filename, skipping`,
+            );
+            return scene;
+          }
 
-      computedArtifact = { scenes: results, sourceAssets };
-      const complete = allScenesResolved(results);
-      // Only a fully-resolved asset set is persisted; intermediate repair
-      // states flow through the graph state instead.
-      return { data: complete ? computedArtifact : null, error: undefined };
+          try {
+            const assetType = scene.assetType ?? "image";
+            const runId = getArtifactNamespace(config, state);
+            const mode = scene.assetMode ?? "generated";
+            const selectedSourceAssets = sourceAssetsFor(scene, sourceAssets);
+            const references = referencesFor(selectedSourceAssets);
+
+            // Provider requests can finish and save their file after the graph's
+            // HTTP request has timed out. Recover that completed work on retry
+            // instead of regenerating every scene and risking another timeout.
+            if (mode === "generated") {
+              const existingPath = resolve(
+                GENERATED_ASSETS_DIR,
+                runId,
+                scene.filename,
+              );
+              const existing = await stat(existingPath).catch(() => null);
+              if (existing?.isFile() && existing.size > 0) {
+                return {
+                  ...scene,
+                  ...(assetType === "image"
+                    ? { assetKind: "generated-image" as const }
+                    : {}),
+                  assetUrl: existingPath,
+                  assetGeneratedAt: existing.mtime.toISOString(),
+                };
+              }
+            }
+
+            if (
+              assetType === "image" &&
+              mode === "source" &&
+              references.length > 0
+            ) {
+              return {
+                ...scene,
+                assetKind: "source-image" as const,
+                assetUrl: references[0].path,
+                assetGeneratedAt: new Date().toISOString(),
+              } as Scene;
+            }
+
+            if (
+              assetType === "image" &&
+              (mode === "source_composite" || mode === "source_edit") &&
+              references.length > 0
+            ) {
+              const supportsReferenceMode =
+                provider.capabilities?.referenceImages === true &&
+                (mode !== "source_edit" ||
+                  provider.capabilities.imageEditing === true);
+              if (!supportsReferenceMode) {
+                logger.info(
+                  "AssetGenerator reference capability unavailable; using source image",
+                  {
+                    sceneId: scene.sceneId,
+                    mode,
+                  },
+                );
+                return {
+                  ...scene,
+                  assetKind: "source-image" as const,
+                  assetUrl: references[0].path,
+                  assetGeneratedAt: new Date().toISOString(),
+                } as Scene;
+              }
+
+              try {
+                const assetResult = await provider.generateImage({
+                  prompt: scene.generationPrompt,
+                  sceneId: scene.sceneId,
+                  filename: scene.filename,
+                  runId,
+                  referenceImages: references,
+                  mode: mode === "source_edit" ? "edit" : "image_to_image",
+                });
+                return {
+                  ...scene,
+                  assetKind:
+                    mode === "source_edit"
+                      ? ("source-edit" as const)
+                      : ("source-composite" as const),
+                  assetUrl: assetResult.url,
+                  assetGeneratedAt: new Date().toISOString(),
+                } as Scene;
+              } catch (error) {
+                logger.info(
+                  "AssetGenerator reference generation failed; using source image",
+                  {
+                    sceneId: scene.sceneId,
+                    mode,
+                    error:
+                      error instanceof Error ? error.message : String(error),
+                  },
+                );
+                return {
+                  ...scene,
+                  assetKind: "source-image" as const,
+                  assetUrl: references[0].path,
+                  assetGeneratedAt: new Date().toISOString(),
+                } as Scene;
+              }
+            }
+
+            const assetResult =
+              assetType === "video"
+                ? await provider.generateVideo({
+                    prompt: scene.generationPrompt,
+                    sceneId: scene.sceneId,
+                    filename: scene.filename,
+                    runId,
+                  })
+                : await provider.generateImage({
+                    prompt: scene.generationPrompt,
+                    sceneId: scene.sceneId,
+                    filename: scene.filename,
+                    runId,
+                  });
+
+            return {
+              ...scene,
+              ...(assetType === "image"
+                ? { assetKind: "generated-image" as const }
+                : {}),
+              assetUrl: assetResult.url,
+              assetGeneratedAt: new Date().toISOString(),
+            };
+          } catch (err) {
+            errors.push(
+              `${AgentModel.AssetGenerator}: Scene ${scene.sceneId} generation failed: ${(err as Error)?.message ?? String(err)}`,
+            );
+            return scene;
+          }
+        },
+      );
+
+      return {
+        data: errors.length > 0 ? null : { scenes: withAsset, sourceAssets },
+        error: errors.length > 0 ? errors.join("\n") : undefined,
+      };
     },
-    withTopic(config, state),
+    config,
   );
 
-  if (fatalError) {
-    const fatalArtifact: AssetArtifact = computedArtifact ?? {
-      scenes: plannedScenes,
-      sourceAssets,
-    };
+  if (result.error) {
+    const artifact = result.data ?? { scenes: plannedScenes, sourceAssets };
     return {
-      production: fatalArtifact,
+      production: artifact,
       diagnostics: {
-        errors: [fatalError],
+        errors: [result.error],
       },
       execution: {
         currentNode: AgentModel.AssetGenerator,
@@ -552,30 +350,9 @@ export async function assetGeneratorNode(
     };
   }
 
-  const artifact =
-    result.data ??
-    computedArtifact ??
-    ({ scenes: plannedScenes, sourceAssets } satisfies AssetArtifact);
-
-  const warnings = artifact.scenes.flatMap((scene) => {
-    if (scene.generationStatus === "prompt_repair") {
-      return [
-        `${AgentModel.AssetGenerator}: Scene ${scene.sceneId} prompt rejected by provider (${scene.providerError?.type ?? "unknown"}). ${scene.providerError?.message ?? ""}`,
-      ];
-    }
-    if (scene.generationStatus === "failed") {
-      return [
-        `${AgentModel.AssetGenerator}: Scene ${scene.sceneId} failed (${scene.failureType ?? "unknown"}). ${scene.providerError?.message ?? ""}`,
-      ];
-    }
-    return [];
-  });
-
   return {
-    production: artifact,
-    diagnostics: {
-      warnings,
-    },
+    production: result.data ?? { scenes: plannedScenes, sourceAssets },
+    diagnostics: {},
     execution: {
       currentNode: AgentModel.AssetGenerator,
     },

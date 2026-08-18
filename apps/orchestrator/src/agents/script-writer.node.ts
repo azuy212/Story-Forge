@@ -7,7 +7,6 @@ import type {
 } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
-import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { ScriptWriterOutputSchema } from "../schemas/script-writer-output.js";
 import type { ScriptWriterOutput } from "../schemas/script-writer-output.js";
@@ -55,22 +54,6 @@ function serializeBeats(
         `Beat ${b.beatId}\nPriority: ${b.priority.toUpperCase()}\nDuration: ${b.estimatedDurationSeconds} sec\nPurpose: ${b.purpose}\nViewer Question: ${b.viewerQuestion}\nCuriosity Question: ${b.curiosityQuestion ?? ""}\nKey Message: ${b.keyMessage}\nReferenced Facts: ${b.referencedFacts.join(", ")}`,
     )
     .join("\n\n");
-}
-
-function serializePreviousScript(
-  content: Partial<Content> | undefined,
-): string {
-  if (!content?.script && !content?.narration) return "";
-  const parts: string[] = [];
-  if (content.script) parts.push(`Script:\n${content.script}`);
-  if (content.narration) parts.push(`Narration:\n${content.narration}`);
-  if (content.ending?.narration) {
-    parts.push(`Ending narration:\n${content.ending.narration}`);
-  }
-  if (content.estimatedDurationSeconds) {
-    parts.push(`Estimated duration: ${content.estimatedDurationSeconds} sec`);
-  }
-  return parts.join("\n\n");
 }
 
 export async function scriptWriterNode(
@@ -131,15 +114,15 @@ export async function scriptWriterNode(
   const branding = resolveBranding(state.branding);
 
   const scriptQA = state.scriptQA;
-  const needsRevision = scriptQA?.status === "minor_revision";
-  const qaFeedback = needsRevision
-    ? [
-        ...(scriptQA.feedback ? [`Feedback: ${scriptQA.feedback}`] : []),
-        ...(scriptQA.issues?.length
-          ? [`Issues:\n${scriptQA.issues.map((i) => `- ${i}`).join("\n")}`]
-          : []),
-      ].join("\n")
-    : "";
+  const qaFeedback =
+    scriptQA?.status === "minor_revision"
+      ? [
+          ...(scriptQA.feedback ? [`Feedback: ${scriptQA.feedback}`] : []),
+          ...(scriptQA.issues?.length
+            ? [`Issues:\n${scriptQA.issues.map((i) => `- ${i}`).join("\n")}`]
+            : []),
+        ].join("\n")
+      : "";
 
   const result = await runAgent<ScriptWriterOutput>({
     agent: AgentModel.ScriptWriter,
@@ -156,12 +139,9 @@ export async function scriptWriterNode(
       channel: branding.channel,
       cta: branding.outroCta,
       qaFeedback,
-      previousScript: needsRevision
-        ? serializePreviousScript(state.content)
-        : "",
     },
     inject,
-    configurable: withTopic(config, state).configurable,
+    configurable: config.configurable as Record<string, unknown>,
   });
 
   if (result.error || !result.data) {

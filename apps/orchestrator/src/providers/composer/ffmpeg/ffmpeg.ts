@@ -1,5 +1,27 @@
 import { execa } from "execa";
+import { existsSync } from "node:fs";
 import { DEFAULT_MAX_RETRIES } from "../../../utils/constants.js";
+import { config } from "../../../utils/config.js";
+
+type MediaBinary = "ffmpeg" | "ffprobe";
+
+/**
+ * Homebrew's ffmpeg-full formula is keg-only, so its binaries are not placed
+ * on PATH. Prefer an explicit override, then a known ffmpeg-full location,
+ * and finally the normal PATH lookup. This keeps Linux/CI behavior unchanged.
+ */
+export function resolveMediaBinary(binary: MediaBinary): string {
+  const configured =
+    binary === "ffmpeg" ? config.ffmpegPath() : config.ffprobePath();
+  if (configured) return configured;
+
+  const candidates = [
+    `/opt/homebrew/opt/ffmpeg-full/bin/${binary}`,
+    `/usr/local/opt/ffmpeg-full/bin/${binary}`,
+    `/home/linuxbrew/.linuxbrew/opt/ffmpeg-full/bin/${binary}`,
+  ];
+  return candidates.find((candidate) => existsSync(candidate)) ?? binary;
+}
 
 export interface FfprobeResult {
   width: number;
@@ -28,7 +50,7 @@ export async function probe(input: string): Promise<FfprobeResult> {
   let proc;
   try {
     proc = await execa(
-      "ffprobe",
+      resolveMediaBinary("ffprobe"),
       [
         "-v",
         "quiet",
@@ -136,9 +158,11 @@ export async function runFfmpeg(opts: RunFfmpegOptions): Promise<void> {
     totalDurationMs,
   } = opts;
 
-  const proc = execa("ffmpeg", ["-progress", "pipe:1", "-nostats", ...args], {
-    timeout,
-  });
+  const proc = execa(
+    resolveMediaBinary("ffmpeg"),
+    ["-progress", "pipe:1", "-nostats", ...args],
+    { timeout },
+  );
 
   let stderr = "";
   let stdout = "";

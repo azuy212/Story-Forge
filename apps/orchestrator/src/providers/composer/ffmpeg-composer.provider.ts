@@ -87,6 +87,7 @@ type ResolvedConfig = {
 
 const DEFAULT_ENCODER = ENCODERS.libx264;
 const OUTRO_CTA_SAFE_AREA_Y = 0.86;
+const NARRATION_LOUDNESS_FILTER = "loudnorm=I=-16:TP=-2:LRA=11";
 
 async function concurrentMap<T, R>(
   items: T[],
@@ -242,12 +243,12 @@ export class FfmpegComposerProvider implements ComposerProvider {
       }
       const subbedVideo = srtPath
         ? await this.burnSubtitlesStep(
-          finalBaseVideo,
-          srtPath,
-          workDir,
-          signal,
-          finalDurationMs,
-        )
+            finalBaseVideo,
+            srtPath,
+            workDir,
+            signal,
+            finalDurationMs,
+          )
         : finalBaseVideo;
 
       updateProgress("Exporting", 90);
@@ -437,14 +438,14 @@ export class FfmpegComposerProvider implements ComposerProvider {
       `fps=${this.config.video.fps}`,
       "format=yuv420p",
       ...(opts.branding?.ctaEnabled &&
-        !opts.branding.outroContainsCta &&
-        opts.branding.outroCta
+      !opts.branding.outroContainsCta &&
+      opts.branding.outroCta
         ? [
-          // CTA is deterministic, centered in lower safe area, and below
-          // the supplied animation's existing "by Zain" lockup. Never add
-          // channel name or handle here; outro animation owns branding.
-          `drawtext=font='${this.config.subtitleFontName}':text='${escapeDrawtextText(opts.branding.outroCta)}':fontsize=${Math.max(18, this.config.subtitleFontSize)}:fontcolor=white:borderw=2:bordercolor=black@0.8:box=1:boxcolor=black@0.35:boxborderw=12:x=(w-text_w)/2:y=h*${OUTRO_CTA_SAFE_AREA_Y}`,
-        ]
+            // CTA is deterministic, centered in lower safe area, and below
+            // the supplied animation's existing "by Zain" lockup. Never add
+            // channel name or handle here; outro animation owns branding.
+            `drawtext=font='${this.config.subtitleFontName}':text='${escapeDrawtextText(opts.branding.outroCta)}':fontsize=${Math.max(18, this.config.subtitleFontSize)}:fontcolor=white:borderw=2:bordercolor=black@0.8:box=1:boxcolor=black@0.35:boxborderw=12:x=(w-text_w)/2:y=h*${OUTRO_CTA_SAFE_AREA_Y}`,
+          ]
         : []),
     ].join(",");
 
@@ -455,13 +456,13 @@ export class FfmpegComposerProvider implements ComposerProvider {
       ...(sourceInfo.hasAudio
         ? []
         : [
-          "-f",
-          "lavfi",
-          "-t",
-          String(durationSeconds),
-          "-i",
-          "anullsrc=channel_layout=stereo:sample_rate=48000",
-        ]),
+            "-f",
+            "lavfi",
+            "-t",
+            String(durationSeconds),
+            "-i",
+            "anullsrc=channel_layout=stereo:sample_rate=48000",
+          ]),
       "-filter_complex",
       `[0:v]${videoFilter}[outv]`,
       "-map",
@@ -659,7 +660,7 @@ export class FfmpegComposerProvider implements ComposerProvider {
         this.config.backgroundMusicPath,
         "-filter_complex",
         [
-          `[1:a]volume=1.0[narr]`,
+          `[1:a]${NARRATION_LOUDNESS_FILTER}[narr]`,
           `[2:a]volume=${bgmVolume}[music]`,
           amixFilter,
         ].join(";"),
@@ -671,6 +672,10 @@ export class FfmpegComposerProvider implements ComposerProvider {
         "copy",
         "-c:a",
         "aac",
+        "-ar",
+        "48000",
+        "-ac",
+        "2",
         "-shortest",
         outputPath,
       ];
@@ -694,6 +699,10 @@ export class FfmpegComposerProvider implements ComposerProvider {
         "copy",
         "-c:a",
         "aac",
+        "-ar",
+        "48000",
+        "-ac",
+        "2",
         "-map",
         "0:v:0",
         "-map",
@@ -701,7 +710,7 @@ export class FfmpegComposerProvider implements ComposerProvider {
       ];
 
       // Pad narration through the hold so -shortest ends with video, not voice.
-      args.push("-af", "apad");
+      args.push("-af", `${NARRATION_LOUDNESS_FILTER},apad`);
       args.push("-shortest", outputPath);
 
       await runFfmpegWithRetry(
@@ -747,10 +756,7 @@ export class FfmpegComposerProvider implements ComposerProvider {
     // xfade's offset is relative to the beginning of the first input.
     // Starting it transitionDuration before the end means the transition
     // happens during the final part of the narrative/hold.
-    const offset = Math.max(
-      0,
-      narrativeInfo.duration - transitionDuration,
-    );
+    const offset = Math.max(0, narrativeInfo.duration - transitionDuration);
 
     const args = [
       "-y",
@@ -762,42 +768,42 @@ export class FfmpegComposerProvider implements ComposerProvider {
       "-filter_complex",
       [
         // Normalize video timestamps and formats for xfade.
-        `[0:v]`
-        + `settb=AVTB,`
-        + `setpts=PTS-STARTPTS,`
-        + `fps=${this.config.video.fps},`
-        + `format=yuv420p`
-        + `[v0]`,
+        `[0:v]` +
+          `settb=AVTB,` +
+          `setpts=PTS-STARTPTS,` +
+          `fps=${this.config.video.fps},` +
+          `format=yuv420p` +
+          `[v0]`,
 
-        `[1:v]`
-        + `settb=AVTB,`
-        + `setpts=PTS-STARTPTS,`
-        + `fps=${this.config.video.fps},`
-        + `format=yuv420p`
-        + `[v1]`,
+        `[1:v]` +
+          `settb=AVTB,` +
+          `setpts=PTS-STARTPTS,` +
+          `fps=${this.config.video.fps},` +
+          `format=yuv420p` +
+          `[v1]`,
 
         // Normalize audio before acrossfade.
-        `[0:a]`
-        + `aresample=48000,`
-        + `aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,`
-        + `asetpts=PTS-STARTPTS`
-        + `[a0]`,
+        `[0:a]` +
+          `aresample=48000,` +
+          `aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,` +
+          `asetpts=PTS-STARTPTS` +
+          `[a0]`,
 
-        `[1:a]`
-        + `aresample=48000,`
-        + `aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,`
-        + `asetpts=PTS-STARTPTS`
-        + `[a1]`,
+        `[1:a]` +
+          `aresample=48000,` +
+          `aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,` +
+          `asetpts=PTS-STARTPTS` +
+          `[a1]`,
 
         // Visual crossfade.
-        `[v0][v1]`
-        + `xfade=transition=fade:duration=${transitionDuration}:offset=${offset}`
-        + `[outv]`,
+        `[v0][v1]` +
+          `xfade=transition=fade:duration=${transitionDuration}:offset=${offset}` +
+          `[outv]`,
 
         // Audio crossfade aligned with the visual transition.
-        `[a0][a1]`
-        + `acrossfade=d=${transitionDuration}:curve1=tri:curve2=tri`
-        + `[outa]`,
+        `[a0][a1]` +
+          `acrossfade=d=${transitionDuration}:curve1=tri:curve2=tri` +
+          `[outa]`,
       ].join(";"),
 
       "-map",

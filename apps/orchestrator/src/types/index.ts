@@ -46,7 +46,6 @@ export type { Thumbnail } from "../schemas/thumbnail.js";
 export type { ThumbnailOutput } from "../schemas/thumbnail-output.js";
 export type { ThumbnailImageOutput } from "../schemas/thumbnail-image.js";
 export type { Publishing, PublishResult } from "../schemas/publishing.js";
-export type { PublishReadyStatus } from "../schemas/publish-ready.js";
 export type {
   ResearchQAOutput,
   FactVerdict,

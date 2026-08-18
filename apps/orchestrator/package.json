@@ -26,7 +26,6 @@
     "@langchain/core": "^1.2.3",
     "@langchain/langgraph": "^1.4.8",
     "execa": "^9.5.2",
-    "googleapis": "^174.0.1",
     "openai": "^4.96.0",
     "zod": "^4.4.3"
   },
@@ -36,8 +35,8 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^22.14.0",
     "dotenv": "^17.4.2",
-    "jest": "^30.4.2",
     "oxlint": "^1.78.0",
+    "jest": "^30.4.2",
     "prettier": "^3.9.5",
     "ts-jest": "^29.4.11",
     "typescript": "^6.0.3"

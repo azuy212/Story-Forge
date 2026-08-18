@@ -25,24 +25,25 @@ const DEFAULT_OPTIONS: GenerateOptions = {
 };
 const EDITORIAL_GUIDELINES_PATH = "shared/editorial-guidelines.md";
 const RETRY_BACKOFF_BASE_MS = 1000;
-const RATE_LIMIT_BACKOFF_BASE_MS = 5000;
 const RETRY_BACKOFF_MAX_MS = 8000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function backoffMs(
-  attempt: number,
-  baseMs = RETRY_BACKOFF_BASE_MS,
-): number {
+function backoffMs(attempt: number): number {
   return (
-    Math.min(RETRY_BACKOFF_MAX_MS, baseMs * 2 ** (attempt - 1)) +
+    Math.min(RETRY_BACKOFF_MAX_MS, RETRY_BACKOFF_BASE_MS * 2 ** (attempt - 1)) +
     Math.random() * 250
   );
 }
 
-type FailureClass = "parse" | "schema" | "timeout" | "transient" | "permanent";
+type FailureClass =
+  | "parse"
+  | "schema"
+  | "timeout"
+  | "transient"
+  | "permanent";
 
 /**
  * Classify a failed LLM attempt so the retry can change the request instead
@@ -52,28 +53,6 @@ type FailureClass = "parse" | "schema" | "timeout" | "transient" | "permanent";
  * - transient: network/API failure — retry with backoff, no feedback needed.
  * - permanent: no point retrying the same request.
  */
-/**
- * Build the feedback message sent back to the model when a parse/schema
- * rejection needs a corrected retry. The rejected raw output is attached
- * verbatim so the model can see exactly what it produced. When no raw output
- * is available (e.g. timeout/transient failure) only the rejection reason is
- * returned; stale content is never attached.
- */
-export function buildRetryFeedback(
-  lastError: string,
-  rawContent?: string | null,
-): string {
-  const rawBlock =
-    rawContent != null && rawContent.length > 0
-      ? `\n\nPrevious response:\n"""\n${rawContent}\n"""`
-      : "";
-  return (
-    `Your previous response was rejected:\n${lastError}${rawBlock}\n` +
-    `Return ONLY corrected valid JSON matching the required schema. ` +
-    `No markdown, no commentary, no backticks.`
-  );
-}
-
 export function classifyError(err: unknown, message: string): FailureClass {
   if (
     message.startsWith("Empty response") ||
@@ -238,20 +217,12 @@ export async function runAgent<T>({
           ? [...messages, { role: "user", content: retryFeedback }]
           : messages;
 
-      // Reset per attempt so the catch block can attach the rejected output
-      // verbatim to the parse/schema retry feedback. Stays undefined (so no
-      // stale content is attached) for timeout/transient failures.
-      let rawContent: string | undefined;
-
       try {
         const response = await model.generate(attemptMessages, opts);
 
-        rawContent = response?.choices?.[0]?.message?.content as
-          string | undefined;
+        const rawContent = response?.choices?.[0]?.message?.content;
         if (!rawContent) {
-          throw new LLMError(
-            "Empty response from model: missing choices or content",
-          );
+          throw new LLMError("Empty response from model: missing choices or content");
         }
 
         let parsed: unknown;
@@ -302,21 +273,17 @@ export async function runAgent<T>({
         const failureClass = classifyError(err, lastError);
 
         if (failureClass === "parse" || failureClass === "schema") {
-          retryFeedback = buildRetryFeedback(lastError, rawContent);
+          retryFeedback =
+            `Your previous response was rejected:\n${lastError}\n` +
+            `Return ONLY corrected valid JSON matching the required schema. ` +
+            `No markdown, no commentary, no backticks.`;
         }
 
         if (
           (failureClass === "transient" || failureClass === "timeout") &&
           attempt < attempts
         ) {
-          const status =
-            typeof err === "object" && err !== null && "status" in err
-              ? (err as { status?: unknown }).status
-              : undefined;
-          const delay = backoffMs(
-            attempt,
-            status === 429 ? RATE_LIMIT_BACKOFF_BASE_MS : undefined,
-          );
+          const delay = backoffMs(attempt);
           logger.warn(`${agent} transient failure, backing off`, {
             attempt,
             delayMs: Math.round(delay),

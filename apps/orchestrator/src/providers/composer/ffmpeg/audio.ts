@@ -32,9 +32,8 @@ export async function concatAudio(
     }
     sceneIds.add(input.sceneId);
 
-    // The concat demuxer reads local files only; a remote URL would silently
-    // fail or be written verbatim into the concat list. Scene TTS providers
-    // must persist audio to disk before this pipeline stage.
+    // FFmpeg inputs are local files only. Scene TTS providers must persist
+    // audio to disk before this pipeline stage.
     if (/^[a-z]+:\/\//i.test(input.filePath)) {
       throw new Error(
         `Scene audio must be a local file path, got URL: ${input.filePath}`,
@@ -45,25 +44,26 @@ export async function concatAudio(
     });
   }
 
-  const listPath = `${outputPath}.concat.txt`;
-  const list = ordered
-    .map((input) => `file '${input.filePath.replace(/'/g, `'\\''`)}'`)
-    .join("\n");
-  await fs.writeFile(listPath, list, "utf-8");
+  // Decode each input independently before concatenation. The concat demuxer
+  // assumes every file has an identical codec; if one TTS result is f32 PCM
+  // while the others are s16 PCM, stream-copying it doubles that scene's
+  // apparent duration. Re-encoding to lossless s16 PCM keeps timing stable
+  // across otherwise compatible WAV variants.
+  const filterInputs = ordered.map((_, index) => `[${index}:a:0]`).join("");
+  const args = ["-y"];
+  for (const input of ordered) args.push("-i", input.filePath);
+  args.push(
+    "-filter_complex",
+    `${filterInputs}concat=n=${ordered.length}:v=0:a=1[outa]`,
+    "-map",
+    "[outa]",
+    "-c:a",
+    "pcm_s16le",
+    outputPath,
+  );
 
   await runFfmpegWithRetry(
-    [
-      "-y",
-      "-f",
-      "concat",
-      "-safe",
-      "0",
-      "-i",
-      listPath,
-      "-c:a",
-      "copy",
-      outputPath,
-    ],
+    args,
     "concatenate scene narration audio",
     DEFAULT_MAX_RETRIES,
   );

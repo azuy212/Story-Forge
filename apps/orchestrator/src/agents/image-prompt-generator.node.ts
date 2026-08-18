@@ -8,7 +8,6 @@ import type {
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
 import { completeArtifactForNode } from "../artifacts/cache.js";
-import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { ImagePromptOutputSchema } from "../schemas/image-prompt-output.js";
 import type { ImagePromptOutput } from "../schemas/image-prompt-output.js";
@@ -87,22 +86,6 @@ export async function imagePromptGeneratorNode(
         )
       : "";
 
-  // Snapshot the previous attempt's prompts BEFORE the wipe below so a
-  // revision run can see what it produced before (the QA verdicts reference
-  // these prompts). Only populated when a revision actually occurred.
-  const previousPrompts = needsRevise
-    ? JSON.stringify(
-        scenes
-          .filter((s) => s.generationPrompt)
-          .map((s) => ({
-            sceneId: s.sceneId,
-            generationPrompt: s.generationPrompt,
-          })),
-        null,
-        2,
-      )
-    : "";
-
   const expectedIds = new Set(scenes.map((s) => s.sceneId));
   const maxAttempts = 2;
 
@@ -140,10 +123,9 @@ export async function imagePromptGeneratorNode(
         logo: logo ?? "",
         scenes: scenesJson,
         qaFeedback: `${qaFeedback}${missingHint}`,
-        previousPrompts,
       },
       inject,
-      configurable: withTopic(config, state).configurable,
+      configurable: config.configurable as Record<string, unknown>,
       deferComplete: true,
     });
     if (result.error || !result.data) {

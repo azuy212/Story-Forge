@@ -15,7 +15,7 @@ import type { ThumbnailOutput } from "../schemas/thumbnail-output.js";
 import type { AssetProvider } from "../providers/asset-provider.js";
 import { createDefaultAssetProvider } from "../providers/asset-provider.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
-import { getArtifactNamespace, withTopic } from "../artifacts/context.js";
+import { getArtifactNamespace } from "../artifacts/context.js";
 import type {
   ThumbnailCompositor,
   ThumbnailTextPosition,
@@ -121,7 +121,7 @@ export async function thumbnailGeneratorNode(
       colorPalette,
     },
     inject,
-    configurable: withTopic(config, state).configurable,
+    configurable: config.configurable as Record<string, unknown>,
     generateOptions: {
       temperature: 0.6,
       responseFormat: { type: "json_object" },
@@ -208,7 +208,7 @@ export async function thumbnailGeneratorNode(
         };
       }
     },
-    withTopic(config, state),
+    config,
   );
 
   if (imageResult.error || !imageResult.data) {

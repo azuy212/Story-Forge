@@ -51,44 +51,13 @@ write appends a new version.
 
 A run's identity resolves in priority order:
 
-1. `config.configurable.runId` — explicit override, used verbatim
-2. `config.configurable.thread_id` — humanized into a readable namespace
+1. `config.configurable.runId`
+2. `config.configurable.thread_id`
 3. `state.execution.runId`
 
-The filesystem namespace is never the raw LangGraph `thread_id` (a UUID). When a run
-resolves through `thread_id`, it is rewritten to a human-readable, per-run directory
-name derived from the project topic:
-
-```text
-unrecognized-countries-20260813-084203-a1b2
-```
-
-Format: `<topic-slug>-<YYYYMMDD-HHmmss>-<4-hex>`. The timestamp is the process's
-**local time** (deliberate, for human readability); the disk index keeps an existing
-thread's namespace stable across processes and timezones, so the stamp only affects
-freshly generated names. The suffix disambiguates two runs of the same topic started
-within the same second. Resolution is stable per run through two layers:
-
-- **in-process memo** — the first resolution wins, so every node and provider in the
-  run writes into the same directory.
-- **disk index** (`runs/.run-names/<sanitized-thread-id>`) — the chosen name is
-  persisted atomically (`wx` create), so resuming the same `thread_id` in a fresh
-  process reuses the same directory and cache continuity holds across restarts.
-  Concurrent processes cannot overwrite an established mapping; a loser of the race
-  briefly retries reading the winner's entry before generating a name. Filesystem
-  failures (permission errors, unwritable `ARTIFACT_STORE_DIR`) are **not** swallowed
-  — they surface as errors rather than silently producing a different namespace than a
-  concurrent process.
-
-Once a thread has a namespace, later topic changes never move its artifacts: the disk
-index is consulted before a new name is generated.
-
-The raw `thread_id` is only sanitized into a filename key; the LangGraph
-thread/checkpoint identity is never modified.
-
-A run with no `runId`/`thread_id` (a standalone node invocation) falls back to a
-topic-derived name, memoized per raw topic within the process but not persisted to disk —
-there is no stable key to index on.
+A fresh run with no id gets a new UUID via `ensureRunId()`. Re-running with the same
+`runId` (e.g. a CLI `--runId` flag or a stored thread id) resumes the same artifact
+history, so previously completed steps are served from cache.
 
 ## Lifecycle
 

@@ -47,8 +47,7 @@ function runNode(state?: Partial<ProjectState>) {
 function buildPublishResponse(platform: string) {
   return {
     platform,
-    platformVideoId: "video-001",
-    url: `https://placeholder.local/${platform}/video-001`,
+    publishUrl: `https://placeholder.local/${platform}/video-001`,
     status: "published",
     publishedAt: new Date().toISOString(),
   };
@@ -68,21 +67,17 @@ describe("publisherNode", () => {
     expect(result.publishing?.results).toHaveLength(1);
     expect(result.publishing?.results![0].platform).toBe("youtube");
     expect(result.publishing?.results![0].status).toBe("published");
-    expect(result.publishing?.results![0].url).toBe(
+    expect(result.publishing?.results![0].publishUrl).toBe(
       "https://placeholder.local/youtube/video-001",
     );
-    expect(result.publishing?.results![0].platformVideoId).toBe("video-001");
     expect(result.publishing?.publishedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(result.execution?.currentNode).toBe("Publisher");
     expect(mockPublish).toHaveBeenCalledTimes(1);
     expect(mockPublish).toHaveBeenCalledWith(
       expect.objectContaining({
         platform: "youtube",
-        videoPath: "https://example.com/video.mp4",
+        videoUrl: "https://example.com/video.mp4",
         title: "Test Title",
-        madeForKids: false,
-        containsSyntheticMedia: true,
-        privacyStatus: "private",
       }),
     );
   });

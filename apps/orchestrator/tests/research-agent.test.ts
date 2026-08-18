@@ -11,8 +11,6 @@ const MOCK_PROMPT = [
   "",
   "Pillar: {{pillar}}",
   "Topic: {{topic}}",
-  "QA Feedback: {{qaFeedback}}",
-  "Previous Research: {{previousResearch}}",
 ].join("\n");
 
 const MOCK_GUIDELINES = "Editorial guidelines for testing.";
@@ -162,57 +160,6 @@ describe("researchAgentNode", () => {
     const userMsg = messages.find((m) => m.role === "user");
     expect(userMsg!.content).toContain("Geography");
     expect(userMsg!.content).toContain("Unrecognized Countries");
-  });
-
-  it("attaches the previous research on minor_revision", async () => {
-    mockGenerate.mockResolvedValue(buildResponse());
-
-    const { promise } = runNode({
-      research: {
-        summary: "OLD RESEARCH SUMMARY distinctive draft.",
-        facts: [
-          {
-            id: "fact-001",
-            fact: "OLD FACT CONTENT that must be carried into the revision.",
-            confidence: "high",
-            sourceType: "general-knowledge",
-          },
-        ],
-      },
-      researchQA: {
-        status: "minor_revision",
-        feedback: "Fix fact-001.",
-        issues: ["fact-001 unsupported"],
-        factsToRegenerate: 1,
-        factVerdicts: [],
-      },
-    });
-    await promise;
-
-    const messages = mockGenerate.mock.calls[0][0] as {
-      role: string;
-      content: string;
-    }[];
-    const userMsg = messages.find((m) => m.role === "user");
-    expect(userMsg!.content).toContain(
-      "OLD RESEARCH SUMMARY distinctive draft.",
-    );
-    expect(userMsg!.content).toContain("OLD FACT CONTENT");
-    expect(userMsg!.content).toContain("fact-001");
-  });
-
-  it("does not attach previous research on a fresh run", async () => {
-    mockGenerate.mockResolvedValue(buildResponse());
-
-    const { promise } = runNode();
-    await promise;
-
-    const messages = mockGenerate.mock.calls[0][0] as {
-      role: string;
-      content: string;
-    }[];
-    const userMsg = messages.find((m) => m.role === "user");
-    expect(userMsg!.content).not.toContain("OLD RESEARCH SUMMARY");
   });
 
   it("trims fact text and summary on success", async () => {

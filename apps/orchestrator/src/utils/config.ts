@@ -23,6 +23,8 @@ export const config = {
   ttsUrl: (): string => read("TTS_URL") ?? "http://localhost:8010",
   transcriberUrl: (): string =>
     read("TRANSCRIBER_URL") ?? "http://localhost:8030",
+  ffmpegPath: (): string | undefined => read("FFMPEG_PATH"),
+  ffprobePath: (): string | undefined => read("FFPROBE_PATH"),
   useRealProviders: (): boolean => read("USE_REAL_PROVIDERS") === "true",
   artifactStoreEnabled: (): boolean =>
     read("ARTIFACT_STORE_ENABLED") === "true",
@@ -47,45 +49,5 @@ export const config = {
     if (!value) return undefined;
     const wpm = Number(value);
     return Number.isFinite(wpm) && wpm > 0 ? wpm : undefined;
-  },
-  // --- YouTube publishing ---
-  // Real uploads require a dedicated opt-in; USE_REAL_PROVIDERS alone must not
-  // start publishing to the internet while the pipeline is being validated.
-  youtubePublishingEnabled: (): boolean =>
-    read("YOUTUBE_PUBLISHING_ENABLED") === "true",
-  youtubeClientId: (): string => read("YOUTUBE_CLIENT_ID") ?? "",
-  youtubeClientSecret: (): string => read("YOUTUBE_CLIENT_SECRET") ?? "",
-  youtubeRefreshToken: (): string => read("YOUTUBE_REFRESH_TOKEN") ?? "",
-  // Optional; used later as a safety verification via channels.list(mine=true),
-  // not passed into upload requests.
-  youtubeChannelId: (): string => read("YOUTUBE_CHANNEL_ID") ?? "",
-  youtubeCategoryId: (): string | undefined => {
-    const value = read("YOUTUBE_CATEGORY_ID");
-    return value && value.length > 0 ? value : undefined;
-  },
-  youtubeLanguage: (): string => read("YOUTUBE_LANGUAGE") ?? "en",
-  youtubeMadeForKids: (): boolean => read("YOUTUBE_MADE_FOR_KIDS") === "true",
-  youtubeContainsSyntheticMedia: (): boolean =>
-    read("YOUTUBE_SYNTHETIC_MEDIA") !== "false",
-  youtubePrivacyStatus: (): "private" | "unlisted" | "public" => {
-    const value = read("YOUTUBE_PRIVACY_STATUS");
-    if (value === "unlisted" || value === "public") return value;
-    return "private";
-  },
-  youtubePublishAt: (): string | undefined => {
-    const value = read("YOUTUBE_PUBLISH_AT");
-    if (!value) return undefined;
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime())
-      ? undefined
-      : new Date(parsed).toISOString();
-  },
-  youtubePlaylistIds: (): string[] => {
-    const value = read("YOUTUBE_PLAYLIST_IDS");
-    if (!value) return [];
-    return value
-      .split(",")
-      .map((id) => id.trim())
-      .filter(Boolean);
   },
 };

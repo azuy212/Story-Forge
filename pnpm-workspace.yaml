@@ -1,3 +1,11 @@
 packages:
   - apps/orchestrator
   - apps/image-provider
+
+onlyBuiltDependencies:
+  - esbuild
+  - playwright
+  - unrs-resolver
+
+overrides:
+  filelist>minimatch: 5.1.8

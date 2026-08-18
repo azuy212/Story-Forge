@@ -3,10 +3,10 @@ import path from "node:path";
 import type { Branding } from "../types/index.js";
 
 const FALLBACK_BRANDING = {
-  channel: "Universe Decoded by Zain",
+  channel: "Untold Epoch",
   creator: "Ali Zain",
   cta: "Follow for more mysteries of the universe.",
-  handle: "@UniverseDecodedByZain",
+  handle: "@Untold_Epoch",
   enabled: true,
   outroAsset: "assets/branding/outro.mp4",
   ctaEnabled: true,

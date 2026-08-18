@@ -1,5 +1,4 @@
 import type { RunnableConfig } from "@langchain/core/runnables";
-import { withTopic } from "../artifacts/context.js";
 import type { ProjectState, Diagnostics, Execution } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
@@ -66,7 +65,7 @@ export async function releaseReviewNode(
       metadata: serializeMetadata(state.metadataOutput),
     },
     inject,
-    configurable: withTopic(config, state).configurable,
+    configurable: config.configurable as Record<string, unknown>,
     generateOptions: {
       temperature: 0.1,
       responseFormat: { type: "json_object" },

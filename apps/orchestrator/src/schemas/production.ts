@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { VisualPlanEntrySchema } from "./visual-planner-output.js";
 import { PromptQAOutputSchema } from "./prompt-qa-output.js";
-import { ImageGenerationFailureTypeEnum } from "../providers/image-generation-error.js";
 
 export const ProviderEnum = z.enum([
   "gpt-image",
@@ -112,36 +111,6 @@ export const AssetKindEnum = z.enum([
   "source-edit",
 ]);
 
-export const GenerationStatusEnum = z.enum([
-  "pending",
-  "generating",
-  "complete",
-  "prompt_repair",
-  "retrying",
-  "failed",
-]);
-
-export const PromptAttemptStatusEnum = z.enum(["rejected", "success"]);
-
-export const PromptAttemptSchema = z.object({
-  attempt: z.number().int().positive(),
-  prompt: z.string().min(1),
-  status: PromptAttemptStatusEnum,
-  errorType: z.string().optional(),
-  providerMessage: z.string().optional(),
-});
-
-export const ProviderErrorSchema = z.object({
-  provider: z.string(),
-  model: z.string().optional(),
-  type: ImageGenerationFailureTypeEnum,
-  message: z.string(),
-  rawMessage: z.string().optional(),
-  retryable: z.boolean().optional(),
-  originalPrompt: z.string().optional(),
-  timestamp: z.string().optional(),
-});
-
 export const SceneSchema = z.object({
   sceneId: z.number().int().positive(),
   startSecond: z.number().optional(),
@@ -181,13 +150,6 @@ export const SceneSchema = z.object({
   extension: z.string().optional(),
   assetUrl: z.string().optional(),
   assetGeneratedAt: z.string().optional(),
-  generationStatus: GenerationStatusEnum.optional(),
-  failureType: z.string().optional(),
-  originalPrompt: z.string().optional(),
-  repairedPrompt: z.string().optional(),
-  providerError: ProviderErrorSchema.optional(),
-  repairCount: z.number().int().nonnegative().optional(),
-  promptAttempts: z.array(PromptAttemptSchema).optional(),
 });
 
 export type Provider = z.input<typeof ProviderEnum>;
@@ -202,9 +164,6 @@ export type SceneEntityType = z.input<typeof SceneEntityTypeEnum>;
 export type SceneEntity = z.input<typeof SceneEntitySchema>;
 export type SourceAsset = z.input<typeof SourceAssetSchema>;
 export type AssetKind = z.input<typeof AssetKindEnum>;
-export type GenerationStatus = z.input<typeof GenerationStatusEnum>;
-export type PromptAttempt = z.input<typeof PromptAttemptSchema>;
-export type ProviderErrorInfo = z.input<typeof ProviderErrorSchema>;
 
 export type Scene = z.input<typeof SceneSchema>;
 

@@ -12,10 +12,6 @@ import { assetStrategyNode } from "../agents/asset-strategy.node.js";
 import { imagePromptGeneratorNode } from "../agents/image-prompt-generator.node.js";
 import { promptQANode } from "../agents/prompt-qa.node.js";
 import { assetGeneratorNode } from "../agents/asset-generator.node.js";
-import {
-  imagePromptRepairNode,
-  isAwaitingRepair,
-} from "../agents/image-prompt-repair.node.js";
 import { narrationGeneratorNode } from "../agents/narration-generator.node.js";
 import { subtitleGeneratorNode } from "../agents/subtitle-generator.node.js";
 import { videoComposerNode } from "../agents/video-composer.node.js";
@@ -119,10 +115,6 @@ const hasThumbnail = (s: GuardState) => !!s.thumbnail?.imageUrl;
 // only advance to Publisher once the full release package is present.
 const hasPublishablePackage = (s: GuardState) =>
   hasVideo(s) && hasMetadata(s) && hasThumbnail(s);
-// PublishReady doubles as a hard operational gate (files exist, lengths valid,
-// credentials present). A "ready" verdict is required on top of the package so
-// a blocked publication cannot reach Publisher.
-const hasPublishReady = (s: GuardState) => s.publishReady?.status === "ready";
 
 // Fail-closed QA routing: an explicit "approved" is the ONLY verdict that
 // advances the pipeline. A missing decision (node produced no status) is
@@ -251,48 +243,6 @@ const finalRouter = (state: typeof StateAnnotation.State) => {
   return "__end__";
 };
 
-const needsPromptRepair = (state: GuardState) =>
-  (state.production?.scenes ?? []).some(isAwaitingRepair);
-
-/**
- * Provider-failure recovery router. Non-retryable provider rejections
- * (content_policy / invalid_prompt) route to ImagePromptRepair within the
- * repair budget; fully-resolved scene sets advance. `unknown` is FATAL (never
- * repaired): an unclassifiable failure could hide an authentication or
- * infrastructure problem. A scene whose repair budget is exhausted or a
- * provider outage stays unresolved and the pipeline halts fail-closed
- * (hasSceneAssets requires EVERY scene to have an asset).
- */
-const assetRouter = (state: typeof StateAnnotation.State) => {
-  if (needsPromptRepair(state)) {
-    logger.info("AssetGenerator router: routing rejected prompts to repair", {
-      scenes: (state.production?.scenes ?? [])
-        .filter((s) => s.generationStatus === "prompt_repair")
-        .map((s) => ({ sceneId: s.sceneId, repairs: s.repairCount ?? 0 })),
-    });
-    return "ImagePromptRepair";
-  }
-  if (hasSceneAssets(state)) return "NarrationGenerator";
-  logger.warn("AssetGenerator router: unresolved scenes, terminating", {
-    scenes: (state.production?.scenes ?? []).map((s) => ({
-      sceneId: s.sceneId,
-      status: s.generationStatus,
-      failureType: s.failureType,
-    })),
-  });
-  return "__end__";
-};
-
-/**
- * ImagePromptRepair exit: always returns to AssetGenerator so repaired
- * prompts are re-issued. Only when every scene already has an asset does it
- * advance (defensive; repair only touches scenes that lack assets).
- */
-const repairRouter = (state: typeof StateAnnotation.State) => {
-  if (hasSceneAssets(state)) return "NarrationGenerator";
-  return "AssetGenerator";
-};
-
 const builder = new StateGraph(StateAnnotation)
   .addNode("ResearchAgent", researchAgentNode)
   .addNode("ResearchQA", researchQANode)
@@ -306,7 +256,6 @@ const builder = new StateGraph(StateAnnotation)
   .addNode("ImagePromptGenerator", imagePromptGeneratorNode)
   .addNode("PromptQA", promptQANode)
   .addNode("AssetGenerator", assetGeneratorNode)
-  .addNode("ImagePromptRepair", imagePromptRepairNode)
   .addNode("NarrationGenerator", narrationGeneratorNode)
   .addNode("SubtitleGenerator", subtitleGeneratorNode)
   .addNode("VideoComposer", videoComposerNode)
@@ -327,12 +276,11 @@ builder
 // All three branches converge at PublishReady, the join/barrier before
 // Publisher. LangGraph triggers a fan-in node when ANY incoming edge fires, so
 // PublishReady may run before the spine finishes; its conditional edge gates
-// Publisher on hasPublishablePackage AND a "ready" PublishReady verdict, so a
-// premature run (or a blocked one) falls through to __end__ and publishing
-// only happens once the full release package exists and passes the operational
-// gate. A branch that fails routes to __end__ via its guard, so Publisher can
-// never fire with a partial package. The spine guards remain: a node only
-// advances when it produced the output the next node needs.
+// Publisher on hasPublishablePackage (video + metadata + thumbnail), so a
+// premature run falls through to __end__ and publishing only happens once the
+// full release package exists. A branch that fails routes to __end__ via its
+// guard, so Publisher can never fire with a partial package. The spine guards
+// remain: a node only advances when it produced the output the next node needs.
 builder
   .addConditionalEdges("MetadataGenerator", guard(hasMetadata, "PublishReady"))
   .addConditionalEdges(
@@ -349,8 +297,10 @@ builder
     guard(hasScenePrompts, "PromptQA"),
   )
   .addConditionalEdges("PromptQA", promptRouter)
-  .addConditionalEdges("AssetGenerator", assetRouter)
-  .addConditionalEdges("ImagePromptRepair", repairRouter)
+  .addConditionalEdges(
+    "AssetGenerator",
+    guard(hasSceneAssets, "NarrationGenerator"),
+  )
   .addConditionalEdges(
     "NarrationGenerator",
     guard(hasNarration, "SubtitleGenerator"),
@@ -367,7 +317,7 @@ builder
   .addConditionalEdges("ReleaseReview", finalRouter)
   .addConditionalEdges(
     "PublishReady",
-    guard((s) => hasPublishablePackage(s) && hasPublishReady(s), "Publisher"),
+    guard(hasPublishablePackage, "Publisher"),
   );
 
 builder.addEdge("Publisher", "__end__");

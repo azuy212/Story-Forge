@@ -17,7 +17,7 @@
     "lint:fix": "oxlint src --config ../../.oxlintrc.json --import-plugin --fix",
     "format": "prettier --write 'src/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts'",
-    "postinstall": "playwright install chromium 2>/dev/null || true"
+    "postinstall": "playwright install chromium"
   },
   "dependencies": {
     "@clack/prompts": "^1.7.0",

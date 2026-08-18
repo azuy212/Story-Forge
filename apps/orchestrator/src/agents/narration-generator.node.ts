@@ -22,7 +22,7 @@ import {
   type AudioConcatResult,
 } from "../providers/composer/ffmpeg/audio.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
-import { getArtifactNamespace, withTopic } from "../artifacts/context.js";
+import { getArtifactNamespace } from "../artifacts/context.js";
 import { hashObject } from "../artifacts/hash.js";
 import { padSceneId } from "../utils/scene-id.js";
 import { AUDIO_DURATION_TOLERANCE_MS } from "../utils/constants.js";
@@ -186,7 +186,7 @@ export async function narrationGeneratorNode(
             };
           }
         },
-        withTopic(config, state),
+        config,
       );
 
       if (!result.data) {
@@ -310,7 +310,7 @@ export async function narrationGeneratorNode(
         };
       }
     },
-    withTopic(config, state),
+    config,
   );
 
   if (combined.error || !combined.data) {

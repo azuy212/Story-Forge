@@ -4,8 +4,8 @@
   "private": true,
   "packageManager": "pnpm@10.34.3",
   "scripts": {
-    "setup:all": "pnpm install && bash scripts/setup-python.sh",
-    "dev": "concurrently --kill-others-on-fail --names orchestrator,image-provider,tts,transcriber --prefix-colors blue,green,magenta,yellow \"pnpm dev:orchestrator\" \"pnpm dev:image-provider\" \"pnpm dev:tts\" \"pnpm dev:transcriber\"",
+    "setup:all": "pnpm install && bash scripts/check-ffmpeg.sh && bash scripts/setup-python.sh",
+    "dev": "bash scripts/check-ffmpeg.sh && concurrently --kill-others-on-fail --names orchestrator,image-provider,tts,transcriber --prefix-colors blue,green,magenta,yellow \"pnpm dev:orchestrator\" \"pnpm dev:image-provider\" \"pnpm dev:tts\" \"pnpm dev:transcriber\"",
     "dev:orchestrator": "pnpm --filter youtube-shorts-orchestrator dev",
     "dev:image-provider": "pnpm --filter gemini-image-automation serve",
     "dev:tts": "cd apps/tts && venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8010",
@@ -14,15 +14,6 @@
     "test": "pnpm --filter youtube-shorts-orchestrator test",
     "lint": "pnpm --filter youtube-shorts-orchestrator lint && pnpm --filter youtube-shorts-orchestrator lint:langgraph-json && pnpm --filter gemini-image-automation lint && pnpm lint:python",
     "lint:python": "bash scripts/lint-python.sh"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "playwright"
-    ],
-    "overrides": {
-      "filelist>minimatch": "5.1.8"
-    }
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

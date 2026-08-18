@@ -1,5 +1,5 @@
 import { jest, describe, it, expect } from "@jest/globals";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -32,7 +32,10 @@ describe("concatAudio", () => {
     const output = join(dir, "narration.wav");
     try {
       for (const id of [1, 2, 10]) {
-        writeFileSync(join(dir, `scene-${String(id).padStart(3, "0")}.wav`), "x");
+        writeFileSync(
+          join(dir, `scene-${String(id).padStart(3, "0")}.wav`),
+          "x",
+        );
       }
 
       const result = await concatAudio(
@@ -44,13 +47,21 @@ describe("concatAudio", () => {
         output,
       );
 
-      const list = readFileSync(`${output}.concat.txt`, "utf8");
-      expect(list).toBe(
-        `file '${join(dir, "scene-001.wav")}'\nfile '${join(dir, "scene-002.wav")}'\nfile '${join(dir, "scene-010.wav")}'`,
+      const args = mockRunFfmpegWithRetry.mock.calls[0][0];
+      expect(args).toEqual(
+        expect.arrayContaining([
+          "-filter_complex",
+          "[0:a:0][1:a:0][2:a:0]concat=n=3:v=0:a=1[outa]",
+          "-c:a",
+          "pcm_s16le",
+        ]),
       );
-      expect(mockRunFfmpegWithRetry.mock.calls[0][0]).toEqual(
-        expect.arrayContaining(["-c:a", "copy"]),
-      );
+      expect(args.filter((arg: string) => arg.endsWith(".wav"))).toEqual([
+        join(dir, "scene-001.wav"),
+        join(dir, "scene-002.wav"),
+        join(dir, "scene-010.wav"),
+        output,
+      ]);
       expect(result).toEqual({ audioPath: output, durationMs: 6250 });
     } finally {
       rmSync(dir, { recursive: true, force: true });

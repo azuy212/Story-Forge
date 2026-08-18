@@ -17,7 +17,6 @@ import type {
   Thumbnail,
   Publishing,
   ResearchQAOutput,
-  PublishReadyStatus,
 } from "../types/index.js";
 import { DEFAULT_BRANDING } from "../utils/branding.js";
 
@@ -98,10 +97,6 @@ export const StateAnnotation = Annotation.Root({
   publishing: Annotation<Publishing, Partial<Publishing>>({
     reducer: merge,
     default: () => ({ results: [] }),
-  }),
-  publishReady: Annotation<PublishReadyStatus, Partial<PublishReadyStatus>>({
-    reducer: merge,
-    default: () => ({}),
   }),
   production: Annotation<Production, Partial<Production>>({
     reducer: merge,

@@ -3,7 +3,6 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FilesystemArtifactStore } from "../src/artifacts/fs/fs-artifact-store.js";
-import { resetRunNamespaces } from "../src/artifacts/namespace.js";
 import type { ArtifactReference } from "../src/artifacts/types.js";
 
 let dir: string;
@@ -13,7 +12,6 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "artifacts-test-"));
   process.env.ARTIFACT_STORE_DIR = dir;
   store = new FilesystemArtifactStore();
-  resetRunNamespaces();
 });
 
 afterEach(() => {
@@ -115,11 +113,9 @@ describe("FilesystemArtifactStore", () => {
     expect(parsed["script@v1"].runId).toBe(RUN_ID);
   });
 
-  it("getRunId resolves config runId, then humanized thread_id, then state", () => {
+  it("getRunId resolves config runId, then thread_id, then state", () => {
     expect(store.getRunId({ runId: "a" })).toBe("a");
-    const human = store.getRunId({ thread_id: "b" });
-    expect(human).toMatch(/^untitled-\d{8}-\d{6}-[0-9a-f]{4}$/);
-    expect(store.getRunId({ thread_id: "b" })).toBe(human);
+    expect(store.getRunId({ thread_id: "b" })).toBe("b");
     expect(store.getRunId({ thread_id: "b", runId: "a" })).toBe("a");
     expect(store.getRunId({}, { execution: { runId: "c" } })).toBe("c");
     expect(store.getRunId({})).toBeNull();
