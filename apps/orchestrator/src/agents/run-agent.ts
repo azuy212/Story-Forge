@@ -6,6 +6,7 @@ import {
 import { loadPrompt as defaultLoadPrompt } from "../utils/load-prompt.js";
 import { renderPrompt } from "../utils/render-prompt.js";
 import { logger } from "../utils/logger.js";
+import { nodeStart, nodeDone } from "../utils/node-labels.js";
 import { LLMError, isPipelineError, getErrorMessage } from "../utils/errors.js";
 import { AgentModel } from "../models/agent-model.js";
 import type { NodeTelemetry } from "../schemas/diagnostics.js";
@@ -32,10 +33,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function backoffMs(
-  attempt: number,
-  baseMs = RETRY_BACKOFF_BASE_MS,
-): number {
+function backoffMs(attempt: number, baseMs = RETRY_BACKOFF_BASE_MS): number {
   return (
     Math.min(RETRY_BACKOFF_MAX_MS, baseMs * 2 ** (attempt - 1)) +
     Math.random() * 250
@@ -195,7 +193,14 @@ export async function runAgent<T>({
     const loadPrompt = inject.loadPrompt ?? defaultLoadPrompt;
     const attempts = singleAttempt ? 1 : maxRetries;
 
-    logger.info(`${agent} start`, variables);
+    logger.info(nodeStart(agent));
+    logger.debug(`${agent} variables`, {
+      keys: Object.keys(variables),
+      totalChars: Object.values(variables).reduce(
+        (sum, v) => sum + v.length,
+        0,
+      ),
+    });
 
     const model = createModel(agent);
     const opts: GenerateOptions = { ...DEFAULT_OPTIONS, ...generateOptions };
@@ -271,7 +276,7 @@ export async function runAgent<T>({
 
         const durationMs = Date.now() - startedAt;
 
-        logger.info(`${agent} success`, {
+        logger.info(nodeDone(agent), {
           durationMs,
           model: model.model,
           retries: attempt - 1,
@@ -336,7 +341,6 @@ export async function runAgent<T>({
         logger.error(`${agent} attempt failed`, {
           attempt,
           error: lastError,
-          err,
         });
       }
     }

@@ -12,6 +12,8 @@ import { cacheNodeResult } from "../artifacts/cache.js";
 import { withTopic } from "../artifacts/context.js";
 import type { SourceAsset } from "../schemas/production.js";
 import { config as configUtils } from "../utils/config.js";
+import { logger } from "../utils/logger.js";
+import { nodeStart, nodeDone, nodeFailed } from "../utils/node-labels.js";
 
 function sourceCredits(state: ProjectState): string {
   const scenes = state.production?.scenes ?? [];
@@ -57,6 +59,7 @@ export async function publisherNode(
   const category = state.metadataOutput?.category ?? "";
   const thumbnailPath = state.thumbnail?.imageUrl ?? "";
   const platforms = state.branding?.platforms ?? ["youtube"];
+  logger.info(nodeStart(AgentModel.Publisher), { platforms });
 
   // Publisher only runs after the PublishReady join/barrier, which gates it on
   // every release prerequisite (video + metadata + thumbnail). The checks below
@@ -72,6 +75,9 @@ export async function publisherNode(
   }
 
   if (!title) {
+    logger.warn(nodeFailed(AgentModel.Publisher), {
+      error: "metadata title is missing",
+    });
     return {
       publishing: { results: [] },
       diagnostics: {
@@ -84,6 +90,9 @@ export async function publisherNode(
   const publishAt = configUtils.youtubePublishAt(state);
   const privacyStatus = configUtils.youtubePrivacyStatus();
   if (publishAt && privacyStatus !== "private") {
+    logger.warn(nodeFailed(AgentModel.Publisher), {
+      error: 'publishAt requires privacyStatus "private"',
+    });
     return {
       publishing: { results: [] },
       diagnostics: {
@@ -152,6 +161,14 @@ export async function publisherNode(
     },
     withTopic(config, state),
   );
+
+  if (result.error) {
+    logger.warn(nodeFailed(AgentModel.Publisher), { error: result.error });
+  } else {
+    logger.info(nodeDone(AgentModel.Publisher), {
+      platforms: result.data?.results?.map((r) => r.platform) ?? platforms,
+    });
+  }
 
   return {
     publishing: result.data ?? { results: [] },

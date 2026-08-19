@@ -6,6 +6,7 @@ import type {
   SynthesizeResult,
 } from "./tts-provider.js";
 import { config } from "../utils/config.js";
+import { logger } from "../utils/logger.js";
 import { PipelineError } from "../utils/errors.js";
 import { runFfmpeg } from "./composer/ffmpeg/ffmpeg.js";
 
@@ -182,10 +183,11 @@ export class ChatterboxTTSProvider implements TTSProvider {
         const requestedSpeed = targetWpm / actualWpm;
         const speed = clampSpeed(requestedSpeed);
 
-        console.log(
-          `[tts] WPM normalization: ${actualWpm.toFixed(1)} -> ${targetWpm} WPM | ` +
-            `speed=${speed.toFixed(3)}x`,
-        );
+        logger.debug("TTS WPM normalization", {
+          actualWpm: actualWpm.toFixed(1),
+          targetWpm,
+          speed: speed.toFixed(3),
+        });
 
         if (Math.abs(speed - 1) > 0.001) {
           const tempPath = `${filePath}.speed.wav`;
@@ -213,10 +215,10 @@ export class ChatterboxTTSProvider implements TTSProvider {
 
             const finalWpm = calculateWpm(opts.text, durationMs);
 
-            console.log(
-              `[tts] Normalized duration: ${(durationMs / 1000).toFixed(3)}s | ` +
-                `WPM: ${finalWpm.toFixed(1)}`,
-            );
+            logger.debug("TTS normalized duration", {
+              durationMs,
+              finalWpm: finalWpm.toFixed(1),
+            });
           } finally {
             await rm(tempPath, { force: true }).catch(() => {});
           }

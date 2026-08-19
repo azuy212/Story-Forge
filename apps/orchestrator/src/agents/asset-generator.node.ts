@@ -29,6 +29,12 @@ import {
 import { padSceneId } from "../utils/scene-id.js";
 import { config as appConfig } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
+import {
+  nodeStart,
+  nodeDone,
+  nodeFailed,
+  nodeIncomplete,
+} from "../utils/node-labels.js";
 
 const DEFAULT_PROVIDER = createDefaultAssetProvider();
 
@@ -441,7 +447,15 @@ export async function assetGeneratorNode(
   const sourceAssets = state.production?.sourceAssets ?? [];
   const provider = getAssetProvider(config);
 
+  logger.info(nodeStart(AgentModel.AssetGenerator), {
+    scenes: scenes.length,
+    provider: provider.constructor.name,
+  });
+
   if (scenes.length === 0) {
+    logger.warn(nodeFailed(AgentModel.AssetGenerator), {
+      error: "No scenes to generate assets for",
+    });
     return {
       diagnostics: {
         errors: [
@@ -537,6 +551,7 @@ export async function assetGeneratorNode(
   );
 
   if (fatalError) {
+    logger.error(nodeFailed(AgentModel.AssetGenerator), { error: fatalError });
     const fatalArtifact: AssetArtifact = computedArtifact ?? {
       scenes: plannedScenes,
       sourceAssets,
@@ -570,6 +585,23 @@ export async function assetGeneratorNode(
     }
     return [];
   });
+
+  const unresolved = artifact.scenes.filter(
+    (scene) =>
+      scene.generationStatus === "prompt_repair" ||
+      scene.generationStatus === "failed" ||
+      scene.generationStatus === "retrying",
+  ).length;
+  if (unresolved > 0) {
+    logger.warn(nodeIncomplete(AgentModel.AssetGenerator), {
+      unresolved,
+      total: artifact.scenes.length,
+    });
+  } else {
+    logger.info(nodeDone(AgentModel.AssetGenerator), {
+      scenes: artifact.scenes.length,
+    });
+  }
 
   return {
     production: artifact,

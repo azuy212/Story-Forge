@@ -134,7 +134,7 @@ const researchRouter = (state: typeof StateAnnotation.State) => {
   const retries = retryCount(state, "ResearchAgent");
   const qaRetries = retryCount(state, "ResearchQA");
 
-  logger.info("ResearchQA router", {
+  logger.debug("ResearchQA router", {
     status,
     retries,
     qaRetries,
@@ -161,7 +161,7 @@ const scriptRouter = (state: typeof StateAnnotation.State) => {
   const retries = retryCount(state, "ScriptWriter");
   const qaRetries = retryCount(state, "ScriptQA");
 
-  logger.info("ScriptQA router", {
+  logger.debug("ScriptQA router", {
     status,
     retries,
     qaRetries,
@@ -187,7 +187,7 @@ const promptRouter = (state: typeof StateAnnotation.State) => {
   const vdRetries = retryCount(state, "VisualDirector");
   const qaRetries = retryCount(state, "PromptQA");
 
-  logger.info("PromptQA router", {
+  logger.debug("PromptQA router", {
     status,
     ipgRetries,
     vdRetries,
@@ -223,7 +223,7 @@ const visualDirectorRouter = (state: typeof StateAnnotation.State) => {
   const review = state.production?.directorReview;
   const retries = retryCount(state, "VisualDirector");
   if (review?.status === "minor_revision" && retries < PROMPT_MAX_RETRIES) {
-    logger.info("VisualDirector router: retrying with feedback", {
+    logger.debug("VisualDirector router: retrying with feedback", {
       retries,
       max: PROMPT_MAX_RETRIES,
     });
@@ -241,7 +241,7 @@ const visualDirectorRouter = (state: typeof StateAnnotation.State) => {
 const finalRouter = (state: typeof StateAnnotation.State) => {
   const status = state.releaseReview?.status;
 
-  logger.info("ReleaseReview router", { status });
+  logger.debug("ReleaseReview router", { status });
 
   if (status === "approved") return "PublishReady";
   logger.warn(
@@ -265,7 +265,7 @@ const needsPromptRepair = (state: GuardState) =>
  */
 const assetRouter = (state: typeof StateAnnotation.State) => {
   if (needsPromptRepair(state)) {
-    logger.info("AssetGenerator router: routing rejected prompts to repair", {
+    logger.debug("AssetGenerator router: routing rejected prompts to repair", {
       scenes: (state.production?.scenes ?? [])
         .filter((s) => s.generationStatus === "prompt_repair")
         .map((s) => ({ sceneId: s.sceneId, repairs: s.repairCount ?? 0 })),

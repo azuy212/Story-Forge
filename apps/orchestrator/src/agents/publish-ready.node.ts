@@ -2,6 +2,8 @@ import fs from "node:fs";
 import type { ProjectState, Diagnostics, Execution } from "../types/index.js";
 import type { PublishReadyStatus } from "../schemas/publish-ready.js";
 import { config as configUtils } from "../utils/config.js";
+import { logger } from "../utils/logger.js";
+import { nodeStart, nodeDone, nodeFailed } from "../utils/node-labels.js";
 
 export const PUBLISH_READY = "PublishReady";
 
@@ -43,7 +45,14 @@ export async function publishReadyNode(state: ProjectState): Promise<{
   execution: Partial<Execution>;
   diagnostics: Partial<Diagnostics>;
 }> {
+  logger.info(nodeStart(PUBLISH_READY));
+
   if (!hasPackage(state)) {
+    logger.debug("PublishReady waiting for remaining branches", {
+      hasVideo: !!state.video?.videoUrl,
+      hasMetadata: !!state.metadataOutput?.title,
+      hasThumbnail: !!state.thumbnail?.imageUrl,
+    });
     return {
       publishReady: {},
       execution: { currentNode: PUBLISH_READY },
@@ -115,6 +124,7 @@ export async function publishReadyNode(state: ProjectState): Promise<{
   }
 
   if (problems.length > 0) {
+    logger.warn(nodeFailed(PUBLISH_READY), { issues: problems.length });
     return {
       publishReady: { status: "blocked", issues: problems },
       execution: { currentNode: PUBLISH_READY },
@@ -123,6 +133,8 @@ export async function publishReadyNode(state: ProjectState): Promise<{
       },
     };
   }
+
+  logger.info(nodeDone(PUBLISH_READY));
 
   return {
     publishReady: { status: "ready", issues: [] },

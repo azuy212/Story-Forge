@@ -24,7 +24,7 @@ export const config = {
     read(`MODEL_${agentName.toUpperCase()}`),
   modelForRole: (roleName: string): string | undefined =>
     read(`MODEL_${roleName}`),
-  isDebug: (): boolean => read("NODE_ENV") !== "production",
+  isDebug: (): boolean => read("LOG_LEVEL") === "debug",
   imageProviderUrl: (): string =>
     read("IMAGE_PROVIDER_URL") ?? "http://localhost:8020",
   ttsUrl: (): string => read("TTS_URL") ?? "http://localhost:8010",

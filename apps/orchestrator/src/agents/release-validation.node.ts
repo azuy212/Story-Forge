@@ -2,6 +2,13 @@ import type { RunnableConfig } from "@langchain/core/runnables";
 import type { ProjectState, Diagnostics, Execution } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { config as configUtils } from "../utils/config.js";
+import { logger } from "../utils/logger.js";
+import {
+  nodeStart,
+  nodeDone,
+  nodeFailed,
+  nodeSkipped,
+} from "../utils/node-labels.js";
 import { parseSrtCues } from "../utils/srt.js";
 import {
   probe as defaultProbe,
@@ -325,7 +332,12 @@ export async function releaseValidationNode(
   diagnostics: Partial<Diagnostics>;
   execution: Partial<Execution>;
 }> {
+  logger.info(nodeStart(AgentModel.ReleaseValidation));
+
   if (!configUtils.enableReleaseQA()) {
+    logger.info(nodeSkipped(AgentModel.ReleaseValidation), {
+      reason: "release QA disabled",
+    });
     return {
       releaseValidation: {
         status: "approved",
@@ -338,6 +350,16 @@ export async function releaseValidationNode(
   }
 
   const result = await validatePackage(state, getProbe(config));
+
+  if (result.status === "fatal") {
+    logger.warn(nodeFailed(AgentModel.ReleaseValidation), {
+      issues: result.issues?.length ?? 0,
+    });
+  } else {
+    logger.info(nodeDone(AgentModel.ReleaseValidation), {
+      validations: result.validations?.length ?? 0,
+    });
+  }
 
   return {
     releaseValidation: result,
