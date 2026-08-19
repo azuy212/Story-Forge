@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ThumbnailFallbackReasonSchema } from "./thumbnail-qa.js";
 
 export const ThumbnailImageOutputSchema = z.object({
   sourceUrl: z.string(),
@@ -8,6 +9,8 @@ export const ThumbnailImageOutputSchema = z.object({
   text: z.string(),
   textPosition: z.string(),
   compositorVersion: z.string(),
+  mode: z.enum(["full", "overlay"]),
+  fallbackReason: ThumbnailFallbackReasonSchema,
 });
 
 export type ThumbnailImageOutput = z.infer<typeof ThumbnailImageOutputSchema>;

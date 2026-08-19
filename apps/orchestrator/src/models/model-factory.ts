@@ -28,6 +28,7 @@ const AGENT_ROLES: Record<AgentModel, string> = {
   [AgentModel.ReleaseReview]: "QA",
   [AgentModel.MetadataGenerator]: "METADATA",
   [AgentModel.ThumbnailGenerator]: "METADATA",
+  [AgentModel.ThumbnailQA]: "QA",
   [AgentModel.Publisher]: "SYSTEM",
 };
 

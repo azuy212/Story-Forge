@@ -31,6 +31,13 @@ export const config = {
   transcriberUrl: (): string =>
     read("TRANSCRIBER_URL") ?? "http://localhost:8030",
   useRealProviders: (): boolean => read("USE_REAL_PROVIDERS") === "true",
+  thumbnailMode: (): "auto" | "full" | "overlay" => {
+    const value = read("THUMBNAIL_MODE");
+    return value === "full" || value === "overlay" ? value : "auto";
+  },
+  thumbnailQaEnabled: (): boolean => read("THUMBNAIL_QA") !== "false",
+  thumbnailQaModel: (): string | undefined =>
+    read("MODEL_THUMBNAILQA") ?? read("MODEL_THUMBNAIL_QA"),
   artifactStoreEnabled: (): boolean =>
     read("ARTIFACT_STORE_ENABLED") === "true",
   artifactStoreDir: (): string => read("ARTIFACT_STORE_DIR") ?? "runs",

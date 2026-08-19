@@ -22,5 +22,6 @@ export enum AgentModel {
   ReleaseReview = "ReleaseReview",
   MetadataGenerator = "MetadataGenerator",
   ThumbnailGenerator = "ThumbnailGenerator",
+  ThumbnailQA = "ThumbnailQA",
   Publisher = "Publisher",
 }

@@ -11,6 +11,7 @@ export const PromptPaths = {
   ReleaseReview: "release-review/v1.md",
   MetadataGenerator: "metadata-generator/v1.md",
   ThumbnailGenerator: "thumbnail-generator/v1.md",
+  ThumbnailQA: "thumbnail-qa/v1.md",
 } as const;
 
 export type PromptPath = (typeof PromptPaths)[keyof typeof PromptPaths];
