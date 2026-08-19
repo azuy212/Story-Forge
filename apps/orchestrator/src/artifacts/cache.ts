@@ -79,7 +79,8 @@ export async function runWithArtifactCache<T>(
     options.type,
     inputHash,
   );
-  const latest = matched?.record ?? (await store.latest<T>(runId, options.type));
+  const latest =
+    matched?.record ?? (await store.latest<T>(runId, options.type));
 
   if (
     latest &&

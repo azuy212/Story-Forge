@@ -149,8 +149,10 @@ describe("releaseReviewNode", () => {
   });
 
   it("skips when disabled", async () => {
-    const prev = process.env.ENABLE_RELEASE_QA;
+    const prevRelease = process.env.ENABLE_RELEASE_QA;
+    const prevQa = process.env.ENABLE_QA;
     process.env.ENABLE_RELEASE_QA = "false";
+    process.env.ENABLE_QA = "false";
     try {
       const { promise } = runNode();
       const result = await promise;
@@ -158,8 +160,10 @@ describe("releaseReviewNode", () => {
       expect(result.releaseReview?.issues).toEqual([]);
       expect(mockGenerate).not.toHaveBeenCalled();
     } finally {
-      if (prev === undefined) delete process.env.ENABLE_RELEASE_QA;
-      else process.env.ENABLE_RELEASE_QA = prev;
+      if (prevRelease === undefined) delete process.env.ENABLE_RELEASE_QA;
+      else process.env.ENABLE_RELEASE_QA = prevRelease;
+      if (prevQa === undefined) delete process.env.ENABLE_QA;
+      else process.env.ENABLE_QA = prevQa;
     }
   });
 });

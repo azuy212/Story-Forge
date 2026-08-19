@@ -63,8 +63,7 @@ export function resolveBranding(
       ? branding.outroCta
       : branding?.cta || branding?.outroCta || DEFAULT_BRANDING.outroCta;
   const outroContainsCta =
-    branding?.outroContainsCta ??
-    DEFAULT_BRANDING.outroContainsCta;
+    branding?.outroContainsCta ?? DEFAULT_BRANDING.outroContainsCta;
   return {
     ...DEFAULT_BRANDING,
     ...branding,

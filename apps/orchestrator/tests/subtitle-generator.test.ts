@@ -169,10 +169,7 @@ describe("subtitleGeneratorNode", () => {
     const result = await runNode({
       audio: {
         ...DEFAULT_AUDIO,
-        scenes: [
-          { ...AUDIO_SCENES[0] },
-          { ...AUDIO_SCENES[1], sceneId: 99 },
-        ],
+        scenes: [{ ...AUDIO_SCENES[0] }, { ...AUDIO_SCENES[1], sceneId: 99 }],
       },
     } as any);
 

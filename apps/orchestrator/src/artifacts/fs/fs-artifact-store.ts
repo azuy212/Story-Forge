@@ -333,7 +333,10 @@ export class FilesystemArtifactStore implements ArtifactStore {
 
   getRunId(
     config: Record<string, unknown>,
-    state?: { execution?: { runId?: string }; project?: { topic?: string; pillar?: string } },
+    state?: {
+      execution?: { runId?: string };
+      project?: { topic?: string; pillar?: string };
+    },
   ): string | null {
     if (config.runId && typeof config.runId === "string") return config.runId;
     if (config.thread_id && typeof config.thread_id === "string") {

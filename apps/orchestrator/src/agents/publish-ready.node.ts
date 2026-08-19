@@ -3,7 +3,7 @@ import type { ProjectState, Diagnostics, Execution } from "../types/index.js";
 import type { PublishReadyStatus } from "../schemas/publish-ready.js";
 import { config as configUtils } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
-import { nodeStart, nodeDone, nodeFailed } from "../utils/node-labels.js";
+import { nodeLabel } from "../utils/node-labels.js";
 
 export const PUBLISH_READY = "PublishReady";
 
@@ -45,14 +45,13 @@ export async function publishReadyNode(state: ProjectState): Promise<{
   execution: Partial<Execution>;
   diagnostics: Partial<Diagnostics>;
 }> {
-  logger.info(nodeStart(PUBLISH_READY));
+  logger.nodeStart(nodeLabel(PUBLISH_READY));
 
   if (!hasPackage(state)) {
-    logger.debug("PublishReady waiting for remaining branches", {
-      hasVideo: !!state.video?.videoUrl,
-      hasMetadata: !!state.metadataOutput?.title,
-      hasThumbnail: !!state.thumbnail?.imageUrl,
-    });
+    logger.nodeSkipped(
+      nodeLabel(PUBLISH_READY),
+      "waiting for remaining branches",
+    );
     return {
       publishReady: {},
       execution: { currentNode: PUBLISH_READY },
@@ -124,7 +123,8 @@ export async function publishReadyNode(state: ProjectState): Promise<{
   }
 
   if (problems.length > 0) {
-    logger.warn(nodeFailed(PUBLISH_READY), { issues: problems.length });
+    const reason = problems.join("; ");
+    logger.nodeFailed(nodeLabel(PUBLISH_READY), reason);
     return {
       publishReady: { status: "blocked", issues: problems },
       execution: { currentNode: PUBLISH_READY },
@@ -134,7 +134,7 @@ export async function publishReadyNode(state: ProjectState): Promise<{
     };
   }
 
-  logger.info(nodeDone(PUBLISH_READY));
+  logger.nodeDone(nodeLabel(PUBLISH_READY), 0);
 
   return {
     publishReady: { status: "ready", issues: [] },

@@ -6,7 +6,7 @@ import {
 import { loadPrompt as defaultLoadPrompt } from "../utils/load-prompt.js";
 import { renderPrompt } from "../utils/render-prompt.js";
 import { logger } from "../utils/logger.js";
-import { nodeStart, nodeDone } from "../utils/node-labels.js";
+import { nodeLabel } from "../utils/node-labels.js";
 import { LLMError, isPipelineError, getErrorMessage } from "../utils/errors.js";
 import { AgentModel } from "../models/agent-model.js";
 import type { NodeTelemetry } from "../schemas/diagnostics.js";
@@ -114,6 +114,45 @@ export function classifyError(err: unknown, message: string): FailureClass {
   return "permanent";
 }
 
+function normalizeError(err: unknown, message: string): string {
+  if (
+    message.startsWith("Empty response") ||
+    message.includes("missing choices or content")
+  ) {
+    return "empty model response";
+  }
+  if (message.includes("Invalid JSON")) {
+    return "invalid JSON response";
+  }
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    "name" in err &&
+    (err as { name?: unknown }).name === "TimeoutError"
+  ) {
+    return "request timed out";
+  }
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    "name" in err &&
+    (err as { name?: unknown }).name === "AbortError"
+  ) {
+    return "request aborted";
+  }
+  const status =
+    typeof err === "object" && err !== null && "status" in err
+      ? (err as { status?: unknown }).status
+      : undefined;
+  if (status === 429) {
+    return "rate limited";
+  }
+  if (typeof status === "number" && status >= 500) {
+    return "provider unavailable";
+  }
+  return "request failed";
+}
+
 export type AgentInject = {
   createModel?: typeof defaultCreateModel;
   loadPrompt?: typeof defaultLoadPrompt;
@@ -193,7 +232,7 @@ export async function runAgent<T>({
     const loadPrompt = inject.loadPrompt ?? defaultLoadPrompt;
     const attempts = singleAttempt ? 1 : maxRetries;
 
-    logger.info(nodeStart(agent));
+    logger.nodeStart(nodeLabel(agent));
     logger.debug(`${agent} variables`, {
       keys: Object.keys(variables),
       totalChars: Object.values(variables).reduce(
@@ -232,8 +271,9 @@ export async function runAgent<T>({
     let retryFeedback: string | null = null;
 
     for (let attempt = 1; attempt <= attempts; attempt++) {
-      if (attempt > 1) {
-        logger.warn(`${agent} retry`, { attempt });
+      if (attempt > 1 && lastError) {
+        const reason = normalizeError(new Error(lastError), lastError);
+        logger.nodeRetry(nodeLabel(agent), attempt, attempts, reason);
       }
 
       // Retries after parse/schema failures carry the previous rejection back
@@ -276,11 +316,7 @@ export async function runAgent<T>({
 
         const durationMs = Date.now() - startedAt;
 
-        logger.info(nodeDone(agent), {
-          durationMs,
-          model: model.model,
-          retries: attempt - 1,
-        });
+        logger.nodeDone(nodeLabel(agent), durationMs);
 
         const promptVersion = promptPath.replace(/\.md$/, "");
         return {
@@ -322,7 +358,7 @@ export async function runAgent<T>({
             attempt,
             status === 429 ? RATE_LIMIT_BACKOFF_BASE_MS : undefined,
           );
-          logger.warn(`${agent} transient failure, backing off`, {
+          logger.debug(`${agent} transient failure, backing off`, {
             attempt,
             delayMs: Math.round(delay),
             error: lastError,
@@ -331,14 +367,12 @@ export async function runAgent<T>({
         }
 
         if (failureClass === "permanent") {
-          logger.error(`${agent} permanent failure, not retrying`, {
-            attempt,
-            error: lastError,
-          });
+          const reason = normalizeError(err, lastError);
+          logger.nodeFailed(nodeLabel(agent), reason);
           break;
         }
 
-        logger.error(`${agent} attempt failed`, {
+        logger.debug(`${agent} attempt failed`, {
           attempt,
           error: lastError,
         });
@@ -346,11 +380,8 @@ export async function runAgent<T>({
     }
 
     const durationMs = Date.now() - startedAt;
-    logger.error(`${agent} failed after max retries`, {
-      durationMs,
-      retries: attempts,
-      lastError,
-    });
+    const reason = normalizeError(new Error(lastError ?? ""), lastError ?? "");
+    logger.nodeFailed(nodeLabel(agent), reason);
 
     const promptVersion = promptPath.replace(/\.md$/, "");
     return {

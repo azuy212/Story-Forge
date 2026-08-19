@@ -1,26 +1,26 @@
 import { AgentModel } from "../models/agent-model.js";
 
 const LABELS: Record<string, string> = {
-  [AgentModel.ResearchAgent]: "research",
-  [AgentModel.ResearchQA]: "research review",
-  [AgentModel.ScriptPlanner]: "story plan",
-  [AgentModel.ScriptWriter]: "script generation",
-  [AgentModel.ScriptQA]: "script review",
-  [AgentModel.MetadataGenerator]: "metadata",
-  [AgentModel.ThumbnailGenerator]: "thumbnail",
-  [AgentModel.VisualDirector]: "scene direction",
-  [AgentModel.AssetStrategy]: "asset strategy",
-  [AgentModel.ImagePromptGenerator]: "scene prompts",
-  [AgentModel.PromptQA]: "prompt review",
-  [AgentModel.AssetGenerator]: "scene assets",
-  [AgentModel.ImagePromptRepair]: "prompt repair",
-  [AgentModel.NarrationGenerator]: "narration",
-  [AgentModel.SubtitleGenerator]: "subtitles",
-  [AgentModel.VideoComposer]: "video composition",
-  [AgentModel.ReleaseValidation]: "release validation",
-  [AgentModel.ReleaseReview]: "release review",
-  [AgentModel.Publisher]: "publishing",
-  PublishReady: "publish readiness",
+  [AgentModel.ResearchAgent]: "Research",
+  [AgentModel.ResearchQA]: "Research review",
+  [AgentModel.ScriptPlanner]: "Story plan",
+  [AgentModel.ScriptWriter]: "Script",
+  [AgentModel.ScriptQA]: "Script review",
+  [AgentModel.MetadataGenerator]: "Metadata",
+  [AgentModel.ThumbnailGenerator]: "Thumbnail",
+  [AgentModel.VisualDirector]: "Scene direction",
+  [AgentModel.AssetStrategy]: "Asset strategy",
+  [AgentModel.ImagePromptGenerator]: "Scene prompts",
+  [AgentModel.PromptQA]: "Prompt review",
+  [AgentModel.AssetGenerator]: "Scene assets",
+  [AgentModel.ImagePromptRepair]: "Prompt repair",
+  [AgentModel.NarrationGenerator]: "Narration",
+  [AgentModel.SubtitleGenerator]: "Subtitles",
+  [AgentModel.VideoComposer]: "Video composition",
+  [AgentModel.ReleaseValidation]: "Release validation",
+  [AgentModel.ReleaseReview]: "Release review",
+  [AgentModel.Publisher]: "Publishing",
+  PublishReady: "Publish readiness",
 };
 
 export function nodeLabel(agent: string): string {
@@ -28,21 +28,39 @@ export function nodeLabel(agent: string): string {
 }
 
 export function nodeStart(agent: string): string {
-  return `Processing ${nodeLabel(agent)}`;
+  return `${nodeLabel(agent)} started`;
 }
 
-export function nodeDone(agent: string): string {
-  return `${nodeLabel(agent)} complete`;
+export function nodeDone(agent: string, durationMs: number): string {
+  return `${nodeLabel(agent)} complete (${formatDuration(durationMs)})`;
 }
 
-export function nodeFailed(agent: string): string {
-  return `${nodeLabel(agent)} failed`;
+export function nodeRetry(
+  agent: string,
+  attempt: number,
+  maxRetries: number,
+  reason: string,
+): string {
+  return `${nodeLabel(agent)} retrying (${attempt}/${maxRetries}): ${reason}`;
 }
 
-export function nodeIncomplete(agent: string): string {
-  return `${nodeLabel(agent)} incomplete`;
+export function nodeSkipped(agent: string, reason: string): string {
+  return `${nodeLabel(agent)} skipped: ${reason}`;
 }
 
-export function nodeSkipped(agent: string): string {
-  return `${nodeLabel(agent)} skipped`;
+export function nodeIncomplete(agent: string, detail: string): string {
+  return `${nodeLabel(agent)} incomplete (${detail})`;
+}
+
+export function nodeFailed(agent: string, reason: string): string {
+  return `${nodeLabel(agent)} failed: ${reason}`;
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  const rem = secs % 60;
+  return rem ? `${mins}m ${rem.toString().padStart(2, "0")}s` : `${mins}m 00s`;
 }

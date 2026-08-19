@@ -18,7 +18,7 @@ import {
 } from "../providers/source-asset-provider.js";
 import { selectBestSourceAsset } from "../providers/source-asset-selection.js";
 import { logger } from "../utils/logger.js";
-import { nodeStart, nodeDone, nodeFailed } from "../utils/node-labels.js";
+import { nodeLabel } from "../utils/node-labels.js";
 import { materializeSourceAsset } from "../providers/source-asset-materializer.js";
 import { config as appConfig } from "../utils/config.js";
 
@@ -59,13 +59,12 @@ export async function assetStrategyNode(
   execution: Partial<Execution>;
 }> {
   const scenes = state.production?.scenes ?? [];
-  logger.info(nodeStart(AgentModel.AssetStrategy), {
-    scenes: scenes.length,
-  });
+  logger.nodeStart(nodeLabel(AgentModel.AssetStrategy));
   if (scenes.length === 0) {
-    logger.warn(nodeFailed(AgentModel.AssetStrategy), {
-      error: "No scenes to process",
-    });
+    logger.nodeFailed(
+      nodeLabel(AgentModel.AssetStrategy),
+      "No scenes to process",
+    );
     return {
       diagnostics: {
         errors: [`${AgentModel.AssetStrategy}: No scenes to process`],
@@ -136,10 +135,7 @@ export async function assetStrategyNode(
     };
   });
 
-  logger.info(nodeDone(AgentModel.AssetStrategy), {
-    scenes: resolvedScenes.length,
-    sourceAssets: [...byId.values()].length,
-  });
+  logger.nodeDone(nodeLabel(AgentModel.AssetStrategy), 0);
 
   return {
     production: { scenes: resolvedScenes, sourceAssets: [...byId.values()] },

@@ -23,13 +23,22 @@ afterEach(() => {
 
 const RUN_ID = "run-001";
 
-async function saveComplete(value: unknown, meta: Record<string, unknown> = {}): Promise<ArtifactReference> {
-  return store.save(RUN_ID, "script", value, {
-    inputHash: "hash-" + JSON.stringify(value),
-    runId: RUN_ID,
-    node: "ScriptWriter",
-    ...meta,
-  }, "complete");
+async function saveComplete(
+  value: unknown,
+  meta: Record<string, unknown> = {},
+): Promise<ArtifactReference> {
+  return store.save(
+    RUN_ID,
+    "script",
+    value,
+    {
+      inputHash: "hash-" + JSON.stringify(value),
+      runId: RUN_ID,
+      node: "ScriptWriter",
+      ...meta,
+    },
+    "complete",
+  );
 }
 
 describe("FilesystemArtifactStore", () => {
@@ -89,7 +98,13 @@ describe("FilesystemArtifactStore", () => {
 
   it("markStatus can flip a pending artifact to complete and it becomes the cacheable latest", async () => {
     const ref1 = await saveComplete({ v: 1 });
-    const ref2 = await store.save(RUN_ID, "script", { v: 2 }, { inputHash: "h2", runId: RUN_ID }, "pending");
+    const ref2 = await store.save(
+      RUN_ID,
+      "script",
+      { v: 2 },
+      { inputHash: "h2", runId: RUN_ID },
+      "pending",
+    );
 
     const latestBefore = await store.latest<{ v: number }>(RUN_ID, "script");
     expect(latestBefore?.version).toBe(2);
@@ -109,7 +124,10 @@ describe("FilesystemArtifactStore", () => {
     await store.recordRef(RUN_ID, ref);
 
     const { readFile } = await import("node:fs/promises");
-    const content = await readFile(join(dir, RUN_ID, "state", "execution.json"), "utf-8");
+    const content = await readFile(
+      join(dir, RUN_ID, "state", "execution.json"),
+      "utf-8",
+    );
     const parsed = JSON.parse(content) as Record<string, ArtifactReference>;
     expect(parsed["script@v1"].artifactId).toBe(ref.artifactId);
     expect(parsed["script@v1"].runId).toBe(RUN_ID);

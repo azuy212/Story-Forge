@@ -1,4 +1,11 @@
-import { jest, describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import {
+  jest,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from "@jest/globals";
 import { narrationGeneratorNode } from "../src/agents/narration-generator.node.js";
 import type { ProjectState, Scene } from "../src/types/index.js";
 import type { TTSProvider } from "../src/providers/tts-provider.js";
@@ -86,7 +93,9 @@ afterEach(async () => {
   if (storeDir) await rm(storeDir, { recursive: true, force: true });
 });
 
-function runNodeWithStore(scenes: Scene[]): ReturnType<typeof narrationGeneratorNode> {
+function runNodeWithStore(
+  scenes: Scene[],
+): ReturnType<typeof narrationGeneratorNode> {
   return narrationGeneratorNode(
     {
       project: { pillar: "Geography", topic: "Test" },
@@ -247,7 +256,9 @@ describe("narrationGeneratorNode", () => {
     expect(mockSynthesize).toHaveBeenCalledTimes(1);
     expect(mockSynthesize.mock.calls[0][0].text).toBe("Scene two narration.");
     expect(second.audio.combinedAudio).toBeDefined();
-    expect(second.audio.scenes?.[0].artifactId).toBe(cachedSceneOne?.artifactId);
+    expect(second.audio.scenes?.[0].artifactId).toBe(
+      cachedSceneOne?.artifactId,
+    );
   });
 
   it("regenerates exactly one scene when scene 3 narration changes", async () => {
@@ -271,7 +282,9 @@ describe("narrationGeneratorNode", () => {
     ]);
 
     expect(mockSynthesize).toHaveBeenCalledTimes(1);
-    expect(mockSynthesize.mock.calls[0][0].text).toBe("Changed third narration.");
+    expect(mockSynthesize.mock.calls[0][0].text).toBe(
+      "Changed third narration.",
+    );
     expect(result.audio.scenes?.[2].sceneId).toBe(3);
     expect(result.audio.combinedAudio).toBeDefined();
   });

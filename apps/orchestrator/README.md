@@ -83,23 +83,23 @@ Given input `{ pillar: "Geography", topic: "Unrecognized Countries" }`, the pipe
 
 ### Input Contract
 
-| Field | Required | Type | Example | Notes |
-|---|---|---|---|---|
-| `project.pillar` | yes | string | `"Geography"` | High-level category |
-| `project.topic` | yes | string | `"Unrecognized Countries"` | Specific angle |
-| `branding.channel` | no | string | `"Universe Decoded by Zain"` | Channel name |
-| `branding.handle` | no | string | `"@UniverseDecodedByZain"` | Channel handle |
-| `branding.creator` | no | string | `"Ali Zain"` | Creator name |
-| `branding.cta` | no | string | `"Follow for more mysteries of the universe."` | Deterministic CTA configuration |
-| `branding.enabled` | no | boolean | `true` | Enable canonical outro |
-| `branding.outroAsset` | no | string | `"assets/branding/outro.mp4"` | Relative repository asset path |
-| `branding.ctaEnabled` | no | boolean | `true` | Render CTA when outro lacks one |
-| `branding.style` | no | string | `"Documentary"` | Visual style guide |
-| `branding.colorPalette` | no | string | `"Cold blue"` | Color theme |
-| `branding.logo` | no | string | `"UD logo"` | Logo reference |
-| `branding.voice` | no | string | `"en-US-Neural2-F"` | TTS voice |
-| `branding.platforms` | no | string[] | `["youtube"]` | Target publish platforms |
-| `execution.version` | yes | string | `"0.1.0"` | Pipeline version |
+| Field                   | Required | Type     | Example                                        | Notes                           |
+| ----------------------- | -------- | -------- | ---------------------------------------------- | ------------------------------- |
+| `project.pillar`        | yes      | string   | `"Geography"`                                  | High-level category             |
+| `project.topic`         | yes      | string   | `"Unrecognized Countries"`                     | Specific angle                  |
+| `branding.channel`      | no       | string   | `"Universe Decoded by Zain"`                   | Channel name                    |
+| `branding.handle`       | no       | string   | `"@UniverseDecodedByZain"`                     | Channel handle                  |
+| `branding.creator`      | no       | string   | `"Ali Zain"`                                   | Creator name                    |
+| `branding.cta`          | no       | string   | `"Follow for more mysteries of the universe."` | Deterministic CTA configuration |
+| `branding.enabled`      | no       | boolean  | `true`                                         | Enable canonical outro          |
+| `branding.outroAsset`   | no       | string   | `"assets/branding/outro.mp4"`                  | Relative repository asset path  |
+| `branding.ctaEnabled`   | no       | boolean  | `true`                                         | Render CTA when outro lacks one |
+| `branding.style`        | no       | string   | `"Documentary"`                                | Visual style guide              |
+| `branding.colorPalette` | no       | string   | `"Cold blue"`                                  | Color theme                     |
+| `branding.logo`         | no       | string   | `"UD logo"`                                    | Logo reference                  |
+| `branding.voice`        | no       | string   | `"en-US-Neural2-F"`                            | TTS voice                       |
+| `branding.platforms`    | no       | string[] | `["youtube"]`                                  | Target publish platforms        |
+| `execution.version`     | yes      | string   | `"0.1.0"`                                      | Pipeline version                |
 
 `branding/brand.json` owns default branding values. Relative media paths are
 resolved centrally by walking from process working directory toward repository
@@ -107,51 +107,51 @@ root; commands must run from orchestrator package or workspace root.
 
 ### Implemented
 
-| Component | Type | Status |
-|---|---|---|
-| ResearchAgent | LLM agent | complete |
-| ResearchQA | LLM gate | complete |
-| StoryPlanner | LLM agent | complete |
-| ScriptWriter | LLM agent | complete |
-| ScriptQA | LLM gate | complete |
-| VisualDirector | LLM agent | complete |
-| ImagePromptGenerator | LLM agent | complete |
-| PromptQA | LLM gate | complete |
-| AssetGenerator | provider | complete |
-| NarrationGenerator (TTS) | provider | complete |
-| SubtitleGenerator | provider | complete |
-| VideoComposer | provider | complete |
-| ReleaseValidation | deterministic gate | complete |
-| ReleaseReview | LLM gate | complete |
-| MetadataGenerator | LLM agent | complete |
-| ThumbnailGenerator | LLM + provider | complete |
-| Publisher | provider | complete |
-| `runAgent()` harness | shared | complete |
-| Prompt cache (in-memory) | utility | complete |
-| Shared editorial guidelines | prompt infra | complete |
-| Completeness validation | ImagePromptGenerator | complete |
-| Gemini instruction filter | PromptQA | complete |
-| `singleAttempt` option | runAgent | complete |
-| Telemetry (model, tokens, retries, versions) | per-node | complete |
-| Zod schema validation | all outputs | complete |
-| Dependency injection for tests | all agents | complete |
-| Provider interface + stub pattern | all providers | complete |
-| FFprobe media validation | ReleaseValidation | complete |
-| SRT parsing (monotonic, overlap, bounds) | ReleaseValidation | complete |
-| Unit tests | 221 | passing |
-| Integration test | 8 | passing |
+| Component                                    | Type                 | Status   |
+| -------------------------------------------- | -------------------- | -------- |
+| ResearchAgent                                | LLM agent            | complete |
+| ResearchQA                                   | LLM gate             | complete |
+| StoryPlanner                                 | LLM agent            | complete |
+| ScriptWriter                                 | LLM agent            | complete |
+| ScriptQA                                     | LLM gate             | complete |
+| VisualDirector                               | LLM agent            | complete |
+| ImagePromptGenerator                         | LLM agent            | complete |
+| PromptQA                                     | LLM gate             | complete |
+| AssetGenerator                               | provider             | complete |
+| NarrationGenerator (TTS)                     | provider             | complete |
+| SubtitleGenerator                            | provider             | complete |
+| VideoComposer                                | provider             | complete |
+| ReleaseValidation                            | deterministic gate   | complete |
+| ReleaseReview                                | LLM gate             | complete |
+| MetadataGenerator                            | LLM agent            | complete |
+| ThumbnailGenerator                           | LLM + provider       | complete |
+| Publisher                                    | provider             | complete |
+| `runAgent()` harness                         | shared               | complete |
+| Prompt cache (in-memory)                     | utility              | complete |
+| Shared editorial guidelines                  | prompt infra         | complete |
+| Completeness validation                      | ImagePromptGenerator | complete |
+| Gemini instruction filter                    | PromptQA             | complete |
+| `singleAttempt` option                       | runAgent             | complete |
+| Telemetry (model, tokens, retries, versions) | per-node             | complete |
+| Zod schema validation                        | all outputs          | complete |
+| Dependency injection for tests               | all agents           | complete |
+| Provider interface + stub pattern            | all providers        | complete |
+| FFprobe media validation                     | ReleaseValidation    | complete |
+| SRT parsing (monotonic, overlap, bounds)     | ReleaseValidation    | complete |
+| Unit tests                                   | 221                  | passing  |
+| Integration test                             | 8                    | passing  |
 
 ### Not Implemented
 
-| Component | Notes |
-|---|---|
+| Component                      | Notes                                                      |
+| ------------------------------ | ---------------------------------------------------------- |
 | Provider adapters (production) | GPT Image, Runway, ElevenLabs, PalmierPro need credentials |
-| Orchestration layer | Parallel execution, caching, progress tracking |
-| Configurable provider map | `ASSET_CONFIG` hardcoded in asset-generator |
-| ResearchCollector agent | Enum entry, no node |
-| PromptEngineer agent | Enum entry, no node |
-| NarrationPlanner agent | Enum entry, no node |
-| QAReviewer agent | Enum entry, no node |
+| Orchestration layer            | Parallel execution, caching, progress tracking             |
+| Configurable provider map      | `ASSET_CONFIG` hardcoded in asset-generator                |
+| ResearchCollector agent        | Enum entry, no node                                        |
+| PromptEngineer agent           | Enum entry, no node                                        |
+| NarrationPlanner agent         | Enum entry, no node                                        |
+| QAReviewer agent               | Enum entry, no node                                        |
 
 ## Quick Start
 
@@ -208,7 +208,13 @@ Audio state contains both scene and combined artifacts:
 {
   "version": 2,
   "scenes": [
-    { "sceneId": 1, "artifactId": "...", "narration": "...", "durationMs": 4520, "url": "..." }
+    {
+      "sceneId": 1,
+      "artifactId": "...",
+      "narration": "...",
+      "durationMs": 4520,
+      "url": "..."
+    }
   ],
   "combinedAudio": {
     "artifactId": "...",
@@ -389,18 +395,18 @@ AssetGenerator / NarrationGenerator / SubtitleGenerator / VideoComposer (determi
 
 ### IDs
 
-| Field | Format | Source |
-|---|---|---|
-| `promptId` | `prompt-scene-NNN` | ImagePromptGenerator |
-| `assetId` | `asset-scene-NNN` | AssetGenerator (deterministic fold) |
+| Field      | Format                            | Source                              |
+| ---------- | --------------------------------- | ----------------------------------- |
+| `promptId` | `prompt-scene-NNN`                | ImagePromptGenerator                |
+| `assetId`  | `asset-scene-NNN`                 | AssetGenerator (deterministic fold) |
 | `filename` | `scene-NNN.png` / `scene-NNN.mp4` | AssetGenerator (deterministic fold) |
 
 ### Providers
 
 | Asset Type | Default Provider | Extension |
-|---|---|---|
-| image | gpt-image | png |
-| video | runway | mp4 |
+| ---------- | ---------------- | --------- |
+| image      | gpt-image        | png       |
+| video      | runway           | mp4       |
 
 Defined in `src/agents/asset-generator.node.ts` — deterministic provider map. Provider is overridable per-scene.
 
@@ -530,10 +536,12 @@ tests/
 ## Roadmap
 
 ### Phase 1 — Production Providers
+
 - Provider adapters: GPT Image, Runway, ElevenLabs, PalmierPro
 - Orchestration: parallel generation, caching, progress
 
 ### Phase 2 — Editorial Quality
+
 - Prompt library with versioned, A/B-tested prompts
 - Configurable provider map (env-driven `ASSET_CONFIG`)
 - Uniform severity routing (`fatal` / `minor_revision` / `major_revision`) across every QA stage

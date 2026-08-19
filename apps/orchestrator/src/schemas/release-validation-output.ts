@@ -6,4 +6,6 @@ export const ReleaseValidationOutputSchema = z.object({
   validations: z.array(z.string()).optional(),
 });
 
-export type ReleaseValidationOutput = z.input<typeof ReleaseValidationOutputSchema>;
+export type ReleaseValidationOutput = z.input<
+  typeof ReleaseValidationOutputSchema
+>;

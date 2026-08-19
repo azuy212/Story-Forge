@@ -15,9 +15,63 @@ const mockWriteFile = jest
   .fn<(...args: any[]) => Promise<void>>()
   .mockResolvedValue(undefined);
 
+// Create a valid WAV Buffer with actual audio data for testing
+function makeValidWavBuffer(
+  sampleRate = 44100,
+  bitsPerSample = 16,
+  durationMs = 2000,
+): Buffer {
+  const channels = 1;
+  const bytesPerSample = bitsPerSample / 8;
+  const numSamples = Math.floor((sampleRate * durationMs) / 1000);
+  const dataSize = numSamples * channels * bytesPerSample;
+  const fileSize = 36 + dataSize;
+  const buf = Buffer.alloc(44 + dataSize);
+
+  buf.write("RIFF", 0);
+  buf.writeUInt32LE(fileSize, 4);
+  buf.write("WAVE", 8);
+  buf.write("fmt ", 12);
+  buf.writeUInt32LE(16, 16);
+  buf.writeUInt16LE(1, 20); // PCM format
+  buf.writeUInt16LE(channels, 22);
+  buf.writeUInt32LE(sampleRate, 24);
+  buf.writeUInt32LE(sampleRate * channels * bytesPerSample, 28);
+  buf.writeUInt16LE(channels * bytesPerSample, 32);
+  buf.writeUInt16LE(bitsPerSample, 34);
+  buf.write("data", 36);
+  buf.writeUInt32LE(dataSize, 40);
+  // Fill data section with silence (zeros) - already zeroed by Buffer.alloc
+  return buf;
+}
+
+const mockReadFile = jest
+  .fn<(...args: any[]) => Promise<Buffer>>()
+  .mockImplementation((path) => {
+    // Return valid WAV buffer for temp files (after ffmpeg normalization)
+    if (typeof path === "string" && path.includes(".speed.wav")) {
+      return Promise.resolve(makeValidWavBuffer());
+    }
+    return Promise.resolve(Buffer.alloc(0));
+  });
+const mockRename = jest
+  .fn<(...args: any[]) => Promise<void>>()
+  .mockResolvedValue(undefined);
+const mockRm = jest
+  .fn<(...args: any[]) => Promise<void>>()
+  .mockResolvedValue(undefined);
+
+jest.unstable_mockModule("../src/providers/composer/ffmpeg/ffmpeg.js", () => ({
+  runFfmpeg: jest.fn(() => Promise.resolve()),
+  runFfmpegWithRetry: jest.fn(() => Promise.resolve()),
+}));
+
 jest.unstable_mockModule("node:fs/promises", () => ({
   mkdir: mockMkdir,
   writeFile: mockWriteFile,
+  readFile: mockReadFile,
+  rename: mockRename,
+  rm: mockRm,
 }));
 
 const { ChatterboxTTSProvider } =
@@ -98,12 +152,13 @@ afterEach(() => {
 describe("ChatterboxTTSProvider", () => {
   const provider = new ChatterboxTTSProvider();
 
-  it("cacheFingerprint includes the chatterbox endpoint", async () => {
+  it("cacheFingerprint includes the chatterbox endpoint and targetWpm", async () => {
     const prev = process.env.TTS_URL;
     process.env.TTS_URL = "http://localhost:8010";
     try {
-      expect(provider.cacheFingerprint()).toBe(
-        "chatterbox-http-v2:http://localhost:8010",
+      // Format: chatterbox-http-<version>:<url>:targetWpm=<wpm>
+      expect(provider.cacheFingerprint()).toMatch(
+        /^chatterbox-http-v3:http:\/\/localhost:8010:targetWpm=\d+$/,
       );
     } finally {
       if (prev === undefined) delete process.env.TTS_URL;
@@ -120,8 +175,12 @@ describe("ChatterboxTTSProvider", () => {
       process.env.TTS_URL = "http://tts-staging.example:9000";
       const second = provider.cacheFingerprint();
 
-      expect(first).toBe("chatterbox-http-v2:http://localhost:8010");
-      expect(second).toBe("chatterbox-http-v2:http://tts-staging.example:9000");
+      expect(first).toMatch(
+        /^chatterbox-http-v3:http:\/\/localhost:8010:targetWpm=\d+$/,
+      );
+      expect(second).toMatch(
+        /^chatterbox-http-v3:http:\/\/tts-staging.example:9000:targetWpm=\d+$/,
+      );
       expect(second).not.toBe(first);
     } finally {
       if (prev === undefined) delete process.env.TTS_URL;
@@ -213,9 +272,16 @@ describe("ChatterboxTTSProvider", () => {
       )
       .mockResolvedValueOnce(makeBinaryResponse(200, wav));
 
-    const result = await provider.synthesize({ text: "Hello world" });
-
-    expect(result.durationMs).toBe(57840);
+    // Disable WPM normalization to test raw duration parsing
+    const prevTargetWpm = process.env.NARRATION_TARGET_WPM;
+    process.env.NARRATION_TARGET_WPM = "";
+    try {
+      const result = await provider.synthesize({ text: "Hello world" });
+      expect(result.durationMs).toBe(57840);
+    } finally {
+      if (prevTargetWpm === undefined) delete process.env.NARRATION_TARGET_WPM;
+      else process.env.NARRATION_TARGET_WPM = prevTargetWpm;
+    }
   });
 
   it("falls back for unsupported WAV compression formats", async () => {

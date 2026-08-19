@@ -4,8 +4,12 @@ type LogLevel = "info" | "warn" | "error" | "debug";
 
 type LogMeta = Record<string, unknown>;
 
+function formatTime(): string {
+  return new Date().toISOString().slice(11, 19);
+}
+
 function formatHuman(level: LogLevel, message: string, meta?: LogMeta): string {
-  const time = new Date().toISOString().slice(11, 19);
+  const time = formatTime();
   const metaStr =
     meta && Object.keys(meta).length > 0 ? ` ${JSON.stringify(meta)}` : "";
   return `[${time}] ${level.toUpperCase()} ${message}${metaStr}`;
@@ -18,6 +22,10 @@ function formatJson(level: LogLevel, message: string, meta?: LogMeta): string {
     message,
     ...meta,
   });
+}
+
+function formatNodeMessage(message: string): string {
+  return `[${formatTime()}] ${message}`;
 }
 
 export const logger = {
@@ -35,4 +43,43 @@ export const logger = {
       console.log(formatJson("debug", message, meta));
     }
   },
+
+  nodeStart(label: string): void {
+    console.log(formatNodeMessage(`${label} started`));
+  },
+  nodeDone(label: string, durationMs: number): void {
+    console.log(
+      formatNodeMessage(`${label} complete (${formatDuration(durationMs)})`),
+    );
+  },
+  nodeRetry(
+    label: string,
+    attempt: number,
+    maxRetries: number,
+    reason: string,
+  ): void {
+    console.log(
+      formatNodeMessage(
+        `${label} retrying (${attempt}/${maxRetries}): ${reason}`,
+      ),
+    );
+  },
+  nodeSkipped(label: string, reason: string): void {
+    console.log(formatNodeMessage(`${label} skipped: ${reason}`));
+  },
+  nodeIncomplete(label: string, detail: string): void {
+    console.log(formatNodeMessage(`${label} incomplete (${detail})`));
+  },
+  nodeFailed(label: string, reason: string): void {
+    console.error(formatNodeMessage(`${label} failed: ${reason}`));
+  },
 };
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  const rem = secs % 60;
+  return rem ? `${mins}m ${rem.toString().padStart(2, "0")}s` : `${mins}m 00s`;
+}

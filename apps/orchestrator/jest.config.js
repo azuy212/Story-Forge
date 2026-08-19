@@ -15,4 +15,5 @@ export default {
   setupFiles: ["dotenv/config", "./tests/setup-env.ts"],
   passWithNoTests: true,
   testTimeout: 20_000,
+  testPathIgnorePatterns: ["<rootDir>/dist/"],
 };

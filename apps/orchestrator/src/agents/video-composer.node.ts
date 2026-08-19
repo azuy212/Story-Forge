@@ -23,7 +23,7 @@ import {
 } from "../utils/branding.js";
 import { config as appConfig } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
-import { nodeStart, nodeDone, nodeFailed } from "../utils/node-labels.js";
+import { nodeLabel } from "../utils/node-labels.js";
 
 const DEFAULT_PROVIDER = new FfmpegComposerProvider({ subtitleFontSize: 16 });
 
@@ -188,13 +188,9 @@ export async function videoComposerNode(
   execution: Partial<Execution>;
 }> {
   const errors = collectErrors(state);
-  logger.info(nodeStart(AgentModel.VideoComposer), {
-    scenes: (state.production?.scenes ?? []).length,
-  });
+  logger.nodeStart(nodeLabel(AgentModel.VideoComposer));
   if (errors.length > 0) {
-    logger.warn(nodeFailed(AgentModel.VideoComposer), {
-      error: errors[0],
-    });
+    logger.nodeFailed(nodeLabel(AgentModel.VideoComposer), errors[0]);
     return {
       video: {},
       diagnostics: { errors },
@@ -217,9 +213,10 @@ export async function videoComposerNode(
       state.audio?.scenes ?? [],
     );
   } catch (err) {
-    logger.warn(nodeFailed(AgentModel.VideoComposer), {
-      error: (err as Error)?.message ?? String(err),
-    });
+    logger.nodeFailed(
+      nodeLabel(AgentModel.VideoComposer),
+      (err as Error)?.message ?? String(err),
+    );
     return {
       production: {},
       video: {},
@@ -312,9 +309,7 @@ export async function videoComposerNode(
   );
 
   if (result.error) {
-    logger.warn(nodeFailed(AgentModel.VideoComposer), {
-      error: result.error,
-    });
+    logger.nodeFailed(nodeLabel(AgentModel.VideoComposer), result.error);
     return {
       video: {},
       diagnostics: {
@@ -324,10 +319,7 @@ export async function videoComposerNode(
     };
   }
 
-  logger.info(nodeDone(AgentModel.VideoComposer), {
-    scenes: timedScenes.length,
-    durationMs: result.data?.durationMs,
-  });
+  logger.nodeDone(nodeLabel(AgentModel.VideoComposer), 0);
 
   return {
     production: {

@@ -1,9 +1,5 @@
 import type { RunnableConfig } from "@langchain/core/runnables";
-import type {
-  ProjectState,
-  Diagnostics,
-  Execution,
-} from "../types/index.js";
+import type { ProjectState, Diagnostics, Execution } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
 import { withTopic } from "../artifacts/context.js";
@@ -30,7 +26,9 @@ export async function metadataGeneratorNode(
     return {
       metadataOutput: null,
       diagnostics: {
-        errors: [`${AgentModel.MetadataGenerator}: Script, title, or hook missing`],
+        errors: [
+          `${AgentModel.MetadataGenerator}: Script, title, or hook missing`,
+        ],
       },
       execution: { currentNode: AgentModel.MetadataGenerator },
     };

@@ -34,7 +34,7 @@ if (!clientId || !clientSecret) {
 const oauth2 = new google.auth.OAuth2(clientId, clientSecret, REDIRECT_URI);
 const scopes = [
   "https://www.googleapis.com/auth/youtube",
-  "https://www.googleapis.com/auth/youtube.upload",
+  "https://www.googleapis.com/auth/drive",
 ];
 
 const url = oauth2.generateAuthUrl({

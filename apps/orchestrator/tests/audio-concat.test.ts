@@ -32,7 +32,10 @@ describe("concatAudio", () => {
     const output = join(dir, "narration.wav");
     try {
       for (const id of [1, 2, 10]) {
-        writeFileSync(join(dir, `scene-${String(id).padStart(3, "0")}.wav`), "x");
+        writeFileSync(
+          join(dir, `scene-${String(id).padStart(3, "0")}.wav`),
+          "x",
+        );
       }
 
       const result = await concatAudio(

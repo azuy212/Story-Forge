@@ -28,7 +28,7 @@ import { padSceneId } from "../utils/scene-id.js";
 import { AUDIO_DURATION_TOLERANCE_MS } from "../utils/constants.js";
 import { config } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
-import { nodeStart, nodeDone, nodeFailed } from "../utils/node-labels.js";
+import { nodeLabel } from "../utils/node-labels.js";
 
 const DEFAULT_PROVIDER = config.useRealProviders()
   ? new ChatterboxTTSProvider()
@@ -111,13 +111,12 @@ export async function narrationGeneratorNode(
   execution: Partial<Execution>;
 }> {
   const input = validScenes(state.production?.scenes ?? []);
-  logger.info(nodeStart(AgentModel.NarrationGenerator), {
-    scenes: input.scenes.length,
-  });
+  logger.nodeStart(nodeLabel(AgentModel.NarrationGenerator));
   if (input.scenes.length === 0) {
-    logger.warn(nodeFailed(AgentModel.NarrationGenerator), {
-      error: "No production scenes found",
-    });
+    logger.nodeFailed(
+      nodeLabel(AgentModel.NarrationGenerator),
+      "No production scenes found",
+    );
     return {
       audio: {},
       diagnostics: {
@@ -129,9 +128,7 @@ export async function narrationGeneratorNode(
     };
   }
   if (input.error) {
-    logger.warn(nodeFailed(AgentModel.NarrationGenerator), {
-      error: input.error,
-    });
+    logger.nodeFailed(nodeLabel(AgentModel.NarrationGenerator), input.error);
     return {
       audio: {},
       diagnostics: { errors: [input.error] },
@@ -233,11 +230,10 @@ export async function narrationGeneratorNode(
     .sort((a, b) => a.sceneId - b.sceneId);
 
   if (failed.length > 0) {
-    logger.warn(nodeFailed(AgentModel.NarrationGenerator), {
-      failedScenes: failed.length,
-      totalScenes: scenes.length,
-      error: failed[0]?.result.error,
-    });
+    logger.nodeFailed(
+      nodeLabel(AgentModel.NarrationGenerator),
+      `${failed.length}/${scenes.length} scenes failed`,
+    );
     return {
       audio: {
         version: 2,
@@ -327,9 +323,10 @@ export async function narrationGeneratorNode(
   );
 
   if (combined.error || !combined.data) {
-    logger.warn(nodeFailed(AgentModel.NarrationGenerator), {
-      error: combined.error ?? "Combined narration is missing",
-    });
+    logger.nodeFailed(
+      nodeLabel(AgentModel.NarrationGenerator),
+      combined.error ?? "Combined narration is missing",
+    );
     return {
       audio: { version: 2, scenes: successfulScenes, voice },
       diagnostics: {
@@ -342,10 +339,7 @@ export async function narrationGeneratorNode(
     };
   }
 
-  logger.info(nodeDone(AgentModel.NarrationGenerator), {
-    scenes: successfulScenes.length,
-    durationMs: combined.data.combinedAudio!.durationMs,
-  });
+  logger.nodeDone(nodeLabel(AgentModel.NarrationGenerator), 0);
 
   return {
     audio: {

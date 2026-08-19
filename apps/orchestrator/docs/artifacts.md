@@ -46,6 +46,7 @@ runs/<runId>/
 ```
 
 `run.json` is written atomically on first namespace claim for a thread. It records:
+
 - `threadId` — the LangGraph thread UUID that created the run
 - `topic` — the original project topic (e.g., "Why Your Brain Lies to You")
 - `pillar` — the project pillar (e.g., "Geography", "History")
@@ -176,6 +177,7 @@ pnpm --filter youtube-shorts-orchestrator resume <namespace|topic> [--pillar <pi
 ```
 
 The CLI (`scripts/resume.mjs`):
+
 1. Resolves the run folder (exact name or topic substring).
 2. Reads `run.json` for the original `project` input (pillar + topic) and original `threadId`.
 3. Reports per-stage status from `manifest.json`; refuses if `publish` is already complete.
@@ -190,6 +192,7 @@ The CLI (`scripts/resume.mjs`):
 ### Important: Dev-Server Checkpointer is Ephemeral
 
 The `langgraph dev` server uses a `MemorySaver` checkpointer synced to `.langgraph_api/.langgraphjs_api.checkpointer.json` with a **3-second debounced flush**. Threads are lost if:
+
 - The process dies before a flush (last checkpoints lost).
 - The file is unreadable at startup — `initialize()` silently resets to `{}` (all threads gone).
 - Multiple `langgraph dev` instances run concurrently — each has its own MemorySaver copy racing writes to the same file; last-writer-wins.

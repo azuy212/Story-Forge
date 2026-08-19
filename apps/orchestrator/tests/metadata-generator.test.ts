@@ -11,7 +11,9 @@ const MOCK_PROMPT = [
 ].join("\n");
 
 function makeMocks() {
-  const createModel = jest.fn<(...args: any[]) => { model: string; generate: typeof mockGenerate }>(() => ({
+  const createModel = jest.fn<
+    (...args: any[]) => { model: string; generate: typeof mockGenerate }
+  >(() => ({
     model: "test-model",
     generate: mockGenerate,
   }));
@@ -26,7 +28,11 @@ function runNode(state?: Partial<ProjectState>) {
   const promise = metadataGeneratorNode(
     {
       project: { pillar: "Geography", topic: "Test" },
-      content: { script: "Test script.", title: "Test Title", hook: "Test hook?" },
+      content: {
+        script: "Test script.",
+        title: "Test Title",
+        hook: "Test hook?",
+      },
       branding: { channel: "TestChannel", creator: "", cta: "" },
       execution: { version: "0.1.0" },
       ...state,
@@ -92,7 +98,9 @@ describe("metadataGeneratorNode", () => {
   });
 
   it("returns error when hook missing", async () => {
-    const { promise } = runNode({ content: { script: "S", title: "T" } } as any);
+    const { promise } = runNode({
+      content: { script: "S", title: "T" },
+    } as any);
     const result = await promise;
 
     expect(result.diagnostics?.errors).toBeDefined();
@@ -101,7 +109,14 @@ describe("metadataGeneratorNode", () => {
   });
 
   it("telemetry recorded", async () => {
-    const metadata = { title: "T", description: "D", tags: [], hashtags: [], category: "Education", pinnedComment: "C" };
+    const metadata = {
+      title: "T",
+      description: "D",
+      tags: [],
+      hashtags: [],
+      category: "Education",
+      pinnedComment: "C",
+    };
     mockGenerate.mockResolvedValueOnce(buildLLMResponse(metadata));
 
     const { promise } = runNode();
@@ -111,7 +126,16 @@ describe("metadataGeneratorNode", () => {
   });
 
   it("schema validation rejects invalid data", async () => {
-    mockGenerate.mockResolvedValueOnce(buildLLMResponse({ title: "", description: "", tags: "not-array", hashtags: [], category: "", pinnedComment: "" }));
+    mockGenerate.mockResolvedValueOnce(
+      buildLLMResponse({
+        title: "",
+        description: "",
+        tags: "not-array",
+        hashtags: [],
+        category: "",
+        pinnedComment: "",
+      }),
+    );
 
     const { promise } = runNode();
     const result = await promise;
@@ -121,7 +145,14 @@ describe("metadataGeneratorNode", () => {
   });
 
   it("sets execution.currentNode", async () => {
-    const metadata = { title: "T", description: "D", tags: [], hashtags: [], category: "Education", pinnedComment: "C" };
+    const metadata = {
+      title: "T",
+      description: "D",
+      tags: [],
+      hashtags: [],
+      category: "Education",
+      pinnedComment: "C",
+    };
     mockGenerate.mockResolvedValueOnce(buildLLMResponse(metadata));
 
     const { promise } = runNode();

@@ -11,5 +11,9 @@ export interface GenerateSubtitlesResult {
 }
 
 export interface SubtitleProvider {
-  generateSubtitles(audioUrl: string, narration: string, durationMs?: number): Promise<GenerateSubtitlesResult>;
+  generateSubtitles(
+    audioUrl: string,
+    narration: string,
+    durationMs?: number,
+  ): Promise<GenerateSubtitlesResult>;
 }

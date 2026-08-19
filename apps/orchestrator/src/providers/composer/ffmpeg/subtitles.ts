@@ -1,5 +1,5 @@
-import { runFfmpeg } from './ffmpeg.js';
-import type { EncoderConfig } from './ffmpeg.js';
+import { runFfmpeg } from "./ffmpeg.js";
+import type { EncoderConfig } from "./ffmpeg.js";
 
 export interface BurnSubtitlesOptions {
   subtitlePath: string;
@@ -10,30 +10,30 @@ export interface BurnSubtitlesOptions {
 
 export function escapeSubtitlePath(filePath: string): string {
   return filePath
-    .replace(/\\/g, '/')
-    .replace(/:/g, '\\:')
-    .replace(/,/g, '\\,')
-    .replace(/\[/g, '\\[')
-    .replace(/\]/g, '\\]')
+    .replace(/\\/g, "/")
+    .replace(/:/g, "\\:")
+    .replace(/,/g, "\\,")
+    .replace(/\[/g, "\\[")
+    .replace(/\]/g, "\\]")
     .replace(/'/g, "\\'");
 }
 
 export function buildSubtitleStyle(fontSize: number, fontName: string): string {
   const styleParts = [
     `FontSize=${fontSize}`,
-    'PrimaryColour=&H00FFFFFF',
-    'OutlineColour=&H00000000',
-    'BorderStyle=1',
-    'Outline=2',
-    'MarginV=40',
-    'Alignment=2',
+    "PrimaryColour=&H00FFFFFF",
+    "OutlineColour=&H00000000",
+    "BorderStyle=1",
+    "Outline=2",
+    "MarginV=40",
+    "Alignment=2",
   ];
 
   if (fontName) {
     styleParts.unshift(`FontName=${fontName}`);
   }
 
-  return styleParts.join(',');
+  return styleParts.join(",");
 }
 
 export async function burnSubtitles(
@@ -45,18 +45,25 @@ export async function burnSubtitles(
   const fontName = opts.fontName;
   const enc = opts.encoder;
 
-  const style = buildSubtitleStyle(fontSize, fontName || '');
+  const style = buildSubtitleStyle(fontSize, fontName || "");
   const escapedPath = escapeSubtitlePath(opts.subtitlePath);
 
   const args = [
-    '-y',
-    '-i', videoPath,
-    '-vf', `subtitles=filename=${escapedPath}:force_style='${style}'`,
-    '-c:a', 'copy',
-    '-c:v', enc.encoder,
-    '-crf', String(enc.crf),
-    '-preset', enc.preset,
-    '-pix_fmt', 'yuv420p',
+    "-y",
+    "-i",
+    videoPath,
+    "-vf",
+    `subtitles=filename=${escapedPath}:force_style='${style}'`,
+    "-c:a",
+    "copy",
+    "-c:v",
+    enc.encoder,
+    "-crf",
+    String(enc.crf),
+    "-preset",
+    enc.preset,
+    "-pix_fmt",
+    "yuv420p",
   ];
 
   if (enc.extraArgs) args.push(...enc.extraArgs);
@@ -64,6 +71,6 @@ export async function burnSubtitles(
 
   await runFfmpeg({
     args,
-    description: 'burn subtitles',
+    description: "burn subtitles",
   });
 }

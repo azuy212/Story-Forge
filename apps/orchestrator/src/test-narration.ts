@@ -10,10 +10,7 @@ const TEXT =
   "In 1925, a powerful earthquake struck Santa Barbara, California, destroying buildings, breaking water pipes, and starting fires. Residents rushed to rescue neighbors as emergency crews struggled to reach the hardest-hit areas.";
 
 function calculateWpm(text: string, durationMs: number): number {
-  const words = text
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean).length;
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
 
   const minutes = durationMs / 60_000;
 
@@ -137,12 +134,9 @@ async function main() {
   const wpms = results.map((result) => result.wpm);
 
   const averageDuration =
-    durations.reduce((sum, value) => sum + value, 0) /
-    durations.length;
+    durations.reduce((sum, value) => sum + value, 0) / durations.length;
 
-  const averageWpm =
-    wpms.reduce((sum, value) => sum + value, 0) /
-    wpms.length;
+  const averageWpm = wpms.reduce((sum, value) => sum + value, 0) / wpms.length;
 
   const sortedDurations = [...durations].sort((a, b) => a - b);
   const sortedWpms = [...wpms].sort((a, b) => a - b);
@@ -166,11 +160,11 @@ async function main() {
   const minWpm = Math.min(...wpms);
   const maxWpm = Math.max(...wpms);
 
-  const variance = durations.reduce(
-    (sum, duration) =>
-      sum + Math.pow(duration - averageDuration, 2),
-    0,
-  ) / durations.length;
+  const variance =
+    durations.reduce(
+      (sum, duration) => sum + Math.pow(duration - averageDuration, 2),
+      0,
+    ) / durations.length;
 
   const standardDeviation = Math.sqrt(variance);
 
@@ -181,11 +175,7 @@ async function main() {
   console.log("=".repeat(80));
 
   console.log();
-  console.log(
-    "Run".padEnd(8) +
-      "Duration".padEnd(15) +
-      "WPM",
-  );
+  console.log("Run".padEnd(8) + "Duration".padEnd(15) + "WPM");
 
   console.log("-".repeat(40));
 
@@ -200,25 +190,15 @@ async function main() {
   console.log();
   console.log("-".repeat(40));
 
-  console.log(
-    `Average duration:  ${formatDuration(averageDuration)}`,
-  );
+  console.log(`Average duration:  ${formatDuration(averageDuration)}`);
 
-  console.log(
-    `Median duration:   ${formatDuration(medianDuration)}`,
-  );
+  console.log(`Median duration:   ${formatDuration(medianDuration)}`);
 
-  console.log(
-    `Minimum duration:  ${formatDuration(minDuration)}`,
-  );
+  console.log(`Minimum duration:  ${formatDuration(minDuration)}`);
 
-  console.log(
-    `Maximum duration:  ${formatDuration(maxDuration)}`,
-  );
+  console.log(`Maximum duration:  ${formatDuration(maxDuration)}`);
 
-  console.log(
-    `Std deviation:     ${formatDuration(standardDeviation)}`,
-  );
+  console.log(`Std deviation:     ${formatDuration(standardDeviation)}`);
 
   console.log();
 

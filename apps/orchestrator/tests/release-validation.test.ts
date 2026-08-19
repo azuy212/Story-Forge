@@ -609,15 +609,19 @@ describe("releaseValidationNode", () => {
   });
 
   it("skips validation when disabled", async () => {
-    const prev = process.env.ENABLE_RELEASE_QA;
+    const prevRelease = process.env.ENABLE_RELEASE_QA;
+    const prevQa = process.env.ENABLE_QA;
     process.env.ENABLE_RELEASE_QA = "false";
+    process.env.ENABLE_QA = "false";
     try {
       const result = await runNode({ video: {} } as any);
       expect(result.releaseValidation.status).toBe("approved");
       expect(result.releaseValidation.issues).toEqual([]);
     } finally {
-      if (prev === undefined) delete process.env.ENABLE_RELEASE_QA;
-      else process.env.ENABLE_RELEASE_QA = prev;
+      if (prevRelease === undefined) delete process.env.ENABLE_RELEASE_QA;
+      else process.env.ENABLE_RELEASE_QA = prevRelease;
+      if (prevQa === undefined) delete process.env.ENABLE_QA;
+      else process.env.ENABLE_QA = prevQa;
     }
   });
 });

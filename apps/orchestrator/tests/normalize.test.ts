@@ -60,19 +60,21 @@ describe("normalizeAsset Ken Burns (image)", () => {
 
     // 10s * 30fps = 300 output frames.
     expect(filter).toContain("d=300");
-    const match = filter.match(/zoom\+([0-9.e-]+),/);
-    expect(match).toBeTruthy();
-    expect(Number(match![1])).toBeCloseTo((1.15 - 1) / 300, 8);
-    expect(filter).toContain("min(zoom+");
-    expect(filter).toContain(",1.15))");
+    // Uses smoothstep interpolation: progress = 3*t^2 - 2*t^3
+    // zoom = 1 + (maxZoom - 1) * progress
+    expect(filter).toContain("z='1+(");
+    expect(filter).toContain("1.15-1"); // maxZoom value in the expression
+    expect(filter).toContain("pow("); // smoothstep uses pow
   });
 
-  it("uses canonical zoompan without -loop, emitting d=frames from a single input frame", async () => {
+  it("uses canonical zoompan with -loop, emitting d=frames from a single input frame", async () => {
     await normalizeAsset("input.png", "out.mp4", 5, 0, { ...BASE_OPTS });
     const args = lastCallArgs();
     const filter = vfFromArgs(args);
 
-    expect(args).not.toContain("-loop");
+    // Image input requires -loop 1 to repeat the single frame
+    expect(args).toContain("-loop");
+    expect(args).toContain("1");
     expect(filter).toContain(`d=${5 * BASE_OPTS.fps}`);
     expect(filter).toContain(`s=${BASE_OPTS.width}x${BASE_OPTS.height}`);
     expect(filter).toContain(`fps=${BASE_OPTS.fps}`);
@@ -83,8 +85,9 @@ describe("normalizeAsset Ken Burns (image)", () => {
     await normalizeAsset("input.png", "out.mp4", 4, 0, { ...BASE_OPTS });
     const filter = vfFromArgs(lastCallArgs());
 
+    // Scale up to 2x then crop via zoompan's s= parameter
     expect(filter).toContain("force_original_aspect_ratio=increase");
-    expect(filter).toContain(`crop=${BASE_OPTS.width}:${BASE_OPTS.height}`);
+    expect(filter).toContain(`s=${BASE_OPTS.width}x${BASE_OPTS.height}`);
     expect(filter).not.toContain("pad=");
     // fps appears exactly once — inside zoompan, not in the pre-filter.
     expect(filter.match(/fps=30/g)).toHaveLength(1);
@@ -96,6 +99,7 @@ describe("normalizeAsset Ken Burns (image)", () => {
 
     expect(filter).toContain("x='iw/2-(iw/zoom/2)'");
     expect(filter).toContain("y='ih/2-(ih/zoom/2)'");
+    // panVariant 0 (center) doesn't use progress/on in x/y
     expect(filter).not.toContain("(on/");
   });
 
@@ -105,14 +109,17 @@ describe("normalizeAsset Ken Burns (image)", () => {
       panVariant: 1,
     });
     const leftRight = vfFromArgs(lastCallArgs());
-    expect(leftRight).toContain("x='(iw-iw/zoom)*(on/120)'");
+    // Uses smoothstep progress: x = (iw-iw/zoom) * progress
+    expect(leftRight).toContain("x='(iw-iw/zoom)*");
+    expect(leftRight).toContain("pow("); // smoothstep uses pow
 
     await normalizeAsset("input.png", "out.mp4", 4, 0, {
       ...BASE_OPTS,
       panVariant: 2,
     });
     const rightLeft = vfFromArgs(lastCallArgs());
-    expect(rightLeft).toContain("x='(iw-iw/zoom)*(1-on/120)'");
+    expect(rightLeft).toContain("x='(iw-iw/zoom)*");
+    expect(rightLeft).toContain("pow(");
     expect(rightLeft).not.toBe(leftRight);
 
     await normalizeAsset("input.png", "out.mp4", 4, 0, {
@@ -120,7 +127,8 @@ describe("normalizeAsset Ken Burns (image)", () => {
       panVariant: 3,
     });
     const topBottom = vfFromArgs(lastCallArgs());
-    expect(topBottom).toContain("y='(ih-ih/zoom)*(on/120)'");
+    expect(topBottom).toContain("y='(ih-ih/zoom)*");
+    expect(topBottom).toContain("pow(");
 
     // Same variant is stable.
     await normalizeAsset("input.png", "out.mp4", 4, 0, {

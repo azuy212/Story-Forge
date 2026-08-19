@@ -83,8 +83,7 @@ function kenBurnsFilter(
   // Smoothstep interpolation gives the camera gentle acceleration/deceleration.
   const progress = `(3*pow(${t},2)-2*pow(${t},3))`;
 
-  const zoomExpr =
-    `1+(${opts.kenBurnsMaxZoom}-1)*${progress}`;
+  const zoomExpr = `1+(${opts.kenBurnsMaxZoom}-1)*${progress}`;
 
   const panX = pan.x.replaceAll("{progress}", progress);
   const panY = pan.y.replaceAll("{progress}", progress);
@@ -107,10 +106,7 @@ async function normalizeImage(
   const enc = opts.encoder;
 
   if (opts.kenBurnsEnabled) {
-    const totalFrames = Math.max(
-      2,
-      Math.round(durationSeconds * opts.fps),
-    );
+    const totalFrames = Math.max(2, Math.round(durationSeconds * opts.fps));
 
     const args = [
       "-y",

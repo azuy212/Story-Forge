@@ -13,7 +13,7 @@ import { DeterministicSceneSubtitleProvider } from "../providers/scene-subtitle-
 import { cacheNodeResult } from "../artifacts/cache.js";
 import { withTopic } from "../artifacts/context.js";
 import { logger } from "../utils/logger.js";
-import { nodeStart, nodeDone, nodeFailed } from "../utils/node-labels.js";
+import { nodeLabel } from "../utils/node-labels.js";
 
 const SUBTITLE_ALIGNMENT_VERSION = 3;
 
@@ -44,18 +44,17 @@ export async function subtitleGeneratorNode(
   const durationMs =
     combinedAudio?.durationMs ?? state.audio?.narrationDurationMs;
 
-  logger.info(nodeStart(AgentModel.SubtitleGenerator), {
-    scenes: scenes.length,
-  });
+  logger.nodeStart(nodeLabel(AgentModel.SubtitleGenerator));
 
   if (
     scenes.length === 0 ||
     audioScenes.length !== scenes.length ||
     !combinedAudio
   ) {
-    logger.warn(nodeFailed(AgentModel.SubtitleGenerator), {
-      error: "Complete scene audio manifest is required",
-    });
+    logger.nodeFailed(
+      nodeLabel(AgentModel.SubtitleGenerator),
+      "Complete scene audio manifest is required",
+    );
     return {
       subtitles: {},
       diagnostics: {
@@ -75,9 +74,10 @@ export async function subtitleGeneratorNode(
     productionIds.length !== audioIds.length ||
     productionIds.some((id, index) => id !== audioIds[index])
   ) {
-    logger.warn(nodeFailed(AgentModel.SubtitleGenerator), {
-      error: "Scene audio IDs do not match production scenes",
-    });
+    logger.nodeFailed(
+      nodeLabel(AgentModel.SubtitleGenerator),
+      "Scene audio IDs do not match production scenes",
+    );
     return {
       subtitles: {},
       diagnostics: {
@@ -90,9 +90,10 @@ export async function subtitleGeneratorNode(
   }
 
   if (!audioUrl || !durationMs) {
-    logger.warn(nodeFailed(AgentModel.SubtitleGenerator), {
-      error: "Audio URL or duration missing",
-    });
+    logger.nodeFailed(
+      nodeLabel(AgentModel.SubtitleGenerator),
+      "Audio URL or duration missing",
+    );
     return {
       subtitles: {},
       diagnostics: {
@@ -145,9 +146,7 @@ export async function subtitleGeneratorNode(
   );
 
   if (result.error) {
-    logger.warn(nodeFailed(AgentModel.SubtitleGenerator), {
-      error: result.error,
-    });
+    logger.nodeFailed(nodeLabel(AgentModel.SubtitleGenerator), result.error);
     return {
       subtitles: {},
       diagnostics: {
@@ -157,9 +156,7 @@ export async function subtitleGeneratorNode(
     };
   }
 
-  logger.info(nodeDone(AgentModel.SubtitleGenerator), {
-    scenes: scenes.length,
-  });
+  logger.nodeDone(nodeLabel(AgentModel.SubtitleGenerator), 0);
 
   return {
     subtitles: result.data ?? {},

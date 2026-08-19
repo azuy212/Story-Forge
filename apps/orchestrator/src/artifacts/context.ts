@@ -9,7 +9,9 @@ import { resolveRunNamespace, resolveUnnamedRun } from "./namespace.js";
 
 let _artifactStore: ArtifactStore | null = null;
 
-export function getArtifactStore(config?: RunnableConfig): ArtifactStore | null {
+export function getArtifactStore(
+  config?: RunnableConfig,
+): ArtifactStore | null {
   const cfg = config?.configurable as Record<string, unknown> | undefined;
   if (cfg?.artifactStore) return cfg.artifactStore as ArtifactStore;
   if (cfg?.artifactStore === null) return null;
@@ -30,7 +32,10 @@ export function resetArtifactStore(): void {
   _artifactStore = null;
 }
 
-export function getRunId(config?: RunnableConfig, state?: ProjectState): string | null {
+export function getRunId(
+  config?: RunnableConfig,
+  state?: ProjectState,
+): string | null {
   const cfg = config?.configurable as Record<string, unknown> | undefined;
   if (cfg?.runId && typeof cfg.runId === "string") return cfg.runId;
   if (cfg?.thread_id && typeof cfg.thread_id === "string") {
@@ -59,18 +64,24 @@ export function withTopic(
   };
 }
 
-export function ensureRunId(config?: RunnableConfig, state?: ProjectState): string {
+export function ensureRunId(
+  config?: RunnableConfig,
+  state?: ProjectState,
+): string {
   return getRunId(config, state) ?? randomUUID();
 }
 
-export function getArtifactNamespace(config?: RunnableConfig, state?: ProjectState): string {
+export function getArtifactNamespace(
+  config?: RunnableConfig,
+  state?: ProjectState,
+): string {
   return getRunId(config, state) ?? resolveUnnamedRun(state?.project?.topic);
 }
 
 export async function completeArtifact(
   config: RunnableConfig,
   nodeName: string,
-  state?: ProjectState
+  state?: ProjectState,
 ): Promise<void> {
   const store = getArtifactStore(config);
   if (!store) return;
@@ -90,7 +101,7 @@ export async function completeArtifact(
 export async function invalidateArtifact(
   config: RunnableConfig,
   nodeName: string,
-  state?: ProjectState
+  state?: ProjectState,
 ): Promise<void> {
   const store = getArtifactStore(config);
   if (!store) return;
@@ -114,7 +125,7 @@ export function isArtifactStoreEnabled(config?: RunnableConfig): boolean {
 export async function recordExecutionRefs(
   config: RunnableConfig,
   refs: ArtifactReference[],
-  state?: ProjectState
+  state?: ProjectState,
 ): Promise<void> {
   const store = getArtifactStore(config);
   if (!store) return;

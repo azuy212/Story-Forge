@@ -4,9 +4,8 @@ const mockExeca = jest.fn();
 
 jest.unstable_mockModule("execa", () => ({ execa: mockExeca }));
 
-const { runFfmpegWithRetry } = await import(
-  "../src/providers/composer/ffmpeg/ffmpeg.js"
-);
+const { runFfmpegWithRetry } =
+  await import("../src/providers/composer/ffmpeg/ffmpeg.js");
 
 function rejectedProcess(): any {
   const process = Promise.reject(new Error("ffmpeg failed")) as any;

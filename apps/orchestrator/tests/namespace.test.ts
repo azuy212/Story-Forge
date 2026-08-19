@@ -108,7 +108,11 @@ describe("resolveRunNamespace", () => {
   });
 
   it("writes run.json with threadId, topic, pillar on first claim", () => {
-    const name = resolveRunNamespace("thread-runmeta-1", "Test Topic", "Test Pillar");
+    const name = resolveRunNamespace(
+      "thread-runmeta-1",
+      "Test Topic",
+      "Test Pillar",
+    );
     const metaPath = join(dir, name, "run.json");
     expect(existsSync(metaPath)).toBe(true);
     const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
@@ -120,7 +124,11 @@ describe("resolveRunNamespace", () => {
   });
 
   it("does not duplicate threadHistory on re-claim by same thread", () => {
-    const name = resolveRunNamespace("thread-runmeta-2", "Test Topic", "Test Pillar");
+    const name = resolveRunNamespace(
+      "thread-runmeta-2",
+      "Test Topic",
+      "Test Pillar",
+    );
     const metaPath = join(dir, name, "run.json");
     let meta = JSON.parse(readFileSync(metaPath, "utf-8"));
     expect(meta.threadHistory).toEqual(["thread-runmeta-2"]);
@@ -132,7 +140,11 @@ describe("resolveRunNamespace", () => {
   });
 
   it("preserves run.json fields when same thread re-claims with different topic", () => {
-    const name = resolveRunNamespace("thread-runmeta-3", "Original Topic", "Original Pillar");
+    const name = resolveRunNamespace(
+      "thread-runmeta-3",
+      "Original Topic",
+      "Original Pillar",
+    );
     resetRunNamespaces();
     resolveRunNamespace("thread-runmeta-3", "Changed Topic", "Changed Pillar");
     const meta = JSON.parse(readFileSync(join(dir, name, "run.json"), "utf-8"));
