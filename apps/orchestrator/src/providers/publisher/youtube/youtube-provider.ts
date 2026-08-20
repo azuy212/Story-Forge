@@ -111,7 +111,12 @@ export class YouTubeProvider implements PublisherProvider {
       platformVideoId: videoId,
       url: `https://youtu.be/${videoId}`,
       status: buildResultStatus(request),
-      publishedAt: new Date().toISOString(),
+      // Only set when actually published: an upload that is scheduled (or
+      // still private) has no published timestamp yet.
+      publishedAt:
+        buildResultStatus(request) === "published"
+          ? new Date().toISOString()
+          : "",
     };
   }
 

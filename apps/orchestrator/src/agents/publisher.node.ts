@@ -8,6 +8,8 @@ import type {
 import { AgentModel } from "../types/index.js";
 import type { PublisherProvider } from "../providers/publisher/publisher-provider.js";
 import { publishForPlatforms } from "../providers/publisher/publisher-service.js";
+import { syncPublishResults } from "../integrations/google-sheets/sync.js";
+import type { SheetsValuesApi } from "../integrations/google-sheets/client.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
 import { withTopic } from "../artifacts/context.js";
 import type { SourceAsset } from "../schemas/production.js";
@@ -41,6 +43,13 @@ function getInjectedProvider(
 ): PublisherProvider | undefined {
   const inject = (config.configurable ?? {}) as Record<string, unknown>;
   return inject.publisherProvider as PublisherProvider | undefined;
+}
+
+function getInjectedSheetsApi(
+  config: RunnableConfig,
+): SheetsValuesApi | undefined {
+  const inject = (config.configurable ?? {}) as Record<string, unknown>;
+  return inject.sheetsApi as SheetsValuesApi | undefined;
 }
 
 export async function publisherNode(
@@ -166,6 +175,17 @@ export async function publisherNode(
     logger.nodeFailed(label, result.error);
   } else {
     logger.nodeDone(label, Date.now() - startedAt);
+  }
+
+  // Best-effort write-back of publish records to Google Sheets. Never throws
+  // and never fails the publish; the sync itself logs its own failures.
+  if (result.data) {
+    await syncPublishResults({
+      state,
+      results: result.data.results ?? [],
+      publishAt: publishAt ?? undefined,
+      api: getInjectedSheetsApi(config),
+    });
   }
 
   return {

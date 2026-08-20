@@ -102,4 +102,13 @@ export const config = {
       .map((id) => id.trim())
       .filter(Boolean);
   },
+  // --- Google Sheets sync ---
+  // Sync is opt-in: set the spreadsheet ID to enable writing publish records
+  // back to a sheet. Auth reuses the YouTube OAuth credentials and scopes.
+  googleSheetsSpreadsheetId: (): string | undefined => {
+    const value = read("GOOGLE_SHEETS_SPREADSHEET_ID");
+    return value && value.length > 0 ? value : undefined;
+  },
+  googleSheetsSheetName: (): string =>
+    read("GOOGLE_SHEETS_SHEET_NAME") || "Sheet1",
 };

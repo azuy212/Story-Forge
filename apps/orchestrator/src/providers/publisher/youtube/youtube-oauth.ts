@@ -17,6 +17,7 @@ export interface OAuthSetupConfig {
 export const YOUTUBE_UPLOAD_SCOPES = [
   "https://www.googleapis.com/auth/youtube.upload",
   "https://www.googleapis.com/auth/youtube",
+  "https://www.googleapis.com/auth/spreadsheets",
 ];
 
 export function buildConsentUrl(config: OAuthSetupConfig): string {

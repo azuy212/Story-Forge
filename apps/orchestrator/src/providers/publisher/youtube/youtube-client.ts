@@ -1,9 +1,11 @@
 import { google } from "googleapis";
+import { createGoogleOAuthClient } from "../../google/google-oauth.js";
 
 /**
- * The only file that imports googleapis. Everything above this layer deals
- * with domain objects. The interface is intentionally loose so tests can
- * inject a fake client without jest.mock.
+ * The only files that import googleapis are this one and the shared OAuth
+ * factory. Everything above this layer deals with domain objects. The
+ * interface is intentionally loose so tests can inject a fake client without
+ * jest.mock.
  */
 
 export interface YouTubeVideoInsertResult {
@@ -29,15 +31,15 @@ export interface YouTubeClientConfig {
 }
 
 export function createYouTubeApi(config: YouTubeClientConfig): YouTubeApi {
-  const oauth2Client = new google.auth.OAuth2(
-    config.clientId,
-    config.clientSecret,
-  );
-  oauth2Client.setCredentials({ refresh_token: config.refreshToken });
+  const auth = createGoogleOAuthClient({
+    clientId: config.clientId,
+    clientSecret: config.clientSecret,
+    refreshToken: config.refreshToken,
+  });
 
   return google.youtube({
     version: "v3",
-    auth: oauth2Client,
+    auth,
   }) as unknown as YouTubeApi;
 }
 

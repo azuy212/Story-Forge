@@ -226,4 +226,56 @@ describe("publisherNode", () => {
       expect.objectContaining({ platform: "youtube" }),
     );
   });
+
+  it("sheets sync failure does not fail the publish", async () => {
+    mockPublish.mockResolvedValueOnce(buildPublishResponse("youtube"));
+    const sheetsApi = {
+      get: jest
+        .fn<() => Promise<any>>()
+        .mockRejectedValueOnce(new Error("Sheets 500")),
+    };
+
+    const previous = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+    process.env.GOOGLE_SHEETS_SPREADSHEET_ID = "spreadsheet-test";
+    try {
+      const result = await publisherNode(
+        {
+          project: { pillar: "Geography", topic: "Test", projectId: "v-123" },
+          video: {
+            videoUrl: "https://example.com/video.mp4",
+            durationMs: 3000,
+            resolution: "1080x1920",
+            composedAt: "2026-01-01T00:00:00.000Z",
+          },
+          metadataOutput: {
+            title: "Test Title",
+            description: "Test description.",
+            tags: ["geo"],
+            hashtags: ["#geo"],
+            category: "Education",
+            pinnedComment: "Comment",
+          },
+          thumbnail: {
+            imageUrl: "https://placeholder.local/thumbnail.png",
+          },
+          branding: { channel: "TestChannel", creator: "", cta: "" },
+          execution: { version: "0.1.0" },
+        } as ProjectState,
+        {
+          configurable: { publisherProvider: makeMockProvider(), sheetsApi },
+        } as any,
+      );
+
+      expect(result.publishing?.results).toHaveLength(1);
+      expect(result.publishing?.results![0].status).toBe("published");
+      expect(result.diagnostics?.errors).toBeUndefined();
+      expect(sheetsApi.get).toHaveBeenCalled();
+    } finally {
+      if (previous === undefined) {
+        delete process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+      } else {
+        process.env.GOOGLE_SHEETS_SPREADSHEET_ID = previous;
+      }
+    }
+  });
 });

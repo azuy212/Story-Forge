@@ -128,7 +128,7 @@ async function fetchJson(url, options = {}) {
   return res.json();
 }
 
-async function getAssistantId() {
+export async function getAssistantId() {
   const assistants = await fetchJson(`${DEV_API}/assistants/search`, {
     method: "POST",
     body: "{}",
@@ -138,7 +138,7 @@ async function getAssistantId() {
   return agent.assistant_id;
 }
 
-async function createThread() {
+export async function createThread() {
   const res = await fetch(`${DEV_API}/threads`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -384,11 +384,18 @@ export async function resumeRun(
   { pillar, topic },
   {
     assistantId = "",
+    projectId = "",
+    youtubePublishAt = "",
     createThread: createThreadImpl = createThread,
     runStream: runStreamImpl = runStream,
     drainStream: drainStreamImpl = drainStream,
     recordThread = async (threadId) => {
-      createOrAppendRunMeta(RUNS_DIR, ns, { threadId, topic, pillar });
+      createOrAppendRunMeta(RUNS_DIR, ns, {
+        threadId,
+        topic,
+        pillar,
+        ...(projectId ? { projectId } : {}),
+      });
     },
   } = {},
 ) {
@@ -400,7 +407,16 @@ export async function resumeRun(
   // so threadHistory is an audit trail of resume attempts.
   await recordThread(threadId);
 
-  const input = { project: { pillar, topic } };
+  const input = {
+    project: {
+      pillar,
+      topic,
+      // projectId ties the Sheet row to the run; youtubePublishAt is only
+      // seeded for a brand-new backlog run and never on resume.
+      ...(projectId ? { projectId } : {}),
+      ...(youtubePublishAt ? { youtubePublishAt } : {}),
+    },
+  };
   console.log(`  Starting run...`);
   const stream = await runStreamImpl(threadId, assistantId, input, ns);
   const { lastEvent } = await drainStreamImpl(stream);
