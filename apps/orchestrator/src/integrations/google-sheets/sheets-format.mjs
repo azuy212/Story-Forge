@@ -125,10 +125,6 @@ function padNumber(n) {
   return String(n).padStart(2, "0");
 }
 
-function padNumber(n) {
-  return String(n).padStart(2, "0");
-}
-
 /**
  * Render a duration in milliseconds as `H:MM:SS` (e.g. `0:01:14`). Empty
  * string when the duration is absent or non-positive.
