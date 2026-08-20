@@ -327,6 +327,7 @@ export async function releaseValidationNode(
   diagnostics: Partial<Diagnostics>;
   execution: Partial<Execution>;
 }> {
+  const startedAt = Date.now();
   const label = nodeLabel(AgentModel.ReleaseValidation);
   logger.nodeStart(label);
 
@@ -350,7 +351,7 @@ export async function releaseValidationNode(
   if (result.status === "fatal") {
     logger.nodeFailed(label, `${result.issues?.length ?? 0} issues`);
   } else {
-    logger.nodeDone(label, 0);
+    logger.nodeDone(label, Date.now() - startedAt);
   }
 
   return {

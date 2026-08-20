@@ -58,6 +58,7 @@ export async function assetStrategyNode(
   diagnostics: Partial<Diagnostics>;
   execution: Partial<Execution>;
 }> {
+  const startedAt = Date.now();
   const scenes = state.production?.scenes ?? [];
   const label = nodeLabel(AgentModel.AssetStrategy);
   logger.nodeStart(label);
@@ -135,7 +136,7 @@ export async function assetStrategyNode(
     };
   });
 
-  logger.nodeDone(nodeLabel(AgentModel.AssetStrategy), 0);
+  logger.nodeDone(label, Date.now() - startedAt);
 
   return {
     production: { scenes: resolvedScenes, sourceAssets: [...byId.values()] },

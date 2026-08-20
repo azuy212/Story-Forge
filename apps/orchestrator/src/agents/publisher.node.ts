@@ -51,6 +51,7 @@ export async function publisherNode(
   diagnostics: Partial<Diagnostics>;
   execution: Partial<Execution>;
 }> {
+  const startedAt = Date.now();
   const videoPath = state.video?.videoUrl;
   const title = state.metadataOutput?.title;
   const description = `${state.metadataOutput?.description ?? ""}${sourceCredits(state)}`;
@@ -76,10 +77,7 @@ export async function publisherNode(
   }
 
   if (!title) {
-    logger.nodeFailed(
-      nodeLabel(AgentModel.Publisher),
-      "metadata title is missing",
-    );
+    logger.nodeFailed(label, "metadata title is missing");
     return {
       publishing: { results: [] },
       diagnostics: {
@@ -92,10 +90,7 @@ export async function publisherNode(
   const publishAt = configUtils.youtubePublishAt(state);
   const privacyStatus = configUtils.youtubePrivacyStatus();
   if (publishAt && privacyStatus !== "private") {
-    logger.nodeFailed(
-      nodeLabel(AgentModel.Publisher),
-      'publishAt requires privacyStatus "private"',
-    );
+    logger.nodeFailed(label, 'publishAt requires privacyStatus "private"');
     return {
       publishing: { results: [] },
       diagnostics: {
@@ -170,7 +165,7 @@ export async function publisherNode(
   if (result.error) {
     logger.nodeFailed(label, result.error);
   } else {
-    logger.nodeDone(label, 0);
+    logger.nodeDone(label, Date.now() - startedAt);
   }
 
   return {

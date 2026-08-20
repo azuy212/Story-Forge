@@ -65,6 +65,7 @@ export async function imagePromptRepairNode(
   diagnostics: Partial<Diagnostics>;
   execution: Partial<Execution>;
 }> {
+  const startedAt = Date.now();
   const scenes = state.production?.scenes ?? [];
   const inject = (config.configurable ?? {}) as AgentInject;
 
@@ -199,7 +200,7 @@ export async function imagePromptRepairNode(
     });
   }
 
-  logger.nodeDone(label, 0);
+  logger.nodeDone(label, Date.now() - startedAt);
 
   return {
     production: { scenes: repaired },

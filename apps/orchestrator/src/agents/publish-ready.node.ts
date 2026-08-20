@@ -45,7 +45,9 @@ export async function publishReadyNode(state: ProjectState): Promise<{
   execution: Partial<Execution>;
   diagnostics: Partial<Diagnostics>;
 }> {
-  logger.nodeStart(nodeLabel(PUBLISH_READY));
+  const startedAt = Date.now();
+  const label = nodeLabel(PUBLISH_READY);
+  logger.nodeStart(label);
 
   if (!hasPackage(state)) {
     logger.nodeSkipped(
@@ -124,7 +126,7 @@ export async function publishReadyNode(state: ProjectState): Promise<{
 
   if (problems.length > 0) {
     const reason = problems.join("; ");
-    logger.nodeFailed(nodeLabel(PUBLISH_READY), reason);
+    logger.nodeFailed(label, reason);
     return {
       publishReady: { status: "blocked", issues: problems },
       execution: { currentNode: PUBLISH_READY },
@@ -134,7 +136,7 @@ export async function publishReadyNode(state: ProjectState): Promise<{
     };
   }
 
-  logger.nodeDone(nodeLabel(PUBLISH_READY), 0);
+  logger.nodeDone(label, Date.now() - startedAt);
 
   return {
     publishReady: { status: "ready", issues: [] },

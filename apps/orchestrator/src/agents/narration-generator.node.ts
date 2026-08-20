@@ -110,6 +110,7 @@ export async function narrationGeneratorNode(
   diagnostics: Partial<Diagnostics>;
   execution: Partial<Execution>;
 }> {
+  const startedAt = Date.now();
   const input = validScenes(state.production?.scenes ?? []);
   const label = nodeLabel(AgentModel.NarrationGenerator);
   logger.nodeStart(label);
@@ -230,10 +231,7 @@ export async function narrationGeneratorNode(
     .sort((a, b) => a.sceneId - b.sceneId);
 
   if (failed.length > 0) {
-    logger.nodeFailed(
-      nodeLabel(AgentModel.NarrationGenerator),
-      `${failed.length}/${scenes.length} scenes failed`,
-    );
+    logger.nodeFailed(label, `${failed.length}/${scenes.length} scenes failed`);
     return {
       audio: {
         version: 2,
@@ -325,10 +323,7 @@ export async function narrationGeneratorNode(
   );
 
   if (combined.error || !combined.data) {
-    logger.nodeFailed(
-      nodeLabel(AgentModel.NarrationGenerator),
-      combined.error ?? "Combined narration is missing",
-    );
+    logger.nodeFailed(label, combined.error ?? "Combined narration is missing");
     return {
       audio: { version: 2, scenes: successfulScenes, voice },
       diagnostics: {
@@ -341,7 +336,7 @@ export async function narrationGeneratorNode(
     };
   }
 
-  logger.nodeDone(label, 0);
+  logger.nodeDone(label, Date.now() - startedAt);
 
   return {
     audio: {

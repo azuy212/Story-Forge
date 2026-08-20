@@ -187,6 +187,7 @@ export async function videoComposerNode(
   diagnostics: Partial<Diagnostics>;
   execution: Partial<Execution>;
 }> {
+  const startedAt = Date.now();
   const errors = collectErrors(state);
   const label = nodeLabel(AgentModel.VideoComposer);
   logger.nodeStart(label);
@@ -216,10 +217,7 @@ export async function videoComposerNode(
       state.audio?.scenes ?? [],
     );
   } catch (err) {
-    logger.nodeFailed(
-      nodeLabel(AgentModel.VideoComposer),
-      (err as Error)?.message ?? String(err),
-    );
+    logger.nodeFailed(label, (err as Error)?.message ?? String(err));
     return {
       production: {},
       video: {},
@@ -324,7 +322,7 @@ export async function videoComposerNode(
     };
   }
 
-  logger.nodeDone(label, 0);
+  logger.nodeDone(label, Date.now() - startedAt);
 
   return {
     production: {

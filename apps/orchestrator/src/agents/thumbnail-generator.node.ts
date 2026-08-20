@@ -138,6 +138,7 @@ export async function thumbnailGeneratorNode(
   diagnostics: Partial<Diagnostics>;
   execution: Partial<Execution>;
 }> {
+  const startedAt = Date.now();
   const inject = (config.configurable ?? {}) as AgentInject;
 
   const title = state.content?.title;
@@ -315,7 +316,7 @@ export async function thumbnailGeneratorNode(
         execution: { currentNode: AgentModel.ThumbnailGenerator },
       };
     }
-    logger.nodeDone(label, 0);
+    logger.nodeDone(label, Date.now() - startedAt);
     return buildSuccess(
       imageResult.data,
       output,
@@ -352,7 +353,7 @@ export async function thumbnailGeneratorNode(
         execution: { currentNode: AgentModel.ThumbnailGenerator },
       };
     }
-    logger.nodeDone(label, 0);
+    logger.nodeDone(label, Date.now() - startedAt);
     return buildSuccess(
       fullResult.data,
       output,
@@ -388,7 +389,7 @@ export async function thumbnailGeneratorNode(
   );
 
   if (cached.fromCache) {
-    logger.nodeDone(label, 0);
+    logger.nodeDone(label, Date.now() - startedAt);
     return buildSuccess(
       cached.data!,
       output,
@@ -444,7 +445,7 @@ export async function thumbnailGeneratorNode(
   if (qa?.status === "pass") {
     // Pending render now verified - make it servable from cache.
     await completeArtifactForNode(config, "ThumbnailCompositor", state);
-    logger.nodeDone(label, 0);
+    logger.nodeDone(label, Date.now() - startedAt);
     return buildSuccess(
       cached.data,
       output,
@@ -505,7 +506,7 @@ export async function thumbnailGeneratorNode(
     textPosition,
     result.telemetry,
   );
-  logger.nodeDone(label, 0);
+  logger.nodeDone(label, Date.now() - startedAt);
   return result2;
 }
 

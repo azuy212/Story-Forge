@@ -441,6 +441,7 @@ export async function assetGeneratorNode(
   diagnostics: Partial<Diagnostics>;
   execution: Partial<Execution>;
 }> {
+  const startedAt = Date.now();
   const scenes = state.production?.scenes ?? [];
   const sourceAssets = state.production?.sourceAssets ?? [];
   const provider = getAssetProvider(config);
@@ -557,7 +558,7 @@ export async function assetGeneratorNode(
   );
 
   if (fatalError) {
-    logger.nodeFailed(nodeLabel(AgentModel.AssetGenerator), fatalError);
+    logger.nodeFailed(label, fatalError);
     const fatalArtifact: AssetArtifact = computedArtifact ?? {
       scenes: plannedScenes,
       sourceAssets,
@@ -604,7 +605,7 @@ export async function assetGeneratorNode(
       `${unresolved}/${artifact.scenes.length} unresolved`,
     );
   } else {
-    logger.nodeDone(label, 0);
+    logger.nodeDone(label, Date.now() - startedAt);
   }
 
   return {

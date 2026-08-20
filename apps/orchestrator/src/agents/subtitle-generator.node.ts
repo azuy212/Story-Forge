@@ -36,6 +36,7 @@ export async function subtitleGeneratorNode(
   diagnostics: Partial<Diagnostics>;
   execution: Partial<Execution>;
 }> {
+  const startedAt = Date.now();
   const scenes = state.production?.scenes ?? [];
   const audioScenes = state.audio?.scenes ?? [];
   const combinedAudio = state.audio?.combinedAudio;
@@ -159,7 +160,7 @@ export async function subtitleGeneratorNode(
     };
   }
 
-  logger.nodeDone(label, 0);
+  logger.nodeDone(label, Date.now() - startedAt);
 
   return {
     subtitles: result.data ?? {},
