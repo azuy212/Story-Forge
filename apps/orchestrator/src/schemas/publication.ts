@@ -27,7 +27,6 @@ export const PublicationArtifactSchema = z.object({
   platform: z.string(),
   status: PublicationStatusSchema,
   videoId: z.string().optional(),
-  thumbnailUploaded: z.boolean().optional(),
   playlistIds: z.array(z.string()).optional(),
   publishAt: z.string().optional(),
   error: PublicationErrorSchema.optional(),

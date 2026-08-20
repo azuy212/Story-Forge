@@ -53,7 +53,7 @@ function makeApi(): FakeApi {
 
 function makeProvider(
   api: FakeApi,
-  overrides: { maxUploadRetries?: number; maxThumbnailRetries?: number } = {},
+  overrides: { maxUploadRetries?: number; maxPlaylistRetries?: number } = {},
 ): YouTubeProvider {
   return new YouTubeProvider({
     api: api as unknown as YouTubeApi,
@@ -79,15 +79,13 @@ function baseRequest(overrides: Partial<PublishRequest> = {}): PublishRequest {
 }
 
 describe("YouTubeProvider", () => {
-  it("uploads, sets thumbnail, and reports the video id", async () => {
+  it("uploads the video and reports the video id", async () => {
     const api = makeApi();
     const provider = makeProvider(api);
     const onUploaded = jest.fn<(...args: any[]) => Promise<void>>();
-    const onThumbnailUploaded = jest.fn<(...args: any[]) => Promise<void>>();
 
     const result = await provider.publish(baseRequest(), {
       onUploaded,
-      onThumbnailUploaded,
     });
 
     expect(api.videos.insert).toHaveBeenCalledTimes(1);
@@ -97,8 +95,7 @@ describe("YouTubeProvider", () => {
     expect(params.requestBody.status.selfDeclaredMadeForKids).toBe(false);
     expect(params.requestBody.snippet.categoryId).toBe("27");
     expect(onUploaded).toHaveBeenCalledWith("abc123");
-    expect(api.thumbnails.set).toHaveBeenCalledTimes(1);
-    expect(onThumbnailUploaded).toHaveBeenCalledWith("abc123");
+    expect(api.thumbnails.set).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       platform: "youtube",
       platformVideoId: "abc123",
@@ -173,63 +170,17 @@ describe("YouTubeProvider", () => {
     expect(onUploaded).not.toHaveBeenCalled();
   });
 
-  it("retries a brief thumbnail 404 (processing race) then succeeds", async () => {
-    const api = makeApi();
-    api.thumbnails.set
-      .mockRejectedValueOnce({ code: 404, message: "not ready yet" })
-      .mockResolvedValueOnce({ data: {} });
-    const provider = makeProvider(api, { maxThumbnailRetries: 2 });
-    const onThumbnailUploaded = jest.fn<(...args: any[]) => Promise<void>>();
-
-    const result = await provider.publish(baseRequest(), {
-      onThumbnailUploaded,
-    });
-
-    expect(api.thumbnails.set).toHaveBeenCalledTimes(2);
-    expect(result.platformVideoId).toBe("abc123");
-    expect(onThumbnailUploaded).toHaveBeenCalledWith("abc123");
-  });
-
-  it("treats a permanent thumbnail failure as failed finalization", async () => {
-    const api = makeApi();
-    api.thumbnails.set.mockRejectedValue({
-      code: 400,
-      message: "invalidImage",
-    });
-    const provider = makeProvider(api);
-
-    await expect(provider.publish(baseRequest())).rejects.toThrow(PublishError);
-    // Upload succeeded (onUploaded boundary) but finalization failed.
-    expect(api.videos.insert).toHaveBeenCalledTimes(1);
-  });
-
-  it("resume skips upload and completed steps", async () => {
+  it("resume skips upload and playlist work for a completed video", async () => {
     const api = makeApi();
     const provider = makeProvider(api);
 
     const result = await provider.resume({
       ...baseRequest(),
       videoId: "abc123",
-      thumbnailUploaded: true,
     });
 
     expect(api.videos.insert).not.toHaveBeenCalled();
     expect(api.thumbnails.set).not.toHaveBeenCalled();
-    expect(result.platformVideoId).toBe("abc123");
-  });
-
-  it("resume re-attempts thumbnail when it was not yet uploaded", async () => {
-    const api = makeApi();
-    const provider = makeProvider(api);
-
-    const result = await provider.resume({
-      ...baseRequest(),
-      videoId: "abc123",
-      thumbnailUploaded: false,
-    });
-
-    expect(api.videos.insert).not.toHaveBeenCalled();
-    expect(api.thumbnails.set).toHaveBeenCalledTimes(1);
     expect(result.platformVideoId).toBe("abc123");
   });
 
@@ -244,16 +195,5 @@ describe("YouTubeProvider", () => {
       provider.publish(baseRequest({ videoPath: join(dir, "missing.mp4") })),
     ).rejects.toThrow(PublishError);
     expect(api.videos.insert).not.toHaveBeenCalled();
-  });
-
-  it("rejects remote thumbnail sources", async () => {
-    const api = makeApi();
-    const provider = makeProvider(api);
-
-    await expect(
-      provider.publish(
-        baseRequest({ thumbnailPath: "https://example.com/t.png" }),
-      ),
-    ).rejects.toThrow(PublishError);
   });
 });

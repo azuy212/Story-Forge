@@ -89,12 +89,6 @@ async function publishToProvider(opts: {
         error: undefined,
       });
     },
-    onThumbnailUploaded: async () => {
-      await updatePublication(store, runId, publicationId, request, {
-        thumbnailUploaded: true,
-        error: undefined,
-      });
-    },
   };
 
   try {
@@ -114,7 +108,6 @@ async function publishToProvider(opts: {
             {
               ...request,
               videoId: existing.videoId,
-              thumbnailUploaded: existing.thumbnailUploaded,
             },
             options,
           )
@@ -142,7 +135,7 @@ async function publishToProvider(opts: {
     });
     return result;
   } catch (err) {
-    // Thumbnail/playlist failures land here AFTER onUploaded persisted the
+    // Playlist/finalize failures land here AFTER onUploaded persisted the
     // videoId, so a retry resumes rather than re-uploading (fail-closed:
     // the publication is marked failed, never silently partial).
     const existing = (await loadPublications(store, runId))[publicationId];

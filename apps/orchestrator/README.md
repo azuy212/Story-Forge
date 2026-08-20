@@ -39,7 +39,7 @@ MetadataGenerator    — LLM: YouTube title, description, tags, hashtags, catego
   ↓
 ThumbnailGenerator   — LLM + provider: thumbnail prompt strategy + image generation
   ↓
-Publisher            — provider: upload to YouTube (and other platforms) with metadata + thumbnail
+Publisher            — provider: upload to YouTube (and other platforms) with metadata (YouTube auto-picks the Shorts frame; custom thumbnails aren't uploaded)
   ↓
 END
 ```

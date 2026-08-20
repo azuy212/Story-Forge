@@ -17,9 +17,6 @@ export interface YouTubeApi {
       options?: { onUploadProgress?: (progress: unknown) => void },
     ): Promise<YouTubeVideoInsertResult>;
   };
-  thumbnails: {
-    set(params: Record<string, unknown>): Promise<{ data: unknown }>;
-  };
   playlistItems: {
     insert(params: Record<string, unknown>): Promise<{ data: unknown }>;
   };

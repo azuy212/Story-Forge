@@ -19,13 +19,12 @@ export interface YouTubeProviderOptions {
   /** Explicit numeric category override; falls back to label mapping. */
   categoryId?: string;
   maxUploadRetries?: number;
-  maxThumbnailRetries?: number;
+  maxPlaylistRetries?: number;
 }
 
 const DEFAULT_MAX_UPLOAD_RETRIES = 3;
-const DEFAULT_MAX_THUMBNAIL_RETRIES = 3;
+const DEFAULT_MAX_PLAYLIST_RETRIES = 3;
 const BACKOFF_BASE_MS = 1000;
-const THUMBNAIL_MIME = "image/png";
 const VIDEO_MIME = "video/mp4";
 
 function isHttpUrl(path: string): boolean {
@@ -77,15 +76,15 @@ export class YouTubeProvider implements PublisherProvider {
   private readonly api: YouTubeApi;
   private readonly categoryId?: string;
   private readonly maxUploadRetries: number;
-  private readonly maxThumbnailRetries: number;
+  private readonly maxPlaylistRetries: number;
 
   constructor(options: YouTubeProviderOptions) {
     this.api = options.api;
     this.categoryId = options.categoryId;
     this.maxUploadRetries =
       options.maxUploadRetries ?? DEFAULT_MAX_UPLOAD_RETRIES;
-    this.maxThumbnailRetries =
-      options.maxThumbnailRetries ?? DEFAULT_MAX_THUMBNAIL_RETRIES;
+    this.maxPlaylistRetries =
+      options.maxPlaylistRetries ?? DEFAULT_MAX_PLAYLIST_RETRIES;
   }
 
   async publish(
@@ -95,17 +94,14 @@ export class YouTubeProvider implements PublisherProvider {
     await this.validateVideoFile(request);
 
     const videoId = await this.uploadVideo(request, options);
-    await this.finalize(request, { ...request, videoId }, options);
+    await this.finalize(request, { ...request, videoId });
 
     return this.buildResult(request, videoId);
   }
 
-  async resume(
-    request: ResumePublishRequest,
-    options?: PublishCallOptions,
-  ): Promise<PublishResult> {
+  async resume(request: ResumePublishRequest): Promise<PublishResult> {
     await this.validateVideoFile(request);
-    await this.finalize(request, request, options);
+    await this.finalize(request, request);
     return this.buildResult(request, request.videoId);
   }
 
@@ -123,7 +119,7 @@ export class YouTubeProvider implements PublisherProvider {
    * Resumable videos.insert. googleapis owns the resumable session within a
    * single attempt; transient failures recreate the stream and start a fresh
    * session. `onUploaded` fires immediately on the confirmed videoId — the
-   * idempotency boundary before any thumbnail/playlist work.
+   * idempotency boundary before any playlist work.
    */
   private async uploadVideo(
     request: PublishRequest,
@@ -167,21 +163,17 @@ export class YouTubeProvider implements PublisherProvider {
   }
 
   /**
-   * Thumbnail + playlist + metadata finalization. Shared by fresh uploads and
-   * resumed publications, which skip steps the persisted artifact already
-   * records as done.
+   * Playlist finalization. Custom thumbnails are intentionally not uploaded:
+   * thumbnails.set returns 200 for Shorts but YouTube silently discards the
+   * image (issuetracker.google.com/issues/381127084), so let YouTube pick a
+   * frame instead.
    */
   private async finalize(
     request: PublishRequest,
-    current: { videoId: string; thumbnailUploaded?: boolean },
-    options?: PublishCallOptions,
+    current: { videoId: string },
   ): Promise<void> {
-    if (request.thumbnailPath && !current.thumbnailUploaded) {
-      await this.uploadThumbnail(request, current.videoId, options);
-    }
-
     for (const playlistId of request.playlistIds ?? []) {
-      await retryStep(this.maxThumbnailRetries, async () => {
+      await retryStep(this.maxPlaylistRetries, async () => {
         await this.api.playlistItems.insert({
           part: ["snippet"],
           requestBody: {
@@ -193,42 +185,6 @@ export class YouTubeProvider implements PublisherProvider {
         });
       });
     }
-  }
-
-  private async uploadThumbnail(
-    request: PublishRequest,
-    videoId: string,
-    options?: PublishCallOptions,
-  ): Promise<void> {
-    const thumbnailPath = request.thumbnailPath;
-    if (!thumbnailPath) return;
-    if (isHttpUrl(thumbnailPath)) {
-      throw new PublishError({
-        code: "invalid_thumbnail",
-        message: `Remote thumbnail sources are not supported: ${thumbnailPath}`,
-        retryable: false,
-      });
-    }
-
-    await retryStep(this.maxThumbnailRetries, async () => {
-      // A newly created video may not be ready for thumbnails.set yet;
-      // 404s are retried briefly, permanent image/auth errors are not.
-      try {
-        await this.api.thumbnails.set({
-          videoId,
-          media: {
-            body: createReadStream(thumbnailPath),
-            mimeType: THUMBNAIL_MIME,
-          },
-          uploadType: "media",
-        });
-      } catch (err) {
-        const info = mapYouTubeError(err, { retryOnNotFound: true });
-        throw new PublishError(info);
-      }
-    });
-
-    await options?.onThumbnailUploaded?.(videoId);
   }
 
   private async validateVideoFile(request: PublishRequest): Promise<void> {

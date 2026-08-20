@@ -30,24 +30,21 @@ export interface PublishRequest {
 
 /**
  * Resume an interrupted publication instead of publishing a new artifact.
- * `videoId` is the already-confirmed platform resource; thumbnail/playlist
- * work is skipped based on the flags the provider persisted via call hooks.
+ * `videoId` is the already-confirmed platform resource; playlist work is
+ * skipped based on the state the provider persisted via call hooks.
  */
 export interface ResumePublishRequest extends PublishRequest {
   videoId: string;
-  thumbnailUploaded?: boolean;
 }
 
 export interface PublishCallOptions {
   /**
    * Fired immediately after the platform confirms the uploaded artifact
-   * (returns its ID), before any thumbnail/playlist/finalize work. This is
-   * the idempotency boundary — the caller persists the ID here so a retry
+   * (returns its ID), before any playlist/finalize work. This is the
+   * idempotency boundary — the caller persists the ID here so a retry
    * resumes rather than re-uploading.
    */
   onUploaded?: (platformVideoId: string) => Promise<void> | void;
-  /** Fired after a thumbnail was successfully set for the video. */
-  onThumbnailUploaded?: (platformVideoId: string) => Promise<void> | void;
 }
 
 export interface PublishResult {

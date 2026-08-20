@@ -137,34 +137,6 @@ describe("publishForPlatforms", () => {
     const artifact = record?.data?.[`${runId}:youtube`];
     expect(artifact?.status).toBe("published");
     expect(artifact?.videoId).toBe("vid1");
-    expect(artifact?.thumbnailUploaded).toBeUndefined();
-  });
-
-  it("records thumbnailUploaded when the provider reports it", async () => {
-    const publish = jest
-      .fn<(...args: unknown[]) => Promise<unknown>>()
-      .mockImplementation(async (_request: unknown, options: unknown) => {
-        const opts = options as {
-          onThumbnailUploaded?: (id: string) => Promise<void>;
-        };
-        await opts.onThumbnailUploaded?.("vid1");
-        return makeResult("youtube", "vid1");
-      });
-    const provider: PublisherProvider = { publish: publish as never };
-
-    await publishForPlatforms({
-      config: makeConfig(),
-      state,
-      platforms: ["youtube"],
-      request: baseRequest(),
-      injectedProvider: provider,
-    });
-
-    const record = await store.latest<Record<string, PublicationArtifact>>(
-      runId,
-      "publication",
-    );
-    expect(record?.data?.[`${runId}:youtube`]?.thumbnailUploaded).toBe(true);
   });
 
   it("resumes an interrupted publication via provider.resume", async () => {
@@ -201,7 +173,6 @@ describe("publishForPlatforms", () => {
     expect(resume).toHaveBeenCalledWith(
       expect.objectContaining({
         videoId: "abc123",
-        thumbnailUploaded: undefined,
       }),
       expect.any(Object),
     );

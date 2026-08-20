@@ -62,16 +62,10 @@ describe("mapYouTubeError", () => {
     });
   });
 
-  it("treats 404 as non-retryable by default but retryable for follow-up ops", () => {
+  it("treats 404 as non-retryable", () => {
     expect(mapYouTubeError({ code: 404 })).toMatchObject({
       code: "not_found",
       retryable: false,
-    });
-    expect(
-      mapYouTubeError({ code: 404 }, { retryOnNotFound: true }),
-    ).toMatchObject({
-      code: "not_found",
-      retryable: true,
     });
   });
 

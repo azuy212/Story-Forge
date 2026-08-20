@@ -25,13 +25,9 @@ function isNetworkError(e: { code?: string | number }): boolean {
 
 /**
  * Classify an unknown failure thrown by googleapis. Upload context defaults to
- * strict retryability; thumbnail/playlist callers override the 404 case
- * through `retryOnNotFound`.
+ * strict retryability; 4xx responses are permanent.
  */
-export function mapYouTubeError(
-  err: unknown,
-  options?: { retryOnNotFound?: boolean },
-): PublishErrorInfo {
+export function mapYouTubeError(err: unknown): PublishErrorInfo {
   const e = (err ?? {}) as {
     code?: number | string;
     message?: string;
@@ -67,9 +63,7 @@ export function mapYouTubeError(
     return {
       code: "not_found",
       message,
-      // A freshly uploaded video may not be ready for follow-up operations
-      // yet; brief retries cover the race. Everything else 404s permanently.
-      retryable: options?.retryOnNotFound === true,
+      retryable: false,
     };
   }
   if (e.code === 400) {
