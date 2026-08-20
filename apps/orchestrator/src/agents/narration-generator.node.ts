@@ -111,12 +111,10 @@ export async function narrationGeneratorNode(
   execution: Partial<Execution>;
 }> {
   const input = validScenes(state.production?.scenes ?? []);
-  logger.nodeStart(nodeLabel(AgentModel.NarrationGenerator));
+  const label = nodeLabel(AgentModel.NarrationGenerator);
+  logger.nodeStart(label);
   if (input.scenes.length === 0) {
-    logger.nodeFailed(
-      nodeLabel(AgentModel.NarrationGenerator),
-      "No production scenes found",
-    );
+    logger.nodeFailed(label, "No production scenes found");
     return {
       audio: {},
       diagnostics: {
@@ -128,13 +126,15 @@ export async function narrationGeneratorNode(
     };
   }
   if (input.error) {
-    logger.nodeFailed(nodeLabel(AgentModel.NarrationGenerator), input.error);
+    logger.nodeFailed(label, input.error);
     return {
       audio: {},
       diagnostics: { errors: [input.error] },
       execution: { currentNode: AgentModel.NarrationGenerator },
     };
   }
+
+  logger.nodePhase(label, "generating voice audio");
 
   const scenes = input.scenes;
   const voice = state.branding?.voice ?? DEFAULT_VOICE;
@@ -272,6 +272,8 @@ export async function narrationGeneratorNode(
   const outputPath = path.resolve("generated", "audio", runId, "narration.wav");
   const concatenator = getAudioConcatenator(config);
 
+  logger.nodePhase(label, "normalizing audio");
+
   const combined = await cacheNodeResult<Audio>(
     {
       type: "audio",
@@ -339,7 +341,7 @@ export async function narrationGeneratorNode(
     };
   }
 
-  logger.nodeDone(nodeLabel(AgentModel.NarrationGenerator), 0);
+  logger.nodeDone(label, 0);
 
   return {
     audio: {

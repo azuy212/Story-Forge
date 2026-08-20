@@ -13,6 +13,7 @@ import { PromptPaths } from "../models/prompt-paths.js";
 import { ImagePromptOutputSchema } from "../schemas/image-prompt-output.js";
 import type { ImagePromptOutput } from "../schemas/image-prompt-output.js";
 import { logger } from "../utils/logger.js";
+import { nodeLabel } from "../utils/node-labels.js";
 import { padSceneId } from "../utils/scene-id.js";
 
 export async function imagePromptGeneratorNode(
@@ -118,6 +119,10 @@ export async function imagePromptGeneratorNode(
   type AssetPrompt = ImagePromptOutput["assets"][number];
   const collected = new Map<number, AssetPrompt>();
 
+  const label = nodeLabel(AgentModel.ImagePromptGenerator);
+  logger.nodeStart(label);
+  logger.nodePhase(label, "generating scene prompts");
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const stillMissing = [...expectedIds].filter((id) => !collected.has(id));
     // Retry is targeted: attempt 2 asks only for what attempt 1 omitted
@@ -154,6 +159,7 @@ export async function imagePromptGeneratorNode(
         });
         continue;
       }
+      logger.nodeFailed(label, result.error ?? "Unknown LLM error");
       return {
         production: { scenes: clearedScenes },
         diagnostics: {
@@ -209,6 +215,8 @@ export async function imagePromptGeneratorNode(
         };
       });
 
+      logger.nodeDone(label, result.telemetry.durationMs);
+
       return {
         production: { scenes: updatedScenes },
         diagnostics: {
@@ -235,6 +243,10 @@ export async function imagePromptGeneratorNode(
         missing: remaining,
       });
     } else {
+      logger.nodeFailed(
+        label,
+        `Incomplete asset mapping after ${maxAttempts} attempts. Missing scenes: [${remaining.join(", ")}].`,
+      );
       return {
         production: { scenes: clearedScenes },
         diagnostics: {

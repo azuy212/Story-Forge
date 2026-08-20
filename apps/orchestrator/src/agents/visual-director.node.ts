@@ -15,6 +15,7 @@ import type {
   VisualPlanEntry,
 } from "../schemas/visual-director-output.js";
 import { logger } from "../utils/logger.js";
+import { nodeLabel } from "../utils/node-labels.js";
 
 function formatFacts(
   facts: {
@@ -363,6 +364,10 @@ export async function visualDirectorNode(
       )
     : "";
 
+  const label = nodeLabel(AgentModel.VisualDirector);
+  logger.nodeStart(label);
+  logger.nodePhase(label, "planning visual direction");
+
   const result = await runAgent<VisualDirectorOutput>({
     agent: AgentModel.VisualDirector,
     promptPath: PromptPaths.VisualDirector,
@@ -394,6 +399,7 @@ export async function visualDirectorNode(
           feedback: `Previous VisualDirector output was rejected: ${result.error}. Return corrected JSON matching the exact schema and allowed enum values.`,
         }
       : undefined;
+    logger.nodeFailed(label, result.error ?? "Unknown LLM error");
     return {
       production: {
         scenes: [],
@@ -412,6 +418,8 @@ export async function visualDirectorNode(
       },
     };
   }
+
+  logger.nodeDone(label, result.telemetry.durationMs);
 
   const validFactIds = new Set(approvedFacts.map((f) => f.id));
   const {

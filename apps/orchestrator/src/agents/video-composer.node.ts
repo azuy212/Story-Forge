@@ -188,15 +188,18 @@ export async function videoComposerNode(
   execution: Partial<Execution>;
 }> {
   const errors = collectErrors(state);
-  logger.nodeStart(nodeLabel(AgentModel.VideoComposer));
+  const label = nodeLabel(AgentModel.VideoComposer);
+  logger.nodeStart(label);
   if (errors.length > 0) {
-    logger.nodeFailed(nodeLabel(AgentModel.VideoComposer), errors[0]);
+    logger.nodeFailed(label, errors[0]);
     return {
       video: {},
       diagnostics: { errors },
       execution: { currentNode: AgentModel.VideoComposer },
     };
   }
+
+  logger.nodePhase(label, "preparing composition");
 
   const baseScenes =
     state.production?.plannedScenes ?? state.production!.scenes!;
@@ -242,6 +245,8 @@ export async function videoComposerNode(
   const outroAssetFingerprint = await brandingAssetFingerprint(branding);
 
   const provider = getComposerProvider(config);
+
+  logger.nodePhase(label, "rendering video");
 
   const result = await cacheNodeResult<Partial<Video>>(
     {
@@ -309,7 +314,7 @@ export async function videoComposerNode(
   );
 
   if (result.error) {
-    logger.nodeFailed(nodeLabel(AgentModel.VideoComposer), result.error);
+    logger.nodeFailed(label, result.error);
     return {
       video: {},
       diagnostics: {
@@ -319,7 +324,7 @@ export async function videoComposerNode(
     };
   }
 
-  logger.nodeDone(nodeLabel(AgentModel.VideoComposer), 0);
+  logger.nodeDone(label, 0);
 
   return {
     production: {

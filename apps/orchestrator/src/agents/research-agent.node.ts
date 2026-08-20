@@ -11,6 +11,8 @@ import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { ResearchOutputSchema } from "../schemas/research-output.js";
 import type { ResearchOutput } from "../schemas/research-output.js";
+import { logger } from "../utils/logger.js";
+import { nodeLabel } from "../utils/node-labels.js";
 
 function serializePreviousResearch(research: Research | undefined): string {
   if (!research) return "";
@@ -54,6 +56,10 @@ export async function researchAgentNode(
       ].join("\n")
     : "";
 
+  const label = nodeLabel(AgentModel.ResearchAgent);
+  logger.nodeStart(label);
+  logger.nodePhase(label, "researching sources");
+
   const result = await runAgent<ResearchOutput>({
     agent: AgentModel.ResearchAgent,
     promptPath: PromptPaths.ResearchAgent,
@@ -71,6 +77,7 @@ export async function researchAgentNode(
   });
 
   if (result.error || !result.data) {
+    logger.nodeFailed(label, result.error ?? "Unknown LLM error");
     return {
       // Clear the channel: the shallow-merge reducer would otherwise keep a
       // previous attempt's research alive and let the guard pass on stale,
@@ -89,6 +96,8 @@ export async function researchAgentNode(
       },
     };
   }
+
+  logger.nodeDone(label, result.telemetry.durationMs);
 
   const { summary, facts } = result.data;
 

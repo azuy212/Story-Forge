@@ -15,6 +15,8 @@ import {
   formatScriptComplexityReport,
   validateScriptComplexity,
 } from "../utils/script-complexity.js";
+import { logger } from "../utils/logger.js";
+import { nodeLabel } from "../utils/node-labels.js";
 
 function serializeFacts(
   facts:
@@ -115,6 +117,10 @@ export async function scriptQANode(
     };
   }
 
+  const label = nodeLabel(AgentModel.ScriptQA);
+  logger.nodeStart(label);
+  logger.nodePhase(label, "checking script");
+
   const result = await runAgent<ScriptQAOutput>({
     agent: AgentModel.ScriptQA,
     promptPath: PromptPaths.ScriptQA,
@@ -139,6 +145,7 @@ export async function scriptQANode(
   if (result.error || !result.data) {
     // QA infra failure (not a content verdict): signal the router to retry
     // this cheap QA node instead of regenerating the whole script.
+    logger.nodeFailed(label, result.error ?? "LLM call failed");
     return {
       scriptQA: {
         status: "retry",
@@ -151,6 +158,8 @@ export async function scriptQANode(
       execution: execution(AgentModel.ScriptQA),
     };
   }
+
+  logger.nodeDone(label, result.telemetry.durationMs);
 
   return {
     scriptQA: result.data,

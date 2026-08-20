@@ -232,7 +232,6 @@ export async function runAgent<T>({
     const loadPrompt = inject.loadPrompt ?? defaultLoadPrompt;
     const attempts = singleAttempt ? 1 : maxRetries;
 
-    logger.nodeStart(nodeLabel(agent));
     logger.debug(`${agent} variables`, {
       keys: Object.keys(variables),
       totalChars: Object.values(variables).reduce(
@@ -316,8 +315,6 @@ export async function runAgent<T>({
 
         const durationMs = Date.now() - startedAt;
 
-        logger.nodeDone(nodeLabel(agent), durationMs);
-
         const promptVersion = promptPath.replace(/\.md$/, "");
         return {
           data: result.data,
@@ -367,8 +364,6 @@ export async function runAgent<T>({
         }
 
         if (failureClass === "permanent") {
-          const reason = normalizeError(err, lastError);
-          logger.nodeFailed(nodeLabel(agent), reason);
           break;
         }
 
@@ -380,9 +375,6 @@ export async function runAgent<T>({
     }
 
     const durationMs = Date.now() - startedAt;
-    const reason = normalizeError(new Error(lastError ?? ""), lastError ?? "");
-    logger.nodeFailed(nodeLabel(agent), reason);
-
     const promptVersion = promptPath.replace(/\.md$/, "");
     return {
       data: null as T | null,

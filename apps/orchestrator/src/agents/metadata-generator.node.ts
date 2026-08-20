@@ -6,6 +6,8 @@ import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { MetadataOutputSchema } from "../schemas/metadata-output.js";
 import type { MetadataOutput } from "../schemas/metadata-output.js";
+import { logger } from "../utils/logger.js";
+import { nodeLabel } from "../utils/node-labels.js";
 
 export async function metadataGeneratorNode(
   state: ProjectState,
@@ -34,6 +36,10 @@ export async function metadataGeneratorNode(
     };
   }
 
+  const label = nodeLabel(AgentModel.MetadataGenerator);
+  logger.nodeStart(label);
+  logger.nodePhase(label, "generating metadata");
+
   const result = await runAgent<MetadataOutput>({
     agent: AgentModel.MetadataGenerator,
     promptPath: PromptPaths.MetadataGenerator,
@@ -48,6 +54,7 @@ export async function metadataGeneratorNode(
   });
 
   if (result.error || !result.data) {
+    logger.nodeFailed(label, result.error ?? "Unknown LLM error");
     return {
       metadataOutput: null,
       diagnostics: {
@@ -57,6 +64,8 @@ export async function metadataGeneratorNode(
       execution: { currentNode: AgentModel.MetadataGenerator },
     };
   }
+
+  logger.nodeDone(label, result.telemetry.durationMs);
 
   return {
     metadataOutput: result.data,

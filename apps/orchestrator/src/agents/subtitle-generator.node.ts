@@ -44,7 +44,8 @@ export async function subtitleGeneratorNode(
   const durationMs =
     combinedAudio?.durationMs ?? state.audio?.narrationDurationMs;
 
-  logger.nodeStart(nodeLabel(AgentModel.SubtitleGenerator));
+  const label = nodeLabel(AgentModel.SubtitleGenerator);
+  logger.nodeStart(label);
 
   if (
     scenes.length === 0 ||
@@ -108,6 +109,8 @@ export async function subtitleGeneratorNode(
   const provider = getSceneSubtitleProvider(config);
   const providerName = provider.constructor.name;
 
+  logger.nodePhase(label, "generating subtitles");
+
   const result = await cacheNodeResult<Partial<Subtitles>>(
     {
       type: "subtitles",
@@ -146,7 +149,7 @@ export async function subtitleGeneratorNode(
   );
 
   if (result.error) {
-    logger.nodeFailed(nodeLabel(AgentModel.SubtitleGenerator), result.error);
+    logger.nodeFailed(label, result.error);
     return {
       subtitles: {},
       diagnostics: {
@@ -156,7 +159,7 @@ export async function subtitleGeneratorNode(
     };
   }
 
-  logger.nodeDone(nodeLabel(AgentModel.SubtitleGenerator), 0);
+  logger.nodeDone(label, 0);
 
   return {
     subtitles: result.data ?? {},

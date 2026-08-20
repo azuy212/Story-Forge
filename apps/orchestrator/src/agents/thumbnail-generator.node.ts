@@ -18,6 +18,8 @@ import {
   cacheNodeResult,
   completeArtifactForNode,
 } from "../artifacts/cache.js";
+import { logger } from "../utils/logger.js";
+import { nodeLabel } from "../utils/node-labels.js";
 import { getArtifactNamespace, withTopic } from "../artifacts/context.js";
 import { config as envConfig } from "../utils/config.js";
 import { getErrorMessage } from "../utils/errors.js";
@@ -155,6 +157,10 @@ export async function thumbnailGeneratorNode(
   const style = state.branding?.style ?? "";
   const colorPalette = state.branding?.colorPalette ?? "";
 
+  const label = nodeLabel(AgentModel.ThumbnailGenerator);
+  logger.nodeStart(label);
+  logger.nodePhase(label, "generating thumbnail prompt");
+
   const result = await runAgent<ThumbnailOutput>({
     agent: AgentModel.ThumbnailGenerator,
     promptPath: PromptPaths.ThumbnailGenerator,
@@ -176,6 +182,7 @@ export async function thumbnailGeneratorNode(
   });
 
   if (result.error || !result.data) {
+    logger.nodeFailed(label, result.error ?? "Unknown LLM error");
     return {
       thumbnail: {},
       diagnostics: {
@@ -186,6 +193,7 @@ export async function thumbnailGeneratorNode(
     };
   }
 
+  logger.nodePhase(label, "generating thumbnail image");
   const provider = getAssetProvider(config);
   const compositor = getThumbnailCompositor(config);
   const runId = getArtifactNamespace(config, state);
@@ -294,6 +302,10 @@ export async function thumbnailGeneratorNode(
   if (mode === "overlay") {
     const imageResult = await cachedRender("overlay");
     if (imageResult.error || !imageResult.data) {
+      logger.nodeFailed(
+        label,
+        imageResult.error ?? "Thumbnail image generation failed",
+      );
       return {
         thumbnail: {},
         diagnostics: {
@@ -303,6 +315,7 @@ export async function thumbnailGeneratorNode(
         execution: { currentNode: AgentModel.ThumbnailGenerator },
       };
     }
+    logger.nodeDone(label, 0);
     return buildSuccess(
       imageResult.data,
       output,
@@ -326,6 +339,10 @@ export async function thumbnailGeneratorNode(
     // caching - an unverified thumbnail must never be reused.
     const fullResult = await generateThumbnail("full");
     if (fullResult.error || !fullResult.data) {
+      logger.nodeFailed(
+        label,
+        fullResult.error ?? "Thumbnail image generation failed",
+      );
       return {
         thumbnail: {},
         diagnostics: {
@@ -335,6 +352,7 @@ export async function thumbnailGeneratorNode(
         execution: { currentNode: AgentModel.ThumbnailGenerator },
       };
     }
+    logger.nodeDone(label, 0);
     return buildSuccess(
       fullResult.data,
       output,
@@ -370,6 +388,7 @@ export async function thumbnailGeneratorNode(
   );
 
   if (cached.fromCache) {
+    logger.nodeDone(label, 0);
     return buildSuccess(
       cached.data!,
       output,
@@ -379,6 +398,10 @@ export async function thumbnailGeneratorNode(
     );
   }
   if (cached.error || !cached.data) {
+    logger.nodeFailed(
+      label,
+      cached.error ?? "Thumbnail image generation failed",
+    );
     return {
       thumbnail: {},
       diagnostics: {
@@ -391,12 +414,19 @@ export async function thumbnailGeneratorNode(
 
   let qa: ThumbnailQaResult | undefined;
   let qaUnavailableError: string | undefined;
+
+  logger.nodePhase(label, "validating thumbnail");
+
   try {
     qa = await getThumbnailQa(config)(cached.data.imageUrl, thumbnailText);
   } catch (err) {
     // QA infrastructure failure: in full mode this is a hard failure.
     // In auto mode we fall back to overlay.
     if (mode === "full") {
+      logger.nodeFailed(
+        label,
+        `Full-mode thumbnail QA failed: ${getErrorMessage(err)}`,
+      );
       return {
         thumbnail: {},
         diagnostics: {
@@ -414,6 +444,7 @@ export async function thumbnailGeneratorNode(
   if (qa?.status === "pass") {
     // Pending render now verified - make it servable from cache.
     await completeArtifactForNode(config, "ThumbnailCompositor", state);
+    logger.nodeDone(label, 0);
     return buildSuccess(
       cached.data,
       output,
@@ -425,6 +456,10 @@ export async function thumbnailGeneratorNode(
 
   if (mode === "full") {
     // qa is defined here because qaUnavailableError would have returned early
+    logger.nodeFailed(
+      label,
+      `Full-mode thumbnail failed QA: ${qa!.issues.join("; ")}`,
+    );
     return {
       thumbnail: {},
       diagnostics: {
@@ -445,6 +480,10 @@ export async function thumbnailGeneratorNode(
     : { code: "thumbnail_qa_failed", issues: qa!.issues };
   const overlayResult = await cachedRender("overlay");
   if (overlayResult.error || !overlayResult.data) {
+    logger.nodeFailed(
+      label,
+      overlayResult.error ?? "Thumbnail image generation failed",
+    );
     return {
       thumbnail: {},
       diagnostics: {
@@ -466,6 +505,7 @@ export async function thumbnailGeneratorNode(
     textPosition,
     result.telemetry,
   );
+  logger.nodeDone(label, 0);
   return result2;
 }
 

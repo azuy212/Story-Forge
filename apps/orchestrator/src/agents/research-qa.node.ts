@@ -12,6 +12,8 @@ import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { ResearchQAOutputSchema } from "../schemas/research-qa-output.js";
 import { config as configUtils } from "../utils/config.js";
+import { logger } from "../utils/logger.js";
+import { nodeLabel } from "../utils/node-labels.js";
 
 function serializeFacts(
   facts:
@@ -78,6 +80,10 @@ export async function researchQANode(
     };
   }
 
+  const label = nodeLabel(AgentModel.ResearchQA);
+  logger.nodeStart(label);
+  logger.nodePhase(label, "reviewing research quality");
+
   const result = await runAgent<ResearchQAOutput>({
     agent: AgentModel.ResearchQA,
     promptPath: PromptPaths.ResearchQA,
@@ -99,6 +105,7 @@ export async function researchQANode(
   if (result.error || !result.data) {
     // QA infra failure (not a content verdict): signal the router to retry
     // this cheap QA node instead of regenerating the whole research.
+    logger.nodeFailed(label, result.error ?? "LLM call failed");
     return {
       research: {},
       researchQA: {
@@ -114,6 +121,8 @@ export async function researchQANode(
       execution: execution(AgentModel.ResearchQA),
     };
   }
+
+  logger.nodeDone(label, result.telemetry.durationMs);
 
   const qa = result.data;
 

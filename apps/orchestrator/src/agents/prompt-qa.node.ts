@@ -12,6 +12,8 @@ import { PromptPaths } from "../models/prompt-paths.js";
 import { PromptQAOutputSchema } from "../schemas/prompt-qa-output.js";
 import type { PromptQAOutput } from "../schemas/prompt-qa-output.js";
 import { config as configUtils } from "../utils/config.js";
+import { logger } from "../utils/logger.js";
+import { nodeLabel } from "../utils/node-labels.js";
 
 function formatScenes(scenes: Scene[]): string {
   return JSON.stringify(
@@ -97,6 +99,10 @@ export async function promptQANode(
     };
   }
 
+  const label = nodeLabel(AgentModel.PromptQA);
+  logger.nodeStart(label);
+  logger.nodePhase(label, "reviewing scene prompts");
+
   const result = await runAgent<PromptQAOutput>({
     agent: AgentModel.PromptQA,
     promptPath: PromptPaths.PromptQA,
@@ -116,6 +122,7 @@ export async function promptQANode(
   if (result.error || !result.data) {
     // QA infra failure (not a content verdict): signal the router to retry
     // this cheap QA node instead of regenerating prompts.
+    logger.nodeFailed(label, result.error ?? "LLM call failed");
     return {
       production: {
         scenes,
@@ -132,6 +139,8 @@ export async function promptQANode(
       execution: execution(AgentModel.PromptQA),
     };
   }
+
+  logger.nodeDone(label, result.telemetry.durationMs);
 
   const expectedIds = new Set(scenes.map((s) => s.sceneId));
   const returnedIds = new Set(result.data.sceneResults.map((r) => r.sceneId));

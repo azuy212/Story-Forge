@@ -14,6 +14,7 @@ import type { ImagePromptRepairOutput } from "../schemas/image-prompt-repair-out
 import type { ImageGenerationError } from "../providers/image-generation-error.js";
 import { MAX_PROMPT_REPAIRS } from "../utils/constants.js";
 import { logger } from "../utils/logger.js";
+import { nodeLabel } from "../utils/node-labels.js";
 
 const UNRESOLVED_REJECTION = "unresolved_provider_rejection";
 const REPAIR_LLM_FAILURE = "prompt_repair_failed";
@@ -76,6 +77,10 @@ export async function imagePromptRepairNode(
       execution: { currentNode: AgentModel.ImagePromptRepair },
     };
   }
+
+  const label = nodeLabel(AgentModel.ImagePromptRepair);
+  logger.nodeStart(label);
+  logger.nodePhase(label, "repairing rejected prompts");
 
   const repaired = [...scenes];
 
@@ -193,6 +198,8 @@ export async function imagePromptRepairNode(
       exhausted: repairCount >= MAX_PROMPT_REPAIRS,
     });
   }
+
+  logger.nodeDone(label, 0);
 
   return {
     production: { scenes: repaired },

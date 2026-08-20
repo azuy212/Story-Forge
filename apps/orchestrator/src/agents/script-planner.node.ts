@@ -11,6 +11,8 @@ import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { ScriptPlannerOutputSchema } from "../schemas/script-planner-output.js";
 import type { ScriptPlannerOutput } from "../schemas/script-planner-output.js";
+import { logger } from "../utils/logger.js";
+import { nodeLabel } from "../utils/node-labels.js";
 
 function formatFacts(
   facts: {
@@ -95,6 +97,10 @@ export async function scriptPlannerNode(
   const estimatedDurationSeconds =
     state.content?.estimatedDurationSeconds ?? 50;
 
+  const label = nodeLabel(AgentModel.ScriptPlanner);
+  logger.nodeStart(label);
+  logger.nodePhase(label, "building story structure");
+
   const result = await runAgent<ScriptPlannerOutput>({
     agent: AgentModel.ScriptPlanner,
     promptPath: PromptPaths.ScriptPlanner,
@@ -115,6 +121,7 @@ export async function scriptPlannerNode(
   });
 
   if (result.error || !result.data) {
+    logger.nodeFailed(label, result.error ?? "Unknown LLM error");
     return {
       content: {},
       storyPlan: { storyType: "mystery", storySummary: "", storyBeats: [] },
@@ -125,6 +132,8 @@ export async function scriptPlannerNode(
       execution: { currentNode: AgentModel.ScriptPlanner },
     };
   }
+
+  logger.nodeDone(label, result.telemetry.durationMs);
 
   const { content, storyType, storySummary, storyBeats } = result.data;
 

@@ -7,6 +7,8 @@ import { PromptPaths } from "../models/prompt-paths.js";
 import { ReleaseValidationOutputSchema } from "../schemas/release-validation-output.js";
 import type { ReleaseValidationOutput } from "../schemas/release-validation-output.js";
 import { config as configUtils } from "../utils/config.js";
+import { logger } from "../utils/logger.js";
+import { nodeLabel } from "../utils/node-labels.js";
 
 function serializeMetadata(
   meta:
@@ -53,6 +55,10 @@ export async function releaseReviewNode(
     };
   }
 
+  const label = nodeLabel(AgentModel.ReleaseReview);
+  logger.nodeStart(label);
+  logger.nodePhase(label, "reviewing release package");
+
   const result = await runAgent<ReleaseValidationOutput>({
     agent: AgentModel.ReleaseReview,
     promptPath: PromptPaths.ReleaseReview,
@@ -74,6 +80,7 @@ export async function releaseReviewNode(
   });
 
   if (result.error || !result.data) {
+    logger.nodeFailed(label, result.error ?? "LLM call failed");
     return {
       releaseReview: {
         status: "fatal",
@@ -86,6 +93,8 @@ export async function releaseReviewNode(
       execution: { currentNode: AgentModel.ReleaseReview },
     };
   }
+
+  logger.nodeDone(label, result.telemetry.durationMs);
 
   const warnings: string[] = [];
   if (result.data.status === "fatal") {

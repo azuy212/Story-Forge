@@ -59,12 +59,10 @@ export async function assetStrategyNode(
   execution: Partial<Execution>;
 }> {
   const scenes = state.production?.scenes ?? [];
-  logger.nodeStart(nodeLabel(AgentModel.AssetStrategy));
+  const label = nodeLabel(AgentModel.AssetStrategy);
+  logger.nodeStart(label);
   if (scenes.length === 0) {
-    logger.nodeFailed(
-      nodeLabel(AgentModel.AssetStrategy),
-      "No scenes to process",
-    );
+    logger.nodeFailed(label, "No scenes to process");
     return {
       diagnostics: {
         errors: [`${AgentModel.AssetStrategy}: No scenes to process`],
@@ -72,6 +70,8 @@ export async function assetStrategyNode(
       execution: { currentNode: AgentModel.AssetStrategy },
     };
   }
+
+  logger.nodePhase(label, "searching source assets");
 
   const provider = getProvider(config);
   const candidates = new Map<string, SourceAsset | undefined>();

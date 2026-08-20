@@ -327,13 +327,11 @@ export async function releaseValidationNode(
   diagnostics: Partial<Diagnostics>;
   execution: Partial<Execution>;
 }> {
-  logger.nodeStart(nodeLabel(AgentModel.ReleaseValidation));
+  const label = nodeLabel(AgentModel.ReleaseValidation);
+  logger.nodeStart(label);
 
   if (!configUtils.enableReleaseQA()) {
-    logger.nodeSkipped(
-      nodeLabel(AgentModel.ReleaseValidation),
-      "release QA disabled",
-    );
+    logger.nodeSkipped(label, "release QA disabled");
     return {
       releaseValidation: {
         status: "approved",
@@ -345,15 +343,14 @@ export async function releaseValidationNode(
     };
   }
 
+  logger.nodePhase(label, "validating release package");
+
   const result = await validatePackage(state, getProbe(config));
 
   if (result.status === "fatal") {
-    logger.nodeFailed(
-      nodeLabel(AgentModel.ReleaseValidation),
-      `${result.issues?.length ?? 0} issues`,
-    );
+    logger.nodeFailed(label, `${result.issues?.length ?? 0} issues`);
   } else {
-    logger.nodeDone(nodeLabel(AgentModel.ReleaseValidation), 0);
+    logger.nodeDone(label, 0);
   }
 
   return {

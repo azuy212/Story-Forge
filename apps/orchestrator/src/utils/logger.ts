@@ -73,6 +73,9 @@ export const logger = {
   nodeFailed(label: string, reason: string): void {
     console.error(formatNodeMessage(`${label} failed: ${reason}`));
   },
+  nodePhase(label: string, phase: string): void {
+    console.log(formatNodeMessage(`${label} ${phase}`));
+  },
 };
 
 function formatDuration(ms: number): string {

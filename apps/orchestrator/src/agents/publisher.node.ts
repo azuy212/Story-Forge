@@ -59,7 +59,8 @@ export async function publisherNode(
   const category = state.metadataOutput?.category ?? "";
   const thumbnailPath = state.thumbnail?.imageUrl ?? "";
   const platforms = state.branding?.platforms ?? ["youtube"];
-  logger.nodeStart(nodeLabel(AgentModel.Publisher));
+  const label = nodeLabel(AgentModel.Publisher);
+  logger.nodeStart(label);
 
   // Publisher only runs after the PublishReady join/barrier, which gates it on
   // every release prerequisite (video + metadata + thumbnail). The checks below
@@ -124,6 +125,8 @@ export async function publisherNode(
 
   const provider = getInjectedProvider(config);
 
+  logger.nodePhase(label, "uploading video");
+
   const result = await cacheNodeResult<Partial<Publishing>>(
     {
       type: "publish",
@@ -165,9 +168,9 @@ export async function publisherNode(
   );
 
   if (result.error) {
-    logger.nodeFailed(nodeLabel(AgentModel.Publisher), result.error);
+    logger.nodeFailed(label, result.error);
   } else {
-    logger.nodeDone(nodeLabel(AgentModel.Publisher), 0);
+    logger.nodeDone(label, 0);
   }
 
   return {

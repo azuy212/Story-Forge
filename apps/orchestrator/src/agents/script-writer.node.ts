@@ -12,6 +12,8 @@ import { PromptPaths } from "../models/prompt-paths.js";
 import { ScriptWriterOutputSchema } from "../schemas/script-writer-output.js";
 import type { ScriptWriterOutput } from "../schemas/script-writer-output.js";
 import { resolveBranding } from "../utils/branding.js";
+import { logger } from "../utils/logger.js";
+import { nodeLabel } from "../utils/node-labels.js";
 
 function serializeFacts(
   facts:
@@ -141,6 +143,10 @@ export async function scriptWriterNode(
       ].join("\n")
     : "";
 
+  const label = nodeLabel(AgentModel.ScriptWriter);
+  logger.nodeStart(label);
+  logger.nodePhase(label, "generating script");
+
   const result = await runAgent<ScriptWriterOutput>({
     agent: AgentModel.ScriptWriter,
     promptPath: PromptPaths.ScriptWriter,
@@ -165,6 +171,7 @@ export async function scriptWriterNode(
   });
 
   if (result.error || !result.data) {
+    logger.nodeFailed(label, result.error ?? "Unknown LLM error");
     return {
       // Clear generated fields (keep title/hook owned by ScriptPlanner): the
       // merge reducer would otherwise let a stale script pass the guard.
@@ -182,6 +189,8 @@ export async function scriptWriterNode(
       },
     };
   }
+
+  logger.nodeDone(label, result.telemetry.durationMs);
 
   const { content } = result.data;
 

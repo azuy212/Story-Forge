@@ -12,7 +12,7 @@ import type {
 } from "../providers/asset-provider.js";
 import { createDefaultAssetProvider } from "../providers/asset-provider.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
-import { withTopic } from "../artifacts/context.js";
+import { withTopic, getRunId } from "../artifacts/context.js";
 import type { Provider, SourceAsset } from "../schemas/production.js";
 import {
   ImageGenerationProviderError,
@@ -208,6 +208,7 @@ async function generateScene(
   scene: Scene,
   sourceAssets: SourceAsset[],
   provider: AssetProvider,
+  runId?: string,
 ): Promise<GenerateOutcome> {
   if (scene.assetUrl) return { kind: "resolved", scene };
   if (scene.generationStatus === "failed") return { kind: "failed", scene };
@@ -295,11 +296,13 @@ async function generateScene(
               prompt,
               sceneId: scene.sceneId,
               filename: scene.filename,
+              runId,
             })
           : await provider.generateImage({
               prompt,
               sceneId: scene.sceneId,
               filename: scene.filename,
+              runId,
               ...(referenceImages && referenceImages.length > 0
                 ? { referenceImages, mode: referenceModeParam }
                 : {}),
@@ -442,13 +445,11 @@ export async function assetGeneratorNode(
   const sourceAssets = state.production?.sourceAssets ?? [];
   const provider = getAssetProvider(config);
 
-  logger.nodeStart(nodeLabel(AgentModel.AssetGenerator));
+  const label = nodeLabel(AgentModel.AssetGenerator);
+  logger.nodeStart(label);
 
   if (scenes.length === 0) {
-    logger.nodeFailed(
-      nodeLabel(AgentModel.AssetGenerator),
-      "No scenes to generate assets for",
-    );
+    logger.nodeFailed(label, "No scenes to generate assets for");
     return {
       diagnostics: {
         errors: [
@@ -461,7 +462,10 @@ export async function assetGeneratorNode(
     };
   }
 
+  logger.nodePhase(label, "preparing asset requests");
+
   const plannedScenes = buildPlan(scenes);
+  const runId = getRunId(config, state) ?? undefined;
 
   let computedArtifact: AssetArtifact | null = null;
   let fatalError: string | undefined;
@@ -495,6 +499,9 @@ export async function assetGeneratorNode(
     },
     async () => {
       const results: Scene[] = [];
+
+      logger.nodePhase(label, "generating images");
+
       try {
         // mapWithConcurrency settles every worker (Promise.all) before this
         // block returns, so an in-flight worker's write always lands before
@@ -503,7 +510,12 @@ export async function assetGeneratorNode(
           plannedScenes,
           3,
           async (scene, index): Promise<void> => {
-            const outcome = await generateScene(scene, sourceAssets, provider);
+            const outcome = await generateScene(
+              scene,
+              sourceAssets,
+              provider,
+              runId,
+            );
             switch (outcome.kind) {
               case "fatal":
                 // Preserve the fatal scene (marked failed) and anything
@@ -535,6 +547,7 @@ export async function assetGeneratorNode(
       }
 
       computedArtifact = { scenes: results, sourceAssets };
+      logger.nodePhase(label, "validating generated assets");
       const complete = allScenesResolved(results);
       // Only a fully-resolved asset set is persisted; intermediate repair
       // states flow through the graph state instead.
@@ -587,11 +600,11 @@ export async function assetGeneratorNode(
   ).length;
   if (unresolved > 0) {
     logger.nodeIncomplete(
-      nodeLabel(AgentModel.AssetGenerator),
+      label,
       `${unresolved}/${artifact.scenes.length} unresolved`,
     );
   } else {
-    logger.nodeDone(nodeLabel(AgentModel.AssetGenerator), 0);
+    logger.nodeDone(label, 0);
   }
 
   return {
