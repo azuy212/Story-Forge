@@ -3,7 +3,7 @@ import { extname, join } from "node:path";
 import { hashObject } from "../artifacts/hash.js";
 import type { SourceAsset } from "../schemas/production.js";
 
-const REQUEST_TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MS = 30_000;
 
 function extension(asset: SourceAsset, contentType: string): string {
   const fromMime = contentType.split("/")[1]?.split(";")[0];
@@ -16,6 +16,7 @@ function extension(asset: SourceAsset, contentType: string): string {
 export async function materializeSourceAsset(
   asset: SourceAsset,
   directory: string,
+  deadlineMs?: number,
 ): Promise<SourceAsset> {
   if (asset.localPath) {
     const exists = await stat(asset.localPath)
@@ -24,10 +25,24 @@ export async function materializeSourceAsset(
     if (exists) return asset;
   }
 
+  if (deadlineMs !== undefined && Date.now() >= deadlineMs) {
+    throw new Error("materialize_deadline_exceeded");
+  }
+
   const mediaDir = join(directory, "media");
   await mkdir(mediaDir, { recursive: true });
+
+  const remainingTimeout =
+    deadlineMs !== undefined
+      ? Math.min(REQUEST_TIMEOUT_MS, deadlineMs - Date.now())
+      : REQUEST_TIMEOUT_MS;
+
+  if (remainingTimeout <= 0) {
+    throw new Error("materialize_deadline_exceeded");
+  }
+
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), remainingTimeout);
   try {
     const response = await fetch(asset.url, { signal: controller.signal });
     if (!response.ok)
@@ -54,6 +69,15 @@ export async function materializeSourceAsset(
       localPath: filePath,
       mimeType: contentType.split(";")[0],
     };
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      (error as { name?: unknown }).name === "AbortError"
+    ) {
+      throw new Error("materialize_deadline_exceeded", { cause: error });
+    }
+    throw error;
   } finally {
     clearTimeout(timeout);
   }

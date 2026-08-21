@@ -6,7 +6,6 @@ import torch
 import torchaudio as ta
 from chatterbox.tts_turbo import ChatterboxTurboTTS
 
-
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 VOICE_PATH = "app/voices/narrator.wav"
@@ -24,10 +23,7 @@ def word_count(text: str) -> int:
 
 def duration_seconds(wav: torch.Tensor, sample_rate: int) -> float:
     # wav shape can be [samples] or [channels, samples]
-    if wav.ndim == 2:
-        samples = wav.shape[-1]
-    else:
-        samples = wav.shape[0]
+    samples = wav.shape[-1] if wav.ndim == 2 else wav.shape[0]
 
     return samples / sample_rate
 

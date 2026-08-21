@@ -12,22 +12,20 @@ import type {
 } from "../schemas/production.js";
 import { AgentModel } from "../models/agent-model.js";
 import {
-  createDefaultSourceAssetProvider,
-  sourceEntityKey,
-  type SourceAssetProvider,
-} from "../providers/source-asset-provider.js";
-import { selectBestSourceAsset } from "../providers/source-asset-selection.js";
+  createDefaultSourceAssetSearcher,
+  type SourceAssetSearcher,
+  type SourceAssetOutcome,
+} from "../providers/source-asset-search.js";
+import { sourceEntityKey } from "../providers/source-asset-provider.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
-import { materializeSourceAsset } from "../providers/source-asset-materializer.js";
-import { config as appConfig } from "../utils/config.js";
 
-const DEFAULT_PROVIDER = createDefaultSourceAssetProvider();
+const DEFAULT_SEARCHER = createDefaultSourceAssetSearcher();
 
-function getProvider(config: RunnableConfig): SourceAssetProvider {
+function getSearcher(config: RunnableConfig): SourceAssetSearcher {
   const inject = (config.configurable ?? {}) as Record<string, unknown>;
   return (
-    (inject.sourceAssetProvider as SourceAssetProvider) ?? DEFAULT_PROVIDER
+    (inject.sourceAssetSearcher as SourceAssetSearcher) ?? DEFAULT_SEARCHER
   );
 }
 
@@ -74,9 +72,11 @@ export async function assetStrategyNode(
 
   logger.nodePhase(label, "searching source assets");
 
-  const provider = getProvider(config);
+  const searcher = getSearcher(config);
   const candidates = new Map<string, SourceAsset | undefined>();
   const allEntities = new Map<string, SceneEntity>();
+  const diagnostics: Diagnostics = { errors: [], warnings: [] };
+
   for (const scene of scenes) {
     for (const entity of normalizedEntities(scene)) {
       if (entity.requiresSourceImage)
@@ -85,23 +85,47 @@ export async function assetStrategyNode(
   }
 
   for (const [key, entity] of allEntities) {
-    try {
-      const found = await provider.search(entity);
-      const selected = selectBestSourceAsset(entity, found);
-      if (!selected) {
-        candidates.set(key, undefined);
-        continue;
+    logger.info("SourceAsset searching for entity", {
+      entity: entity.name,
+      type: entity.type,
+    });
+    const outcome: SourceAssetOutcome = await searcher.search(entity);
+
+    switch (outcome.status) {
+      case "ok": {
+        candidates.set(key, outcome.asset);
+        logger.info("SourceAsset found", {
+          entity: entity.name,
+          provider: outcome.provider,
+          query: outcome.query,
+          assetId: outcome.asset.id,
+          durationMs: outcome.totalDurationMs,
+        });
+        break;
       }
-      candidates.set(
-        key,
-        await materializeSourceAsset(selected, appConfig.sourceAssetCacheDir()),
-      );
-    } catch (error) {
-      candidates.set(key, undefined);
-      logger.debug("AssetStrategy source lookup failed; using generation", {
-        entity: entity.name,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      case "no_match": {
+        candidates.set(key, undefined);
+        const warning = `AssetStrategy: no usable source asset for "${entity.name}" (queries: ${outcome.queries.join(", ")})`;
+        diagnostics.warnings?.push(warning);
+        logger.warn(warning, {
+          entity: entity.name,
+          queries: outcome.queries,
+          durationMs: outcome.totalDurationMs,
+        });
+        break;
+      }
+      case "provider_failure": {
+        candidates.set(key, undefined);
+        const warning = `AssetStrategy: source lookup failed for "${entity.name}" (${outcome.provider}: ${outcome.reason})`;
+        diagnostics.warnings?.push(warning);
+        logger.warn(warning, {
+          entity: entity.name,
+          provider: outcome.provider,
+          reason: outcome.reason,
+          durationMs: outcome.totalDurationMs,
+        });
+        break;
+      }
     }
   }
 
@@ -140,7 +164,7 @@ export async function assetStrategyNode(
 
   return {
     production: { scenes: resolvedScenes, sourceAssets: [...byId.values()] },
-    diagnostics: {},
+    diagnostics,
     execution: { currentNode: AgentModel.AssetStrategy },
   };
 }

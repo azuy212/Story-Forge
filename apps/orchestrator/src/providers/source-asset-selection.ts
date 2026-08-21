@@ -1,11 +1,35 @@
 import type { SceneEntity, SourceAsset } from "../schemas/production.js";
 
+export const TYPE_HINT: Record<string, string> = {
+  person: "",
+  place: "city",
+  object: "",
+  organization: "",
+  product: "",
+  document: "",
+  landmark: "landmark",
+  other: "",
+};
+
 function tokens(value: string): string[] {
   return value
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .split(/\s+/)
-    .filter(Boolean);
+    .filter((t) => t.length >= 3);
+}
+
+function substringMatch(wanted: string[], haystack: Set<string>): number {
+  let matches = 0;
+  for (const w of wanted) {
+    for (const h of haystack) {
+      if (h === w || h.includes(w) || w.includes(h)) {
+        matches++;
+        break;
+      }
+    }
+  }
+  return matches;
 }
 
 function relevance(entity: SceneEntity, asset: SourceAsset): number {
@@ -16,7 +40,18 @@ function relevance(entity: SceneEntity, asset: SourceAsset): number {
     ),
   );
   if (wanted.length === 0 || haystack.size === 0) return 0;
-  return wanted.filter((token) => haystack.has(token)).length / wanted.length;
+  const matches = substringMatch(wanted, haystack);
+  return matches / wanted.length;
+}
+
+function hasHintMatch(entity: SceneEntity, asset: SourceAsset): boolean {
+  const hint = TYPE_HINT[entity.type];
+  if (!hint) return false;
+  const haystack = [asset.title, asset.attribution, asset.url]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(hint.toLowerCase());
 }
 
 export function scoreSourceAsset(
@@ -27,7 +62,13 @@ export function scoreSourceAsset(
   const height = asset.height ?? 0;
   const pixels = width * height;
   const title = (asset.title ?? "").toLowerCase();
-  let score = relevance(entity, asset) * 100;
+  const rel = relevance(entity, asset);
+  const hintMatch = hasHintMatch(entity, asset);
+  let score = rel * 100;
+
+  if (rel === 0 && hintMatch) {
+    score = 5;
+  }
 
   if (entity.type === "person") {
     if (height >= width) score += 18;

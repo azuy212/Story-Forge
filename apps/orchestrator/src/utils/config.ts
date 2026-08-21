@@ -48,6 +48,12 @@ export const config = {
   artifactStoreDir: (): string => read("ARTIFACT_STORE_DIR") ?? "runs",
   sourceAssetCacheDir: (): string =>
     read("SOURCE_ASSET_CACHE_DIR") ?? "cache/source-assets",
+  unsplashAccessKey: (): string => read("UNSPLASH_ACCESS_KEY") ?? "",
+  pexelsApiKey: (): string => read("PEXELS_API_KEY") ?? "",
+  sourceAssetDeadlineMs: (): number => {
+    const value = Number(read("SOURCE_ASSET_DEADLINE_MS") ?? "60000");
+    return Number.isFinite(value) && value > 0 ? value : 60000;
+  },
   enableScriptQA: (): boolean => {
     const v = read("ENABLE_SCRIPT_QA");
     if (v !== undefined) return v === "true";

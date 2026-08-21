@@ -19,8 +19,15 @@ import {
   FileSourceAssetCache,
 } from "../src/providers/source-asset-cache.js";
 import { selectBestSourceAsset } from "../src/providers/source-asset-selection.js";
-import type { ProjectState, Scene, SourceAsset } from "../src/types/index.js";
-import type { SourceAssetProvider } from "../src/providers/source-asset-provider.js";
+import { FallbackSourceAssetSearcher } from "../src/providers/source-asset-search.js";
+import { fetchWithRetry } from "../src/providers/source-asset-fetcher.js";
+import type { SceneEntity, SourceAsset } from "../src/schemas/production.js";
+import type { ProjectState, Scene } from "../src/types/index.js";
+import type {
+  SourceAssetSearcher,
+  SourceAssetOutcome,
+  SourceAssetProvider,
+} from "../src/providers/source-asset-search.js";
 import {
   WikimediaSourceAssetProvider,
   wikimediaPageUrl,
@@ -46,12 +53,69 @@ afterEach(async () => {
   await rm(cacheDir, { recursive: true, force: true });
 });
 
+const PERSON: SceneEntity = { type: "person", name: "Ada Lovelace" };
+
 function stateWithScenes(scenes: Scene[]): ProjectState {
   return {
     project: { pillar: "History", topic: "People" },
     production: { scenes },
     execution: { version: "0.1.0" },
   } as ProjectState;
+}
+
+function makeNoMatchOutcome(queries: string[]): SourceAssetOutcome {
+  return { status: "no_match", queries, totalDurationMs: 100 };
+}
+
+function makeFailureOutcome(
+  provider: string,
+  reason: string,
+): SourceAssetOutcome {
+  return { status: "provider_failure", provider, reason, totalDurationMs: 100 };
+}
+
+function makeAsset(
+  id: string,
+  overrides: Partial<SourceAsset> = {},
+): SourceAsset {
+  return {
+    id,
+    entityId: PERSON.name,
+    url: `https://example.test/${id}.png`,
+    source: "test",
+    license: "CC BY",
+    attribution: "tester",
+    sourcePageUrl: `https://example.test/${id}`,
+    width: 1200,
+    height: 1600,
+    mimeType: "image/png",
+    title: "Ada Lovelace portrait",
+    ...overrides,
+  };
+}
+
+function makeProvider(
+  name: string,
+  impl: (
+    entity: SceneEntity,
+    query: string,
+    deadlineMs?: number,
+  ) => Promise<SourceAsset[]>,
+): SourceAssetProvider {
+  return { name, search: jest.fn(impl) };
+}
+
+function mockHangingFetch(): void {
+  fetchSpy.mockImplementation((_input, init) => {
+    return new Promise<Response>((_resolve, reject) => {
+      const signal = (init as RequestInit | undefined)?.signal;
+      if (signal) {
+        signal.addEventListener("abort", () =>
+          reject(new DOMException("aborted", "AbortError")),
+        );
+      }
+    });
+  });
 }
 
 describe("asset strategy", () => {
@@ -81,8 +145,7 @@ describe("asset strategy", () => {
   });
 
   it("selects best candidate deterministically", () => {
-    const entity = { type: "person" as const, name: "Ada Lovelace" };
-    const selected = selectBestSourceAsset(entity, [
+    const selected = selectBestSourceAsset(PERSON, [
       {
         id: "portrait",
         url: "https://example.test/portrait.png",
@@ -106,44 +169,38 @@ describe("asset strategy", () => {
   });
 
   it("does not select unrelated source candidates", () => {
-    const selected = selectBestSourceAsset(
-      { type: "person", name: "Ada Lovelace" },
-      [
-        {
-          id: "unrelated",
-          url: "https://example.test/unrelated.png",
-          source: "test",
-          title: "A landscape",
-          width: 1200,
-          height: 800,
-        },
-      ],
-    );
+    const selected = selectBestSourceAsset(PERSON, [
+      {
+        id: "unrelated",
+        url: "https://example.test/unrelated.png",
+        source: "test",
+        title: "A landscape",
+        width: 1200,
+        height: 800,
+      },
+    ]);
     expect(selected).toBeUndefined();
   });
 
   it("accepts partial and sparse Wikimedia matches", () => {
-    const selected = selectBestSourceAsset(
-      { type: "person", name: "Ada Lovelace" },
-      [
-        {
-          id: "sparse",
-          url: "https://upload.wikimedia.org/lovelace.png",
-          source: "Wikimedia Commons",
-          title: "Portrait of Ada",
-          width: 1200,
-          height: 1600,
-        },
-        {
-          id: "partial",
-          url: "https://upload.wikimedia.org/portrait.png",
-          source: "Wikimedia Commons",
-          title: "Portrait of Lovelace",
-          width: 800,
-          height: 600,
-        },
-      ],
-    );
+    const selected = selectBestSourceAsset(PERSON, [
+      {
+        id: "sparse",
+        url: "https://upload.wikimedia.org/lovelace.png",
+        source: "Wikimedia Commons",
+        title: "Portrait of Ada",
+        width: 1200,
+        height: 1600,
+      },
+      {
+        id: "partial",
+        url: "https://upload.wikimedia.org/portrait.png",
+        source: "Wikimedia Commons",
+        title: "Portrait of Lovelace",
+        width: 800,
+        height: 600,
+      },
+    ]);
     expect(selected?.id).toBe("sparse");
   });
 
@@ -181,10 +238,7 @@ describe("asset strategy", () => {
       ),
     );
 
-    const [asset] = await new WikimediaSourceAssetProvider().search({
-      type: "person",
-      name: "Ada Lovelace",
-    });
+    const [asset] = await new WikimediaSourceAssetProvider().search(PERSON);
 
     expect(asset).toMatchObject({
       sourcePageUrl:
@@ -208,24 +262,10 @@ describe("asset strategy", () => {
   });
 
   it("uses source result and persists provenance", async () => {
-    const provider: SourceAssetProvider = {
-      search: jest.fn<() => Promise<SourceAsset[]>>().mockResolvedValue([
-        {
-          id: "wikimedia:1",
-          entityId: "Ada Lovelace",
-          url: "https://commons.wikimedia.org/wiki/File:Ada.png",
-          source: "Wikimedia Commons",
-          license: "CC BY-SA 4.0",
-          licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0/",
-          attribution: "Wikimedia contributor",
-          sourcePageUrl: "https://commons.wikimedia.org/wiki/File:Ada.png",
-          width: 1200,
-          height: 1600,
-          mimeType: "image/png",
-          title: "Ada Lovelace portrait",
-        },
-      ]),
-    };
+    const provider = makeProvider("test", async () => [
+      makeAsset("wikimedia:1"),
+    ]);
+    const searcher = new FallbackSourceAssetSearcher([provider], null, 60_000);
 
     const result = await assetStrategyNode(
       stateWithScenes([
@@ -235,7 +275,7 @@ describe("asset strategy", () => {
           entities: [{ type: "person", name: "Ada Lovelace" }],
         },
       ]),
-      { configurable: { sourceAssetProvider: provider } } as any,
+      { configurable: { sourceAssetSearcher: searcher } } as any,
     );
 
     const source = result.production?.sourceAssets?.[0];
@@ -244,10 +284,10 @@ describe("asset strategy", () => {
       "wikimedia:1",
     ]);
     expect(source).toMatchObject({
-      source: "Wikimedia Commons",
-      url: "https://commons.wikimedia.org/wiki/File:Ada.png",
-      license: "CC BY-SA 4.0",
-      attribution: "Wikimedia contributor",
+      source: "test",
+      url: "https://example.test/wikimedia:1.png",
+      license: "CC BY",
+      attribution: "tester",
     });
     expect(source?.localPath).toBeDefined();
     expect(await readFile(source!.localPath!)).toEqual(
@@ -284,17 +324,19 @@ describe("asset strategy", () => {
     expect(publish).toHaveBeenCalledWith(
       expect.objectContaining({
         description: expect.stringContaining(
-          "https://commons.wikimedia.org/wiki/File:Ada.png",
+          "https://example.test/wikimedia:1 (CC BY)",
         ),
       }),
     );
   });
 
   it("falls back to generated when source search fails", async () => {
-    const provider: SourceAssetProvider = {
+    const searcher: SourceAssetSearcher = {
       search: jest
-        .fn<() => Promise<SourceAsset[]>>()
-        .mockRejectedValue(new Error("API unavailable")),
+        .fn<() => Promise<SourceAssetOutcome>>()
+        .mockResolvedValue(
+          makeFailureOutcome("wikimedia", "network:ENOTFOUND"),
+        ),
     };
 
     const result = await assetStrategyNode(
@@ -304,47 +346,306 @@ describe("asset strategy", () => {
           entities: [{ type: "person", name: "Ada Lovelace" }],
         },
       ]),
-      { configurable: { sourceAssetProvider: provider } } as any,
+      { configurable: { sourceAssetSearcher: searcher } } as any,
     );
 
     expect(result.production?.scenes[0].assetMode).toBe("generated");
     expect(result.production?.scenes[0].sourceAssetIds).toBeUndefined();
+    expect(result.diagnostics?.warnings).toContainEqual(
+      expect.stringContaining('source lookup failed for "Ada Lovelace"'),
+    );
   });
 
   it("falls back to generated when source search has no results", async () => {
-    const provider: SourceAssetProvider = {
-      search: jest.fn<() => Promise<SourceAsset[]>>().mockResolvedValue([]),
+    const searcher: SourceAssetSearcher = {
+      search: jest
+        .fn<() => Promise<SourceAssetOutcome>>()
+        .mockResolvedValue(
+          makeNoMatchOutcome(["Unknown Landmark", "Unknown Landmark landmark"]),
+        ),
     };
 
     const result = await assetStrategyNode(
       stateWithScenes([
         {
           sceneId: 1,
-          entities: [{ type: "landmark", name: "Unknown Landmark" }],
+          entities: [
+            {
+              type: "landmark",
+              name: "Unknown Landmark",
+              requiresSourceImage: true,
+            },
+          ],
         },
       ]),
-      { configurable: { sourceAssetProvider: provider } } as any,
+      { configurable: { sourceAssetSearcher: searcher } } as any,
     );
 
     expect(result.production?.scenes[0].assetMode).toBe("generated");
+    expect(result.diagnostics?.warnings).toContainEqual(
+      expect.stringContaining('no usable source asset for "Unknown Landmark"'),
+    );
   });
 
-  it("reuses cached source search results", async () => {
-    const entity = { type: "person" as const, name: "Ada Lovelace" };
-    const cache = new FileSourceAssetCache(cacheDir);
-    const provider: SourceAssetProvider = {
-      search: jest.fn<() => Promise<SourceAsset[]>>().mockResolvedValue([
+  it("records provider failure warning with provider name and reason", async () => {
+    const searcher: SourceAssetSearcher = {
+      search: jest
+        .fn<() => Promise<SourceAssetOutcome>>()
+        .mockResolvedValue(makeFailureOutcome("unsplash", "http:429")),
+    };
+
+    const result = await assetStrategyNode(
+      stateWithScenes([
         {
-          id: "wikimedia:1",
-          url: "https://commons.wikimedia.org/wiki/File:Ada.png",
-          source: "Wikimedia Commons",
+          sceneId: 1,
+          entities: [{ type: "person", name: "Test Person" }],
         },
       ]),
+      { configurable: { sourceAssetSearcher: searcher } } as any,
+    );
+
+    expect(result.diagnostics?.warnings).toContainEqual(
+      expect.stringContaining(
+        'source lookup failed for "Test Person" (unsplash: http:429)',
+      ),
+    );
+  });
+
+  it("records no_match warning with queries tried", async () => {
+    const searcher: SourceAssetSearcher = {
+      search: jest
+        .fn<() => Promise<SourceAssetOutcome>>()
+        .mockResolvedValue(
+          makeNoMatchOutcome(["Test Entity", "Test Entity city"]),
+        ),
     };
+
+    const result = await assetStrategyNode(
+      stateWithScenes([
+        {
+          sceneId: 1,
+          entities: [
+            { type: "place", name: "Test Entity", requiresSourceImage: true },
+          ],
+        },
+      ]),
+      { configurable: { sourceAssetSearcher: searcher } } as any,
+    );
+
+    expect(result.diagnostics?.warnings).toContainEqual(
+      expect.stringContaining(
+        'no usable source asset for "Test Entity" (queries: Test Entity, Test Entity city)',
+      ),
+    );
+  });
+});
+
+describe("fallback searcher", () => {
+  it("tries fallback provider when the first returns no results", async () => {
+    const wikimedia = makeProvider("wikimedia", async () => []);
+    const unsplash = makeProvider("unsplash", async () => [
+      makeAsset("unsplash:1"),
+    ]);
+    const searcher = new FallbackSourceAssetSearcher(
+      [wikimedia, unsplash],
+      null,
+      60_000,
+    );
+
+    const outcome = await searcher.search(PERSON);
+
+    expect(unsplash.search).toHaveBeenCalledTimes(1);
+    expect(outcome.status).toBe("ok");
+  });
+
+  it("does not cache empty results", async () => {
+    const cache = new FileSourceAssetCache(cacheDir);
+    const wikimedia = makeProvider("wikimedia", async () => []);
+    const searcher = new FallbackSourceAssetSearcher(
+      [wikimedia],
+      cache,
+      60_000,
+    );
+
+    const outcome = await searcher.search(PERSON);
+
+    expect(outcome.status).toBe("no_match");
+    expect(await cache.get(PERSON, "Ada Lovelace")).toBeNull();
+  });
+
+  it("tries fallback provider when the first throws", async () => {
+    const wikimedia = makeProvider("wikimedia", async () => {
+      throw new Error("network:ENOTFOUND");
+    });
+    const unsplash = makeProvider("unsplash", async () => [
+      makeAsset("unsplash:1"),
+    ]);
+    const searcher = new FallbackSourceAssetSearcher(
+      [wikimedia, unsplash],
+      null,
+      60_000,
+    );
+
+    const outcome = await searcher.search(PERSON);
+
+    expect(unsplash.search).toHaveBeenCalledTimes(1);
+    expect(outcome.status).toBe("ok");
+  });
+
+  it("does not cache provider failures", async () => {
+    const cache = new FileSourceAssetCache(cacheDir);
+    const wikimedia = makeProvider("wikimedia", async () => {
+      throw new Error("network:ENOTFOUND");
+    });
+    const searcher = new FallbackSourceAssetSearcher(
+      [wikimedia],
+      cache,
+      60_000,
+    );
+
+    await searcher.search(PERSON);
+
+    expect(await cache.get(PERSON, "Ada Lovelace")).toBeNull();
+  });
+
+  it("reports provider_failure when all providers fail", async () => {
+    const a = makeProvider("a", async () => {
+      throw new Error("network:ECONNRESET");
+    });
+    const b = makeProvider("b", async () => {
+      throw new Error("http:500");
+    });
+    const searcher = new FallbackSourceAssetSearcher([a, b], null, 60_000);
+
+    const outcome = await searcher.search(PERSON);
+
+    expect(outcome.status).toBe("provider_failure");
+    if (outcome.status === "provider_failure") {
+      expect(outcome.provider).toBe("multiple");
+      expect(outcome.reason).toMatch(/http:500|ECONNRESET/);
+    }
+  });
+
+  it("reports no_match when all providers return empty", async () => {
+    const a = makeProvider("a", async () => []);
+    const b = makeProvider("b", async () => []);
+    const searcher = new FallbackSourceAssetSearcher([a, b], null, 60_000);
+
+    const outcome = await searcher.search(PERSON);
+
+    expect(outcome.status).toBe("no_match");
+  });
+
+  it("treats an existing empty cache entry as a miss", async () => {
+    const cache = new FileSourceAssetCache(cacheDir);
+    await cache.set(PERSON, "Ada Lovelace", []);
+    const provider = makeProvider("test", async () => [
+      makeAsset("wikimedia:1"),
+    ]);
+    const searcher = new FallbackSourceAssetSearcher([provider], cache, 60_000);
+
+    const outcome = await searcher.search(PERSON);
+
+    expect(provider.search).toHaveBeenCalledTimes(1);
+    expect(outcome.status).toBe("ok");
+  });
+
+  it("reuses a successful cached result without calling the provider", async () => {
+    const cache = new FileSourceAssetCache(cacheDir);
+    await cache.set(PERSON, "Ada Lovelace", [makeAsset("wikimedia:1")]);
+    const provider = makeProvider("test", async () => [makeAsset("other:1")]);
+    const searcher = new FallbackSourceAssetSearcher([provider], cache, 60_000);
+
+    const outcome = await searcher.search(PERSON);
+
+    expect(provider.search).not.toHaveBeenCalled();
+    expect(outcome.status).toBe("ok");
+    if (outcome.status === "ok") {
+      expect(outcome.asset.id).toBe("wikimedia:1");
+    }
+  });
+
+  it("reports deadline_exceeded when materialization cannot finish in time", async () => {
+    mockHangingFetch();
+    const provider = makeProvider("test", async () => [
+      makeAsset("wikimedia:1"),
+    ]);
+    const searcher = new FallbackSourceAssetSearcher([provider], null, 150);
+
+    const started = Date.now();
+    const outcome = await searcher.search(PERSON);
+
+    expect(outcome.status).toBe("provider_failure");
+    if (outcome.status === "provider_failure") {
+      expect(outcome.reason).toBe("deadline_exceeded");
+    }
+    expect(Date.now() - started).toBeLessThan(10_000);
+  });
+
+  it("cached provider does not cache empty results", async () => {
+    const cache = new FileSourceAssetCache(cacheDir);
+    const provider = makeProvider("test", async () => []);
     const cachedProvider = new CachedSourceAssetProvider(provider, cache);
 
-    await cachedProvider.search(entity);
-    await cachedProvider.search(entity);
-    expect(provider.search).toHaveBeenCalledTimes(1);
+    const assets = await cachedProvider.search(PERSON, "Ada Lovelace");
+
+    expect(assets).toEqual([]);
+    expect(await cache.get(PERSON, "Ada Lovelace")).toBeNull();
+  });
+});
+
+describe("fetch with retry", () => {
+  it("caps each attempt timeout by the remaining deadline", async () => {
+    mockHangingFetch();
+    const started = Date.now();
+
+    await expect(
+      fetchWithRetry(
+        "https://example.test/1",
+        {},
+        { timeoutMs: 5_000, deadlineMs: Date.now() + 200, retryDelaysMs: [] },
+      ),
+    ).rejects.toThrow("timeout");
+
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  it("does not retry once the retry delay would exceed the deadline", async () => {
+    fetchSpy.mockImplementation(
+      async () => new Response("err", { status: 500 }),
+    );
+    const started = Date.now();
+
+    await expect(
+      fetchWithRetry(
+        "https://example.test/1",
+        {},
+        {
+          timeoutMs: 5_000,
+          deadlineMs: Date.now() + 300,
+          retryDelaysMs: [5_000],
+        },
+      ),
+    ).rejects.toThrow("deadline_exceeded");
+
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  it("retries transient failures within the deadline", async () => {
+    fetchSpy
+      .mockImplementationOnce(async () => new Response("err", { status: 503 }))
+      .mockImplementationOnce(async () => new Response("ok", { status: 200 }));
+
+    const response = await fetchWithRetry(
+      "https://example.test/1",
+      {},
+      {
+        timeoutMs: 5_000,
+        deadlineMs: Date.now() + 10_000,
+        retryDelaysMs: [10],
+      },
+    );
+
+    expect(response.status).toBe(200);
   });
 });
