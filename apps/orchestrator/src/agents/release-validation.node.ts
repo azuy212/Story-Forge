@@ -118,8 +118,10 @@ export async function validatePackage(
     !!meta?.title && !!meta?.description && (meta?.tags?.length ?? 0) > 0,
     "Metadata fields present",
   );
-  check(!!state.thumbnail?.thumbnailPrompt, "Thumbnail prompt present");
-  check(!!state.thumbnail?.imageUrl, "Thumbnail image exists");
+  if (configUtils.enableThumbnail()) {
+    check(!!state.thumbnail?.thumbnailPrompt, "Thumbnail prompt present");
+    check(!!state.thumbnail?.imageUrl, "Thumbnail image exists");
+  }
 
   const missingAssets = scenes.filter((s) => !s.assetUrl);
   check(

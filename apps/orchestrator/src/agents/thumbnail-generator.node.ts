@@ -196,14 +196,29 @@ export async function thumbnailGeneratorNode(
     };
   }
 
+  const output = result.data;
+  const thumbnailText = output.thumbnailText.trim();
+  const textPosition = normalizeTextPosition(output.textPosition);
+
+  // Thumbnail generation disabled via ENABLE_THUMBNAIL — return prompt only
+  if (!envConfig.enableThumbnail()) {
+    logger.nodeDone(label, Date.now() - startedAt);
+    return {
+      thumbnail: {
+        thumbnailPrompt: output.thumbnailPrompt,
+        thumbnailText,
+        textPosition,
+        colorScheme: output.colorScheme,
+      },
+      diagnostics: {},
+      execution: { currentNode: AgentModel.ThumbnailGenerator },
+    };
+  }
+
   logger.nodePhase(label, "generating thumbnail image");
   const provider = getAssetProvider(config);
   const compositor = getThumbnailCompositor(config);
   const runId = getArtifactNamespace(config, state);
-
-  const output = result.data;
-  const thumbnailText = output.thumbnailText.trim();
-  const textPosition = normalizeTextPosition(output.textPosition);
   const colorScheme = output.colorScheme;
   const mode = envConfig.thumbnailMode();
   const qaEnabled = envConfig.thumbnailQaEnabled();

@@ -31,6 +31,11 @@ export const config = {
   transcriberUrl: (): string =>
     read("TRANSCRIBER_URL") ?? "http://localhost:8030",
   useRealProviders: (): boolean => read("USE_REAL_PROVIDERS") === "true",
+  enableThumbnail: (): boolean => {
+    const v = read("ENABLE_THUMBNAIL");
+    if (v !== undefined) return v === "true";
+    return read("ENABLE_QA") === "true";
+  },
   thumbnailMode: (): "auto" | "full" | "overlay" => {
     const value = read("THUMBNAIL_MODE");
     return value === "full" || value === "overlay" ? value : "auto";
