@@ -55,6 +55,7 @@ export interface FfmpegComposerConfig {
   transitionType?: FadeTransition;
   subtitleFontSize?: number;
   subtitleFontName?: string;
+  subtitleFontPath?: string;
   backgroundMusicPath?: string;
   bgmVolume?: number;
   kenBurns?: Partial<KenBurnsConfig>;
@@ -73,6 +74,7 @@ type ResolvedConfig = {
   transitionType: FadeTransition;
   subtitleFontSize: number;
   subtitleFontName: string;
+  subtitleFontPath: string;
   backgroundMusicPath: string;
   bgmVolume: number;
   kenBurns: KenBurnsConfig;
@@ -149,6 +151,8 @@ export class FfmpegComposerProvider implements ComposerProvider {
       transitionType: config?.transitionType ?? "fade",
       subtitleFontSize: config?.subtitleFontSize ?? 20,
       subtitleFontName: config?.subtitleFontName ?? "Noto Sans",
+      subtitleFontPath:
+        config?.subtitleFontPath ?? "assets/branding/NotoSans-Bold.ttf",
       backgroundMusicPath: config?.backgroundMusicPath ?? "",
       bgmVolume: config?.bgmVolume ?? 0.15,
       kenBurns: {
@@ -193,9 +197,11 @@ export class FfmpegComposerProvider implements ComposerProvider {
 
     try {
       updateProgress("Preparing", 0);
-      const srtPath = opts.srt
-        ? await this.prepareSrt(opts.srt, workDir)
-        : null;
+      const subtitlePath = opts.ass
+        ? await this.prepareAss(opts.ass, workDir)
+        : opts.srt
+          ? await this.prepareSrt(opts.srt, workDir)
+          : null;
       const branding = opts.branding?.enabled
         ? await this.prepareBranding(opts, workDir, signal)
         : null;
@@ -237,13 +243,13 @@ export class FfmpegComposerProvider implements ComposerProvider {
       const finalBaseInfo = await probe(finalBaseVideo);
       const finalDurationMs = finalBaseInfo.duration * 1000;
 
-      if (srtPath) {
+      if (subtitlePath) {
         updateProgress("Subtitles", 60);
       }
-      const subbedVideo = srtPath
+      const subbedVideo = subtitlePath
         ? await this.burnSubtitlesStep(
             finalBaseVideo,
-            srtPath,
+            subtitlePath,
             workDir,
             signal,
             finalDurationMs,
@@ -414,6 +420,15 @@ export class FfmpegComposerProvider implements ComposerProvider {
     const srtPath = path.join(workDir, "subtitles.srt");
     await fs.writeFile(srtPath, srtContent, "utf-8");
     return srtPath;
+  }
+
+  private async prepareAss(
+    assContent: string,
+    workDir: string,
+  ): Promise<string> {
+    const assPath = path.join(workDir, "subtitles.ass");
+    await fs.writeFile(assPath, assContent, "utf-8");
+    return assPath;
   }
 
   private async prepareBranding(
@@ -842,25 +857,38 @@ export class FfmpegComposerProvider implements ComposerProvider {
 
   private async burnSubtitlesStep(
     videoPath: string,
-    srtPath: string,
+    subtitlePath: string,
     workDir: string,
     signal?: AbortSignal,
     totalDurationMs?: number,
   ): Promise<string> {
     const outputPath = path.join(workDir, "subbed.mp4");
     const enc = this.config.encoder;
-    const style = buildSubtitleStyle(
-      this.config.subtitleFontSize,
-      this.config.subtitleFontName,
-    );
-    const escapedPath = escapeSubtitlePath(srtPath);
+    const escapedPath = escapeSubtitlePath(subtitlePath);
+
+    // Point libass at the bundled subtitle font directory so it never
+    // silently substitutes a system font with different metrics.
+    const fontsDir = path.dirname(this.config.subtitleFontPath);
+    const fontsDirOpt = fontsDir
+      ? `:fontsdir=${escapeSubtitlePath(fontsDir)}`
+      : "";
+
+    // ASS carries its own full style (karaoke overrides included), so no
+    // force_style override is needed. SRT has no style, so apply one.
+    const isAss = subtitlePath.toLowerCase().endsWith(".ass");
+    const vf = isAss
+      ? `subtitles=filename=${escapedPath}${fontsDirOpt}`
+      : `subtitles=filename=${escapedPath}:force_style='${buildSubtitleStyle(
+          this.config.subtitleFontSize,
+          this.config.subtitleFontName,
+        )}'${fontsDirOpt}`;
 
     const args = [
       "-y",
       "-i",
       videoPath,
       "-vf",
-      `subtitles=filename=${escapedPath}:force_style='${style}'`,
+      vf,
       // Explicitly map video and audio to ensure audio isn't dropped
       "-map",
       "0:v:0",

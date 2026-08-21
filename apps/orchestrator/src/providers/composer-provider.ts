@@ -10,6 +10,7 @@ export interface ComposeOptions {
   scenes: ComposeSceneInput[];
   narrationUrl: string;
   srt: string;
+  ass?: string;
   totalDurationSeconds: number;
   narrativeHoldSeconds?: number;
   branding: {

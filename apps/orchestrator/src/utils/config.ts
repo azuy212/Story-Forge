@@ -128,4 +128,28 @@ export const config = {
   },
   googleSheetsSheetName: (): string =>
     read("GOOGLE_SHEETS_SHEET_NAME") || "Sheet1",
+  // --- Subtitle appearance (word-level karaoke rendering) ---
+  // Subtitle styling is controlled here so it is configurable in one place
+  // rather than hardcoded across the pipeline. Colors are ASS &HAABBGGRR.
+  subtitleFontSize: (): number => {
+    const value = Number(read("SUBTITLE_FONT_SIZE") ?? "48");
+    return Number.isFinite(value) && value > 0 ? value : 48;
+  },
+  subtitleFontName: (): string => read("SUBTITLE_FONT_NAME") ?? "Noto Sans",
+  // Bundled font file libass/fontconfig is pointed at via `fontsdir` so the
+  // render does not silently substitute a system font of different metrics.
+  subtitleFontPath: (): string =>
+    read("SUBTITLE_FONT_PATH") ?? "assets/branding/NotoSans-Bold.ttf",
+  subtitleMarginV: (): number => {
+    const value = Number(read("SUBTITLE_MARGIN_V") ?? "70");
+    return Number.isFinite(value) && value >= 0 ? value : 70;
+  },
+  subtitlePrimaryColor: (): string =>
+    read("SUBTITLE_PRIMARY_COLOR") ?? "&H00FFFFFF",
+  subtitleAccentColor: (): string =>
+    read("SUBTITLE_ACCENT_COLOR") ?? "&H0000E0FF",
+  subtitleOutline: (): number => {
+    const value = Number(read("SUBTITLE_OUTLINE") ?? "2");
+    return Number.isFinite(value) && value >= 0 ? value : 2;
+  },
 };

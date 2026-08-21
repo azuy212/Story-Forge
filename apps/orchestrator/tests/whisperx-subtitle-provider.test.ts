@@ -248,4 +248,18 @@ describe("groupWords", () => {
     expect(groups[0][0].start).toBe(0.1);
     expect(groups[0][2].end).toBe(0.4);
   });
+
+  it("cuts on a timing gap even below the min word count", () => {
+    const groups = groupWords(
+      words([
+        ["one", 0.0, 0.3],
+        ["two", 0.8, 1.1],
+        ["three", 1.1, 1.4],
+      ]),
+    );
+    expect(groups.map((g) => g.map((w) => w.word))).toEqual([
+      ["one"],
+      ["two", "three"],
+    ]);
+  });
 });

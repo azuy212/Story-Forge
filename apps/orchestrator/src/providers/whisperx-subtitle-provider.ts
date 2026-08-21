@@ -4,7 +4,8 @@ import type {
   WordTimestamp,
 } from "./subtitle-provider.js";
 import type { WhisperXProvider } from "./whisperx-provider.js";
-import { formatSrtTime, formatAssTime } from "../utils/subtitle-format.js";
+import { formatSrtTime } from "../utils/subtitle-format.js";
+import { buildKaraokeAss, appAssStyle } from "../utils/ass.js";
 
 const MIN_WORDS_PER_CUE = 3;
 const MAX_WORDS_PER_CUE = 5;
@@ -51,12 +52,7 @@ export class WhisperXSubtitleProvider implements SubtitleProvider {
       )
       .join("\n\n");
 
-    const ass = cues
-      .map(
-        (c) =>
-          `Dialogue: 0,${formatAssTime(c.startMs)},${formatAssTime(c.endMs)},Default,,0,0,0,,${c.text}`,
-      )
-      .join("\n");
+    const ass = buildKaraokeAss(groups, appAssStyle());
 
     return { srt, ass, wordTimestamps };
   }
@@ -73,11 +69,13 @@ export function groupWords(words: WordTimestamp[]): WordTimestamp[][] {
     if (i === words.length - 1) continue;
 
     const next = words[i + 1];
+    // A meaningful timing gap always cuts the group (even below the min word
+    // count) so a trailing word never stays highlighted through silence.
+    // Punctuation and max-length cuts only apply once the group is readable.
     const shouldCut =
-      current.length >= MIN_WORDS_PER_CUE &&
-      (isPunctuationBoundary(word) ||
-        hasTimingGap(word, next) ||
-        current.length >= MAX_WORDS_PER_CUE);
+      hasTimingGap(word, next) ||
+      (current.length >= MIN_WORDS_PER_CUE &&
+        (isPunctuationBoundary(word) || current.length >= MAX_WORDS_PER_CUE));
 
     if (shouldCut) {
       groups.push(current);

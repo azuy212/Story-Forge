@@ -25,7 +25,11 @@ import { config as appConfig } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
 
-const DEFAULT_PROVIDER = new FfmpegComposerProvider({ subtitleFontSize: 16 });
+const DEFAULT_PROVIDER = new FfmpegComposerProvider({
+  subtitleFontSize: appConfig.subtitleFontSize(),
+  subtitleFontName: appConfig.subtitleFontName(),
+  subtitleFontPath: appConfig.subtitleFontPath(),
+});
 
 const FRAME_RATE = 30;
 const MIN_SCALE_FACTOR = 0.5;
@@ -258,6 +262,7 @@ export async function videoComposerNode(
         scenes,
         narrationUrl: state.audio!.narrationUrl!,
         srt: state.subtitles!.srt!,
+        ass: state.subtitles!.ass,
         totalDurationSeconds,
         narrativeHoldSeconds,
         narrationDurationMs: targetMs,
@@ -273,6 +278,7 @@ export async function videoComposerNode(
           scenes,
           narrationUrl: state.audio!.narrationUrl!,
           srt: state.subtitles!.srt!,
+          ass: state.subtitles!.ass,
           totalDurationSeconds,
           narrativeHoldSeconds,
           branding: {

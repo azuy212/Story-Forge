@@ -1,5 +1,6 @@
 import type { Scene, SceneAudio } from "../types/index.js";
-import { formatAssTime, formatSrtTime } from "../utils/subtitle-format.js";
+import { formatSrtTime } from "../utils/subtitle-format.js";
+import { buildKaraokeAss, appAssStyle } from "../utils/ass.js";
 import type {
   GenerateSubtitlesResult,
   WordTimestamp,
@@ -49,37 +50,29 @@ export class DeterministicSceneSubtitleProvider implements SceneSubtitleProvider
       sceneStart += durationSeconds;
     }
 
-    const cues = groupWordsByScene(wordTimestamps, orderedAudio, sceneById);
-    const srt = cues
-      .map(
-        (cue, index) =>
-          `${index + 1}\n${formatSrtTime(cue.startMs)} --> ${formatSrtTime(cue.endMs)}\n${cue.text}`,
-      )
+    const groups = groupWordsByScene(wordTimestamps, orderedAudio, sceneById);
+    const srt = groups
+      .map((group, index) => {
+        const startMs = Math.round(group[0].start * 1000);
+        const endMs = Math.max(
+          startMs + 1,
+          Math.round(group[group.length - 1].end * 1000),
+        );
+        return `${index + 1}\n${formatSrtTime(startMs)} --> ${formatSrtTime(endMs)}\n${group.map((w) => w.word).join(" ")}`;
+      })
       .join("\n\n");
-    const ass = cues
-      .map(
-        (cue) =>
-          `Dialogue: 0,${formatAssTime(cue.startMs)},${formatAssTime(cue.endMs)},Default,,0,0,0,,${cue.text}`,
-      )
-      .join("\n");
+    const ass = buildKaraokeAss(groups, appAssStyle());
 
     return { srt, ass, wordTimestamps };
   }
-}
-
-interface Cue {
-  startMs: number;
-  endMs: number;
-  text: string;
 }
 
 function groupWordsByScene(
   words: WordTimestamp[],
   audioScenes: SceneAudio[],
   scenes: Map<number, Scene>,
-): Cue[] {
-  const cues: Cue[] = [];
-  let offset = 0;
+): WordTimestamp[][] {
+  const groups: WordTimestamp[][] = [];
   let wordOffset = 0;
 
   for (const audio of audioScenes) {
@@ -100,22 +93,11 @@ function groupWordsByScene(
           PUNCTUATION_RE.test(word.word.trim()) ||
           current.length >= MAX_WORDS_PER_CUE);
       if (shouldCut || !next) {
-        const startMs = Math.round(current[0].start * 1000);
-        const endMs = Math.min(
-          Math.round((offset + audio.durationMs / 1000) * 1000),
-          Math.round(current.at(-1)!.end * 1000),
-        );
-        cues.push({
-          startMs,
-          endMs: Math.max(startMs + 1, endMs),
-          text: current.map((item) => item.word).join(" "),
-        });
+        groups.push(current);
         current = [];
       }
     }
-
-    offset += audio.durationMs / 1000;
   }
 
-  return cues;
+  return groups;
 }

@@ -10,22 +10,67 @@ import type { SceneAudio } from "../schemas/audio.js";
 import { AgentModel } from "../models/agent-model.js";
 import type { SceneSubtitleProvider } from "../providers/scene-subtitle-provider.js";
 import { DeterministicSceneSubtitleProvider } from "../providers/scene-subtitle-provider.js";
+import { WhisperXSceneSubtitleProvider } from "../providers/whisperx-scene-subtitle-provider.js";
+import { HttpWhisperXProvider } from "../providers/whisperx-provider.js";
+import type { GenerateSubtitlesResult } from "../providers/subtitle-provider.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
 import { withTopic } from "../artifacts/context.js";
+import { config as appConfig } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
 
-const SUBTITLE_ALIGNMENT_VERSION = 3;
+const SUBTITLE_ALIGNMENT_VERSION = 5;
 
 const DEFAULT_PROVIDER = new DeterministicSceneSubtitleProvider();
+const REAL_PROVIDER = new WhisperXSceneSubtitleProvider(
+  new HttpWhisperXProvider(),
+);
+
+/**
+ * Tries the primary (WhisperX) provider and falls back to the deterministic
+ * provider on any failure, logging a warning. The fallback decision lives at
+ * the provider-selection boundary so a WhisperX outage degrades gracefully
+ * instead of failing the subtitle node.
+ */
+export class FallbackSceneSubtitleProvider implements SceneSubtitleProvider {
+  constructor(
+    private readonly primary: SceneSubtitleProvider,
+    private readonly fallback: SceneSubtitleProvider,
+  ) {}
+
+  async generateSceneSubtitles(
+    scenes: Scene[],
+    audioScenes: SceneAudio[],
+  ): Promise<GenerateSubtitlesResult> {
+    try {
+      return await this.primary.generateSceneSubtitles(scenes, audioScenes);
+    } catch (err) {
+      logger.warn(
+        "WhisperX subtitle alignment failed; using deterministic subtitles",
+        { error: (err as Error)?.message ?? String(err) },
+      );
+      return this.fallback.generateSceneSubtitles(scenes, audioScenes);
+    }
+  }
+}
+
+const FALLBACK_REAL_PROVIDER = new FallbackSceneSubtitleProvider(
+  REAL_PROVIDER,
+  DEFAULT_PROVIDER,
+);
 
 function getSceneSubtitleProvider(
   config: RunnableConfig,
 ): SceneSubtitleProvider {
   const inject = (config.configurable ?? {}) as Record<string, unknown>;
-  return (
-    (inject.sceneSubtitleProvider as SceneSubtitleProvider) ?? DEFAULT_PROVIDER
-  );
+  if (inject.sceneSubtitleProvider) {
+    return inject.sceneSubtitleProvider as SceneSubtitleProvider;
+  }
+  // WhisperX provides real word-level alignment in real-provider mode; on
+  // failure it falls back to deterministic scene-bounded timing.
+  return appConfig.useRealProviders()
+    ? FALLBACK_REAL_PROVIDER
+    : DEFAULT_PROVIDER;
 }
 
 export async function subtitleGeneratorNode(

@@ -1,5 +1,8 @@
 import { jest, describe, it, expect, beforeEach } from "@jest/globals";
-import { subtitleGeneratorNode } from "../src/agents/subtitle-generator.node.js";
+import {
+  subtitleGeneratorNode,
+  FallbackSceneSubtitleProvider,
+} from "../src/agents/subtitle-generator.node.js";
 import type { ProjectState, Scene } from "../src/types/index.js";
 import type {
   SubtitleProvider,
@@ -239,5 +242,59 @@ describe("subtitleGeneratorNode", () => {
       "Complete scene audio manifest",
     );
     expect(mockGenerateSubtitles).not.toHaveBeenCalled();
+  });
+});
+
+describe("FallbackSceneSubtitleProvider", () => {
+  const ok = { srt: "ok", ass: "ok", wordTimestamps: [] };
+  const primary = {
+    generateSceneSubtitles: jest.fn<(...args: any[]) => Promise<any>>(),
+  };
+  const fallback = {
+    generateSceneSubtitles: jest.fn<(...args: any[]) => Promise<any>>(),
+  };
+
+  beforeEach(() => {
+    primary.generateSceneSubtitles.mockReset();
+    fallback.generateSceneSubtitles.mockReset();
+  });
+
+  it("falls back to the deterministic provider when the primary fails", async () => {
+    primary.generateSceneSubtitles.mockRejectedValue(
+      new Error("WhisperX down"),
+    );
+    fallback.generateSceneSubtitles.mockResolvedValue(ok);
+
+    const wrapped = new FallbackSceneSubtitleProvider(
+      primary as any,
+      fallback as any,
+    );
+    const result = await wrapped.generateSceneSubtitles(
+      SCENES as any,
+      AUDIO_SCENES as any,
+    );
+
+    expect(primary.generateSceneSubtitles).toHaveBeenCalledWith(
+      SCENES,
+      AUDIO_SCENES,
+    );
+    expect(fallback.generateSceneSubtitles).toHaveBeenCalled();
+    expect(result).toEqual(ok);
+  });
+
+  it("does not call the fallback when the primary succeeds", async () => {
+    primary.generateSceneSubtitles.mockResolvedValue(ok);
+
+    const wrapped = new FallbackSceneSubtitleProvider(
+      primary as any,
+      fallback as any,
+    );
+    const result = await wrapped.generateSceneSubtitles(
+      SCENES as any,
+      AUDIO_SCENES as any,
+    );
+
+    expect(fallback.generateSceneSubtitles).not.toHaveBeenCalled();
+    expect(result).toEqual(ok);
   });
 });

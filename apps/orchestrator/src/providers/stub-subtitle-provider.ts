@@ -3,7 +3,8 @@ import type {
   GenerateSubtitlesResult,
   WordTimestamp,
 } from "./subtitle-provider.js";
-import { formatSrtTime, formatAssTime } from "../utils/subtitle-format.js";
+import { formatSrtTime } from "../utils/subtitle-format.js";
+import { buildKaraokeAss, appAssStyle } from "../utils/ass.js";
 
 const WORDS_PER_CUE = 3;
 const FALLBACK_MS_PER_WORD = 300;
@@ -52,18 +53,18 @@ export class StubSubtitleProvider implements SubtitleProvider {
       )
       .join("\n\n");
 
-    const ass = cues
-      .map(
-        (c) =>
-          `Dialogue: 0,${formatAssTime(c.startMs)},${formatAssTime(c.endMs)},Default,,0,0,0,,${c.text}`,
-      )
-      .join("\n");
-
     const wordTimestamps: WordTimestamp[] = words.map((word, i) => {
       const startSec = (totalMs / 1000) * (i / words.length);
       const endSec = (totalMs / 1000) * ((i + 1) / words.length);
       return { word, start: round2(startSec), end: round2(endSec) };
     });
+
+    const groups: WordTimestamp[][] = [];
+    for (let i = 0; i < wordTimestamps.length; i += WORDS_PER_CUE) {
+      groups.push(wordTimestamps.slice(i, i + WORDS_PER_CUE));
+    }
+
+    const ass = buildKaraokeAss(groups, appAssStyle());
 
     return { srt, ass, wordTimestamps };
   }
