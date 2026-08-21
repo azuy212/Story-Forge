@@ -24,6 +24,7 @@ import { releaseReviewNode } from "../agents/release-review.node.js";
 import { publisherNode } from "../agents/publisher.node.js";
 import { publishReadyNode } from "../agents/publish-ready.node.js";
 import { logger } from "../utils/logger.js";
+import { config as configUtils } from "../utils/config.js";
 
 import {
   RESEARCH_MAX_RETRIES,
@@ -110,9 +111,11 @@ const hasMetadata = (s: GuardState) =>
   !!s.metadataOutput?.title &&
   !!s.metadataOutput?.description &&
   (s.metadataOutput?.tags?.length ?? 0) > 0;
-// Require the actual thumbnail image, not just the prompt: Publisher sends
-// imageUrl, so a prompt-only thumbnail would publish with no thumbnail.
-const hasThumbnail = (s: GuardState) => !!s.thumbnail?.imageUrl;
+const thumbnailEnabled = configUtils.enableThumbnail();
+// Require the actual thumbnail image only when thumbnails are enabled.
+// When disabled, the prompt-only thumbnail is sufficient for the package.
+const hasThumbnail = (s: GuardState) =>
+  thumbnailEnabled ? !!s.thumbnail?.imageUrl : !!s.thumbnail?.thumbnailPrompt;
 // Publisher requires video + metadata + thumbnail to all exist. This is the
 // final gate on PublishReady's conditional edge: PublishReady may be triggered
 // by a single branch (LangGraph fan-in is any-edge, not a join), but it can

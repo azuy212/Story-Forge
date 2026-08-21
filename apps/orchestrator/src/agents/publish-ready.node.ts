@@ -16,12 +16,15 @@ function isHttpUrl(value: string): boolean {
 }
 
 function hasPackage(state: ProjectState): boolean {
+  const thumbnailEnabled = configUtils.enableThumbnail();
   return (
     !!state.video?.videoUrl &&
     !!state.metadataOutput?.title &&
     !!state.metadataOutput?.description &&
     (state.metadataOutput?.tags?.length ?? 0) > 0 &&
-    !!state.thumbnail?.imageUrl
+    (thumbnailEnabled
+      ? !!state.thumbnail?.imageUrl
+      : !!state.thumbnail?.thumbnailPrompt)
   );
 }
 
@@ -63,7 +66,10 @@ export async function publishReadyNode(state: ProjectState): Promise<{
 
   const problems: string[] = [];
   const video = state.video!.videoUrl!;
-  const thumbnail = state.thumbnail!.imageUrl!;
+  const thumbnailEnabled = configUtils.enableThumbnail();
+  const thumbnail = thumbnailEnabled
+    ? state.thumbnail!.imageUrl!
+    : state.thumbnail!.thumbnailPrompt!;
   const meta = state.metadataOutput!;
   const platforms = state.branding?.platforms ?? ["youtube"];
 
@@ -73,10 +79,14 @@ export async function publishReadyNode(state: ProjectState): Promise<{
     problems.push(`Final video file missing: ${video}`);
   }
 
-  if (thumbnail.length === 0) {
-    problems.push("Thumbnail missing");
-  } else if (!isHttpUrl(thumbnail) && !fs.existsSync(thumbnail)) {
-    problems.push(`Thumbnail file missing: ${thumbnail}`);
+  if (thumbnailEnabled) {
+    if (thumbnail.length === 0) {
+      problems.push("Thumbnail missing");
+    } else if (!isHttpUrl(thumbnail) && !fs.existsSync(thumbnail)) {
+      problems.push(`Thumbnail file missing: ${thumbnail}`);
+    }
+  } else if (!thumbnail || thumbnail.length === 0) {
+    problems.push("Thumbnail prompt missing");
   }
 
   if ((meta.title?.length ?? 0) > TITLE_MAX_CHARS) {

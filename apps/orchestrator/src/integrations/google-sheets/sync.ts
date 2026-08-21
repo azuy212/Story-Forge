@@ -110,7 +110,7 @@ export async function syncPublishResults(options: {
   }
 
   const sheetName = config.googleSheetsSheetName();
-  const category = state.metadataOutput?.category;
+  const category = state.project?.pillar ?? state.metadataOutput?.category;
   const topic = state.project?.topic;
   const title = state.metadataOutput?.title;
   const privacy = config.youtubePrivacyStatus();
