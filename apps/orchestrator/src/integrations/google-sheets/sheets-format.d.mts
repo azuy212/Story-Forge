@@ -11,6 +11,12 @@ export const COLUMN: {
   SCHEDULED_AT: number;
   PUBLISHED_AT: number;
   DURATION: number;
+  LLM_PROMPT_TOKENS: number;
+  LLM_COMPLETION_TOKENS: number;
+  LLM_TOTAL_TOKENS: number;
+  LLM_REASONING_TOKENS: number;
+  LLM_CACHED_TOKENS: number;
+  LLM_COST_USD: number;
 };
 export const PLANNED_STATUS: "planned";
 export const SLOT_HOURS: number[];
@@ -47,6 +53,12 @@ export interface SheetRowRecord {
   scheduledAt?: string;
   publishedAt?: string;
   durationMs?: number | null;
+  llmPromptTokens?: number;
+  llmCompletionTokens?: number;
+  llmTotalTokens?: number;
+  llmReasoningTokens?: number;
+  llmCachedTokens?: number;
+  llmCostUsd?: number;
 }
 
-export function buildSheetRow(record: SheetRowRecord): string[];
+export function buildSheetRow(record: SheetRowRecord): (string | number)[];

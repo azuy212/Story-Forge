@@ -56,7 +56,7 @@ describe("syncVideoRecord", () => {
     expect(api.append).toHaveBeenCalledWith(
       expect.objectContaining({
         spreadsheetId: "sheet-1",
-        range: "'Sheet1'!A:K",
+        range: "'Sheet1'!A:Q",
         valueInputOption: "RAW",
         insertDataOption: "INSERT_ROWS",
         requestBody: {
@@ -73,6 +73,12 @@ describe("syncVideoRecord", () => {
               "2026-08-20T12:00:00.000Z",
               "",
               "0:01:05",
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
             ],
           ],
         },
@@ -110,7 +116,7 @@ describe("syncVideoRecord", () => {
     expect(api.append).not.toHaveBeenCalled();
     expect(api.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        range: "'Sheet1'!A2:K2",
+        range: "'Sheet1'!A2:Q2",
         valueInputOption: "RAW",
       }),
     );
@@ -136,7 +142,7 @@ describe("syncVideoRecord", () => {
 });
 
 describe("buildSheetRow", () => {
-  it("renders the canonical 11-cell row", () => {
+  it("renders the canonical 17-cell row", () => {
     const row = buildSheetRow({
       videoId: "abc123",
       category: "Geography",
@@ -160,7 +166,32 @@ describe("buildSheetRow", () => {
       "",
       "2026-08-20T12:00:00.000Z",
       "0:01:05",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
     ]);
+  });
+
+  it("renders LLM usage cells when present", () => {
+    const row = buildSheetRow({
+      videoId: "abc123",
+      status: "published",
+      llmPromptTokens: 100,
+      llmCompletionTokens: 200,
+      llmTotalTokens: 300,
+      llmReasoningTokens: 50,
+      llmCachedTokens: 40,
+      llmCostUsd: 0.0123,
+    });
+    expect(row[11]).toBe(100);
+    expect(row[12]).toBe(200);
+    expect(row[13]).toBe(300);
+    expect(row[14]).toBe(50);
+    expect(row[15]).toBe(40);
+    expect(row[16]).toBe(0.0123);
   });
 
   it("leaves timestamps and duration empty when not applicable", () => {
@@ -171,6 +202,12 @@ describe("buildSheetRow", () => {
     expect(row[8]).toBe("");
     expect(row[9]).toBe("");
     expect(row[10]).toBe("");
+    expect(row[11]).toBe("");
+    expect(row[12]).toBe("");
+    expect(row[13]).toBe("");
+    expect(row[14]).toBe("");
+    expect(row[15]).toBe("");
+    expect(row[16]).toBe("");
   });
 });
 
@@ -283,7 +320,7 @@ describe("syncPublishResults", () => {
         return { data: {} };
       }),
       update: jest.fn(async ({ range, requestBody }) => {
-        const idx = Number(range.match(/!A(\d+):K(\d+)$/)[1]) - 1;
+        const idx = Number(range.match(/!A(\d+):Q(\d+)$/)[1]) - 1;
         rows[idx] = requestBody.values[0];
         return { data: {} };
       }),
@@ -313,6 +350,46 @@ describe("syncPublishResults", () => {
       "",
       "2026-08-20T12:00:00.000Z",
       "0:01:05",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+    ]);
+  });
+
+  it("writes LLM usage aggregate into the row when provided", async () => {
+    const api = makeMutableApi();
+    await syncPublishResults({
+      state: baseState(),
+      results: [pubResult("published", "yt-1", "2026-08-20T12:00:00.000Z")],
+      usage: {
+        llmPromptTokens: 100,
+        llmCompletionTokens: 200,
+        llmTotalTokens: 300,
+        llmReasoningTokens: 50,
+        llmCachedTokens: 40,
+        llmCacheWriteTokens: 10,
+        llmCostUsd: 0.05,
+        llmRequestCount: 5,
+        llmModels: {
+          "model-x": {
+            requests: 5,
+            promptTokens: 100,
+            completionTokens: 200,
+            totalTokens: 300,
+            costUsd: 0.05,
+          },
+        },
+      },
+      api: api as any,
+    });
+
+    expect(api.append).toHaveBeenCalledTimes(1);
+    const { requestBody } = api.append.mock.calls[0][0];
+    expect(requestBody.values[0].slice(11)).toEqual([
+      100, 200, 300, 50, 40, 0.05,
     ]);
   });
 
@@ -326,7 +403,9 @@ describe("syncPublishResults", () => {
     });
 
     const { requestBody } = api.append.mock.calls[0][0];
-    expect(requestBody.values[0][8]).toBe(formatLocalTimestamp("2026-08-20T12:00:00.000Z"));
+    expect(requestBody.values[0][8]).toBe(
+      formatLocalTimestamp("2026-08-20T12:00:00.000Z"),
+    );
     expect(requestBody.values[0][9]).toBe("");
   });
 

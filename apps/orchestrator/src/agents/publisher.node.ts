@@ -12,6 +12,8 @@ import { syncPublishResults } from "../integrations/google-sheets/sync.js";
 import type { SheetsValuesApi } from "../integrations/google-sheets/client.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
 import { withTopic } from "../artifacts/context.js";
+import { aggregateForRun } from "../artifacts/usage.js";
+import type { LLMAggregate } from "../models/usage.js";
 import type { SourceAsset } from "../schemas/production.js";
 import { config as configUtils } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
@@ -179,11 +181,14 @@ export async function publisherNode(
 
   // Best-effort write-back of publish records to Google Sheets. Never throws
   // and never fails the publish; the sync itself logs its own failures.
+  let usage: LLMAggregate | undefined;
   if (result.data) {
+    usage = await aggregateForRun(withTopic(config, state));
     await syncPublishResults({
       state,
       results: result.data.results ?? [],
       publishAt: publishAt ?? undefined,
+      usage,
       api: getInjectedSheetsApi(config),
     });
   }
@@ -192,6 +197,7 @@ export async function publisherNode(
     publishing: result.data ?? { results: [] },
     diagnostics: {
       errors: result.error ? [result.error] : undefined,
+      llmUsage: usage,
     },
     execution: { currentNode: AgentModel.Publisher },
   };

@@ -38,6 +38,8 @@ export interface ArtifactStore {
     inputHash: string,
   ): Promise<{ record: ArtifactRecord<T>; ref: ArtifactReference } | null>;
 
+  listAll<T>(runId: string, type: ArtifactType): Promise<ArtifactRecord<T>[]>;
+
   listVersions(
     runId: string,
     type: ArtifactType,

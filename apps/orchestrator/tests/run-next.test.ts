@@ -16,7 +16,7 @@ afterEach(() => {
 });
 
 function plannedRow(overrides: Partial<Record<number, string>> = {}): string[] {
-  const row = Array(11).fill("");
+  const row = Array(EXPECTED_HEADERS.length).fill("");
   row[0] = "abc123";
   row[1] = "Geography";
   row[2] = "Unrecognized Countries";
@@ -54,6 +54,59 @@ describe("decideRun", () => {
       topic: "Unrecognized Countries",
       projectId: "legacy-1",
     });
+  });
+
+  it("re-seeds the next free slot on resume like a new run", () => {
+    addRun("geo-run-3", {
+      topic: "Unrecognized Countries",
+      pillar: "Geography",
+      projectId: "legacy-1",
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    const decision: any = decideRun(
+      runsDir,
+      [EXPECTED_HEADERS, plannedRow()],
+      FIXED_NOW,
+    );
+    expect(decision.action).toBe("resume");
+    expect(decision.youtubePublishAt).toBe(
+      new Date("2026-08-20T12:00:00").toISOString(),
+    );
+  });
+
+  it("still resumes without a slot when every slot is occupied", () => {
+    addRun("geo-run-4", {
+      topic: "Unrecognized Countries",
+      pillar: "Geography",
+      projectId: "legacy-1",
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    const scheduled = new Date("2026-08-20T10:00:00");
+    const rows = [EXPECTED_HEADERS, plannedRow()];
+    for (let day = 0; day < 30; day++) {
+      for (const hour of [12, 20]) {
+        const slot = new Date(scheduled);
+        slot.setDate(slot.getDate() + day);
+        slot.setHours(hour, 0, 0, 0);
+        if (slot.getTime() <= FIXED_NOW.getTime()) continue;
+        rows.push([
+          `other-${day}-${hour}`,
+          "Geography",
+          "Other",
+          "Other",
+          "scheduled",
+          "yt-x",
+          "https://youtu.be/x",
+          "private",
+          slot.toISOString(),
+          "",
+          "",
+        ]);
+      }
+    }
+    const decision: any = decideRun(runsDir, rows, FIXED_NOW);
+    expect(decision.action).toBe("resume");
+    expect(decision.youtubePublishAt).toBeUndefined();
   });
 
   it("falls back to the backlog row video id for legacy runs without projectId", () => {

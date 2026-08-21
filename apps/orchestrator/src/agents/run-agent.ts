@@ -15,6 +15,8 @@ import {
   type ComputeResult,
 } from "../artifacts/cache.js";
 import { getArtifactDefByNode } from "../artifacts/registry.js";
+import { persistLlmUsage } from "../artifacts/usage.js";
+import { newInvocationId } from "../models/usage.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
 
 import { DEFAULT_MAX_RETRIES } from "../utils/constants.js";
@@ -286,12 +288,26 @@ export async function runAgent<T>({
       // verbatim to the parse/schema retry feedback. Stays undefined (so no
       // stale content is attached) for timeout/transient failures.
       let rawContent: string | undefined;
+      const invocationId = newInvocationId();
 
       try {
-        const response = await model.generate(attemptMessages, opts);
+        const llmResult = await model.generate(attemptMessages, opts);
 
-        rawContent = response?.choices?.[0]?.message?.content as
-          string | undefined;
+        // Persist usage for EVERY completed request — including attempts that
+        // then fail JSON/schema validation, since those consumed tokens.
+        // Best-effort: accounting never fails generation.
+        await persistLlmUsage(
+          { configurable },
+          { node: agent, attempt, invocationId },
+          llmResult.usage,
+        );
+        if (!llmResult.usage) {
+          logger.warn(`${agent} response did not include usage`, {
+            attempt,
+          });
+        }
+
+        rawContent = llmResult.output;
         if (!rawContent) {
           throw new LLMError(
             "Empty response from model: missing choices or content",
@@ -315,15 +331,21 @@ export async function runAgent<T>({
 
         const durationMs = Date.now() - startedAt;
 
+        logger.debug(`${agent} model call complete`, {
+          model: model.model,
+          totalTokens: llmResult.usage?.totalTokens,
+          costUsd: llmResult.usage?.costUsd,
+        });
+
         const promptVersion = promptPath.replace(/\.md$/, "");
         return {
           data: result.data,
           telemetry: {
             model: model.model,
             durationMs,
-            promptTokens: response.usage?.prompt_tokens ?? undefined,
-            completionTokens: response.usage?.completion_tokens ?? undefined,
-            totalTokens: response.usage?.total_tokens ?? undefined,
+            promptTokens: llmResult.usage?.promptTokens,
+            completionTokens: llmResult.usage?.completionTokens,
+            totalTokens: llmResult.usage?.totalTokens,
             retries: attempt - 1,
             promptVersion,
             agentVersion: AGENT_VERSION,

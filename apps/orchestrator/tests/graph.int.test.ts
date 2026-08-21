@@ -338,156 +338,97 @@ describe("Graph", () => {
     mockGenerate
       // ResearchAgent
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                summary: "A remote island in the Pacific Ocean.",
-                facts: FACTS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 11, completion_tokens: 22, total_tokens: 33 },
-        model: "test-model",
+        output: JSON.stringify({
+          summary: "A remote island in the Pacific Ocean.",
+          facts: FACTS,
+        }),
+
+        usage: { promptTokens: 11, completionTokens: 22, totalTokens: 33 },
       })
       // ResearchQA (approved)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: { content: JSON.stringify(makeResearchQAResponse(FACTS)) },
-          },
-        ],
-        usage: { prompt_tokens: 9, completion_tokens: 6, total_tokens: 15 },
-        model: "test-model",
+        output: JSON.stringify(makeResearchQAResponse(FACTS)),
+
+        usage: { promptTokens: 9, completionTokens: 6, totalTokens: 15 },
       })
       // ScriptPlanner (title/hook + story plan, single call)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: {
-                  title: "The Country That Doesn't Exist",
-                  hook: "What if a country officially wasn't real?",
-                },
-                storyType: "mystery",
-                storySummary:
-                  "A remote island that is one of the most isolated places on Earth.",
-                storyBeats: STORY_BEATS,
-              }),
-            },
+        output: JSON.stringify({
+          content: {
+            title: "The Country That Doesn't Exist",
+            hook: "What if a country officially wasn't real?",
           },
-        ],
-        usage: { prompt_tokens: 13, completion_tokens: 26, total_tokens: 39 },
-        model: "test-model",
+          storyType: "mystery",
+          storySummary:
+            "A remote island that is one of the most isolated places on Earth.",
+          storyBeats: STORY_BEATS,
+        }),
+
+        usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: {
-                  script: "Script text.",
-                  narration: SCENE_NARRATIONS.join(" "),
-                  callToAction: "Follow @UniverseDecoded for more.",
-                  estimatedDurationSeconds: 42,
-                },
-              }),
-            },
+        output: JSON.stringify({
+          content: {
+            script: "Script text.",
+            narration: SCENE_NARRATIONS.join(" "),
+            callToAction: "Follow @UniverseDecoded for more.",
+            estimatedDurationSeconds: 42,
           },
-        ],
-        usage: { prompt_tokens: 12, completion_tokens: 24, total_tokens: 36 },
-        model: "test-model",
+        }),
+
+        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({ status: "approved", feedback: "" }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify({ status: "approved", feedback: "" }),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       // MetadataGenerator
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                title: "Test Title",
-                description: "Test description.",
-                tags: ["geography"],
-                hashtags: ["geo"],
-                category: "Education",
-                pinnedComment: "Comment?",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          title: "Test Title",
+          description: "Test description.",
+          tags: ["geography"],
+          hashtags: ["geo"],
+          category: "Education",
+          pinnedComment: "Comment?",
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       // ThumbnailGenerator
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                thumbnailPrompt: "High contrast aerial view",
-                thumbnailText: "Doesn't Exist?",
-                textPosition: "bottom-third",
-                colorScheme: "cold blue and white",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 12, total_tokens: 28 },
-        model: "test-model",
+        output: JSON.stringify({
+          thumbnailPrompt: "High contrast aerial view",
+          thumbnailText: "Doesn't Exist?",
+          textPosition: "bottom-third",
+          colorScheme: "cold blue and white",
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
       })
       // VisualDirector (scenes + visual plans, single call)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                scenes: SCENES,
-                visualPlans: VISUAL_PLANS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: VISUAL_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       .mockResolvedValueOnce({
-        choices: [{ message: { content: JSON.stringify({ assets: ASSETS }) } }],
-        usage: { prompt_tokens: 16, completion_tokens: 32, total_tokens: 48 },
-        model: "test-model",
+        output: JSON.stringify({ assets: ASSETS }),
+        usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify(makePromptQAResponse("approved", SCENES)),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify(makePromptQAResponse("approved", SCENES)),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({ status: "approved", issues: [] }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify({ status: "approved", issues: [] }),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       });
 
     const result = await graph.invoke(
@@ -642,141 +583,89 @@ describe("Graph", () => {
 
     mockGenerate
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({ summary: "Summary.", facts: FACTS }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 11, completion_tokens: 22, total_tokens: 33 },
-        model: "test-model",
+        output: JSON.stringify({ summary: "Summary.", facts: FACTS }),
+
+        usage: { promptTokens: 11, completionTokens: 22, totalTokens: 33 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: { content: JSON.stringify(makeResearchQAResponse(FACTS)) },
-          },
-        ],
-        usage: { prompt_tokens: 9, completion_tokens: 6, total_tokens: 15 },
-        model: "test-model",
+        output: JSON.stringify(makeResearchQAResponse(FACTS)),
+
+        usage: { promptTokens: 9, completionTokens: 6, totalTokens: 15 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: { title: "Title", hook: "Hook?" },
-                storyType: "mystery",
-                storySummary: "Summary.",
-                storyBeats: BEATS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 13, completion_tokens: 26, total_tokens: 39 },
-        model: "test-model",
+        output: JSON.stringify({
+          content: { title: "Title", hook: "Hook?" },
+          storyType: "mystery",
+          storySummary: "Summary.",
+          storyBeats: BEATS,
+        }),
+
+        usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: {
-                  script: "Script.",
-                  narration: "Narration.",
-                  callToAction: "Subscribe.",
-                  estimatedDurationSeconds: 45,
-                },
-              }),
-            },
+        output: JSON.stringify({
+          content: {
+            script: "Script.",
+            narration: "Narration.",
+            callToAction: "Subscribe.",
+            estimatedDurationSeconds: 45,
           },
-        ],
-        usage: { prompt_tokens: 12, completion_tokens: 24, total_tokens: 36 },
-        model: "test-model",
+        }),
+
+        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
       })
       // First ScriptQA call — retries becomes 1
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                status: "minor_revision",
-                feedback: "Fix pacing.",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify({
+          status: "minor_revision",
+          feedback: "Fix pacing.",
+        }),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       // ScriptWriter runs again
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: {
-                  script: "Script v2.",
-                  narration: "Narration v2.",
-                  callToAction: "Subscribe.",
-                  estimatedDurationSeconds: 45,
-                },
-              }),
-            },
+        output: JSON.stringify({
+          content: {
+            script: "Script v2.",
+            narration: "Narration v2.",
+            callToAction: "Subscribe.",
+            estimatedDurationSeconds: 45,
           },
-        ],
-        usage: { prompt_tokens: 12, completion_tokens: 24, total_tokens: 36 },
-        model: "test-model",
+        }),
+
+        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
       })
       // Second ScriptQA call — retries becomes 2
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                status: "minor_revision",
-                feedback: "Still bad pacing.",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify({
+          status: "minor_revision",
+          feedback: "Still bad pacing.",
+        }),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       // ScriptWriter runs again
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: {
-                  script: "Script v3.",
-                  narration: "Narration v3.",
-                  callToAction: "Subscribe.",
-                  estimatedDurationSeconds: 45,
-                },
-              }),
-            },
+        output: JSON.stringify({
+          content: {
+            script: "Script v3.",
+            narration: "Narration v3.",
+            callToAction: "Subscribe.",
+            estimatedDurationSeconds: 45,
           },
-        ],
-        usage: { prompt_tokens: 12, completion_tokens: 24, total_tokens: 36 },
-        model: "test-model",
+        }),
+
+        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
       })
       // Third ScriptQA call — retries becomes 3, router returns __end__
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                status: "minor_revision",
-                feedback: "Still bad pacing.",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify({
+          status: "minor_revision",
+          feedback: "Still bad pacing.",
+        }),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       });
 
     const result = await graph.invoke(
@@ -810,178 +699,103 @@ describe("Graph", () => {
 
     mockGenerate
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                summary: "Summary.",
-                facts: makeFacts(8),
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 11, completion_tokens: 22, total_tokens: 33 },
-        model: "test-model",
+        output: JSON.stringify({
+          summary: "Summary.",
+          facts: makeFacts(8),
+        }),
+
+        usage: { promptTokens: 11, completionTokens: 22, totalTokens: 33 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify(makeResearchQAResponse(makeFacts(8))),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 9, completion_tokens: 6, total_tokens: 15 },
-        model: "test-model",
+        output: JSON.stringify(makeResearchQAResponse(makeFacts(8))),
+
+        usage: { promptTokens: 9, completionTokens: 6, totalTokens: 15 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: { title: "Title", hook: "Hook?" },
-                storyType: "mystery",
-                storySummary: "Summary.",
-                storyBeats: makeBeats(6),
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 13, completion_tokens: 26, total_tokens: 39 },
-        model: "test-model",
+        output: JSON.stringify({
+          content: { title: "Title", hook: "Hook?" },
+          storyType: "mystery",
+          storySummary: "Summary.",
+          storyBeats: makeBeats(6),
+        }),
+
+        usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: {
-                  script: "Script.",
-                  narration: SCENE_NARRATIONS.join(" "),
-                  callToAction: "Subscribe.",
-                  estimatedDurationSeconds: 48,
-                },
-              }),
-            },
+        output: JSON.stringify({
+          content: {
+            script: "Script.",
+            narration: SCENE_NARRATIONS.join(" "),
+            callToAction: "Subscribe.",
+            estimatedDurationSeconds: 48,
           },
-        ],
-        usage: { prompt_tokens: 12, completion_tokens: 24, total_tokens: 36 },
-        model: "test-model",
+        }),
+
+        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({ status: "approved", feedback: "" }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify({ status: "approved", feedback: "" }),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                title: "T",
-                description: "D",
-                tags: ["geography"],
-                hashtags: [],
-                category: "Education",
-                pinnedComment: "C",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          title: "T",
+          description: "D",
+          tags: ["geography"],
+          hashtags: [],
+          category: "Education",
+          pinnedComment: "C",
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                thumbnailPrompt: "P",
-                thumbnailText: "T",
-                textPosition: "center",
-                colorScheme: "blue",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 12, total_tokens: 28 },
-        model: "test-model",
+        output: JSON.stringify({
+          thumbnailPrompt: "P",
+          thumbnailText: "T",
+          textPosition: "center",
+          colorScheme: "blue",
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                scenes: SCENES,
-                visualPlans: VISUAL_PLANS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: VISUAL_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       .mockResolvedValueOnce({
-        choices: [{ message: { content: JSON.stringify({ assets: ASSETS }) } }],
-        usage: { prompt_tokens: 16, completion_tokens: 32, total_tokens: 48 },
-        model: "test-model",
+        output: JSON.stringify({ assets: ASSETS }),
+        usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify(
-                makePromptQAResponse("minor_revision", SCENES),
-              ),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify(makePromptQAResponse("minor_revision", SCENES)),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                assets: ASSETS.map((a) => ({
-                  ...a,
-                  generationPrompt: a.generationPrompt + " (revised)",
-                })),
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 32, total_tokens: 48 },
-        model: "test-model",
+        output: JSON.stringify({
+          assets: ASSETS.map((a) => ({
+            ...a,
+            generationPrompt: a.generationPrompt + " (revised)",
+          })),
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify(makePromptQAResponse("approved", SCENES)),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify(makePromptQAResponse("approved", SCENES)),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({ status: "approved", issues: [] }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify({ status: "approved", issues: [] }),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       });
 
     const result = await graph.invoke(
@@ -1020,182 +834,106 @@ describe("Graph", () => {
 
     mockGenerate
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                summary: "Summary.",
-                facts: makeFacts(8),
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 11, completion_tokens: 22, total_tokens: 33 },
-        model: "test-model",
+        output: JSON.stringify({
+          summary: "Summary.",
+          facts: makeFacts(8),
+        }),
+
+        usage: { promptTokens: 11, completionTokens: 22, totalTokens: 33 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify(makeResearchQAResponse(makeFacts(8))),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 9, completion_tokens: 6, total_tokens: 15 },
-        model: "test-model",
+        output: JSON.stringify(makeResearchQAResponse(makeFacts(8))),
+
+        usage: { promptTokens: 9, completionTokens: 6, totalTokens: 15 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: { title: "Title", hook: "Hook?" },
-                storyType: "mystery",
-                storySummary: "Summary.",
-                storyBeats: makeBeats(6),
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 13, completion_tokens: 26, total_tokens: 39 },
-        model: "test-model",
+        output: JSON.stringify({
+          content: { title: "Title", hook: "Hook?" },
+          storyType: "mystery",
+          storySummary: "Summary.",
+          storyBeats: makeBeats(6),
+        }),
+
+        usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: {
-                  script: "Script.",
-                  narration: SCENE_NARRATIONS.join(" "),
-                  callToAction: "Subscribe.",
-                  estimatedDurationSeconds: 48,
-                },
-              }),
-            },
+        output: JSON.stringify({
+          content: {
+            script: "Script.",
+            narration: SCENE_NARRATIONS.join(" "),
+            callToAction: "Subscribe.",
+            estimatedDurationSeconds: 48,
           },
-        ],
-        usage: { prompt_tokens: 12, completion_tokens: 24, total_tokens: 36 },
-        model: "test-model",
+        }),
+
+        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({ status: "approved", feedback: "" }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify({ status: "approved", feedback: "" }),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                title: "T",
-                description: "D",
-                tags: ["geography"],
-                hashtags: [],
-                category: "Education",
-                pinnedComment: "C",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          title: "T",
+          description: "D",
+          tags: ["geography"],
+          hashtags: [],
+          category: "Education",
+          pinnedComment: "C",
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                thumbnailPrompt: "P",
-                thumbnailText: "T",
-                textPosition: "center",
-                colorScheme: "blue",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 12, total_tokens: 28 },
-        model: "test-model",
+        output: JSON.stringify({
+          thumbnailPrompt: "P",
+          thumbnailText: "T",
+          textPosition: "center",
+          colorScheme: "blue",
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                scenes: SCENES,
-                visualPlans: VISUAL_PLANS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: VISUAL_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       .mockResolvedValueOnce({
-        choices: [{ message: { content: JSON.stringify({ assets: ASSETS }) } }],
-        usage: { prompt_tokens: 16, completion_tokens: 32, total_tokens: 48 },
-        model: "test-model",
+        output: JSON.stringify({ assets: ASSETS }),
+        usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify(
-                makePromptQAResponse("major_revision", SCENES),
-              ),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify(makePromptQAResponse("major_revision", SCENES)),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       // VisualDirector re-runs
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                scenes: SCENES,
-                visualPlans: VISUAL_PLANS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: VISUAL_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       .mockResolvedValueOnce({
-        choices: [{ message: { content: JSON.stringify({ assets: ASSETS }) } }],
-        usage: { prompt_tokens: 16, completion_tokens: 32, total_tokens: 48 },
-        model: "test-model",
+        output: JSON.stringify({ assets: ASSETS }),
+        usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify(makePromptQAResponse("approved", SCENES)),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify(makePromptQAResponse("approved", SCENES)),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({ status: "approved", issues: [] }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify({ status: "approved", issues: [] }),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       });
 
     const result = await graph.invoke(
@@ -1233,140 +971,83 @@ describe("Graph", () => {
 
     mockGenerate
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                summary: "Summary.",
-                facts: makeFacts(8),
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 11, completion_tokens: 22, total_tokens: 33 },
-        model: "test-model",
+        output: JSON.stringify({
+          summary: "Summary.",
+          facts: makeFacts(8),
+        }),
+
+        usage: { promptTokens: 11, completionTokens: 22, totalTokens: 33 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify(makeResearchQAResponse(makeFacts(8))),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 9, completion_tokens: 6, total_tokens: 15 },
-        model: "test-model",
+        output: JSON.stringify(makeResearchQAResponse(makeFacts(8))),
+
+        usage: { promptTokens: 9, completionTokens: 6, totalTokens: 15 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: { title: "Title", hook: "Hook?" },
-                storyType: "mystery",
-                storySummary: "Summary.",
-                storyBeats: makeBeats(6),
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 13, completion_tokens: 26, total_tokens: 39 },
-        model: "test-model",
+        output: JSON.stringify({
+          content: { title: "Title", hook: "Hook?" },
+          storyType: "mystery",
+          storySummary: "Summary.",
+          storyBeats: makeBeats(6),
+        }),
+
+        usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: {
-                  script: "Script.",
-                  narration: SCENE_NARRATIONS.join(" "),
-                  callToAction: "Subscribe.",
-                  estimatedDurationSeconds: 48,
-                },
-              }),
-            },
+        output: JSON.stringify({
+          content: {
+            script: "Script.",
+            narration: SCENE_NARRATIONS.join(" "),
+            callToAction: "Subscribe.",
+            estimatedDurationSeconds: 48,
           },
-        ],
-        usage: { prompt_tokens: 12, completion_tokens: 24, total_tokens: 36 },
-        model: "test-model",
+        }),
+
+        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({ status: "approved", feedback: "" }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify({ status: "approved", feedback: "" }),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                title: "T",
-                description: "D",
-                tags: ["geography"],
-                hashtags: [],
-                category: "Education",
-                pinnedComment: "C",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          title: "T",
+          description: "D",
+          tags: ["geography"],
+          hashtags: [],
+          category: "Education",
+          pinnedComment: "C",
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                thumbnailPrompt: "P",
-                thumbnailText: "T",
-                textPosition: "center",
-                colorScheme: "blue",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 12, total_tokens: 28 },
-        model: "test-model",
+        output: JSON.stringify({
+          thumbnailPrompt: "P",
+          thumbnailText: "T",
+          textPosition: "center",
+          colorScheme: "blue",
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                scenes: SCENES,
-                visualPlans: VISUAL_PLANS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: VISUAL_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       .mockResolvedValueOnce({
-        choices: [{ message: { content: JSON.stringify({ assets: ASSETS }) } }],
-        usage: { prompt_tokens: 16, completion_tokens: 32, total_tokens: 48 },
-        model: "test-model",
+        output: JSON.stringify({ assets: ASSETS }),
+        usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify(
-                makePromptQAResponse("minor_revision", SCENES),
-              ),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify(makePromptQAResponse("minor_revision", SCENES)),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       });
 
     const result = await graph.invoke(
@@ -1402,140 +1083,83 @@ describe("Graph", () => {
 
     mockGenerate
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                summary: "Summary.",
-                facts: makeFacts(8),
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 11, completion_tokens: 22, total_tokens: 33 },
-        model: "test-model",
+        output: JSON.stringify({
+          summary: "Summary.",
+          facts: makeFacts(8),
+        }),
+
+        usage: { promptTokens: 11, completionTokens: 22, totalTokens: 33 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify(makeResearchQAResponse(makeFacts(8))),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 9, completion_tokens: 6, total_tokens: 15 },
-        model: "test-model",
+        output: JSON.stringify(makeResearchQAResponse(makeFacts(8))),
+
+        usage: { promptTokens: 9, completionTokens: 6, totalTokens: 15 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: { title: "Title", hook: "Hook?" },
-                storyType: "mystery",
-                storySummary: "Summary.",
-                storyBeats: makeBeats(6),
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 13, completion_tokens: 26, total_tokens: 39 },
-        model: "test-model",
+        output: JSON.stringify({
+          content: { title: "Title", hook: "Hook?" },
+          storyType: "mystery",
+          storySummary: "Summary.",
+          storyBeats: makeBeats(6),
+        }),
+
+        usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: {
-                  script: "Script.",
-                  narration: SCENE_NARRATIONS.join(" "),
-                  callToAction: "Subscribe.",
-                  estimatedDurationSeconds: 48,
-                },
-              }),
-            },
+        output: JSON.stringify({
+          content: {
+            script: "Script.",
+            narration: SCENE_NARRATIONS.join(" "),
+            callToAction: "Subscribe.",
+            estimatedDurationSeconds: 48,
           },
-        ],
-        usage: { prompt_tokens: 12, completion_tokens: 24, total_tokens: 36 },
-        model: "test-model",
+        }),
+
+        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({ status: "approved", feedback: "" }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify({ status: "approved", feedback: "" }),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                title: "T",
-                description: "D",
-                tags: ["geography"],
-                hashtags: [],
-                category: "Education",
-                pinnedComment: "C",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          title: "T",
+          description: "D",
+          tags: ["geography"],
+          hashtags: [],
+          category: "Education",
+          pinnedComment: "C",
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                thumbnailPrompt: "P",
-                thumbnailText: "T",
-                textPosition: "center",
-                colorScheme: "blue",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 12, total_tokens: 28 },
-        model: "test-model",
+        output: JSON.stringify({
+          thumbnailPrompt: "P",
+          thumbnailText: "T",
+          textPosition: "center",
+          colorScheme: "blue",
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                scenes: SCENES,
-                visualPlans: VISUAL_PLANS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: VISUAL_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       .mockResolvedValueOnce({
-        choices: [{ message: { content: JSON.stringify({ assets: ASSETS }) } }],
-        usage: { prompt_tokens: 16, completion_tokens: 32, total_tokens: 48 },
-        model: "test-model",
+        output: JSON.stringify({ assets: ASSETS }),
+        usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify(
-                makePromptQAResponse("major_revision", SCENES),
-              ),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify(makePromptQAResponse("major_revision", SCENES)),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       });
 
     const result = await graph.invoke(
@@ -1577,160 +1201,101 @@ describe("Graph", () => {
     mockGenerate
       // 1. ResearchAgent
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                summary: "Remote island in Pacific.",
-                facts: FACTS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 11, completion_tokens: 22, total_tokens: 33 },
-        model: "test-model",
+        output: JSON.stringify({
+          summary: "Remote island in Pacific.",
+          facts: FACTS,
+        }),
+
+        usage: { promptTokens: 11, completionTokens: 22, totalTokens: 33 },
       })
       // 1b. ResearchQA (approved)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: { content: JSON.stringify(makeResearchQAResponse(FACTS)) },
-          },
-        ],
-        usage: { prompt_tokens: 9, completion_tokens: 6, total_tokens: 15 },
-        model: "test-model",
+        output: JSON.stringify(makeResearchQAResponse(FACTS)),
+
+        usage: { promptTokens: 9, completionTokens: 6, totalTokens: 15 },
       })
       // 2. ScriptPlanner
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: {
-                  title: "Mystery Island",
-                  hook: "What if a country wasn't real?",
-                },
-                storyType: "mystery",
-                storySummary: "Mystery Island story.",
-                storyBeats: BEATS_ADJUSTED,
-              }),
-            },
+        output: JSON.stringify({
+          content: {
+            title: "Mystery Island",
+            hook: "What if a country wasn't real?",
           },
-        ],
-        usage: { prompt_tokens: 13, completion_tokens: 26, total_tokens: 39 },
-        model: "test-model",
+          storyType: "mystery",
+          storySummary: "Mystery Island story.",
+          storyBeats: BEATS_ADJUSTED,
+        }),
+
+        usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
       })
       // 3. ScriptWriter
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: {
-                  script: "Script body.",
-                  narration: NARRATIONS.join(" "),
-                  callToAction: "Subscribe!",
-                  estimatedDurationSeconds: 50,
-                },
-              }),
-            },
+        output: JSON.stringify({
+          content: {
+            script: "Script body.",
+            narration: NARRATIONS.join(" "),
+            callToAction: "Subscribe!",
+            estimatedDurationSeconds: 50,
           },
-        ],
-        usage: { prompt_tokens: 12, completion_tokens: 24, total_tokens: 36 },
-        model: "test-model",
+        }),
+
+        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
       })
       // 4. ScriptQA (approved)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({ status: "approved", feedback: "" }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify({ status: "approved", feedback: "" }),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       // 5. MetadataGenerator
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                title: "Mystery Island Video",
-                description: "Explore the mystery.",
-                tags: ["geography"],
-                hashtags: ["#mystery"],
-                category: "Education",
-                pinnedComment: "What do you think?",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          title: "Mystery Island Video",
+          description: "Explore the mystery.",
+          tags: ["geography"],
+          hashtags: ["#mystery"],
+          category: "Education",
+          pinnedComment: "What do you think?",
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       // 6. ThumbnailGenerator
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                thumbnailPrompt: "Mysterious island aerial",
-                thumbnailText: "Doesn't Exist?",
-                textPosition: "bottom-third",
-                colorScheme: "cold blue",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 12, total_tokens: 28 },
-        model: "test-model",
+        output: JSON.stringify({
+          thumbnailPrompt: "Mysterious island aerial",
+          thumbnailText: "Doesn't Exist?",
+          textPosition: "bottom-third",
+          colorScheme: "cold blue",
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
       })
       // 7. VisualDirector (scenes + visual plans)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                scenes: SCENES,
-                visualPlans: VISUAL_PLANS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: VISUAL_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       // 8. ImagePromptGenerator
       .mockResolvedValueOnce({
-        choices: [{ message: { content: JSON.stringify({ assets: ASSETS }) } }],
-        usage: { prompt_tokens: 16, completion_tokens: 32, total_tokens: 48 },
-        model: "test-model",
+        output: JSON.stringify({ assets: ASSETS }),
+        usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
       })
       // 9. PromptQA (approved)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify(makePromptQAResponse("approved", SCENES)),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify(makePromptQAResponse("approved", SCENES)),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       // 10. ReleaseReview (approved)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({ status: "approved", issues: [] }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify({ status: "approved", issues: [] }),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       });
 
     const result = await graph.invoke(
@@ -1873,177 +1438,112 @@ describe("Graph", () => {
     mockGenerate
       // 1. ResearchAgent
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                summary: "Remote island in Pacific.",
-                facts: FACTS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 11, completion_tokens: 22, total_tokens: 33 },
-        model: "test-model",
+        output: JSON.stringify({
+          summary: "Remote island in Pacific.",
+          facts: FACTS,
+        }),
+
+        usage: { promptTokens: 11, completionTokens: 22, totalTokens: 33 },
       })
       // 2. ResearchQA (approved)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: { content: JSON.stringify(makeResearchQAResponse(FACTS)) },
-          },
-        ],
-        usage: { prompt_tokens: 9, completion_tokens: 6, total_tokens: 15 },
-        model: "test-model",
+        output: JSON.stringify(makeResearchQAResponse(FACTS)),
+
+        usage: { promptTokens: 9, completionTokens: 6, totalTokens: 15 },
       })
       // 3. ScriptPlanner
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: {
-                  title: "Mystery Island",
-                  hook: "What if a country wasn't real?",
-                },
-                storyType: "mystery",
-                storySummary: "Mystery Island story.",
-                storyBeats: BEATS,
-              }),
-            },
+        output: JSON.stringify({
+          content: {
+            title: "Mystery Island",
+            hook: "What if a country wasn't real?",
           },
-        ],
-        usage: { prompt_tokens: 13, completion_tokens: 26, total_tokens: 39 },
-        model: "test-model",
+          storyType: "mystery",
+          storySummary: "Mystery Island story.",
+          storyBeats: BEATS,
+        }),
+
+        usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
       })
       // 4. ScriptWriter
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: {
-                  script: "Script body.",
-                  narration: NARRATIONS.join(" "),
-                  callToAction: "Subscribe!",
-                  estimatedDurationSeconds: 8,
-                },
-              }),
-            },
+        output: JSON.stringify({
+          content: {
+            script: "Script body.",
+            narration: NARRATIONS.join(" "),
+            callToAction: "Subscribe!",
+            estimatedDurationSeconds: 8,
           },
-        ],
-        usage: { prompt_tokens: 12, completion_tokens: 24, total_tokens: 36 },
-        model: "test-model",
+        }),
+
+        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
       })
       // 5. ScriptQA (approved)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({ status: "approved", feedback: "" }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify({ status: "approved", feedback: "" }),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       // 6. MetadataGenerator
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                title: "Mystery Island Video",
-                description: "Explore the mystery.",
-                tags: ["geography"],
-                hashtags: ["#mystery"],
-                category: "Education",
-                pinnedComment: "What do you think?",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          title: "Mystery Island Video",
+          description: "Explore the mystery.",
+          tags: ["geography"],
+          hashtags: ["#mystery"],
+          category: "Education",
+          pinnedComment: "What do you think?",
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       // 7. ThumbnailGenerator
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                thumbnailPrompt: "Mysterious island aerial",
-                thumbnailText: "Doesn't Exist?",
-                textPosition: "bottom-third",
-                colorScheme: "cold blue",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 12, total_tokens: 28 },
-        model: "test-model",
+        output: JSON.stringify({
+          thumbnailPrompt: "Mysterious island aerial",
+          thumbnailText: "Doesn't Exist?",
+          textPosition: "bottom-third",
+          colorScheme: "cold blue",
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
       })
       // 8. VisualDirector
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                scenes: SCENES,
-                visualPlans: VISUAL_PLANS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: VISUAL_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       // 9. ImagePromptGenerator
       .mockResolvedValueOnce({
-        choices: [{ message: { content: JSON.stringify({ assets: ASSETS }) } }],
-        usage: { prompt_tokens: 16, completion_tokens: 32, total_tokens: 48 },
-        model: "test-model",
+        output: JSON.stringify({ assets: ASSETS }),
+        usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
       })
       // 10. PromptQA (approved)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify(makePromptQAResponse("approved", SCENES)),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify(makePromptQAResponse("approved", SCENES)),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       // 11. ImagePromptRepair (provider rejected the original prompt)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                repairedPrompt: REPAIRED_PROMPT,
-                changes: ["Removed reference-likeness language"],
-                reason: "Provider rejects public-figure likenesses.",
-                shouldRetry: true,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
-        model: "test-model",
+        output: JSON.stringify({
+          repairedPrompt: REPAIRED_PROMPT,
+          changes: ["Removed reference-likeness language"],
+          reason: "Provider rejects public-figure likenesses.",
+          shouldRetry: true,
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 16, totalTokens: 32 },
       })
       // 12. ReleaseReview (approved)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({ status: "approved", issues: [] }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify({ status: "approved", issues: [] }),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       });
 
     const result = await graph.invoke(
@@ -2122,357 +1622,226 @@ describe("Graph", () => {
     mockGenerate
       // 1. ResearchAgent
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                summary: "Remote island in Pacific.",
-                facts: FACTS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 11, completion_tokens: 22, total_tokens: 33 },
-        model: "test-model",
+        output: JSON.stringify({
+          summary: "Remote island in Pacific.",
+          facts: FACTS,
+        }),
+
+        usage: { promptTokens: 11, completionTokens: 22, totalTokens: 33 },
       })
       // 2. ResearchQA (approved)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: { content: JSON.stringify(makeResearchQAResponse(FACTS)) },
-          },
-        ],
-        usage: { prompt_tokens: 9, completion_tokens: 6, total_tokens: 15 },
-        model: "test-model",
+        output: JSON.stringify(makeResearchQAResponse(FACTS)),
+
+        usage: { promptTokens: 9, completionTokens: 6, totalTokens: 15 },
       })
       // 3. ScriptPlanner
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: {
-                  title: "Mystery Island",
-                  hook: "What if a country wasn't real?",
-                },
-                storyType: "mystery",
-                storySummary: "Mystery Island story.",
-                storyBeats: BEATS,
-              }),
-            },
+        output: JSON.stringify({
+          content: {
+            title: "Mystery Island",
+            hook: "What if a country wasn't real?",
           },
-        ],
-        usage: { prompt_tokens: 13, completion_tokens: 26, total_tokens: 39 },
-        model: "test-model",
+          storyType: "mystery",
+          storySummary: "Mystery Island story.",
+          storyBeats: BEATS,
+        }),
+
+        usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
       })
       // 4. ScriptWriter
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: {
-                  script: "Script body.",
-                  narration: NARRATIONS.join(" "),
-                  callToAction: "Subscribe!",
-                  estimatedDurationSeconds: 8,
-                },
-              }),
-            },
+        output: JSON.stringify({
+          content: {
+            script: "Script body.",
+            narration: NARRATIONS.join(" "),
+            callToAction: "Subscribe!",
+            estimatedDurationSeconds: 8,
           },
-        ],
-        usage: { prompt_tokens: 12, completion_tokens: 24, total_tokens: 36 },
-        model: "test-model",
+        }),
+
+        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
       })
       // 5. ScriptQA (approved)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({ status: "approved", feedback: "" }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify({ status: "approved", feedback: "" }),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       // 6. MetadataGenerator
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                title: "Mystery Island Video",
-                description: "Explore the mystery.",
-                tags: ["geography"],
-                hashtags: ["#mystery"],
-                category: "Education",
-                pinnedComment: "What do you think?",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          title: "Mystery Island Video",
+          description: "Explore the mystery.",
+          tags: ["geography"],
+          hashtags: ["#mystery"],
+          category: "Education",
+          pinnedComment: "What do you think?",
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       // 7. ThumbnailGenerator
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                thumbnailPrompt: "Mysterious island aerial",
-                thumbnailText: "Doesn't Exist?",
-                textPosition: "bottom-third",
-                colorScheme: "cold blue",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 12, total_tokens: 28 },
-        model: "test-model",
+        output: JSON.stringify({
+          thumbnailPrompt: "Mysterious island aerial",
+          thumbnailText: "Doesn't Exist?",
+          textPosition: "bottom-third",
+          colorScheme: "cold blue",
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
       })
       // 8. VisualDirector
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                scenes: SCENES,
-                visualPlans: VISUAL_PLANS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: VISUAL_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       // 9. ImagePromptGenerator
       .mockResolvedValueOnce({
-        choices: [{ message: { content: JSON.stringify({ assets: ASSETS }) } }],
-        usage: { prompt_tokens: 16, completion_tokens: 32, total_tokens: 48 },
-        model: "test-model",
+        output: JSON.stringify({ assets: ASSETS }),
+        usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
       })
       // 10. PromptQA (approved)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify(makePromptQAResponse("approved", SCENES)),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify(makePromptQAResponse("approved", SCENES)),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       // 11-22. ImagePromptRepair: 6 scenes × 2 repair rounds (all rejected)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                repairedPrompt: REPAIRED_PROMPT_1,
-                changes: ["Removed likeness language"],
-                reason: "Content policy.",
-                shouldRetry: true,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
-        model: "test-model",
+        output: JSON.stringify({
+          repairedPrompt: REPAIRED_PROMPT_1,
+          changes: ["Removed likeness language"],
+          reason: "Content policy.",
+          shouldRetry: true,
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 16, totalTokens: 32 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                repairedPrompt: REPAIRED_PROMPT_1,
-                changes: ["Removed likeness language"],
-                reason: "Content policy.",
-                shouldRetry: true,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
-        model: "test-model",
+        output: JSON.stringify({
+          repairedPrompt: REPAIRED_PROMPT_1,
+          changes: ["Removed likeness language"],
+          reason: "Content policy.",
+          shouldRetry: true,
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 16, totalTokens: 32 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                repairedPrompt: REPAIRED_PROMPT_1,
-                changes: ["Removed likeness language"],
-                reason: "Content policy.",
-                shouldRetry: true,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
-        model: "test-model",
+        output: JSON.stringify({
+          repairedPrompt: REPAIRED_PROMPT_1,
+          changes: ["Removed likeness language"],
+          reason: "Content policy.",
+          shouldRetry: true,
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 16, totalTokens: 32 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                repairedPrompt: REPAIRED_PROMPT_1,
-                changes: ["Removed likeness language"],
-                reason: "Content policy.",
-                shouldRetry: true,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
-        model: "test-model",
+        output: JSON.stringify({
+          repairedPrompt: REPAIRED_PROMPT_1,
+          changes: ["Removed likeness language"],
+          reason: "Content policy.",
+          shouldRetry: true,
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 16, totalTokens: 32 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                repairedPrompt: REPAIRED_PROMPT_1,
-                changes: ["Removed likeness language"],
-                reason: "Content policy.",
-                shouldRetry: true,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
-        model: "test-model",
+        output: JSON.stringify({
+          repairedPrompt: REPAIRED_PROMPT_1,
+          changes: ["Removed likeness language"],
+          reason: "Content policy.",
+          shouldRetry: true,
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 16, totalTokens: 32 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                repairedPrompt: REPAIRED_PROMPT_1,
-                changes: ["Removed likeness language"],
-                reason: "Content policy.",
-                shouldRetry: true,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
-        model: "test-model",
+        output: JSON.stringify({
+          repairedPrompt: REPAIRED_PROMPT_1,
+          changes: ["Removed likeness language"],
+          reason: "Content policy.",
+          shouldRetry: true,
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 16, totalTokens: 32 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                repairedPrompt: REPAIRED_PROMPT_2,
-                changes: ["Further de-identification"],
-                reason: "Still rejected.",
-                shouldRetry: true,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
-        model: "test-model",
+        output: JSON.stringify({
+          repairedPrompt: REPAIRED_PROMPT_2,
+          changes: ["Further de-identification"],
+          reason: "Still rejected.",
+          shouldRetry: true,
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 16, totalTokens: 32 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                repairedPrompt: REPAIRED_PROMPT_2,
-                changes: ["Further de-identification"],
-                reason: "Still rejected.",
-                shouldRetry: true,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
-        model: "test-model",
+        output: JSON.stringify({
+          repairedPrompt: REPAIRED_PROMPT_2,
+          changes: ["Further de-identification"],
+          reason: "Still rejected.",
+          shouldRetry: true,
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 16, totalTokens: 32 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                repairedPrompt: REPAIRED_PROMPT_2,
-                changes: ["Further de-identification"],
-                reason: "Still rejected.",
-                shouldRetry: true,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
-        model: "test-model",
+        output: JSON.stringify({
+          repairedPrompt: REPAIRED_PROMPT_2,
+          changes: ["Further de-identification"],
+          reason: "Still rejected.",
+          shouldRetry: true,
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 16, totalTokens: 32 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                repairedPrompt: REPAIRED_PROMPT_2,
-                changes: ["Further de-identification"],
-                reason: "Still rejected.",
-                shouldRetry: true,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
-        model: "test-model",
+        output: JSON.stringify({
+          repairedPrompt: REPAIRED_PROMPT_2,
+          changes: ["Further de-identification"],
+          reason: "Still rejected.",
+          shouldRetry: true,
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 16, totalTokens: 32 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                repairedPrompt: REPAIRED_PROMPT_2,
-                changes: ["Further de-identification"],
-                reason: "Still rejected.",
-                shouldRetry: true,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
-        model: "test-model",
+        output: JSON.stringify({
+          repairedPrompt: REPAIRED_PROMPT_2,
+          changes: ["Further de-identification"],
+          reason: "Still rejected.",
+          shouldRetry: true,
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 16, totalTokens: 32 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                repairedPrompt: REPAIRED_PROMPT_2,
-                changes: ["Further de-identification"],
-                reason: "Still rejected.",
-                shouldRetry: true,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
-        model: "test-model",
+        output: JSON.stringify({
+          repairedPrompt: REPAIRED_PROMPT_2,
+          changes: ["Further de-identification"],
+          reason: "Still rejected.",
+          shouldRetry: true,
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 16, totalTokens: 32 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                repairedPrompt: REPAIRED_PROMPT_2,
-                changes: ["Further de-identification"],
-                reason: "Still rejected.",
-                shouldRetry: true,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 16, total_tokens: 32 },
-        model: "test-model",
+        output: JSON.stringify({
+          repairedPrompt: REPAIRED_PROMPT_2,
+          changes: ["Further de-identification"],
+          reason: "Still rejected.",
+          shouldRetry: true,
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 16, totalTokens: 32 },
       });
 
     const result = await graph.invoke(
@@ -2540,159 +1909,101 @@ describe("Graph", () => {
     mockGenerate
       // 1. ResearchAgent
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                summary: "Remote island in Pacific.",
-                facts: FACTS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 11, completion_tokens: 22, total_tokens: 33 },
-        model: "test-model",
+        output: JSON.stringify({
+          summary: "Remote island in Pacific.",
+          facts: FACTS,
+        }),
+
+        usage: { promptTokens: 11, completionTokens: 22, totalTokens: 33 },
       })
       // 1b. ResearchQA (approved)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: { content: JSON.stringify(makeResearchQAResponse(FACTS)) },
-          },
-        ],
-        usage: { prompt_tokens: 9, completion_tokens: 6, total_tokens: 15 },
-        model: "test-model",
+        output: JSON.stringify(makeResearchQAResponse(FACTS)),
+
+        usage: { promptTokens: 9, completionTokens: 6, totalTokens: 15 },
       })
       // 2. ScriptPlanner
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: {
-                  title: "Mystery Island",
-                  hook: "What if a country wasn't real?",
-                },
-                storyType: "mystery",
-                storySummary: "Mystery Island story.",
-                storyBeats: BEATS,
-              }),
-            },
+        output: JSON.stringify({
+          content: {
+            title: "Mystery Island",
+            hook: "What if a country wasn't real?",
           },
-        ],
-        usage: { prompt_tokens: 13, completion_tokens: 26, total_tokens: 39 },
-        model: "test-model",
+          storyType: "mystery",
+          storySummary: "Mystery Island story.",
+          storyBeats: BEATS,
+        }),
+
+        usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
       })
       // 3. ScriptWriter
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                content: {
-                  script: "Script body.",
-                  narration: NARRATIONS.join(" "),
-                  callToAction: "Subscribe!",
-                  estimatedDurationSeconds: 50,
-                },
-              }),
-            },
+        output: JSON.stringify({
+          content: {
+            script: "Script body.",
+            narration: NARRATIONS.join(" "),
+            callToAction: "Subscribe!",
+            estimatedDurationSeconds: 50,
           },
-        ],
-        usage: { prompt_tokens: 12, completion_tokens: 24, total_tokens: 36 },
-        model: "test-model",
+        }),
+
+        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
       })
       // 4. ScriptQA (approved)
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({ status: "approved", feedback: "" }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 8, completion_tokens: 4, total_tokens: 12 },
-        model: "test-model",
+        output: JSON.stringify({ status: "approved", feedback: "" }),
+
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
       // 5. MetadataGenerator
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                title: "Mystery Island Video",
-                description: "Explore the mystery.",
-                tags: ["geography"],
-                hashtags: ["#mystery"],
-                category: "Education",
-                pinnedComment: "What do you think?",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          title: "Mystery Island Video",
+          description: "Explore the mystery.",
+          tags: ["geography"],
+          hashtags: ["#mystery"],
+          category: "Education",
+          pinnedComment: "What do you think?",
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       // 6. ThumbnailGenerator
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                thumbnailPrompt: "Mysterious island aerial",
-                thumbnailText: "Doesn't Exist?",
-                textPosition: "bottom-third",
-                colorScheme: "cold blue",
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 16, completion_tokens: 12, total_tokens: 28 },
-        model: "test-model",
+        output: JSON.stringify({
+          thumbnailPrompt: "Mysterious island aerial",
+          thumbnailText: "Doesn't Exist?",
+          textPosition: "bottom-third",
+          colorScheme: "cold blue",
+        }),
+
+        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
       })
       // 7..9. VisualDirector: structural failure with feedback, retried by the
       // router until the retry budget (3) is exhausted.
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                scenes: SCENES,
-                visualPlans: BAD_PLANS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: BAD_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                scenes: SCENES,
-                visualPlans: BAD_PLANS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: BAD_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       .mockResolvedValueOnce({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                scenes: SCENES,
-                visualPlans: BAD_PLANS,
-              }),
-            },
-          },
-        ],
-        usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-        model: "test-model",
+        output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: BAD_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       });
 
     const result = await graph.invoke(

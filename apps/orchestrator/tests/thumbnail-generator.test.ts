@@ -82,9 +82,8 @@ function runNode(
 
 function buildLLMResponse(data: unknown) {
   return {
-    choices: [{ message: { content: JSON.stringify(data) } }],
-    usage: { prompt_tokens: 16, completion_tokens: 12, total_tokens: 28 },
-    model: "test-model",
+    output: JSON.stringify(data),
+    usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
   };
 }
 

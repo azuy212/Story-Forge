@@ -9,6 +9,10 @@ import { PromptPaths } from "../models/prompt-paths.js";
 import { AgentModel } from "../models/agent-model.js";
 import { ThumbnailQaSchema } from "../schemas/thumbnail-qa.js";
 import { LLMError, getErrorMessage } from "../utils/errors.js";
+import { logger } from "../utils/logger.js";
+import { persistLlmUsage } from "../artifacts/usage.js";
+import { newInvocationId } from "../models/usage.js";
+import type { RunnableConfig } from "@langchain/core/runnables";
 
 export interface ThumbnailQaResult {
   status: "pass" | "fail";
@@ -45,6 +49,7 @@ async function downscaleToDataUrl(inputPath: string): Promise<string> {
 export async function runThumbnailQa(
   imagePath: string,
   thumbnailText: string,
+  config?: RunnableConfig,
 ): Promise<ThumbnailQaResult> {
   const template = await loadPrompt(PromptPaths.ThumbnailQA);
   const userPrompt = renderPrompt(template, { thumbnailText });
@@ -67,8 +72,27 @@ export async function runThumbnailQa(
   ];
 
   try {
-    const response = await model.generate(messages as never, genOpts);
-    const raw = response?.choices?.[0]?.message?.content;
+    const llmResult = await model.generate(messages as never, genOpts);
+    await persistLlmUsage(
+      config,
+      {
+        node: AgentModel.ThumbnailQA,
+        attempt: 1,
+        invocationId: newInvocationId(),
+      },
+      llmResult.usage,
+    );
+    if (!llmResult.usage) {
+      logger.warn(`${AgentModel.ThumbnailQA} response did not include usage`, {
+        attempt: 1,
+      });
+    }
+    logger.debug(`${AgentModel.ThumbnailQA} model call complete`, {
+      model: model.model,
+      totalTokens: llmResult.usage?.totalTokens,
+      costUsd: llmResult.usage?.costUsd,
+    });
+    const raw = llmResult.output;
     if (!raw) throw new LLMError("Empty QA response");
     const result = ThumbnailQaSchema.safeParse(JSON.parse(raw));
     if (!result.success) {

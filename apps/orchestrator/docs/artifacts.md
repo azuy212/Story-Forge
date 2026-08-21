@@ -132,6 +132,65 @@ Any change recomputes and writes a new version. Semantic validation is an option
 per-node hook (`validateArtifact` in `RunAgentOptions`; e.g. `AssetGenerator` requires
 all planned scenes to have assets).
 
+## LLM Usage Records (`llmUsage`)
+
+Every actual LLM call is recorded as an `llmUsage` artifact (`runs/<runId>/artifacts/llmUsage/vN.json`). Unlike node artifacts, `llmUsage` is **write-only accounting**: it is never served from cache and never affects pipeline behavior.
+
+### What is recorded
+
+`runAgent()` and the direct Thumbnail QA call persist a record **immediately after `model.generate()` returns, before JSON/schema validation**. So every token-consuming call is captured, including:
+
+- retries after parse/schema failures (`attempt > 1`),
+- requests that later fail validation (the tokens were spent),
+- the final successful attempt.
+
+Requests that throw before a response (transport errors, aborts) produce no usage payload and are **not** recorded — there is no usage to report.
+
+Record shape (`src/models/usage.ts`):
+
+```ts
+{
+  provider: "openrouter",
+  model: string,
+  requestId: string,           // OpenRouter response id
+  promptTokens, completionTokens, totalTokens,
+  reasoningTokens, cachedTokens, cacheWriteTokens,  // optional
+  costUsd,                     // optional, from OpenRouter usage.cost (fallback total_cost)
+  timestamp: ISO string,
+  runId, node, attempt, invocationId,
+}
+```
+
+Missing OpenRouter fields stay `undefined`, never zeroed (so "no reasoning" ≠ "0 reasoning").
+
+### Invocation ID & deduplication
+
+`invocationId` is a random UUID minted **before** the model call, per attempt. The persistence key is `sha256({provider, invocationId})` (see `src/artifacts/hash.ts`), so:
+
+- two attempts at the same node never collide,
+- re-running the same attempt (e.g. resume replaying a node whose thread was lost) is deduplicated — the second persist is a no-op,
+- OpenRouter `requestId` is kept for traceability but never used as the dedup key (it is absent on some streaming responses).
+
+`persistLlmUsage()` resolves the complete record first (`findCompleteByInputHash`); on a hit it does not write a new version.
+
+### Aggregation & cost semantics
+
+`aggregateForRun(config)` (`src/artifacts/usage.ts`) reads every `llmUsage` record for the run via `store.listAll()` and sums:
+
+- token totals (defined fields only),
+- `costUsd` **only over records that report it** — a run where no provider reported cost yields `llmCostUsd: undefined`, never `0` (which would look like "free"),
+- per-model breakdown `llmModels: { [model]: { requests, promptTokens, completionTokens, totalTokens, costUsd } }`.
+
+### Relationship to run diagnostics & Sheets
+
+The publisher node attaches the aggregate to `diagnostics.llmUsage` and writes the six scalar columns into the Google Sheets row (`A:Q`, columns 11-16: Prompt/Completion/Total/Reasoning/Cached tokens + Cost USD). The per-model breakdown stays in the persisted aggregate and `diagnostics.llmUsage.llmModels` only — it is not mirrored into Sheets.
+
+Reconciliation chain: individual `llmUsage` records → `aggregateForRun` → `diagnostics.llmUsage` → Sheet cells. `persistLlmUsage` and `aggregateForRun` never throw; aggregation is best-effort and returns `undefined` when storage is unavailable.
+
+### Behavior when the artifact store is disabled
+
+**LLM usage accounting is unavailable when the artifact store is disabled.** `persistLlmUsage` is a silent no-op (no store, no runId, or no usage). This is intentional — usage tracking is store-backed and non-blocking; it can never fail or slow a video generation.
+
 ## Telemetry
 
 `AgentResult.telemetry` carries artifact info alongside existing fields:
@@ -207,5 +266,7 @@ The `langgraph dev` server uses a `MemorySaver` checkpointer synced to `.langgra
 - `src/artifacts/cache.ts` — `runWithArtifactCache`, `cacheNodeResult`, `completeArtifactForNode`.
 - `src/artifacts/context.ts` — store/runId resolution, `completeArtifact`, `invalidateArtifact`.
 - `src/artifacts/registry.ts` — artifact type → node → zod schema map.
+- `src/artifacts/usage.ts` — `persistLlmUsage`, `aggregateForRun` (LLM usage accounting).
+- `src/models/usage.ts` — `normalizeUsage`, `aggregateUsage`, LLM usage types.
 - `src/agents/run-agent.ts` — interception point for all LLM agents.
 - `src/utils/config.ts` — `artifactStoreEnabled()`, `artifactStoreDir()`.

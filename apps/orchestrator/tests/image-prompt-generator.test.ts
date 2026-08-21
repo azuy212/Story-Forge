@@ -96,36 +96,29 @@ function buildResponse(overrides?: {
   const promptTokens = overrides?.promptTokens ?? 15;
   const completionTokens = overrides?.completionTokens ?? 30;
   return {
-    choices: [
-      {
-        message: {
-          content:
-            overrides?.content ??
-            JSON.stringify({
-              assets: [
-                {
-                  sceneId: 1,
-                  assetType: "image",
-                  generationPrompt:
-                    "Ultra detailed Satellite view of Eastern Europe at night. Cold blue atmosphere. Documentary realism. High contrast. National Geographic style. No text.",
-                },
-                {
-                  sceneId: 2,
-                  assetType: "image",
-                  generationPrompt:
-                    "Detailed political map of Moldova and Transnistria. Clean borders. Cartographic style. Documentary aesthetic. Educational. No watermark.",
-                },
-              ],
-            }),
-        },
-      },
-    ],
+    output:
+      overrides?.content ??
+      JSON.stringify({
+        assets: [
+          {
+            sceneId: 1,
+            assetType: "image",
+            generationPrompt:
+              "Ultra detailed Satellite view of Eastern Europe at night. Cold blue atmosphere. Documentary realism. High contrast. National Geographic style. No text.",
+          },
+          {
+            sceneId: 2,
+            assetType: "image",
+            generationPrompt:
+              "Detailed political map of Moldova and Transnistria. Clean borders. Cartographic style. Documentary aesthetic. Educational. No watermark.",
+          },
+        ],
+      }),
     usage: {
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      total_tokens: promptTokens + completionTokens,
+      promptTokens,
+      completionTokens,
+      totalTokens: promptTokens + completionTokens,
     },
-    model: "test-model",
   };
 }
 
@@ -321,9 +314,7 @@ describe("imagePromptGeneratorNode", () => {
 
   it("handles empty response (no content in message)", async () => {
     mockGenerate.mockResolvedValue({
-      choices: [{ message: { content: null } }],
-      usage: {},
-      model: "test-model",
+      output: null,
     });
 
     const { promise } = runNode();

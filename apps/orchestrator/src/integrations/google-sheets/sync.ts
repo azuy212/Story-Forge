@@ -11,6 +11,7 @@ import { createSheetsClientFromConfig } from "./client.js";
 import { toSheetsError } from "./errors.js";
 import type { ProjectState } from "../../schemas/index.js";
 import type { PublishResult } from "../../providers/publisher/publisher-provider.js";
+import type { LLMAggregate } from "../../models/usage.js";
 
 export interface SyncVideoRecordOptions {
   api: SheetsValuesApi;
@@ -26,11 +27,11 @@ export interface SyncVideoRecordResult {
 }
 
 function boundedRange(sheetName: string): string {
-  return `'${sheetName}'!A:K`;
+  return `'${sheetName}'!A:Q`;
 }
 
 function boundedCellRange(sheetName: string, rowNumber: number): string {
-  return `'${sheetName}'!A${rowNumber}:K${rowNumber}`;
+  return `'${sheetName}'!A${rowNumber}:Q${rowNumber}`;
 }
 
 /**
@@ -90,9 +91,10 @@ export async function syncPublishResults(options: {
   state: ProjectState;
   results: PublishResult[];
   publishAt?: string;
+  usage?: LLMAggregate;
   api?: SheetsValuesApi;
 }): Promise<void> {
-  const { state, results, publishAt, api: injectedApi } = options;
+  const { state, results, publishAt, usage, api: injectedApi } = options;
   const spreadsheetId = config.googleSheetsSpreadsheetId();
 
   const api =
@@ -131,6 +133,12 @@ export async function syncPublishResults(options: {
             : "",
         publishedAt: result.status === "published" ? result.publishedAt : "",
         durationMs,
+        llmPromptTokens: usage?.llmPromptTokens,
+        llmCompletionTokens: usage?.llmCompletionTokens,
+        llmTotalTokens: usage?.llmTotalTokens,
+        llmReasoningTokens: usage?.llmReasoningTokens,
+        llmCachedTokens: usage?.llmCachedTokens,
+        llmCostUsd: usage?.llmCostUsd,
       };
       const outcome = await syncVideoRecord({
         api,

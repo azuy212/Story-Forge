@@ -81,21 +81,14 @@ function buildResponse(overrides?: {
   const promptTokens = overrides?.promptTokens ?? 15;
   const completionTokens = overrides?.completionTokens ?? 30;
   return {
-    choices: [
-      {
-        message: {
-          content:
-            overrides?.content ??
-            JSON.stringify({ status: "approved", feedback: "" }),
-        },
-      },
-    ],
+    output:
+      overrides?.content ??
+      JSON.stringify({ status: "approved", feedback: "" }),
     usage: {
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      total_tokens: promptTokens + completionTokens,
+      promptTokens,
+      completionTokens,
+      totalTokens: promptTokens + completionTokens,
     },
-    model: "test-model",
   };
 }
 

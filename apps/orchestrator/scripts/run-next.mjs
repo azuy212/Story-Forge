@@ -4,8 +4,9 @@
 // Reads the Google Sheets backlog, picks the first valid "planned" row
 // (Video ID + Category + Topic), then:
 //   - if a run already exists for that topic, resumes it from its persisted
-//     state (no new publish slot is assigned; the run's persisted projectId
-//     is preserved),
+//     state (the run's persisted projectId is preserved; the next free
+//     12:00 / 20:00 publish slot is (re)seeded so a resumed run still
+//     publishes at a valid schedule time),
 //   - otherwise creates a new run seeded with the row's projectId, pillar
 //     (Category), topic, and the next free 12:00 / 20:00 publish slot.
 //
@@ -99,10 +100,10 @@ export function findRunByTopic(runsDir, topic) {
  * Pure decision step of the runner, separated from I/O so it is unit-testable.
  *
  * @param {string} runsDir artifact store root
- * @param {(string | number | boolean)[][]} rows full sheet A:K values
+ * @param {(string | number | boolean)[][]} rows full sheet A:Q values
  * @returns {object} decision:
  *   - { action: "none", reason: "no-pending-row" | "no-slot" }
- *   - { action: "resume", ns, pillar, topic, projectId }
+ *   - { action: "resume", ns, pillar, topic, projectId, youtubePublishAt? }
  *   - { action: "create", ns, pillar, topic, projectId, youtubePublishAt }
  */
 export function decideRun(runsDir, rows, now = new Date()) {
@@ -120,6 +121,7 @@ export function decideRun(runsDir, rows, now = new Date()) {
   }
 
   const existing = findRunByTopic(runsDir, pending.topic);
+  const slot = nextPublishSlot(scheduledAtValues, now);
   if (existing) {
     return {
       action: "resume",
@@ -129,10 +131,13 @@ export function decideRun(runsDir, rows, now = new Date()) {
       // Preserve the run's persisted Sheet identity; fall back to the current
       // backlog row only for legacy runs created before projectId was stored.
       projectId: existing.meta.projectId ?? pending.videoId,
+      // (Re)seed the next free slot so a resumed run still publishes at a
+      // valid schedule time. May be absent when every slot is taken within 30
+      // days; the resume proceeds regardless.
+      ...(slot ? { youtubePublishAt: slot } : {}),
     };
   }
 
-  const slot = nextPublishSlot(scheduledAtValues, now);
   if (!slot) {
     return { action: "none", reason: "no-slot" };
   }
@@ -150,7 +155,7 @@ export function decideRun(runsDir, rows, now = new Date()) {
 async function readSheetRows(client, spreadsheetId, sheetName) {
   const res = await client.spreadsheets.values.get({
     spreadsheetId,
-    range: `'${sheetName}'!A:K`,
+    range: `'${sheetName}'!A:Q`,
   });
   return res.data?.values ?? [];
 }
@@ -209,11 +214,21 @@ async function main() {
     console.log(
       `Resuming existing run for topic "${decision.topic}": ${decision.ns}`,
     );
-    console.log("  No new publish slot assigned (preserving persisted state).");
+    if (decision.youtubePublishAt) {
+      console.log(
+        `  (Re)seeding publish slot ${decision.youtubePublishAt} for this resume.`,
+      );
+    } else {
+      console.log("  No free publish slot within 30 days; publishing as-is.");
+    }
     await resumeRun(
       decision.ns,
       { pillar: decision.pillar, topic: decision.topic },
-      { assistantId, projectId: decision.projectId },
+      {
+        assistantId,
+        projectId: decision.projectId,
+        youtubePublishAt: decision.youtubePublishAt,
+      },
     );
     console.log(`\nArtifacts in: runs/${decision.ns}`);
     return;

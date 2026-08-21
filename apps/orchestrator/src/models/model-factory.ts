@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { config } from "../utils/config.js";
 import { AgentModel } from "./agent-model.js";
+import { normalizeUsage, type LLMResult } from "./usage.js";
 
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
@@ -69,7 +70,7 @@ export function createModel(agent: AgentModel) {
     async generate(
       messages: OpenAI.Chat.ChatCompletionMessageParam[],
       options?: GenerateOptions,
-    ) {
+    ): Promise<LLMResult<string>> {
       const timeoutMs = options?.timeoutMs ?? 600_000; // Default to 10 minutes
       const controller = new AbortController();
       let timedOut = false;
@@ -79,7 +80,7 @@ export function createModel(agent: AgentModel) {
       }, timeoutMs);
 
       try {
-        return await client.chat.completions.create(
+        const response = await client.chat.completions.create(
           {
             model,
             messages,
@@ -89,6 +90,13 @@ export function createModel(agent: AgentModel) {
           },
           { signal: controller.signal },
         );
+        return {
+          output: response.choices?.[0]?.message?.content ?? "",
+          usage: normalizeUsage(response.usage, {
+            model: response.model ?? model,
+            requestId: response.id,
+          }),
+        };
       } catch (err) {
         if (timedOut) {
           const timeoutError = new Error(

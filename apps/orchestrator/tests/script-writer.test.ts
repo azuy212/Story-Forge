@@ -184,35 +184,28 @@ function buildResponse(overrides?: {
   const promptTokens = overrides?.promptTokens ?? 15;
   const completionTokens = overrides?.completionTokens ?? 30;
   return {
-    choices: [
-      {
-        message: {
-          content:
-            overrides?.content ??
-            JSON.stringify({
-              content: {
-                script:
-                  "[What if a country officially wasn't real?] The nation has no borders...",
-                narration:
-                  "What if a country officially wasn't real? The nation has no borders...",
-                callToAction: "Follow @UniverseDecoded for more.",
-                estimatedDurationSeconds: 42,
-                ending: {
-                  type: "open_question",
-                  narration: "The nation has no borders...",
-                  visualDirection: "Hold on the empty map.",
-                },
-              },
-            }),
+    output:
+      overrides?.content ??
+      JSON.stringify({
+        content: {
+          script:
+            "[What if a country officially wasn't real?] The nation has no borders...",
+          narration:
+            "What if a country officially wasn't real? The nation has no borders...",
+          callToAction: "Follow @UniverseDecoded for more.",
+          estimatedDurationSeconds: 42,
+          ending: {
+            type: "open_question",
+            narration: "The nation has no borders...",
+            visualDirection: "Hold on the empty map.",
+          },
         },
-      },
-    ],
+      }),
     usage: {
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      total_tokens: promptTokens + completionTokens,
+      promptTokens,
+      completionTokens,
+      totalTokens: promptTokens + completionTokens,
     },
-    model: "test-model",
   };
 }
 
@@ -437,9 +430,7 @@ describe("scriptWriterNode", () => {
 
   it("handles empty response (no content in message)", async () => {
     mockGenerate.mockResolvedValue({
-      choices: [{ message: { content: null } }],
-      usage: {},
-      model: "test-model",
+      output: null,
     });
 
     const { promise } = runNode();

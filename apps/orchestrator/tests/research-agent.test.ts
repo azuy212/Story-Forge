@@ -106,25 +106,17 @@ function buildResponse(overrides?: {
   const promptTokens = overrides?.promptTokens ?? 12;
   const completionTokens = overrides?.completionTokens ?? 40;
   return {
-    choices: [
-      {
-        message: {
-          content:
-            overrides?.content ??
-            JSON.stringify({
-              summary:
-                "This is a summary of the research findings about the topic.",
-              facts: BASE_FACTS,
-            }),
-        },
-      },
-    ],
+    output:
+      overrides?.content ??
+      JSON.stringify({
+        summary: "This is a summary of the research findings about the topic.",
+        facts: BASE_FACTS,
+      }),
     usage: {
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      total_tokens: promptTokens + completionTokens,
+      promptTokens,
+      completionTokens,
+      totalTokens: promptTokens + completionTokens,
     },
-    model: "test-model",
   };
 }
 

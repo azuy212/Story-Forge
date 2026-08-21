@@ -87,30 +87,23 @@ function buildResponse(overrides?: {
   const promptTokens = overrides?.promptTokens ?? 15;
   const completionTokens = overrides?.completionTokens ?? 30;
   return {
-    choices: [
-      {
-        message: {
-          content:
-            overrides?.content ??
-            JSON.stringify({
-              content: {
-                title: "The Country That Doesn't Exist",
-                hook: "What if a country officially wasn't real?",
-              },
-              storyType: "mystery",
-              storySummary:
-                "A remote island that is one of the most isolated places on Earth.",
-              storyBeats: storyBeats(),
-            }),
+    output:
+      overrides?.content ??
+      JSON.stringify({
+        content: {
+          title: "The Country That Doesn't Exist",
+          hook: "What if a country officially wasn't real?",
         },
-      },
-    ],
+        storyType: "mystery",
+        storySummary:
+          "A remote island that is one of the most isolated places on Earth.",
+        storyBeats: storyBeats(),
+      }),
     usage: {
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      total_tokens: promptTokens + completionTokens,
+      promptTokens,
+      completionTokens,
+      totalTokens: promptTokens + completionTokens,
     },
-    model: "test-model",
   };
 }
 

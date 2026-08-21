@@ -242,6 +242,26 @@ export class FilesystemArtifactStore implements ArtifactStore {
     return null;
   }
 
+  async listAll<T>(
+    runId: string,
+    type: ArtifactType,
+  ): Promise<ArtifactRecord<T>[]> {
+    const versions = await this.listVersions(runId, type);
+    const records: ArtifactRecord<T>[] = [];
+    for (const entry of versions) {
+      const ref: ArtifactReference = {
+        artifactId: entry.artifactId,
+        type,
+        version: entry.version,
+        location: artifactPath(runId, type, entry.version),
+        runId,
+      };
+      const record = await this.load<T>(ref);
+      if (record) records.push(record);
+    }
+    return records;
+  }
+
   async listVersions(
     runId: string,
     type: ArtifactType,

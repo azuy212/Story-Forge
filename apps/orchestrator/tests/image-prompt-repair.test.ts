@@ -64,7 +64,7 @@ function makeMocks(output: unknown = REPAIR_OUTPUT) {
       return Promise.resolve(MOCK_PROMPT);
     });
   mockGenerate.mockResolvedValue({
-    choices: [{ message: { content: JSON.stringify(output) } }],
+    output: JSON.stringify(output),
   });
   return { createModel, loadPrompt };
 }

@@ -70,6 +70,14 @@ describe("FilesystemArtifactStore", () => {
     expect(latest?.data.v).toBe(3);
   });
 
+  it("listAll returns every saved record in version order", async () => {
+    await saveComplete({ v: 1 });
+    await saveComplete({ v: 2 });
+    const all = await store.listAll<{ v: number }>(RUN_ID, "script");
+    expect(all.map((r) => r.version)).toEqual([1, 2]);
+    expect(all.map((r) => r.data.v)).toEqual([1, 2]);
+  });
+
   it("returns null from latest when nothing saved", async () => {
     const latest = await store.latest(RUN_ID, "script");
     expect(latest).toBeNull();

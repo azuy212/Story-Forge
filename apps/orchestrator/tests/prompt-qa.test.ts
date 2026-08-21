@@ -105,25 +105,18 @@ function buildResponse(overrides?: {
   const promptTokens = overrides?.promptTokens ?? 8;
   const completionTokens = overrides?.completionTokens ?? 16;
   return {
-    choices: [
-      {
-        message: {
-          content:
-            overrides?.content ??
-            JSON.stringify({
-              status: "approved",
-              globalFeedback: "",
-              sceneResults: SCENE_RESULTS,
-            }),
-        },
-      },
-    ],
+    output:
+      overrides?.content ??
+      JSON.stringify({
+        status: "approved",
+        globalFeedback: "",
+        sceneResults: SCENE_RESULTS,
+      }),
     usage: {
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      total_tokens: promptTokens + completionTokens,
+      promptTokens,
+      completionTokens,
+      totalTokens: promptTokens + completionTokens,
     },
-    model: "test-model",
   };
 }
 

@@ -19,6 +19,12 @@ export const EXPECTED_HEADERS = [
   "Scheduled At",
   "Published At",
   "Duration",
+  "LLM Prompt Tokens",
+  "LLM Completion Tokens",
+  "LLM Total Tokens",
+  "LLM Reasoning Tokens",
+  "LLM Cached Tokens",
+  "LLM Cost USD",
 ];
 
 export const COLUMN = {
@@ -33,6 +39,12 @@ export const COLUMN = {
   SCHEDULED_AT: 8,
   PUBLISHED_AT: 9,
   DURATION: 10,
+  LLM_PROMPT_TOKENS: 11,
+  LLM_COMPLETION_TOKENS: 12,
+  LLM_TOTAL_TOKENS: 13,
+  LLM_REASONING_TOKENS: 14,
+  LLM_CACHED_TOKENS: 15,
+  LLM_COST_USD: 16,
 };
 
 export const PLANNED_STATUS = "planned";
@@ -150,7 +162,7 @@ export function formatLocalTimestamp(iso) {
 }
 
 /**
- * Build one canonical 11-cell row for a video record.
+ * Build one canonical 17-cell row for a video record.
  */
 export function buildSheetRow(record) {
   const youtubeUrl = record.youtubeId
@@ -168,5 +180,11 @@ export function buildSheetRow(record) {
     record.scheduledAt ?? "",
     record.publishedAt ?? "",
     formatDurationMs(record.durationMs),
+    record.llmPromptTokens ?? "",
+    record.llmCompletionTokens ?? "",
+    record.llmTotalTokens ?? "",
+    record.llmReasoningTokens ?? "",
+    record.llmCachedTokens ?? "",
+    record.llmCostUsd ?? "",
   ];
 }

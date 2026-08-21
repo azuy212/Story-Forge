@@ -30,6 +30,7 @@ export const ArtifactTypeSchema = z.enum([
   "releaseReview",
   "publish",
   "publication",
+  "llmUsage",
 ]);
 
 export type ArtifactType = z.infer<typeof ArtifactTypeSchema>;

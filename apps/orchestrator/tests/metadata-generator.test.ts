@@ -44,9 +44,8 @@ function runNode(state?: Partial<ProjectState>) {
 
 function buildLLMResponse(data: unknown) {
   return {
-    choices: [{ message: { content: JSON.stringify(data) } }],
-    usage: { prompt_tokens: 14, completion_tokens: 28, total_tokens: 42 },
-    model: "test-model",
+    output: JSON.stringify(data),
+    usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
   };
 }
 

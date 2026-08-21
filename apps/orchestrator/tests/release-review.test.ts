@@ -69,9 +69,8 @@ function runNode(state?: Partial<ProjectState>) {
 
 function buildResponse(data: unknown) {
   return {
-    choices: [{ message: { content: JSON.stringify(data) } }],
-    usage: { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 },
-    model: "test-model",
+    output: JSON.stringify(data),
+    usage: { promptTokens: 12, completionTokens: 8, totalTokens: 20 },
   };
 }
 

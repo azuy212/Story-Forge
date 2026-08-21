@@ -120,7 +120,9 @@ function getThumbnailQa(
     (inject.thumbnailQa as (
       imagePath: string,
       thumbnailText: string,
-    ) => Promise<ThumbnailQaResult>) ?? runThumbnailQa
+    ) => Promise<ThumbnailQaResult>) ??
+    ((imagePath, thumbnailText) =>
+      runThumbnailQa(imagePath, thumbnailText, config))
   );
 }
 

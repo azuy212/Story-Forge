@@ -6,7 +6,7 @@ import {
 } from "../src/integrations/google-sheets/sheets-format.mjs";
 
 function plannedRow(overrides: Partial<Record<number, string>> = {}): string[] {
-  const row = Array(11).fill("");
+  const row = Array(EXPECTED_HEADERS.length).fill("");
   row[0] = "abc123";
   row[1] = "Geography";
   row[2] = "Unrecognized Countries";

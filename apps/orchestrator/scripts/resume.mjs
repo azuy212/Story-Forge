@@ -412,7 +412,7 @@ export async function resumeRun(
       pillar,
       topic,
       // projectId ties the Sheet row to the run; youtubePublishAt is only
-      // seeded for a brand-new backlog run and never on resume.
+      // seeded by run-next (new or resume) and never by the manual resume CLI.
       ...(projectId ? { projectId } : {}),
       ...(youtubePublishAt ? { youtubePublishAt } : {}),
     },

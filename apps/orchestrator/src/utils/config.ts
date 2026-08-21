@@ -43,14 +43,26 @@ export const config = {
   artifactStoreDir: (): string => read("ARTIFACT_STORE_DIR") ?? "runs",
   sourceAssetCacheDir: (): string =>
     read("SOURCE_ASSET_CACHE_DIR") ?? "cache/source-assets",
-  enableScriptQA: (): boolean =>
-    read("ENABLE_SCRIPT_QA") === "true" || read("ENABLE_QA") === "true",
-  enableResearchQA: (): boolean =>
-    read("ENABLE_RESEARCH_QA") === "true" || read("ENABLE_QA") === "true",
-  enablePromptQA: (): boolean =>
-    read("ENABLE_PROMPT_QA") === "true" || read("ENABLE_QA") === "true",
-  enableReleaseQA: (): boolean =>
-    read("ENABLE_RELEASE_QA") === "true" || read("ENABLE_QA") === "true",
+  enableScriptQA: (): boolean => {
+    const v = read("ENABLE_SCRIPT_QA");
+    if (v !== undefined) return v === "true";
+    return read("ENABLE_QA") === "true";
+  },
+  enableResearchQA: (): boolean => {
+    const v = read("ENABLE_RESEARCH_QA");
+    if (v !== undefined) return v === "true";
+    return read("ENABLE_QA") === "true";
+  },
+  enablePromptQA: (): boolean => {
+    const v = read("ENABLE_PROMPT_QA");
+    if (v !== undefined) return v === "true";
+    return read("ENABLE_QA") === "true";
+  },
+  enableReleaseQA: (): boolean => {
+    const v = read("ENABLE_RELEASE_QA");
+    if (v !== undefined) return v === "true";
+    return read("ENABLE_QA") === "true";
+  },
   supportsVideoAssets: (): boolean => read("ENABLE_VIDEO_ASSETS") === "true",
   narrativeHoldSeconds: (): number => {
     const value = Number(read("NARRATIVE_HOLD_SECONDS") ?? "0.5");
