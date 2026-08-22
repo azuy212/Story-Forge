@@ -57,7 +57,7 @@ describe("syncVideoRecord", () => {
       expect.objectContaining({
         spreadsheetId: "sheet-1",
         range: "'Sheet1'!A:Q",
-        valueInputOption: "RAW",
+        valueInputOption: "USER_ENTERED",
         insertDataOption: "INSERT_ROWS",
         requestBody: {
           values: [
@@ -117,7 +117,7 @@ describe("syncVideoRecord", () => {
     expect(api.update).toHaveBeenCalledWith(
       expect.objectContaining({
         range: "'Sheet1'!A2:Q2",
-        valueInputOption: "RAW",
+        valueInputOption: "USER_ENTERED",
       }),
     );
   });

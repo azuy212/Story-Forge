@@ -62,7 +62,7 @@ export async function syncVideoRecord(
       await api.update({
         spreadsheetId,
         range: boundedCellRange(sheetName, rowNumber),
-        valueInputOption: "RAW",
+        valueInputOption: "USER_ENTERED",
         requestBody: { values },
       });
       return { action: "updated", row: rowNumber };
@@ -71,7 +71,7 @@ export async function syncVideoRecord(
     await api.append({
       spreadsheetId,
       range: boundedRange(sheetName),
-      valueInputOption: "RAW",
+      valueInputOption: "USER_ENTERED",
       insertDataOption: "INSERT_ROWS",
       requestBody: { values },
     });
