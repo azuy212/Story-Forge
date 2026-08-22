@@ -139,6 +139,48 @@ describe("drainStream", () => {
       drainStream(new Response(stream, { status: 200 })),
     ).rejects.toThrow("Malformed SSE data event");
   });
+
+  it("returns on the complete terminal event and cancels the stream even when the server never closes it", async () => {
+    let cancelled = false;
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode(
+            `data: ${JSON.stringify(completeEvent)}\n\n`,
+          ),
+        );
+        // Never closed: simulates a server holding the connection open.
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const { lastEvent } = await drainStream(
+      new Response(stream, { status: 200 }),
+    );
+    expect(lastEvent.data.execution.status).toBe("complete");
+    expect(cancelled).toBe(true);
+  });
+
+  it("cancels the stream when the run fails mid-stream", async () => {
+    let cancelled = false;
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode(
+            `data: ${JSON.stringify({ event: "error", data: { error: "boom" } })}\n\n`,
+          ),
+        );
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    await expect(
+      drainStream(new Response(stream, { status: 200 })),
+    ).rejects.toThrow("Graph run failed");
+    expect(cancelled).toBe(true);
+  });
 });
 
 describe("runStream", () => {

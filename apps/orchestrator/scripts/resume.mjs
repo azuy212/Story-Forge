@@ -8,7 +8,8 @@ import { createOrAppendRunMeta } from "../src/artifacts/run-meta.mjs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RUNS_DIR =
   process.env.ARTIFACT_STORE_DIR || join(__dirname, "..", "runs");
-const DEV_API = "http://localhost:2024";
+// Overridable so tests can point at a stub server.
+const DEV_API = process.env.LANGGRAPH_URL || "http://localhost:2024";
 
 function sanitizeKey(threadId) {
   return threadId.replace(/[^a-z0-9-_.]+/gi, "_");
@@ -178,49 +179,77 @@ export async function drainStream(res) {
   const decoder = new TextDecoder();
   let lastEvent = null;
   let buffer = "";
+  let drained = false;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        drained = true;
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
 
-      let event;
+        let event;
+        try {
+          event = JSON.parse(line.slice(6));
+        } catch {
+          throw new Error(`Malformed SSE data event: ${line.slice(0, 200)}`);
+        }
+
+        lastEvent = event;
+
+        if (
+          event.event === "error" ||
+          (event.event === "values" &&
+            event.data?.execution?.status === "failed")
+        ) {
+          const errMsg =
+            event.data?.diagnostics?.errors?.[0] ||
+            event.data?.error ||
+            JSON.stringify(event);
+          throw new Error(`Graph run failed: ${errMsg}`);
+        }
+
+        // The run's own execution status is the terminal signal: stop reading
+        // as soon as this specific graph run completes instead of waiting for
+        // the server to close the SSE connection.
+        if (
+          event.event === "values" &&
+          event.data?.execution?.status === "complete"
+        ) {
+          return { lastEvent };
+        }
+
+        if (event.event === "values" || event.event === "updates") {
+          process.stdout.write(".");
+        }
+      }
+    }
+
+    if (lastEvent?.data?.execution?.status !== "complete") {
+      throw new Error(
+        `Run ended prematurely. Final status: ${lastEvent?.data?.execution?.status ?? "unknown"}`,
+      );
+    }
+
+    return { lastEvent };
+  } finally {
+    // Cancel the body whenever we leave before the server drains it (terminal
+    // event observed or an error thrown) so no socket keeps the process alive
+    // after the run ends. A fully drained stream is already closed; skip it.
+    if (!drained) {
       try {
-        event = JSON.parse(line.slice(6));
+        await reader.cancel();
       } catch {
-        throw new Error(`Malformed SSE data event: ${line.slice(0, 200)}`);
-      }
-
-      lastEvent = event;
-
-      if (
-        event.event === "error" ||
-        (event.event === "values" && event.data?.execution?.status === "failed")
-      ) {
-        const errMsg =
-          event.data?.diagnostics?.errors?.[0] ||
-          event.data?.error ||
-          JSON.stringify(event);
-        throw new Error(`Graph run failed: ${errMsg}`);
-      }
-
-      if (event.event === "values" || event.event === "updates") {
-        process.stdout.write(".");
+        // Stream already closed or errored; nothing to release.
       }
     }
   }
-
-  if (lastEvent?.data?.execution?.status !== "complete") {
-    throw new Error(
-      `Run ended prematurely. Final status: ${lastEvent?.data?.execution?.status ?? "unknown"}`,
-    );
-  }
-
-  return { lastEvent };
 }
 
 export function parseArgs(args) {

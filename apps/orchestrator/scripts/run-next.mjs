@@ -42,9 +42,15 @@ const RUNS_DIR =
   process.env.ARTIFACT_STORE_DIR || join(__dirname, "..", "runs");
 
 function fail(message) {
-  console.error(`run-next: ${message}`);
-  process.exit(1);
+  throw new LauncherError(message);
 }
+
+/**
+ * Fatal launcher/configuration failure: missing credentials, bad sheet
+ * config, unreadable sheet, invalid headers, unavailable assistant.
+ * The entrypoint maps this to exit code 1.
+ */
+class LauncherError extends Error {}
 
 function slugify(value) {
   return (
@@ -152,7 +158,7 @@ export function decideRun(runsDir, rows, now = new Date()) {
   };
 }
 
-async function readSheetRows(client, spreadsheetId, sheetName) {
+export async function readSheetRows(client, spreadsheetId, sheetName) {
   const res = await client.spreadsheets.values.get({
     spreadsheetId,
     range: `'${sheetName}'!A:Q`,
@@ -160,12 +166,34 @@ async function readSheetRows(client, spreadsheetId, sheetName) {
   return res.data?.values ?? [];
 }
 
-async function main() {
-  const clientId = process.env.YOUTUBE_CLIENT_ID;
-  const clientSecret = process.env.YOUTUBE_CLIENT_SECRET;
-  const refreshToken = process.env.YOUTUBE_REFRESH_TOKEN;
-  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
-  const sheetName = process.env.GOOGLE_SHEETS_SHEET_NAME || "Sheet1";
+/**
+ * Full launcher lifecycle: read backlog → decide create/resume → obtain
+ * assistant → dispatch and wait for ONE graph run → finalize.
+ *
+ * Launcher/configuration failures (credentials, sheet access, headers,
+ * assistant lookup) throw LauncherError and are fatal (exit 1). A failure of
+ * the pipeline run itself is recoverable: it is logged with the run's
+ * namespace/topic and the launcher finishes normally (exit 0); what happens
+ * on the next invocation is decided by the backlog and the run's persisted
+ * state, not by this launcher. The LangGraph server is never owned by this
+ * process; once the dispatched run reaches its terminal state, this returns
+ * and Node exits naturally.
+ *
+ * Deps are injectable for tests; defaults read env, Google Sheets, and hit
+ * the real dev server.
+ */
+export async function runLauncher({
+  env = process.env,
+  runsDir = RUNS_DIR,
+  readRows = readSheetRows,
+  getAssistantId: getAssistant = getAssistantId,
+  resumeRun: runPipeline = resumeRun,
+} = {}) {
+  const clientId = env.YOUTUBE_CLIENT_ID;
+  const clientSecret = env.YOUTUBE_CLIENT_SECRET;
+  const refreshToken = env.YOUTUBE_REFRESH_TOKEN;
+  const spreadsheetId = env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  const sheetName = env.GOOGLE_SHEETS_SHEET_NAME || "Sheet1";
 
   if (!clientId || !clientSecret || !refreshToken) {
     fail(
@@ -182,7 +210,7 @@ async function main() {
 
   let rows;
   try {
-    rows = await readSheetRows(sheets, spreadsheetId, sheetName);
+    rows = await readRows(sheets, spreadsheetId, sheetName);
   } catch (e) {
     fail(`reading sheet failed: ${e.message}`);
   }
@@ -193,7 +221,7 @@ async function main() {
     fail(e.message);
   }
 
-  const decision = decideRun(RUNS_DIR, rows);
+  const decision = decideRun(runsDir, rows);
   if (decision.action === "none") {
     console.log(
       decision.reason === "no-pending-row"
@@ -205,48 +233,46 @@ async function main() {
 
   let assistantId;
   try {
-    assistantId = await getAssistantId();
+    assistantId = await getAssistant();
   } catch (e) {
     fail(`getAssistantId failed: ${e.message}`);
   }
 
-  if (decision.action === "resume") {
-    console.log(
-      `Resuming existing run for topic "${decision.topic}": ${decision.ns}`,
-    );
-    if (decision.youtubePublishAt) {
-      console.log(
-        `  (Re)seeding publish slot ${decision.youtubePublishAt} for this resume.`,
-      );
-    } else {
-      console.log("  No free publish slot within 30 days; publishing as-is.");
-    }
-    await resumeRun(
-      decision.ns,
-      { pillar: decision.pillar, topic: decision.topic },
-      {
-        assistantId,
-        projectId: decision.projectId,
-        youtubePublishAt: decision.youtubePublishAt,
-      },
-    );
-    console.log(`\nArtifacts in: runs/${decision.ns}`);
-    return;
-  }
+  const input = { pillar: decision.pillar, topic: decision.topic };
+  const options = {
+    assistantId,
+    projectId: decision.projectId,
+    youtubePublishAt: decision.youtubePublishAt,
+  };
 
-  console.log(
-    `New backlog run "${decision.topic}" (video ${decision.projectId}) at slot ${decision.youtubePublishAt}`,
-  );
-  await resumeRun(
-    decision.ns,
-    { pillar: decision.pillar, topic: decision.topic },
-    {
-      assistantId,
-      projectId: decision.projectId,
-      youtubePublishAt: decision.youtubePublishAt,
-    },
-  );
-  console.log(`\nArtifacts in: runs/${decision.ns}`);
+  try {
+    if (decision.action === "resume") {
+      console.log(
+        `Resuming existing run for topic "${decision.topic}": ${decision.ns}`,
+      );
+      if (decision.youtubePublishAt) {
+        console.log(
+          `  (Re)seeding publish slot ${decision.youtubePublishAt} for this resume.`,
+        );
+      } else {
+        console.log("  No free publish slot within 30 days; publishing as-is.");
+      }
+    } else {
+      console.log(
+        `New backlog run "${decision.topic}" (video ${decision.projectId}) at slot ${decision.youtubePublishAt}`,
+      );
+    }
+    // Resolves only when this specific graph run reached its terminal state.
+    await runPipeline(decision.ns, input, options);
+    console.log(`\nArtifacts in: runs/${decision.ns}`);
+  } catch (e) {
+    // Recoverable pipeline failure: log it and finalize normally (exit 0).
+    // Whatever state this run persisted stays authoritative; whether a later
+    // invocation can resume depends on that state, not on this launcher.
+    console.error(
+      `run-next: pipeline run failed for "${decision.topic}" (${decision.ns}): ${e?.stack || e}`,
+    );
+  }
 }
 
 if (
@@ -254,8 +280,12 @@ if (
   fileURLToPath(import.meta.url) ===
     fileURLToPath(pathToFileURL(process.argv[1]).href)
 ) {
-  main().catch((e) => {
-    console.error(e);
-    process.exit(1);
+  runLauncher().catch((e) => {
+    if (e instanceof LauncherError) {
+      console.error(`run-next: ${e.message}`);
+    } else {
+      console.error(e?.stack || e);
+    }
+    process.exitCode = 1;
   });
 }
