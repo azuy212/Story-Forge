@@ -24,6 +24,7 @@ export const PromptQAOutputSchema = z.object({
   sceneResults: z
     .array(SceneResultSchema)
     .min(1, "must have at least one scene result"),
+  repeated: z.boolean().optional(),
 });
 
 export type PromptQAOutput = z.input<typeof PromptQAOutputSchema>;

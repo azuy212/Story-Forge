@@ -225,6 +225,157 @@ function makePromptQAResponse(
   };
 }
 
+/**
+ * Queue the standard happy-path LLM mock chain (research → release review).
+ * `scriptWriterRuns` controls how many ScriptWriter responses are queued (for
+ * revision loops), `scriptQA` is the ordered list of ScriptQA responses, and
+ * `promptQA` overrides the single PromptQA verdict.
+ */
+function queueHappyPathMocks(
+  options: {
+    scriptWriterRuns?: number;
+    scriptQA?: Record<string, unknown>[];
+    promptQA?: "approved" | "minor_revision" | "major_revision";
+  } = {},
+) {
+  const {
+    scriptWriterRuns = 1,
+    scriptQA = [{ status: "approved", feedback: "" }],
+    promptQA = "approved",
+  } = options;
+  const FACTS = makeFacts(8);
+  const BEATS = makeBeats(6);
+  const NARRATIONS = SCENE_NARRATIONS;
+  const SCENES = makeScenes(NARRATIONS, [8, 8, 8, 8, 8, 10]);
+  const VISUAL_PLANS = makeVisualPlans(SCENES);
+  const ASSETS = makeAssets(SCENES, LONG_PROMPT);
+
+  mockGenerate
+    // 1. ResearchAgent
+    .mockResolvedValueOnce({
+      output: JSON.stringify({
+        summary: "Remote island in Pacific.",
+        facts: FACTS,
+      }),
+      usage: { promptTokens: 11, completionTokens: 22, totalTokens: 33 },
+    })
+    // 2. ResearchQA
+    .mockResolvedValueOnce({
+      output: JSON.stringify(makeResearchQAResponse(FACTS)),
+      usage: { promptTokens: 9, completionTokens: 6, totalTokens: 15 },
+    })
+    // 3. ScriptPlanner
+    .mockResolvedValueOnce({
+      output: JSON.stringify({
+        content: {
+          title: "Mystery Island",
+          hook: "What if a country wasn't real?",
+        },
+        storyType: "mystery",
+        storySummary: "Mystery Island story.",
+        storyBeats: BEATS,
+      }),
+      usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
+    });
+
+  // ScriptWriter and ScriptQA alternate (writer → QA → writer → QA) for
+  // revision loops, so the responses are queued interleaved.
+  const writer = (i: number) => ({
+    output: JSON.stringify({
+      content: {
+        script: `Script body v${i + 1}.`,
+        narration: NARRATIONS.join(" "),
+        callToAction: "Subscribe!",
+        estimatedDurationSeconds: 50,
+      },
+    }),
+    usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
+  });
+
+  const rounds = Math.max(scriptWriterRuns, scriptQA.length);
+  for (let i = 0; i < rounds; i++) {
+    if (i < scriptWriterRuns) {
+      mockGenerate.mockResolvedValueOnce(writer(i));
+    }
+    if (i < scriptQA.length) {
+      mockGenerate.mockResolvedValueOnce({
+        output: JSON.stringify(scriptQA[i]),
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
+      });
+    }
+  }
+
+  mockGenerate
+    // 5. MetadataGenerator
+    .mockResolvedValueOnce({
+      output: JSON.stringify({
+        title: "Mystery Island Video",
+        description: "Explore the mystery.",
+        tags: ["geography"],
+        hashtags: ["#mystery"],
+        category: "Education",
+        pinnedComment: "What do you think?",
+      }),
+      usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+    })
+    // 6. ThumbnailGenerator
+    .mockResolvedValueOnce({
+      output: JSON.stringify({
+        thumbnailPrompt: "Mysterious island aerial",
+        thumbnailText: "Doesn't Exist?",
+        textPosition: "bottom-third",
+        colorScheme: "cold blue",
+      }),
+      usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
+    })
+    // 7. VisualDirector
+    .mockResolvedValueOnce({
+      output: JSON.stringify({ scenes: SCENES, visualPlans: VISUAL_PLANS }),
+      usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+    })
+    // 8. ImagePromptGenerator
+    .mockResolvedValueOnce({
+      output: JSON.stringify({ assets: ASSETS }),
+      usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
+    })
+    // 9. PromptQA
+    .mockResolvedValueOnce({
+      output: JSON.stringify(makePromptQAResponse(promptQA, SCENES)),
+      usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
+    })
+    // 10. ReleaseReview
+    .mockResolvedValueOnce({
+      output: JSON.stringify({ status: "approved", issues: [] }),
+      usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
+    });
+
+  return { SCENES, NARRATIONS };
+}
+
+/** Full provider config needed for a complete end-to-end run. */
+function happyPathConfigurable() {
+  return {
+    createModel: mockCreateModel,
+    loadPrompt: mockLoadPrompt,
+    assetProvider: ASSET_PROVIDER,
+    ttsProvider: TTS_PROVIDER,
+    audioConcatenator: AUDIO_CONCATENATOR.concat,
+    sceneSubtitleProvider: SCENE_SUBTITLE_PROVIDER,
+    composerProvider: COMPOSER_PROVIDER,
+    probe: () => Promise.resolve(RELEASE_PROBE),
+    publisherProvider: {
+      publish: () =>
+        Promise.resolve({
+          platform: "youtube",
+          platformVideoId: "abc123",
+          url: "https://youtube.com/watch?v=abc123",
+          status: "published",
+          publishedAt: new Date().toISOString(),
+        }),
+    },
+  };
+}
+
 const ASSET_PROVIDER = {
   generateImage: () =>
     Promise.resolve({ url: "https://placeholder.local/scene.png" }),
@@ -535,7 +686,8 @@ describe("Graph", () => {
     expect(s[1].filename).toBe("scene-002.png");
     expect(s[1].assetId).toBe("asset-scene-002");
 
-    expect(result.execution.currentNode).toBe("Publisher");
+    expect(result.execution.currentNode).toBe("Finalize");
+    expect(result.execution.status).toBe("complete");
 
     expect(result.publishing?.results).toBeDefined();
     expect(result.publishing?.results).toHaveLength(1);
@@ -577,102 +729,106 @@ describe("Graph", () => {
     expect(result.thumbnail?.textPosition).toBe("bottom-third");
   }, 30000);
 
-  it("terminates at ScriptQA when minor_revision retries exhausted", async () => {
-    const FACTS = makeFacts(8);
-    const BEATS = makeBeats(6);
+  it("continues and completes when ScriptQA minor_revision budget is exhausted", async () => {
+    // Seed the producer counter so the FIRST minor_revision is already past
+    // the one-revision budget: the router must accept the best script and
+    // continue rather than regenerate or terminate.
+    queueHappyPathMocks({
+      scriptQA: [
+        {
+          status: "minor_revision",
+          feedback: "Improve pacing.",
+          issues: ["Beat 2 could be stronger"],
+        },
+      ],
+    });
 
+    const result = await graph.invoke(
+      {
+        project: { pillar: "Geography", topic: "Mystery Island" },
+        branding: { channel: "TestChannel", creator: "", cta: "Subscribe" },
+        execution: { version: "0.1.0", retryCount: { ScriptWriter: 2 } },
+      },
+      {
+        recursionLimit: 100,
+        configurable: happyPathConfigurable(),
+      } as any,
+    );
+
+    // Actual terminal state: accepted best script and the run completed.
+    expect(result.execution.status).toBe("complete");
+    expect(result.execution.currentNode).toBe("Finalize");
+    expect(result.scriptQA?.status).toBe("minor_revision");
+    // One real writer run (2 seeded + 1); the router did NOT route back, so the
+    // revision counter did not increment again.
+    expect(result.execution.retryCount?.ScriptWriter).toBe(3);
+    expect(result.publishing?.results![0].status).toBe("published");
+  }, 30000);
+
+  it("accepts immediately when ScriptQA returns repeated minor feedback", async () => {
+    // Identical feedback twice: after one revision the second round repeats, so
+    // the router must accept the best result instead of regenerating a third
+    // time.
+    const minor = {
+      status: "minor_revision",
+      feedback: "Same pacing issue.",
+      issues: ["Pacing is off"],
+    };
+    queueHappyPathMocks({ scriptWriterRuns: 2, scriptQA: [minor, minor] });
+
+    const result = await graph.invoke(
+      {
+        project: { pillar: "Geography", topic: "Mystery Island" },
+        branding: { channel: "TestChannel", creator: "", cta: "Subscribe" },
+        execution: { version: "0.1.0" },
+      },
+      {
+        recursionLimit: 100,
+        configurable: happyPathConfigurable(),
+      } as any,
+    );
+
+    expect(result.execution.status).toBe("complete");
+    expect(result.execution.currentNode).toBe("Finalize");
+    expect(result.scriptQA?.status).toBe("minor_revision");
+    expect(result.scriptQA?.repeated).toBe(true);
+    // Exactly 2 writer runs (initial + 1 revision); the repeated round never
+    // routed back to the producer.
+    expect(result.execution.retryCount?.ScriptWriter).toBe(2);
+    expect(result.publishing?.results![0].status).toBe("published");
+  }, 30000);
+
+  it("fails the run when ResearchQA returns fail past its budget", async () => {
+    // Research is unusable (fail verdict) with the producer already at its
+    // budget: the run must terminate failed, not loop or continue.
     mockGenerate
       .mockResolvedValueOnce({
-        output: JSON.stringify({ summary: "Summary.", facts: FACTS }),
-
+        output: JSON.stringify({
+          summary: "Summary.",
+          facts: makeFacts(8),
+        }),
         usage: { promptTokens: 11, completionTokens: 22, totalTokens: 33 },
       })
       .mockResolvedValueOnce({
-        output: JSON.stringify(makeResearchQAResponse(FACTS)),
-
+        output: JSON.stringify({
+          status: "fail",
+          feedback: "No usable facts for script generation.",
+          issues: ["Fewer than 5 facts survive review"],
+          factsToRegenerate: 0,
+          factVerdicts: makeFacts(8).map((f) => ({
+            factId: f.id,
+            verdict: "remove",
+            reason: "Unsupported",
+          })),
+        }),
         usage: { promptTokens: 9, completionTokens: 6, totalTokens: 15 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          content: { title: "Title", hook: "Hook?" },
-          storyType: "mystery",
-          storySummary: "Summary.",
-          storyBeats: BEATS,
-        }),
-
-        usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          content: {
-            script: "Script.",
-            narration: "Narration.",
-            callToAction: "Subscribe.",
-            estimatedDurationSeconds: 45,
-          },
-        }),
-
-        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
-      })
-      // First ScriptQA call — retries becomes 1
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          status: "minor_revision",
-          feedback: "Fix pacing.",
-        }),
-
-        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
-      })
-      // ScriptWriter runs again
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          content: {
-            script: "Script v2.",
-            narration: "Narration v2.",
-            callToAction: "Subscribe.",
-            estimatedDurationSeconds: 45,
-          },
-        }),
-
-        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
-      })
-      // Second ScriptQA call — retries becomes 2
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          status: "minor_revision",
-          feedback: "Still bad pacing.",
-        }),
-
-        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
-      })
-      // ScriptWriter runs again
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          content: {
-            script: "Script v3.",
-            narration: "Narration v3.",
-            callToAction: "Subscribe.",
-            estimatedDurationSeconds: 45,
-          },
-        }),
-
-        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
-      })
-      // Third ScriptQA call — retries becomes 3, router returns __end__
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          status: "minor_revision",
-          feedback: "Still bad pacing.",
-        }),
-
-        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       });
 
     const result = await graph.invoke(
       {
-        project: { pillar: "Geography", topic: "Test" },
-        branding: { channel: "C", creator: "", cta: "" },
-        execution: { version: "0.1.0" },
+        project: { pillar: "Geography", topic: "Mystery Island" },
+        branding: { channel: "TestChannel", creator: "", cta: "Subscribe" },
+        execution: { version: "0.1.0", retryCount: { ResearchAgent: 3 } },
       },
       {
         configurable: {
@@ -682,14 +838,14 @@ describe("Graph", () => {
       } as any,
     );
 
-    expect(result.scriptQA?.status).toBe("minor_revision");
-    expect(result.scriptQA?.feedback).toContain("Still bad pacing");
-    expect(result.execution.currentNode).toBe("ScriptQA");
-
-    expect(result.production?.scenes).toHaveLength(0);
-    expect(result.content?.callToAction).toBe(
-      "Follow for more mysteries of the universe.",
+    expect(result.execution.status).toBe("failed");
+    expect(result.execution.currentNode).toBe("Finalize");
+    expect(result.researchQA?.status).toBe("fail");
+    expect(result.diagnostics?.errors?.join("\n")).toContain(
+      "No usable facts for script generation",
     );
+    // Script was never produced.
+    expect(result.content?.script).toBeUndefined();
   }, 30000);
 
   it("promptQA revise loops back to ImagePromptGenerator then proceeds on approval", async () => {
@@ -824,7 +980,8 @@ describe("Graph", () => {
     expect(result.production?.scenes![0].generationPrompt).toContain(
       "(revised)",
     );
-    expect(result.execution.currentNode).toBe("Publisher");
+    expect(result.execution.currentNode).toBe("Finalize");
+    expect(result.execution.status).toBe("complete");
   }, 30000);
 
   it("promptQA major_revision loops back to VisualDirector then proceeds on approval", async () => {
@@ -961,225 +1118,64 @@ describe("Graph", () => {
     expect(result.production?.visualPlan).toBeDefined();
     expect(result.production?.visualPlan).toHaveLength(6);
     expect(result.execution?.retryCount?.VisualDirector).toBe(2);
-    expect(result.execution.currentNode).toBe("Publisher");
+    expect(result.execution.currentNode).toBe("Finalize");
+    expect(result.execution.status).toBe("complete");
   }, 30000);
 
-  it("terminates at PromptQA when promptQA retries exhausted with revise status", async () => {
-    const SCENES = makeScenes(SCENE_NARRATIONS, [8, 8, 8, 8, 8, 8]);
-    const VISUAL_PLANS = makeVisualPlans(SCENES);
-    const ASSETS = makeAssets(SCENES);
-
-    mockGenerate
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          summary: "Summary.",
-          facts: makeFacts(8),
-        }),
-
-        usage: { promptTokens: 11, completionTokens: 22, totalTokens: 33 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify(makeResearchQAResponse(makeFacts(8))),
-
-        usage: { promptTokens: 9, completionTokens: 6, totalTokens: 15 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          content: { title: "Title", hook: "Hook?" },
-          storyType: "mystery",
-          storySummary: "Summary.",
-          storyBeats: makeBeats(6),
-        }),
-
-        usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          content: {
-            script: "Script.",
-            narration: SCENE_NARRATIONS.join(" "),
-            callToAction: "Subscribe.",
-            estimatedDurationSeconds: 48,
-          },
-        }),
-
-        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({ status: "approved", feedback: "" }),
-
-        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          title: "T",
-          description: "D",
-          tags: ["geography"],
-          hashtags: [],
-          category: "Education",
-          pinnedComment: "C",
-        }),
-
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          thumbnailPrompt: "P",
-          thumbnailText: "T",
-          textPosition: "center",
-          colorScheme: "blue",
-        }),
-
-        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          scenes: SCENES,
-          visualPlans: VISUAL_PLANS,
-        }),
-
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({ assets: ASSETS }),
-        usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify(makePromptQAResponse("minor_revision", SCENES)),
-
-        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
-      });
+  it("continues and completes when PromptQA minor_revision budget is exhausted", async () => {
+    // Seed the ImagePromptGenerator counter so the first minor_revision is
+    // past its budget: the router accepts the best prompts and continues.
+    queueHappyPathMocks({ promptQA: "minor_revision" });
 
     const result = await graph.invoke(
       {
-        project: { pillar: "Geography", topic: "Test" },
-        branding: { channel: "C", creator: "", cta: "" },
+        project: { pillar: "Geography", topic: "Mystery Island" },
+        branding: { channel: "TestChannel", creator: "", cta: "Subscribe" },
         execution: {
           version: "0.1.0",
           retryCount: { ImagePromptGenerator: 2 },
         },
       },
       {
-        configurable: {
-          createModel: mockCreateModel,
-          loadPrompt: mockLoadPrompt,
-          assetProvider: ASSET_PROVIDER,
-        },
+        recursionLimit: 100,
+        configurable: happyPathConfigurable(),
       } as any,
     );
 
+    expect(result.execution.status).toBe("complete");
+    expect(result.execution.currentNode).toBe("Finalize");
     expect(result.production?.promptQA?.status).toBe("minor_revision");
-    expect(result.production?.promptQA?.globalFeedback).toBe("Fix consistency");
-    expect(result.execution.currentNode).toBe("PromptQA");
-
-    expect(result.production?.scenes![0].assetId).toBeUndefined();
-    expect(result.production?.scenes![0].assetUrl).toBeUndefined();
+    // IPG ran once (2 seeded + 1); the router accepted without routing back.
+    expect(result.execution.retryCount?.ImagePromptGenerator).toBe(3);
+    expect(result.publishing?.results![0].status).toBe("published");
   }, 30000);
 
-  it("terminates at PromptQA when major_revision retries exhausted", async () => {
-    const SCENES = makeScenes(SCENE_NARRATIONS, [8, 8, 8, 8, 8, 8]);
-    const VISUAL_PLANS = makeVisualPlans(SCENES);
-    const ASSETS = makeAssets(SCENES);
-
-    mockGenerate
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          summary: "Summary.",
-          facts: makeFacts(8),
-        }),
-
-        usage: { promptTokens: 11, completionTokens: 22, totalTokens: 33 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify(makeResearchQAResponse(makeFacts(8))),
-
-        usage: { promptTokens: 9, completionTokens: 6, totalTokens: 15 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          content: { title: "Title", hook: "Hook?" },
-          storyType: "mystery",
-          storySummary: "Summary.",
-          storyBeats: makeBeats(6),
-        }),
-
-        usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          content: {
-            script: "Script.",
-            narration: SCENE_NARRATIONS.join(" "),
-            callToAction: "Subscribe.",
-            estimatedDurationSeconds: 48,
-          },
-        }),
-
-        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({ status: "approved", feedback: "" }),
-
-        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          title: "T",
-          description: "D",
-          tags: ["geography"],
-          hashtags: [],
-          category: "Education",
-          pinnedComment: "C",
-        }),
-
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          thumbnailPrompt: "P",
-          thumbnailText: "T",
-          textPosition: "center",
-          colorScheme: "blue",
-        }),
-
-        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          scenes: SCENES,
-          visualPlans: VISUAL_PLANS,
-        }),
-
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({ assets: ASSETS }),
-        usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify(makePromptQAResponse("major_revision", SCENES)),
-
-        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
-      });
+  it("fails the run when PromptQA major_revision budget is exhausted", async () => {
+    // Seed the VisualDirector counter at the limit so the first
+    // major_revision (blocking) fails the run through the shared terminal.
+    queueHappyPathMocks({ promptQA: "major_revision" });
 
     const result = await graph.invoke(
       {
-        project: { pillar: "Geography", topic: "Test" },
-        branding: { channel: "C", creator: "", cta: "" },
-        execution: { version: "0.1.0", retryCount: { VisualDirector: 2 } },
+        project: { pillar: "Geography", topic: "Mystery Island" },
+        branding: { channel: "TestChannel", creator: "", cta: "Subscribe" },
+        execution: {
+          version: "0.1.0",
+          retryCount: { VisualDirector: 3 },
+        },
       },
       {
-        configurable: {
-          createModel: mockCreateModel,
-          loadPrompt: mockLoadPrompt,
-          assetProvider: ASSET_PROVIDER,
-        },
+        recursionLimit: 100,
+        configurable: happyPathConfigurable(),
       } as any,
     );
 
+    expect(result.execution.status).toBe("failed");
+    expect(result.execution.currentNode).toBe("Finalize");
     expect(result.production?.promptQA?.status).toBe("major_revision");
-    expect(result.execution.currentNode).toBe("PromptQA");
+    // No assets were generated: the pipeline stopped before AssetGenerator.
     expect(result.production?.scenes![0].assetId).toBeUndefined();
+    expect(result.publishing?.results).toHaveLength(0);
   }, 30000);
 
   it("complete pipeline produces all artifacts end-to-end", async () => {
@@ -1416,7 +1412,8 @@ describe("Graph", () => {
     expect(result.publishing?.results![0].status).toBe("published");
     expect(result.publishing?.publishedAt).toBeDefined();
 
-    expect(result.execution.currentNode).toBe("Publisher");
+    expect(result.execution.currentNode).toBe("Finalize");
+    expect(result.execution.status).toBe("complete");
     expect(result.diagnostics?.errors).toHaveLength(0);
     expect(result.diagnostics?.warnings).toHaveLength(0);
   }, 30000);
@@ -1603,7 +1600,8 @@ describe("Graph", () => {
     // Unaffected scenes generated on the first pass.
     expect(result.production?.scenes![1].generationStatus).toBe("complete");
     expect(repairProvider.sceneImageCalls).toBe(7);
-    expect(result.execution.currentNode).toBe("Publisher");
+    expect(result.execution.currentNode).toBe("Finalize");
+    expect(result.execution.status).toBe("complete");
     expect(result.diagnostics?.errors).toHaveLength(0);
   }, 30000);
 
@@ -1889,7 +1887,8 @@ describe("Graph", () => {
       result.production?.scenes?.every((s) => s.generationStatus === "failed"),
     ).toBe(true);
     expect(repairProvider.sceneImageCalls).toBe(18);
-    expect(result.execution.currentNode).toBe("AssetGenerator");
+    expect(result.execution.currentNode).toBe("Finalize");
+    expect(result.execution.status).toBe("failed");
     expect(result.diagnostics?.warnings).toEqual(
       expect.arrayContaining([
         expect.stringContaining("unresolved_provider_rejection"),
@@ -1979,8 +1978,8 @@ describe("Graph", () => {
 
         usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
       })
-      // 7..9. VisualDirector: structural failure with feedback, retried by the
-      // router until the retry budget (3) is exhausted.
+      // 7..8. VisualDirector: structural failure with feedback, retried by the
+      // router until the minor budget (1 revision) is exhausted.
       .mockResolvedValueOnce({
         output: JSON.stringify({
           scenes: SCENES,
@@ -2042,8 +2041,8 @@ describe("Graph", () => {
     );
 
     // Spine died at VisualDirector after exhausting its retry budget:
-    // 7 calls upstream + 3 VisualDirector attempts.
-    expect(mockGenerate).toHaveBeenCalledTimes(10);
+    // 7 calls upstream + 2 VisualDirector attempts (minor budget: 1 revision).
+    expect(mockGenerate).toHaveBeenCalledTimes(9);
 
     // No scenes produced downstream.
     expect(result.production?.scenes).toEqual([]);
@@ -2054,9 +2053,13 @@ describe("Graph", () => {
     expect(result.releaseValidation).toBeUndefined();
     expect(result.releaseReview).toBeUndefined();
 
-    // Publisher still joined (via Metadata/Thumbnail branches) but no-oped.
+    // Publisher never fired: the package was never assembled.
     expect(result.publishing?.results).toHaveLength(0);
     expect(result.publishing?.publishedAt).toBeUndefined();
+
+    // Shared terminal finalized the run as failed.
+    expect(result.execution.currentNode).toBe("Finalize");
+    expect(result.execution.status).toBe("failed");
 
     // The upstream error is preserved; downstream must not invent its own.
     expect(result.diagnostics?.errors!.length).toBeGreaterThanOrEqual(1);
@@ -2070,5 +2073,40 @@ describe("Graph", () => {
     expect(result.diagnostics?.errors!.join("\n")).not.toContain(
       "composition failed",
     );
+  }, 30000);
+
+  it("PublishReady fan-in: premature firing dead-ends branch, spine continues, final PublishReady fires with full package", async () => {
+    // This test verifies the fan-in semantics of PublishReady:
+    // 1. Metadata/Thumbnail branch finishes first -> PublishReady fires prematurely (package incomplete)
+    // 2. Router returns __end__ (dead-ends this branch, spine continues)
+    // 3. Spine completes -> PublishReady fires again with full package
+    // 4. Publisher fires exactly once -> Finalize executes exactly once
+    queueHappyPathMocks();
+
+    const result = await graph.invoke(
+      {
+        project: { pillar: "Geography", topic: "Fan-in Test" },
+        branding: { channel: "TestChannel", creator: "", cta: "Subscribe" },
+        execution: { version: "0.1.0" },
+      },
+      {
+        recursionLimit: 100,
+        configurable: happyPathConfigurable(),
+      } as any,
+    );
+
+    // Verify the pipeline completed successfully
+    expect(result.execution.status).toBe("complete");
+    expect(result.execution.currentNode).toBe("Finalize");
+    expect(result.publishing?.results![0].status).toBe("published");
+
+    // The graph execution should have:
+    // - One Publisher execution (not zero, not multiple)
+    // - One Finalize execution (the final terminal)
+    // - No early termination from premature PublishReady
+    expect(result.execution.currentNode).toBe("Finalize");
+    expect(result.execution.status).toBe("complete");
+    expect(result.publishing?.results).toHaveLength(1);
+    expect(result.publishing?.results![0].status).toBe("published");
   }, 30000);
 });

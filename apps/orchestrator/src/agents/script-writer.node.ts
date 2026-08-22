@@ -133,7 +133,10 @@ export async function scriptWriterNode(
   const branding = resolveBranding(state.branding);
 
   const scriptQA = state.scriptQA;
-  const needsRevision = scriptQA?.status === "minor_revision";
+  const needsRevision =
+    scriptQA?.status === "minor_revision" ||
+    scriptQA?.status === "major_revision" ||
+    scriptQA?.status === "fatal";
   const qaFeedback = needsRevision
     ? [
         ...(scriptQA.feedback ? [`Feedback: ${scriptQA.feedback}`] : []),

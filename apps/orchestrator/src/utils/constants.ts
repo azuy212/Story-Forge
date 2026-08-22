@@ -2,6 +2,12 @@ export const DEFAULT_MAX_RETRIES = 3;
 export const RESEARCH_MAX_RETRIES = DEFAULT_MAX_RETRIES;
 export const SCRIPT_MAX_RETRIES = DEFAULT_MAX_RETRIES;
 export const PROMPT_MAX_RETRIES = DEFAULT_MAX_RETRIES;
+// QA revision budgets (pipeline continuation policy). A revision re-runs the
+// producer; minor issues get one revision before the best result is accepted,
+// major/fail get two before the run fails. These bound every QA loop so a
+// router can never regenerate indefinitely.
+export const MINOR_REVISION_MAX = 1;
+export const MAJOR_REVISION_MAX = 2;
 // QA nodes are cheap (small prompt, low temperature). When a QA's own LLM
 // call fails, retrying the QA node itself costs far less than regenerating
 // the producer's output, so QA gets its own (smaller) budget.

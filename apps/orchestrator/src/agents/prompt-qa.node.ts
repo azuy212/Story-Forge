@@ -12,6 +12,7 @@ import { PromptPaths } from "../models/prompt-paths.js";
 import { PromptQAOutputSchema } from "../schemas/prompt-qa-output.js";
 import type { PromptQAOutput } from "../schemas/prompt-qa-output.js";
 import { config as configUtils } from "../utils/config.js";
+import { hashIssues } from "../utils/qa-policy.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
 
@@ -173,21 +174,50 @@ export async function promptQANode(
         },
       },
       diagnostics: {
-        errors,
+        warnings: errors,
         telemetry: { [AgentModel.PromptQA]: result.telemetry },
       },
       execution: execution(AgentModel.PromptQA),
     };
   }
 
+  const qa = result.data;
+  const isRevision =
+    qa.status === "minor_revision" ||
+    qa.status === "major_revision" ||
+    qa.status === "fatal";
+  const feedbackHash = hashIssues(qa.issues, qa.globalFeedback);
+  const previousHash = state.execution?.qaFeedback?.[AgentModel.PromptQA];
+  const repeated = isRevision && previousHash === feedbackHash;
+
+  const qaOutput: PromptQAOutput = repeated ? { ...qa, repeated: true } : qa;
+
   return {
     production: {
       scenes,
-      promptQA: result.data,
+      promptQA: qaOutput,
     },
     diagnostics: {
+      ...(qa.status === "fatal"
+        ? {
+            errors: [
+              `${AgentModel.PromptQA}: ${qa.globalFeedback ?? "scene prompts are unusable"}`,
+            ],
+          }
+        : {}),
       telemetry: { [AgentModel.PromptQA]: result.telemetry },
     },
-    execution: execution(AgentModel.PromptQA),
+    execution: {
+      currentNode: AgentModel.PromptQA,
+      retryCount: { ...state.execution?.retryCount, PromptQA: retryCount },
+      ...(isRevision
+        ? {
+            qaFeedback: {
+              ...state.execution?.qaFeedback,
+              [AgentModel.PromptQA]: feedbackHash,
+            },
+          }
+        : {}),
+    },
   };
 }

@@ -97,14 +97,19 @@ export async function releaseReviewNode(
   logger.nodeDone(label, result.telemetry.durationMs);
 
   const warnings: string[] = [];
+  const errors: string[] = [];
   if (result.data.status === "fatal") {
     warnings.push(...(result.data.issues ?? []));
+    errors.push(
+      `${AgentModel.ReleaseReview}: ${(result.data.issues ?? []).join("; ") || "release package rejected"}`,
+    );
   }
 
   return {
     releaseReview: result.data,
     diagnostics: {
       warnings,
+      ...(errors.length > 0 ? { errors } : {}),
       telemetry: { [AgentModel.ReleaseReview]: result.telemetry },
     },
     execution: { currentNode: AgentModel.ReleaseReview },

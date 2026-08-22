@@ -15,6 +15,7 @@ import {
   formatScriptComplexityReport,
   validateScriptComplexity,
 } from "../utils/script-complexity.js";
+import { hashIssues } from "../utils/qa-policy.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
 
@@ -161,11 +162,41 @@ export async function scriptQANode(
 
   logger.nodeDone(label, result.telemetry.durationMs);
 
+  const qa = result.data;
+
+  const isRevision =
+    qa.status === "minor_revision" ||
+    qa.status === "major_revision" ||
+    qa.status === "fatal";
+  const feedbackHash = hashIssues(qa.issues, qa.feedback);
+  const previousHash = state.execution?.qaFeedback?.[AgentModel.ScriptQA];
+  const repeated = isRevision && previousHash === feedbackHash;
+
+  const qaOutput: ScriptQAOutput = repeated ? { ...qa, repeated: true } : qa;
+
   return {
-    scriptQA: result.data,
+    scriptQA: qaOutput,
     diagnostics: {
+      ...(qa.status === "fatal"
+        ? {
+            errors: [
+              `${AgentModel.ScriptQA}: ${qa.feedback ?? "script is unusable"}`,
+            ],
+          }
+        : {}),
       telemetry: { [AgentModel.ScriptQA]: result.telemetry },
     },
-    execution: execution(AgentModel.ScriptQA),
+    execution: {
+      currentNode: AgentModel.ScriptQA,
+      retryCount: { ...state.execution?.retryCount, ScriptQA: retryCount },
+      ...(isRevision
+        ? {
+            qaFeedback: {
+              ...state.execution?.qaFeedback,
+              [AgentModel.ScriptQA]: feedbackHash,
+            },
+          }
+        : {}),
+    },
   };
 }

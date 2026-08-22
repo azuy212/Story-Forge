@@ -213,12 +213,13 @@ describe("researchQANode", () => {
     expect(result.research).toEqual({});
   });
 
-  it("returns minor_revision when no facts collected", async () => {
+  it("returns fail when no facts collected", async () => {
     const { promise } = runNode({ research: { facts: [] } } as any);
     const result = await promise;
 
-    expect(result.researchQA?.status).toBe("minor_revision");
+    expect(result.researchQA?.status).toBe("fail");
     expect(result.researchQA?.issues).toContain("No facts collected");
+    expect(result.diagnostics?.errors).toBeDefined();
     expect(mockGenerate).not.toHaveBeenCalled();
   });
 

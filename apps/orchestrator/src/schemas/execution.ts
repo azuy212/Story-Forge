@@ -7,7 +7,7 @@ const NodeResultSchema = z.object({
 });
 
 export const ExecutionSchema = z.object({
-  status: z.enum(["pending", "running", "completed", "failed"]).optional(),
+  status: z.enum(["pending", "running", "complete", "failed"]).optional(),
   currentNode: z.string().optional(),
   startedAt: z.string().optional(),
   finishedAt: z.string().optional(),
@@ -23,6 +23,7 @@ export const ExecutionSchema = z.object({
     .record(z.string(), z.enum(["running", "complete", "failed"]))
     .optional()
     .default({}),
+  qaFeedback: z.record(z.string(), z.string()).optional().default({}),
 });
 
 export type Execution = z.input<typeof ExecutionSchema>;

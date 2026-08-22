@@ -359,6 +359,13 @@ export async function releaseValidationNode(
   return {
     releaseValidation: result,
     diagnostics: {
+      ...(result.status === "fatal"
+        ? {
+            errors: result.issues ?? [
+              `${AgentModel.ReleaseValidation}: validation failed`,
+            ],
+          }
+        : {}),
       warnings: result.warnings,
     },
     execution: { currentNode: AgentModel.ReleaseValidation },

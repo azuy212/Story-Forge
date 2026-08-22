@@ -43,7 +43,10 @@ export async function researchAgentNode(
   const retryCount = (state.execution?.retryCount?.ResearchAgent ?? 0) + 1;
 
   const qa = state.researchQA;
-  const needsRevision = qa?.status === "minor_revision";
+  const needsRevision =
+    qa?.status === "minor_revision" ||
+    qa?.status === "major_revision" ||
+    qa?.status === "fail";
   const qaFeedback = needsRevision
     ? [
         ...(qa.feedback ? [`Feedback: ${qa.feedback}`] : []),

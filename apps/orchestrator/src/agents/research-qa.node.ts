@@ -12,6 +12,7 @@ import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { ResearchQAOutputSchema } from "../schemas/research-qa-output.js";
 import { config as configUtils } from "../utils/config.js";
+import { hashIssues } from "../utils/qa-policy.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
 
@@ -49,9 +50,13 @@ export async function researchQANode(
   const inject = (config.configurable ?? {}) as AgentInject;
 
   const retryCount = (state.execution?.retryCount?.ResearchQA ?? 0) + 1;
-  const execution = (currentNode: string) => ({
+  const execution = (
+    currentNode: string,
+    qaFeedback?: Record<string, string>,
+  ) => ({
     currentNode,
     retryCount: { ...state.execution?.retryCount, ResearchQA: retryCount },
+    ...(qaFeedback ? { qaFeedback } : {}),
   });
 
   if (!configUtils.enableResearchQA()) {
@@ -66,16 +71,21 @@ export async function researchQANode(
   const facts = state.research?.facts ?? [];
 
   if (facts.length === 0) {
+    // No facts at all is a hard failure: script generation needs research.
+    const feedback =
+      "No facts were collected for review; research is unusable for script generation.";
     return {
       research: {},
       researchQA: {
-        status: "minor_revision",
-        feedback: "No facts were collected for review.",
+        status: "fail",
+        feedback,
         issues: ["No facts collected"],
         factsToRegenerate: 0,
         factVerdicts: [],
       },
-      diagnostics: {},
+      diagnostics: {
+        errors: [`${AgentModel.ResearchQA}: ${feedback}`],
+      },
       execution: execution(AgentModel.ResearchQA),
     };
   }
@@ -150,12 +160,39 @@ export async function researchQANode(
     };
   }
 
+  // A revision verdict (minor/major/fail) records its feedback hash so the
+  // router can detect repeated feedback and stop regenerating identical input.
+  const isRevision =
+    qa.status === "minor_revision" ||
+    qa.status === "major_revision" ||
+    qa.status === "fail";
+  const feedbackHash = hashIssues(qa.issues, qa.feedback);
+  const previousHash = state.execution?.qaFeedback?.[AgentModel.ResearchQA];
+  const repeated = isRevision && previousHash === feedbackHash;
+
+  const qaOutput: ResearchQAOutput = repeated ? { ...qa, repeated: true } : qa;
+
   return {
     research: {},
-    researchQA: qa,
+    researchQA: qaOutput,
     diagnostics: {
+      ...(qa.status === "fail"
+        ? {
+            errors: [
+              `${AgentModel.ResearchQA}: ${qa.feedback ?? "research is unusable for script generation"}`,
+            ],
+          }
+        : {}),
       telemetry: { [AgentModel.ResearchQA]: result.telemetry },
     },
-    execution: execution(AgentModel.ResearchQA),
+    execution: execution(
+      AgentModel.ResearchQA,
+      isRevision
+        ? {
+            ...state.execution?.qaFeedback,
+            [AgentModel.ResearchQA]: feedbackHash,
+          }
+        : undefined,
+    ),
   };
 }
