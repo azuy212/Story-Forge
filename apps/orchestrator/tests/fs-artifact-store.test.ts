@@ -144,7 +144,7 @@ describe("FilesystemArtifactStore", () => {
   it("getRunId resolves config runId, then humanized thread_id, then state", () => {
     expect(store.getRunId({ runId: "a" })).toBe("a");
     const human = store.getRunId({ thread_id: "b" });
-    expect(human).toMatch(/^untitled-\d{8}-\d{6}-[0-9a-f]{4}$/);
+    expect(human).toMatch(/^\d{8}-\d{6}\.\d{3}-untitled$/);
     expect(store.getRunId({ thread_id: "b" })).toBe(human);
     expect(store.getRunId({ thread_id: "b", runId: "a" })).toBe("a");
     expect(store.getRunId({}, { execution: { runId: "c" } })).toBe("c");

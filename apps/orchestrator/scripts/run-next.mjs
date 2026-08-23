@@ -19,7 +19,6 @@
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { randomBytes } from "node:crypto";
 import googleapis from "googleapis";
 import dotenv from "dotenv";
 import {
@@ -64,6 +63,7 @@ function slugify(value) {
 
 function formatRunStamp(date = new Date()) {
   const pad = (n) => String(n).padStart(2, "0");
+  const ms = String(date.getMilliseconds()).padStart(3, "0");
   return [
     date.getFullYear(),
     pad(date.getMonth() + 1),
@@ -72,13 +72,14 @@ function formatRunStamp(date = new Date()) {
     pad(date.getHours()),
     pad(date.getMinutes()),
     pad(date.getSeconds()),
+    ".",
+    ms,
   ].join("");
 }
 
 function buildNamespace(topic) {
   const stamp = formatRunStamp();
-  const hex = randomBytes(2).toString("hex");
-  return `${slugify(topic)}-${stamp}-${hex}`;
+  return `${stamp}-${slugify(topic)}`;
 }
 
 export function findRunByTopic(runsDir, topic) {

@@ -1,6 +1,5 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { randomBytes } from "node:crypto";
 import { slugify } from "../utils/slugify.js";
 import { createOrAppendRunMeta } from "./run-meta.mjs";
 
@@ -8,8 +7,8 @@ import { createOrAppendRunMeta } from "./run-meta.mjs";
  * Human-readable run namespace resolution.
  *
  * A run's filesystem namespace is never the raw LangGraph thread_id (a UUID).
- * Instead it resolves to `slug-YYYYMMDD-HHmmss-xxxx` (e.g.
- * `unrecognized-countries-20260813-084203-a1b2`), derived from the project
+ * Instead it resolves to `YYYYMMDD-HHmmss-slug` (e.g.
+ * `20260813-084203-unrecognized-countries`), derived from the project
  * topic when known. Resolution is stable per run:
  *
  *  1. in-process memo (first resolution wins, whole run consistent)
@@ -35,22 +34,19 @@ export function getRunsDir(): string {
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /**
- * Compact timestamp `YYYYMMDD-HHmmss` in the process's LOCAL time. Local
+ * Compact timestamp `YYYYMMDD-HHmmss.sss` in the process's LOCAL time. Local
  * time is intentional for human-readable directory names; the disk index
  * keeps an existing thread's namespace stable across processes and
  * timezones, so the stamp only affects freshly generated names.
  */
 export function formatRunStamp(d: Date): string {
-  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
-}
-
-function randomSuffix(): string {
-  return randomBytes(2).toString("hex");
+  const ms = String(d.getMilliseconds()).padStart(3, "0");
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.${ms}`;
 }
 
 function buildName(topic?: string): string {
   const slug = slugify(topic ?? "untitled");
-  return `${slug}-${formatRunStamp(new Date())}-${randomSuffix()}`;
+  return `${formatRunStamp(new Date())}-${slug}`;
 }
 
 /**

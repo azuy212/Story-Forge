@@ -150,7 +150,7 @@ describe("decideRun", () => {
       projectId: "abc123",
       youtubePublishAt: new Date("2026-08-20T12:00:00").toISOString(),
     });
-    expect(decision.ns).toMatch(/^unrecognized-countries-/);
+    expect(decision.ns).toMatch(/^\d{8}-\d{6}\.\d{3}-unrecognized-countries$/);
   });
 
   it("returns no-pending-row when nothing is planned", () => {
@@ -260,7 +260,7 @@ describe("runLauncher", () => {
 
     expect(deps.resumeRun).toHaveBeenCalledTimes(1);
     const [ns, input, options]: any[] = deps.resumeRun.mock.calls[0];
-    expect(ns).toMatch(/^unrecognized-countries-/);
+    expect(ns).toMatch(/^\d{8}-\d{6}\.\d{3}-unrecognized-countries$/);
     expect(input).toEqual({
       pillar: "Geography",
       topic: "Unrecognized Countries",
@@ -310,7 +310,7 @@ describe("runLauncher", () => {
     const logged = errorLines[0];
     expect(logged).toContain("pipeline run failed");
     expect(logged).toContain('"Unrecognized Countries"');
-    expect(logged).toContain("unrecognized-countries-");
+    expect(logged).toMatch(/\d{8}-\d{6}\.\d{3}-unrecognized-countries/);
     expect(logged).toContain("graph exploded");
   });
 
