@@ -161,6 +161,19 @@ export async function thumbnailGeneratorNode(
   const colorPalette = state.branding?.colorPalette ?? "";
 
   const label = nodeLabel(AgentModel.ThumbnailGenerator);
+
+  // Idempotent on graph re-entry: any re-entry through VisualDirector
+  // (e.g. a QA router sending work back) re-fires this branch, and the
+  // existing output must be kept instead of regenerated.
+  if (state.thumbnail?.thumbnailPrompt) {
+    logger.nodeSkipped(label, "thumbnail already present");
+    return {
+      thumbnail: state.thumbnail,
+      diagnostics: {},
+      execution: { currentNode: AgentModel.ThumbnailGenerator },
+    };
+  }
+
   logger.nodeStart(label);
   logger.nodePhase(label, "generating thumbnail prompt");
 

@@ -29,19 +29,17 @@ function hasPackage(state: ProjectState): boolean {
 }
 
 /**
- * PublishReady is the explicit join/barrier before Publisher. LangGraph
- * triggers a fan-in node when ANY incoming edge fires — not when all of them
- * do — so this node may run several times as branches complete (once after
- * Metadata/Thumbnail, again after the spine). It therefore records nothing for
- * a partial package: that is the expected intermediate state while the slower
- * spine is still running.
+ * PublishReady is the operational gate before Publisher. It has a single
+ * incoming edge (ReleaseReview approval) so it fires exactly once, after the
+ * spine is complete and the Metadata/Thumbnail branches have long finished.
+ * The partial-package branch below is therefore defensive only.
  *
  * When the full package IS present it acts as a hard operational gate: cheap
  * existence/length/credentials checks only. Technical validation (media
  * streams, subtitles, timing) belongs to ReleaseValidation; PublishReady
  * never probes media. A blocked verdict writes publishReady.status=blocked so
- * the graph's conditional edge falls through to __end__ and Publisher never
- * fires on an unpublishable artifact.
+ * the graph's conditional edge routes to Finalize and Publisher never fires
+ * on an unpublishable artifact.
  */
 export async function publishReadyNode(state: ProjectState): Promise<{
   publishReady: Partial<PublishReadyStatus>;

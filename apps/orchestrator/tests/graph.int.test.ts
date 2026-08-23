@@ -306,7 +306,12 @@ function queueHappyPathMocks(
   }
 
   mockGenerate
-    // 5. MetadataGenerator
+    // 5. VisualDirector (gates the Metadata/Thumbnail fan-out)
+    .mockResolvedValueOnce({
+      output: JSON.stringify({ scenes: SCENES, visualPlans: VISUAL_PLANS }),
+      usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+    })
+    // 6. MetadataGenerator (parallel branch after VisualDirector)
     .mockResolvedValueOnce({
       output: JSON.stringify({
         title: "Mystery Island Video",
@@ -318,7 +323,7 @@ function queueHappyPathMocks(
       }),
       usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
     })
-    // 6. ThumbnailGenerator
+    // 7. ThumbnailGenerator (parallel branch after VisualDirector)
     .mockResolvedValueOnce({
       output: JSON.stringify({
         thumbnailPrompt: "Mysterious island aerial",
@@ -327,11 +332,6 @@ function queueHappyPathMocks(
         colorScheme: "cold blue",
       }),
       usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
-    })
-    // 7. VisualDirector
-    .mockResolvedValueOnce({
-      output: JSON.stringify({ scenes: SCENES, visualPlans: VISUAL_PLANS }),
-      usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
     })
     // 8. ImagePromptGenerator
     .mockResolvedValueOnce({
@@ -534,7 +534,16 @@ describe("Graph", () => {
 
         usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
-      // MetadataGenerator
+      // VisualDirector (gates the Metadata/Thumbnail fan-out)
+      .mockResolvedValueOnce({
+        output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: VISUAL_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+      })
+      // MetadataGenerator (parallel branch after VisualDirector)
       .mockResolvedValueOnce({
         output: JSON.stringify({
           title: "Test Title",
@@ -547,7 +556,7 @@ describe("Graph", () => {
 
         usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
-      // ThumbnailGenerator
+      // ThumbnailGenerator (parallel branch after VisualDirector)
       .mockResolvedValueOnce({
         output: JSON.stringify({
           thumbnailPrompt: "High contrast aerial view",
@@ -557,15 +566,6 @@ describe("Graph", () => {
         }),
 
         usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
-      })
-      // VisualDirector (scenes + visual plans, single call)
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          scenes: SCENES,
-          visualPlans: VISUAL_PLANS,
-        }),
-
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       .mockResolvedValueOnce({
         output: JSON.stringify({ assets: ASSETS }),
@@ -896,6 +896,14 @@ describe("Graph", () => {
       })
       .mockResolvedValueOnce({
         output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: VISUAL_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+      })
+      .mockResolvedValueOnce({
+        output: JSON.stringify({
           title: "T",
           description: "D",
           tags: ["geography"],
@@ -915,14 +923,6 @@ describe("Graph", () => {
         }),
 
         usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          scenes: SCENES,
-          visualPlans: VISUAL_PLANS,
-        }),
-
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       .mockResolvedValueOnce({
         output: JSON.stringify({ assets: ASSETS }),
@@ -1032,6 +1032,14 @@ describe("Graph", () => {
       })
       .mockResolvedValueOnce({
         output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: VISUAL_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+      })
+      .mockResolvedValueOnce({
+        output: JSON.stringify({
           title: "T",
           description: "D",
           tags: ["geography"],
@@ -1051,14 +1059,6 @@ describe("Graph", () => {
         }),
 
         usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          scenes: SCENES,
-          visualPlans: VISUAL_PLANS,
-        }),
-
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       .mockResolvedValueOnce({
         output: JSON.stringify({ assets: ASSETS }),
@@ -1243,7 +1243,16 @@ describe("Graph", () => {
 
         usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
-      // 5. MetadataGenerator
+      // 5. VisualDirector (gates the Metadata/Thumbnail fan-out)
+      .mockResolvedValueOnce({
+        output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: VISUAL_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+      })
+      // 6. MetadataGenerator (parallel branch after VisualDirector)
       .mockResolvedValueOnce({
         output: JSON.stringify({
           title: "Mystery Island Video",
@@ -1256,7 +1265,7 @@ describe("Graph", () => {
 
         usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
-      // 6. ThumbnailGenerator
+      // 7. ThumbnailGenerator (parallel branch after VisualDirector)
       .mockResolvedValueOnce({
         output: JSON.stringify({
           thumbnailPrompt: "Mysterious island aerial",
@@ -1266,15 +1275,6 @@ describe("Graph", () => {
         }),
 
         usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
-      })
-      // 7. VisualDirector (scenes + visual plans)
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          scenes: SCENES,
-          visualPlans: VISUAL_PLANS,
-        }),
-
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       // 8. ImagePromptGenerator
       .mockResolvedValueOnce({
@@ -1481,7 +1481,16 @@ describe("Graph", () => {
 
         usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
-      // 6. MetadataGenerator
+      // 6. VisualDirector (gates the Metadata/Thumbnail fan-out)
+      .mockResolvedValueOnce({
+        output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: VISUAL_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+      })
+      // 7. MetadataGenerator (parallel branch after VisualDirector)
       .mockResolvedValueOnce({
         output: JSON.stringify({
           title: "Mystery Island Video",
@@ -1494,7 +1503,7 @@ describe("Graph", () => {
 
         usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
-      // 7. ThumbnailGenerator
+      // 8. ThumbnailGenerator (parallel branch after VisualDirector)
       .mockResolvedValueOnce({
         output: JSON.stringify({
           thumbnailPrompt: "Mysterious island aerial",
@@ -1504,15 +1513,6 @@ describe("Graph", () => {
         }),
 
         usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
-      })
-      // 8. VisualDirector
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          scenes: SCENES,
-          visualPlans: VISUAL_PLANS,
-        }),
-
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       // 9. ImagePromptGenerator
       .mockResolvedValueOnce({
@@ -1666,7 +1666,16 @@ describe("Graph", () => {
 
         usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
-      // 6. MetadataGenerator
+      // 6. VisualDirector (gates the Metadata/Thumbnail fan-out)
+      .mockResolvedValueOnce({
+        output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: VISUAL_PLANS,
+        }),
+
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+      })
+      // 7. MetadataGenerator (parallel branch after VisualDirector)
       .mockResolvedValueOnce({
         output: JSON.stringify({
           title: "Mystery Island Video",
@@ -1679,7 +1688,7 @@ describe("Graph", () => {
 
         usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
-      // 7. ThumbnailGenerator
+      // 8. ThumbnailGenerator (parallel branch after VisualDirector)
       .mockResolvedValueOnce({
         output: JSON.stringify({
           thumbnailPrompt: "Mysterious island aerial",
@@ -1689,15 +1698,6 @@ describe("Graph", () => {
         }),
 
         usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
-      })
-      // 8. VisualDirector
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          scenes: SCENES,
-          visualPlans: VISUAL_PLANS,
-        }),
-
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
       })
       // 9. ImagePromptGenerator
       .mockResolvedValueOnce({
@@ -1954,32 +1954,10 @@ describe("Graph", () => {
 
         usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
       })
-      // 5. MetadataGenerator
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          title: "Mystery Island Video",
-          description: "Explore the mystery.",
-          tags: ["geography"],
-          hashtags: ["#mystery"],
-          category: "Education",
-          pinnedComment: "What do you think?",
-        }),
-
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      // 6. ThumbnailGenerator
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          thumbnailPrompt: "Mysterious island aerial",
-          thumbnailText: "Doesn't Exist?",
-          textPosition: "bottom-third",
-          colorScheme: "cold blue",
-        }),
-
-        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
-      })
-      // 7..8. VisualDirector: structural failure with feedback, retried by the
-      // router until the minor budget (1 revision) is exhausted.
+      // 5..6. VisualDirector: structural failure with feedback, retried by
+      // the router until the minor budget (1 revision) is exhausted.
+      // Metadata/Thumbnail never run: they are gated on VisualDirector
+      // success.
       .mockResolvedValueOnce({
         output: JSON.stringify({
           scenes: SCENES,
@@ -2041,10 +2019,12 @@ describe("Graph", () => {
     );
 
     // Spine died at VisualDirector after exhausting its retry budget:
-    // 7 calls upstream + 2 VisualDirector attempts (minor budget: 1 revision).
-    expect(mockGenerate).toHaveBeenCalledTimes(9);
+    // 5 calls upstream + 2 VisualDirector attempts (minor budget: 1 revision).
+    expect(mockGenerate).toHaveBeenCalledTimes(7);
 
-    // No scenes produced downstream.
+    // No scenes produced downstream, and the gated branches never ran.
+    expect(result.metadataOutput).toBeUndefined();
+    expect(result.thumbnail?.thumbnailPrompt).toBeUndefined();
     expect(result.production?.scenes).toEqual([]);
     expect(result.production?.directorReview?.status).toBe("minor_revision");
     expect(result.audio).toEqual({});
@@ -2075,12 +2055,13 @@ describe("Graph", () => {
     );
   }, 30000);
 
-  it("PublishReady fan-in: premature firing dead-ends branch, spine continues, final PublishReady fires with full package", async () => {
-    // This test verifies the fan-in semantics of PublishReady:
-    // 1. Metadata/Thumbnail branch finishes first -> PublishReady fires prematurely (package incomplete)
-    // 2. Router returns __end__ (dead-ends this branch, spine continues)
-    // 3. Spine completes -> PublishReady fires again with full package
-    // 4. Publisher fires exactly once -> Finalize executes exactly once
+  it("PublishReady single-fire: Metadata/Thumbnail synchronize at BranchJoin, PublishReady runs once post-ReleaseReview", async () => {
+    // This test verifies the gated fan-out semantics:
+    // 1. ScriptQA approval -> VisualDirector alone
+    // 2. VisualDirector success -> Metadata/Thumbnail run in parallel and
+    //    synchronize at BranchJoin WITHOUT touching PublishReady
+    // 3. Spine completes -> ReleaseReview approves -> PublishReady fires
+    //    exactly once with the full package -> Publisher fires exactly once
     queueHappyPathMocks();
 
     const result = await graph.invoke(
@@ -2098,15 +2079,161 @@ describe("Graph", () => {
     // Verify the pipeline completed successfully
     expect(result.execution.status).toBe("complete");
     expect(result.execution.currentNode).toBe("Finalize");
-    expect(result.publishing?.results![0].status).toBe("published");
+    expect(result.publishReady?.status).toBe("ready");
 
-    // The graph execution should have:
-    // - One Publisher execution (not zero, not multiple)
-    // - One Finalize execution (the final terminal)
-    // - No early termination from premature PublishReady
-    expect(result.execution.currentNode).toBe("Finalize");
-    expect(result.execution.status).toBe("complete");
+    // The gated parallel branches produced their outputs.
+    expect(result.metadataOutput?.title).toBe("Mystery Island Video");
+    expect(result.thumbnail?.thumbnailPrompt).toBe("Mysterious island aerial");
+
+    // Publisher fired exactly once (not zero, not multiple).
     expect(result.publishing?.results).toHaveLength(1);
     expect(result.publishing?.results![0].status).toBe("published");
+  }, 30000);
+
+  it("orders the fan-out: VisualDirector gates Metadata/Thumbnail, BranchJoin releases AssetStrategy only after both complete", async () => {
+    queueHappyPathMocks();
+
+    const order: string[] = [];
+    const stream = await graph.stream(
+      {
+        project: { pillar: "Geography", topic: "Ordering Test" },
+        branding: { channel: "TestChannel", creator: "", cta: "Subscribe" },
+        execution: { version: "0.1.0" },
+      },
+      {
+        recursionLimit: 100,
+        configurable: happyPathConfigurable(),
+        streamMode: "updates",
+      } as any,
+    );
+    for await (const update of stream) {
+      order.push(...Object.keys(update));
+    }
+
+    const idx = (node: string) => order.indexOf(node);
+    // VisualDirector ran and gated both parallel branches.
+    expect(idx("VisualDirector")).toBeGreaterThanOrEqual(0);
+    expect(idx("VisualDirector")).toBeLessThan(idx("MetadataGenerator"));
+    expect(idx("VisualDirector")).toBeLessThan(idx("ThumbnailGenerator"));
+    // The synchronization barrier exists and released the spine only after
+    // BOTH branches completed.
+    expect(idx("BranchJoin")).toBeGreaterThanOrEqual(0);
+    expect(idx("MetadataGenerator")).toBeLessThan(idx("AssetStrategy"));
+    expect(idx("ThumbnailGenerator")).toBeLessThan(idx("AssetStrategy"));
+    // The barrier released the spine exactly once (no double execution).
+    expect(order.filter((n) => n === "AssetStrategy")).toHaveLength(1);
+  }, 30000);
+
+  it("BranchJoin never releases the spine when a parallel branch fails", async () => {
+    const FACTS = makeFacts(8);
+    const BEATS = makeBeats(6);
+    const NARRATIONS = SCENE_NARRATIONS;
+    const SCENES = makeScenes(NARRATIONS, [8, 8, 8, 8, 8, 8]);
+    const VISUAL_PLANS = makeVisualPlans(SCENES);
+    const badThumbnail = {
+      output: JSON.stringify({ broken: true }),
+      usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
+    };
+
+    mockGenerate
+      // ResearchAgent
+      .mockResolvedValueOnce({
+        output: JSON.stringify({
+          summary: "Remote island in Pacific.",
+          facts: FACTS,
+        }),
+        usage: { promptTokens: 11, completionTokens: 22, totalTokens: 33 },
+      })
+      // ResearchQA (approved)
+      .mockResolvedValueOnce({
+        output: JSON.stringify(makeResearchQAResponse(FACTS)),
+        usage: { promptTokens: 9, completionTokens: 6, totalTokens: 15 },
+      })
+      // ScriptPlanner
+      .mockResolvedValueOnce({
+        output: JSON.stringify({
+          content: {
+            title: "Mystery Island",
+            hook: "What if a country wasn't real?",
+          },
+          storyType: "mystery",
+          storySummary: "Mystery Island story.",
+          storyBeats: BEATS,
+        }),
+        usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
+      })
+      // ScriptWriter
+      .mockResolvedValueOnce({
+        output: JSON.stringify({
+          content: {
+            script: "Script body.",
+            narration: NARRATIONS.join(" "),
+            callToAction: "Subscribe!",
+            estimatedDurationSeconds: 50,
+          },
+        }),
+        usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
+      })
+      // ScriptQA (approved)
+      .mockResolvedValueOnce({
+        output: JSON.stringify({ status: "approved", feedback: "" }),
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
+      })
+      // VisualDirector (gates the fan-out)
+      .mockResolvedValueOnce({
+        output: JSON.stringify({
+          scenes: SCENES,
+          visualPlans: VISUAL_PLANS,
+        }),
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+      })
+      // MetadataGenerator succeeds...
+      .mockResolvedValueOnce({
+        output: JSON.stringify({
+          title: "Mystery Island Video",
+          description: "Explore the mystery.",
+          tags: ["geography"],
+          hashtags: ["#mystery"],
+          category: "Education",
+          pinnedComment: "What do you think?",
+        }),
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+      })
+      // ...while ThumbnailGenerator fails all 3 retry attempts with a
+      // schema-invalid payload.
+      .mockResolvedValueOnce(badThumbnail)
+      .mockResolvedValueOnce(badThumbnail)
+      .mockResolvedValueOnce(badThumbnail);
+
+    const result = await graph.invoke(
+      {
+        project: { pillar: "Geography", topic: "Join Failure Test" },
+        branding: { channel: "TestChannel", creator: "", cta: "Subscribe" },
+        execution: { version: "0.1.0" },
+      },
+      {
+        recursionLimit: 100,
+        configurable: happyPathConfigurable(),
+      } as any,
+    );
+
+    // The failed branch routed to Finalize; the run is fail-closed.
+    expect(result.execution.status).toBe("failed");
+    expect(result.execution.currentNode).toBe("Finalize");
+    expect(result.diagnostics?.errors!.join("\n")).toContain(
+      "ThumbnailGenerator",
+    );
+
+    // The barrier never released the production spine: scenes exist (the
+    // VisualDirector wrote them) but were never turned into prompts/assets.
+    expect(result.production?.scenes).toHaveLength(6);
+    expect(result.production?.scenes![0].generationPrompt).toBeUndefined();
+    expect(result.production?.scenes![0].assetId).toBeUndefined();
+    expect(result.releaseValidation).toBeUndefined();
+    expect(result.releaseReview).toBeUndefined();
+    expect(result.video?.videoUrl).toBeUndefined();
+
+    // Nothing was published.
+    expect(result.publishing?.results).toHaveLength(0);
   }, 30000);
 });

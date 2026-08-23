@@ -37,10 +37,11 @@ import {
   PROMPT_QA_MAX_RETRIES,
 } from "../utils/constants.js";
 
-const QA_FANOUT: [string, string, string] = [
+// Fan-out fired by VisualDirector once the visual plan exists: the parallel
+// Metadata/Thumbnail enrichment pair.
+const POST_VD_FANOUT: [string, string] = [
   "MetadataGenerator",
   "ThumbnailGenerator",
-  "VisualDirector",
 ];
 
 // Single terminal node: every fail-closed guard and every QA/other router
@@ -125,9 +126,9 @@ const thumbnailEnabled = configUtils.enableThumbnail();
 const hasThumbnail = (s: GuardState) =>
   thumbnailEnabled ? !!s.thumbnail?.imageUrl : !!s.thumbnail?.thumbnailPrompt;
 // Publisher requires video + metadata + thumbnail to all exist. This is the
-// final gate on PublishReady's conditional edge: PublishReady may be triggered
-// by a single branch (LangGraph fan-in is any-edge, not a join), but it can
-// only advance to Publisher once the full release package is present.
+// final gate on PublishReady's conditional edge: PublishReady fires once after
+// ReleaseReview approval, and can only advance to Publisher once the full
+// release package is present.
 const hasPublishablePackage = (s: GuardState) =>
   hasVideo(s) && hasMetadata(s) && hasThumbnail(s);
 // PublishReady doubles as a hard operational gate (files exist, lengths valid,
@@ -164,7 +165,7 @@ const scriptRouter = (state: typeof StateAnnotation.State) => {
     repeated: state.scriptQA?.repeated,
     infraMax: SCRIPT_QA_MAX_RETRIES,
   });
-  if (decision.action === "continue") return QA_FANOUT;
+  if (decision.action === "continue") return "VisualDirector";
   if (decision.action === "revise") return "ScriptWriter";
   if (decision.action === "retry") return "ScriptQA";
   return FINALIZE;
@@ -195,14 +196,16 @@ const promptRouter = (state: typeof StateAnnotation.State) => {
 };
 
 /**
- * VisualDirector edge: on success (scenes present) advance to the image
- * prompt stage. On a hard structural validation failure the node emits
- * directorReview = minor_revision, so retry VisualDirector with the feedback
- * within the minor budget; when no scenes exist after the budget the run fails
- * through the shared terminal.
+ * VisualDirector edge: on success (scenes present) fan out to the parallel
+ * Metadata/Thumbnail branches, which rejoin the production spine at the
+ * BranchJoin barrier before AssetStrategy. On a hard structural validation
+ * failure the node emits directorReview = minor_revision, so retry
+ * VisualDirector with the feedback within the minor budget; when no scenes
+ * exist after the budget the run fails through the shared terminal.
+ * Metadata/Thumbnail therefore never start unless the visual plan succeeded.
  */
 const visualDirectorRouter = (state: typeof StateAnnotation.State) => {
-  if (hasScenes(state)) return "AssetStrategy";
+  if (hasScenes(state)) return POST_VD_FANOUT;
   const review = state.production?.directorReview;
   const decision = decideQaRetry({
     node: "VisualDirector",
@@ -213,6 +216,26 @@ const visualDirectorRouter = (state: typeof StateAnnotation.State) => {
   });
   if (decision.action === "revise") return "VisualDirector";
   return FINALIZE;
+};
+
+/**
+ * Metadata/Thumbnail synchronization barrier. LangGraph fires a node when ANY
+ * incoming edge delivers, so BranchJoin runs once per completed branch:
+ * - Both branches finish in the SAME superstep: LangGraph coalesces the
+ *   triggers into ONE BranchJoin execution, which sees the full pair and
+ *   releases the spine at AssetStrategy.
+ * - Branches finish in DIFFERENT supersteps: the first firing sees a half
+ *   pair. There is no "wait" routing target in a StateGraph, so it dead-ends
+ *   that branch via __end__ WITHOUT touching execution.status; the graph stays
+ *   alive because the other branch's task is still pending, and its completion
+ *   re-fires BranchJoin with the full pair.
+ * A branch that FAILED never reaches here (its guard routed to Finalize), so
+ * the barrier can only release on a complete, healthy pair.
+ */
+const branchJoinRouter = (state: typeof StateAnnotation.State) => {
+  if (hasMetadata(state) && hasThumbnail(state)) return "AssetStrategy";
+  logger.debug("BranchJoin waiting for remaining parallel branch");
+  return "__end__";
 };
 
 const finalRouter = (state: typeof StateAnnotation.State) => {
@@ -226,17 +249,16 @@ const finalRouter = (state: typeof StateAnnotation.State) => {
 };
 
 /**
- * PublishReady is a fan-in join: LangGraph fires it when ANY incoming branch
- * completes, so it runs once while the parallel spine is still assembling the
- * package. A premature firing must dead-end this branch WITHOUT touching the
- * run terminal (the spine re-fires PublishReady with the full package later).
- * A genuinely blocked gate is a terminal failure.
+ * PublishReady has a single incoming edge (ReleaseReview approval), so it
+ * fires exactly once with the spine complete and the parallel
+ * Metadata/Thumbnail branches long finished. It advances to Publisher only
+ * when the full package exists AND its operational gate passed; a blocked
+ * gate (or any other non-ready outcome) is a terminal failure.
  */
 const publishReadyRouter = (state: typeof StateAnnotation.State) => {
   if (hasPublishablePackage(state) && hasPublishReady(state))
     return "Publisher";
-  if (state.publishReady?.status === "blocked") return FINALIZE;
-  return "__end__";
+  return FINALIZE;
 };
 
 /**
@@ -320,6 +342,7 @@ const builder = new StateGraph(StateAnnotation)
   .addNode("MetadataGenerator", metadataGeneratorNode)
   .addNode("ThumbnailGenerator", thumbnailGeneratorNode)
   .addNode("VisualDirector", visualDirectorNode)
+  .addNode("BranchJoin", () => ({}))
   .addNode("AssetStrategy", assetStrategyNode)
   .addNode("ImagePromptGenerator", imagePromptGeneratorNode)
   .addNode("PromptQA", promptQANode)
@@ -342,22 +365,21 @@ builder
   .addConditionalEdges("ScriptWriter", guard(hasScript, "ScriptQA"))
   .addConditionalEdges("ScriptQA", scriptRouter);
 
-// Fan-out: Metadata/Thumbnail branch off the production spine after ScriptQA.
-// All three branches converge at PublishReady, the join/barrier before
-// Publisher. LangGraph triggers a fan-in node when ANY incoming edge fires, so
-// PublishReady may run before the spine finishes; its conditional edge gates
-// Publisher on hasPublishablePackage AND a "ready" PublishReady verdict, so a
-// premature run (or a blocked one) falls through to Finalize and publishing
-// only happens once the full release package exists and passes the operational
-// gate. A branch that fails routes to Finalize via its guard, so Publisher can
-// never fire with a partial package. The spine guards remain: a node only
-// advances when it produced the output the next node needs.
+// VisualDirector gates the parallel branches: ScriptQA approval runs
+// VisualDirector alone; its success fans out to Metadata/Thumbnail, which run
+// in parallel and synchronize at BranchJoin — the barrier releases the
+// production spine (AssetStrategy) only once BOTH outputs exist. A branch
+// that fails routes to Finalize via its guard, so BranchJoin can never
+// release with a half pair and Publisher can never fire with a partial
+// package. The spine guards remain: a node only advances when it produced
+// the output the next node needs.
 builder
-  .addConditionalEdges("MetadataGenerator", guard(hasMetadata, "PublishReady"))
+  .addConditionalEdges("MetadataGenerator", guard(hasMetadata, "BranchJoin"))
   .addConditionalEdges(
     "ThumbnailGenerator",
-    guard(hasThumbnail, "PublishReady"),
+    guard(hasThumbnail, "BranchJoin"),
   )
+  .addConditionalEdges("BranchJoin", branchJoinRouter)
   .addConditionalEdges("VisualDirector", visualDirectorRouter)
   .addConditionalEdges(
     "AssetStrategy",

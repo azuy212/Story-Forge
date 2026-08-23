@@ -9,6 +9,14 @@ import type { MetadataOutput } from "../schemas/metadata-output.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
 
+function hasMetadataOutput(state: ProjectState): boolean {
+  return (
+    !!state.metadataOutput?.title &&
+    !!state.metadataOutput?.description &&
+    (state.metadataOutput?.tags?.length ?? 0) > 0
+  );
+}
+
 export async function metadataGeneratorNode(
   state: ProjectState,
   config: RunnableConfig,
@@ -18,6 +26,17 @@ export async function metadataGeneratorNode(
   execution: Partial<Execution>;
 }> {
   const inject = (config.configurable ?? {}) as AgentInject;
+
+  // Idempotent on graph re-entry: any re-entry through VisualDirector
+  // (e.g. a QA router sending work back) re-fires this branch, and the
+  // existing output must be kept instead of regenerated.
+  if (hasMetadataOutput(state)) {
+    return {
+      metadataOutput: state.metadataOutput ?? null,
+      diagnostics: {},
+      execution: { currentNode: AgentModel.MetadataGenerator },
+    };
+  }
 
   const script = state.content?.script;
   const title = state.content?.title;
