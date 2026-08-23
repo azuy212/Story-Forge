@@ -55,6 +55,32 @@ function endsWithTokens(source: string, suffix: string): boolean {
   );
 }
 
+function narrationWithEnding(
+  narration: string,
+  endingNarration: string | undefined,
+): string {
+  const normalizedNarration = normalizeWhitespace(narration);
+  const normalizedEnding = normalizeWhitespace(endingNarration ?? "");
+  if (
+    normalizedEnding.length === 0 ||
+    endsWithTokens(normalizedNarration, normalizedEnding)
+  ) {
+    return normalizedNarration;
+  }
+  return `${normalizedNarration} ${normalizedEnding}`.trim();
+}
+
+function narrationWithoutEnding(
+  narration: string,
+  endingNarration: string,
+): string {
+  if (!endsWithTokens(narration, endingNarration)) {
+    return normalizeWhitespace(narration);
+  }
+  const words = normalizeWhitespace(narration).split(/\s+/);
+  return words.slice(0, -tokenize(endingNarration).length).join(" ").trim();
+}
+
 /**
  * Fraction of `target` words found, in order, as a subsequence of `source`.
  * forward(source, concat) ~ 1 means nothing was dropped;
@@ -180,6 +206,7 @@ function normalizeOutput(
   data: VisualDirectorOutput,
   narration: string,
   validFactIds: Set<string>,
+  endingNarration?: string,
 ): NormalizedScenes {
   const warnings: string[] = [];
 
@@ -214,7 +241,7 @@ function normalizeOutput(
 
   // Drop references to fact IDs that do not exist in approved facts. A scene
   // ending up with no references is acceptable (B-roll scenes).
-  const filtered = scenes.map((s) => {
+  let filtered = scenes.map((s) => {
     const known = s.references.filter((r) => validFactIds.has(r));
     const dropped = s.references.length - known.length;
     if (dropped > 0) {
@@ -232,6 +259,51 @@ function normalizeOutput(
       })),
     };
   });
+
+  if (endingNarration && filtered.length > 0) {
+    const finalIndex = filtered.length - 1;
+    const finalScene = filtered[finalIndex];
+
+    if (!endsWithTokens(finalScene.narration, endingNarration)) {
+      const mainNarration = narrationWithoutEnding(narration, endingNarration);
+      if (finalIndex === 0) {
+        filtered = [
+          {
+            ...finalScene,
+            narration: narrationWithEnding(mainNarration, endingNarration),
+          },
+        ];
+      } else {
+        const proportions = filtered
+          .slice(0, finalIndex)
+          .map((scene) => tokenize(scene.narration).length);
+        const mainSegments = splitNarrationProportional(
+          mainNarration,
+          proportions,
+        );
+        filtered = filtered.map((scene, index) => ({
+          ...scene,
+          narration:
+            index === finalIndex ? endingNarration : mainSegments[index],
+        }));
+      }
+      warnings.push(
+        "VisualDirector: explicit ending moved wholly into the final scene.",
+      );
+    }
+
+    const repairedFinal = filtered[finalIndex];
+    if (!["payoff", "reflection"].includes(repairedFinal.emotionalBeat)) {
+      filtered = filtered.map((scene, index) =>
+        index === finalIndex
+          ? { ...scene, emotionalBeat: "reflection" as const }
+          : scene,
+      );
+      warnings.push(
+        "VisualDirector: final scene emotionalBeat normalized to reflection.",
+      );
+    }
+  }
 
   // Reindex visual plans against the renumbered scenes; drop extras.
   const newToOld = new Map<number, number>();
@@ -279,6 +351,7 @@ export async function visualDirectorNode(
   const approvedFacts = state.research?.facts;
   const channel = state.branding?.channel;
   const inject = (config.configurable ?? {}) as AgentInject;
+  const fullNarration = narrationWithEnding(narration ?? "", ending?.narration);
 
   const retryCount = (state.execution?.retryCount?.VisualDirector ?? 0) + 1;
 
@@ -327,7 +400,7 @@ export async function visualDirectorNode(
     schema: VisualDirectorOutputSchema,
     variables: {
       title: title ?? "",
-      narration: narration ?? "",
+      narration: fullNarration,
       endingNarration: ending?.narration ?? "",
       endingVisualDirection: ending?.visualDirection ?? "",
       estimatedDurationSeconds: String(estimatedDurationSeconds ?? 50),
@@ -375,7 +448,12 @@ export async function visualDirectorNode(
     scenes: normalized,
     visualPlans,
     warnings,
-  } = normalizeOutput(result.data, narration ?? "", validFactIds);
+  } = normalizeOutput(
+    result.data,
+    fullNarration,
+    validFactIds,
+    ending?.narration,
+  );
 
   // Hard structural failure: visual plan coverage is not repairable in code.
   // Surface a minor_revision so the router retries VisualDirector with

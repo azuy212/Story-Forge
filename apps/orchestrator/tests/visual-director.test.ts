@@ -160,7 +160,46 @@ describe("visualDirectorNode", () => {
     expect(result.production?.scenes?.at(-1)?.emotionalBeat).toBe("payoff");
   });
 
-  it("rejects ending that is not represented by final scene", async () => {
+  it("keeps a separately stored ending wholly in the final scene", async () => {
+    const endingNarration = "The final answer remains disputed.";
+    const scenes = makeScenes([
+      "Alpha beta gamma delta.",
+      "Epsilon zeta eta theta.",
+      "Iota kappa lambda mu. The final answer",
+      "remains disputed.",
+    ]);
+    mockGenerate.mockResolvedValue(
+      buildResponse({ scenes, visualPlans: makePlans(4) }),
+    );
+
+    const { promise } = runNode({
+      content: {
+        title: "Title",
+        narration:
+          "Alpha beta gamma delta. Epsilon zeta eta theta. Iota kappa lambda mu.",
+        estimatedDurationSeconds: 50,
+        ending: {
+          type: "open_question",
+          narration: endingNarration,
+          visualDirection: "Hold on the unresolved evidence.",
+        },
+      },
+    });
+    const result = await promise;
+
+    expect(result.production?.scenes).toHaveLength(4);
+    expect(result.production?.scenes?.at(-1)?.narration).toBe(endingNarration);
+    expect(result.production?.scenes?.at(-1)?.emotionalBeat).toBe("reflection");
+    expect(result.production?.directorReview?.status).toBe("approved");
+    expect(result.diagnostics.warnings).toEqual(
+      expect.arrayContaining([
+        "VisualDirector: explicit ending moved wholly into the final scene.",
+        "VisualDirector: final scene emotionalBeat normalized to reflection.",
+      ]),
+    );
+  });
+
+  it("repairs an omitted ending using the explicit content ending", async () => {
     const scenes = makeScenes([
       "Alpha beta gamma delta.",
       "Epsilon zeta eta theta.",
@@ -185,8 +224,12 @@ describe("visualDirectorNode", () => {
     });
     const result = await promise;
 
-    expect(result.production?.scenes).toEqual([]);
-    expect(result.production?.directorReview?.status).toBe("minor_revision");
+    expect(result.production?.scenes).toHaveLength(4);
+    expect(result.production?.scenes?.at(-1)?.narration).toMatch(
+      /A different final sentence\.$/,
+    );
+    expect(result.production?.scenes?.at(-1)?.emotionalBeat).toBe("reflection");
+    expect(result.production?.directorReview?.status).toBe("approved");
   });
 
   it("repairs paraphrased narration by re-segmenting in code", async () => {

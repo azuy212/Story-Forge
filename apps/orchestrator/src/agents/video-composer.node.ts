@@ -22,6 +22,7 @@ import {
   type ResolvedBranding,
 } from "../utils/branding.js";
 import { config as appConfig } from "../utils/config.js";
+import { exportTranscriptBesideVideo } from "../utils/transcript.js";
 
 const DEFAULT_PROVIDER = new FfmpegComposerProvider({ subtitleFontSize: 16 });
 
@@ -141,6 +142,16 @@ export function alignSceneDurationsToAudio(
 function getComposerProvider(config: RunnableConfig): ComposerProvider {
   const inject = (config.configurable ?? {}) as Record<string, unknown>;
   return (inject.composerProvider as ComposerProvider) ?? DEFAULT_PROVIDER;
+}
+
+type TranscriptExporter = typeof exportTranscriptBesideVideo;
+
+function getTranscriptExporter(config: RunnableConfig): TranscriptExporter {
+  const inject = (config.configurable ?? {}) as Record<string, unknown>;
+  return (
+    (inject.transcriptExporter as TranscriptExporter | undefined) ??
+    exportTranscriptBesideVideo
+  );
 }
 
 function collectErrors(state: ProjectState): string[] {
@@ -310,12 +321,33 @@ export async function videoComposerNode(
     };
   }
 
+  const videoUrl = result.data?.videoUrl;
+  let transcriptUrl: string | undefined;
+  if (videoUrl) {
+    try {
+      transcriptUrl = await getTranscriptExporter(config)(videoUrl, state);
+    } catch (err) {
+      return {
+        video: {},
+        diagnostics: {
+          errors: [
+            `${AgentModel.VideoComposer}: Transcript export failed: ${(err as Error)?.message ?? String(err)}`,
+          ],
+        },
+        execution: { currentNode: AgentModel.VideoComposer },
+      };
+    }
+  }
+
   return {
     production: {
       plannedScenes: baseScenes,
       scenes: timedScenes,
     },
-    video: result.data ?? {},
+    video: {
+      ...result.data,
+      ...(transcriptUrl ? { transcriptUrl } : {}),
+    },
     diagnostics: {},
     execution: { currentNode: AgentModel.VideoComposer },
   };

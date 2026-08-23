@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const VideoSchema = z.object({
   videoUrl: z.string().optional(),
+  transcriptUrl: z.string().optional(),
   durationMs: z.number().optional(),
   resolution: z.string().optional(),
   timeline: z

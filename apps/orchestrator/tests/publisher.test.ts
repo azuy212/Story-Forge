@@ -8,7 +8,10 @@ function makeMockProvider() {
   return { publish: mockPublish };
 }
 
-function runNode(state?: Partial<ProjectState>) {
+function runNode(
+  state?: Partial<ProjectState>,
+  configurable: Record<string, unknown> = {},
+) {
   const provider = makeMockProvider();
   const promise = publisherNode(
     {
@@ -39,7 +42,7 @@ function runNode(state?: Partial<ProjectState>) {
       execution: { version: "0.1.0" },
       ...state,
     } as ProjectState,
-    { configurable: { publisherProvider: provider } } as any,
+    { configurable: { publisherProvider: provider, ...configurable } } as any,
   );
   return { promise, provider };
 }
@@ -72,6 +75,7 @@ describe("publisherNode", () => {
     );
     expect(result.publishing?.publishedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(result.execution?.currentNode).toBe("Publisher");
+    expect(result.execution?.status).toBe("completed");
     expect(mockPublish).toHaveBeenCalledTimes(1);
     expect(mockPublish).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -80,6 +84,39 @@ describe("publisherNode", () => {
         title: "Test Title",
       }),
     );
+  });
+
+  it("records the YouTube Studio edit URL on the matching sheet row", async () => {
+    const recordYoutubeEditUrl = jest.fn<
+      (threadId: string, editUrl: string) => Promise<void>
+    >(async () => undefined);
+    mockPublish.mockResolvedValueOnce({
+      ...buildPublishResponse("youtube"),
+      publishUrl: "https://studio.youtube.com/video/youtube-123/edit",
+    });
+
+    const { promise } = runNode(
+      {
+        project: {
+          projectId: "thread-123",
+          pillar: "Geography",
+          topic: "Test",
+        },
+      },
+      {
+        storySource: {
+          reserveRandom: jest.fn(),
+          recordYoutubeEditUrl,
+        },
+      },
+    );
+    const result = await promise;
+
+    expect(recordYoutubeEditUrl).toHaveBeenCalledWith(
+      "thread-123",
+      "https://studio.youtube.com/video/youtube-123/edit",
+    );
+    expect(result.execution?.status).toBe("completed");
   });
 
   it("successful publish to multiple platforms", async () => {
@@ -179,6 +216,7 @@ describe("publisherNode", () => {
     expect(result.diagnostics?.errors![0]).toContain(
       "Succeeded: youtube, instagram",
     );
+    expect(result.execution?.status).toBe("failed");
     expect(mockPublish).toHaveBeenCalledTimes(3);
   });
 

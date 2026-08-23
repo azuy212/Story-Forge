@@ -8,11 +8,16 @@ import type {
 import { AgentModel } from "../types/index.js";
 import type { PublisherProvider } from "../providers/publisher-provider.js";
 import { StubPublisherProvider } from "../providers/stub-publisher-provider.js";
+import { YouTubePublisherProvider } from "../providers/youtube-publisher-provider.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
 import { getErrorMessage } from "../utils/errors.js";
 import type { SourceAsset } from "../schemas/production.js";
+import { config as appConfig } from "../utils/config.js";
+import type { StorySource } from "../providers/story-source.js";
+import { GoogleSheetsStorySource } from "../providers/google-sheets-story-source.js";
 
 const DEFAULT_PROVIDER = new StubPublisherProvider();
+let youtubeProvider: YouTubePublisherProvider | undefined;
 
 function sourceCredits(state: ProjectState): string {
   const scenes = state.production?.scenes ?? [];
@@ -37,7 +42,44 @@ function sourceCredits(state: ProjectState): string {
 
 function getPublisherProvider(config: RunnableConfig): PublisherProvider {
   const inject = (config.configurable ?? {}) as Record<string, unknown>;
-  return (inject.publisherProvider as PublisherProvider) ?? DEFAULT_PROVIDER;
+  if (inject.publisherProvider) {
+    return inject.publisherProvider as PublisherProvider;
+  }
+  if (appConfig.useRealProviders() && appConfig.youtubeUploadEnabled()) {
+    youtubeProvider ??= new YouTubePublisherProvider();
+    return youtubeProvider;
+  }
+  return DEFAULT_PROVIDER;
+}
+
+function getStorySource(config: RunnableConfig): StorySource | undefined {
+  const inject = (config.configurable ?? {}) as Record<string, unknown>;
+  if (inject.storySource) return inject.storySource as StorySource;
+  return appConfig.storySheetEnabled()
+    ? new GoogleSheetsStorySource()
+    : undefined;
+}
+
+async function recordYoutubeEditUrl(
+  state: ProjectState,
+  publishing: Partial<Publishing> | null,
+  config: RunnableConfig,
+): Promise<string | undefined> {
+  const youtube = publishing?.results?.find(
+    (item) => item.platform.toLocaleLowerCase() === "youtube",
+  );
+  if (!youtube) return undefined;
+
+  const threadId = state.project?.projectId ?? state.execution?.runId;
+  const storySource = getStorySource(config);
+  if (!threadId || !storySource) return undefined;
+
+  try {
+    await storySource.recordYoutubeEditUrl(threadId, youtube.publishUrl);
+    return undefined;
+  } catch (error) {
+    return `${AgentModel.Publisher}: YouTube uploaded, but saving its edit URL to the story sheet failed: ${getErrorMessage(error)}`;
+  }
 }
 
 export async function publisherNode(
@@ -151,11 +193,20 @@ export async function publisherNode(
     config,
   );
 
+  const sheetError = result.error
+    ? undefined
+    : await recordYoutubeEditUrl(state, result.data, config);
+  const finalError = result.error ?? sheetError;
+
   return {
     publishing: result.data ?? { results: [] },
     diagnostics: {
-      errors: result.error ? [result.error] : undefined,
+      errors: finalError ? [finalError] : undefined,
     },
-    execution: { currentNode: AgentModel.Publisher },
+    execution: {
+      currentNode: AgentModel.Publisher,
+      status: finalError ? "failed" : "completed",
+      finishedAt: new Date().toISOString(),
+    },
   };
 }

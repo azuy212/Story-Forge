@@ -19,6 +19,7 @@ import { releaseValidationNode } from "../agents/release-validation.node.js";
 import { releaseReviewNode } from "../agents/release-review.node.js";
 import { publisherNode } from "../agents/publisher.node.js";
 import { publishReadyNode } from "../agents/publish-ready.node.js";
+import { storyIntakeNode } from "../agents/story-intake.node.js";
 import { logger } from "../utils/logger.js";
 
 import {
@@ -57,6 +58,8 @@ function guard(condition: (state: GuardState) => boolean, next: string) {
 
 const hasResearch = (s: GuardState) =>
   !!s.research?.summary && (s.research?.facts?.length ?? 0) > 0;
+const hasProject = (s: GuardState) =>
+  !!s.project?.pillar?.trim() && !!s.project?.topic?.trim();
 const hasStoryPlan = (s: GuardState) =>
   (s.storyPlan?.storyBeats?.length ?? 0) > 0;
 const hasScript = (s: GuardState) => !!s.content?.script;
@@ -244,6 +247,7 @@ const finalRouter = (state: typeof StateAnnotation.State) => {
 };
 
 const builder = new StateGraph(StateAnnotation)
+  .addNode("StoryIntake", storyIntakeNode)
   .addNode("ResearchAgent", researchAgentNode)
   .addNode("ResearchQA", researchQANode)
   .addNode("ScriptPlanner", scriptPlannerNode)
@@ -265,7 +269,8 @@ const builder = new StateGraph(StateAnnotation)
   .addNode("Publisher", publisherNode);
 
 builder
-  .addEdge("__start__", "ResearchAgent")
+  .addEdge("__start__", "StoryIntake")
+  .addConditionalEdges("StoryIntake", guard(hasProject, "ResearchAgent"))
   .addConditionalEdges("ResearchAgent", guard(hasResearch, "ResearchQA"))
   .addConditionalEdges("ResearchQA", researchRouter)
   .addConditionalEdges("ScriptPlanner", guard(hasStoryPlan, "ScriptWriter"))

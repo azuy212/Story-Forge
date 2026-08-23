@@ -54,6 +54,7 @@ const defaultExecution: Execution = {
 export const StateAnnotation = Annotation.Root({
   project: Annotation<ProjectInfo, Partial<ProjectInfo>>({
     reducer: merge,
+    default: () => ({ pillar: "", topic: "" }),
   }),
   content: Annotation<Content, Partial<Content>>({
     reducer: merge,
