@@ -4,6 +4,7 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createOrAppendRunMeta } from "../src/artifacts/run-meta.mjs";
+import { logger } from "../dist/src/utils/logger.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RUNS_DIR =
@@ -304,6 +305,27 @@ Examples:
 `);
 }
 
+// Inline buildSummary to avoid test module resolution issues
+function buildSummary(data) {
+  if (!data) return undefined;
+  
+  const parts = [];
+  
+  const scenes = data.production?.scenes?.length;
+  if (scenes) parts.push(`${scenes} scenes`);
+  
+  const duration = data.video?.durationSec;
+  if (duration !== undefined) parts.push(`${duration.toFixed(1)}s`);
+  
+  const sceneAssets = data.production?.scenes;
+  if (sceneAssets) {
+    const assets = sceneAssets.filter((s) => s.generationStatus === "complete" && s.assetUrl).length;
+    if (assets) parts.push(`${assets} assets`);
+  }
+  
+  return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
 async function main() {
   let parsed;
   try {
@@ -379,26 +401,34 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("\nResuming...");
-  console.log(`  Topic: ${topic}`);
-  console.log(`  Pillar: ${pillar}`);
+  // Calculate attempt number from thread history
+  const attempt = (meta?.threadHistory?.length ?? 0) + 1;
+  logger.setRunContext(ns, topic, attempt);
+
+  logger.info(`Resuming run: ${ns}`);
+  logger.info(`  Topic: ${topic}`);
+  logger.info(`  Pillar: ${pillar}`);
 
   let assistantId;
   try {
     assistantId = await getAssistantId();
   } catch (e) {
-    console.error(`Failed to get assistant: ${e.message}`);
+    logger.error(`Failed to get assistant: ${e.message}`);
     process.exit(1);
   }
 
   try {
-    await resumeRun(ns, { pillar, topic }, { assistantId });
+    const { lastEvent } = await resumeRun(ns, { pillar, topic }, { assistantId });
+    const status = lastEvent?.data?.execution?.status === "complete" ? "complete" : "failed";
+    const summary = buildSummary(lastEvent?.data);
+    logger.finalize(status, summary);
   } catch (e) {
-    console.error(e.message);
+    logger.finalize("failed", e.message);
+    logger.error(e.message);
     process.exit(1);
   }
 
-  console.log(`\nArtifacts in: runs/${ns}`);
+  logger.info(`Artifacts in: runs/${ns}`);
 }
 
 /**
@@ -430,7 +460,7 @@ export async function resumeRun(
 ) {
   const newThread = await createThreadImpl();
   const threadId = newThread.thread_id;
-  console.log(`  Created thread: ${threadId}`);
+  logger.info(`Created thread: ${threadId}`);
 
   // Record every attempted thread in run.json history, even if the run fails,
   // so threadHistory is an audit trail of resume attempts.
@@ -446,13 +476,9 @@ export async function resumeRun(
       ...(youtubePublishAt ? { youtubePublishAt } : {}),
     },
   };
-  console.log(`  Starting run...`);
+  logger.info("Starting run...");
   const stream = await runStreamImpl(threadId, assistantId, input, ns);
   const { lastEvent } = await drainStreamImpl(stream);
-  console.log("\nRun complete.");
-  if (lastEvent?.event === "values" && lastEvent.data?.execution?.status) {
-    console.log(`Final status: ${lastEvent.data.execution.status}`);
-  }
   return { threadId, lastEvent };
 }
 

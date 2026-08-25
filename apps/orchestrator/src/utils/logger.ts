@@ -1,4 +1,5 @@
 import { config } from "./config.js";
+import { prettyFormatter } from "./pretty-formatter.js";
 
 type LogLevel = "info" | "warn" | "error" | "debug";
 
@@ -28,29 +29,68 @@ function formatNodeMessage(message: string): string {
   return `[${formatTime()}] ${message}`;
 }
 
+const usePretty = config.logFormat() === "pretty";
+
 export const logger = {
+  setRunContext(runId: string, topic: string, attempt: number): void {
+    if (usePretty) {
+      prettyFormatter.setRunContext({ runId, topic, attempt });
+    }
+  },
+
   info(message: string, meta?: LogMeta): void {
-    console.log(formatHuman("info", message, meta));
+    if (usePretty) {
+      prettyFormatter.info(message, meta);
+    } else {
+      console.log(formatHuman("info", message, meta));
+    }
   },
   warn(message: string, meta?: LogMeta): void {
-    console.warn(formatHuman("warn", message, meta));
+    if (usePretty) {
+      prettyFormatter.warn(message, meta);
+    } else {
+      console.warn(formatHuman("warn", message, meta));
+    }
   },
   error(message: string, meta?: LogMeta): void {
-    console.error(formatHuman("error", message, meta));
+    if (usePretty) {
+      prettyFormatter.error(message, meta);
+    } else {
+      console.error(formatHuman("error", message, meta));
+    }
   },
   debug(message: string, meta?: LogMeta): void {
     if (config.isDebug()) {
-      console.log(formatJson("debug", message, meta));
+      if (usePretty) {
+        prettyFormatter.debug(message, meta);
+      } else {
+        console.log(formatJson("debug", message, meta));
+      }
     }
   },
 
   nodeStart(label: string): void {
-    console.log(formatNodeMessage(`${label} started`));
+    if (usePretty) {
+      prettyFormatter.nodeStart(label, "");
+    } else {
+      console.log(formatNodeMessage(`${label} started`));
+    }
   },
   nodeDone(label: string, durationMs: number): void {
-    console.log(
-      formatNodeMessage(`${label} complete (${formatDuration(durationMs)})`),
-    );
+    if (usePretty) {
+      prettyFormatter.nodeDone(label, durationMs);
+    } else {
+      console.log(
+        formatNodeMessage(`${label} complete (${formatDuration(durationMs)})`),
+      );
+    }
+  },
+  nodePhase(label: string, phase: string): void {
+    if (usePretty) {
+      prettyFormatter.nodePhase(label, phase);
+    } else {
+      console.log(formatNodeMessage(`${label} ${phase}`));
+    }
   },
   nodeRetry(
     label: string,
@@ -58,23 +98,46 @@ export const logger = {
     maxRetries: number,
     reason: string,
   ): void {
-    console.log(
-      formatNodeMessage(
-        `${label} retrying (${attempt}/${maxRetries}): ${reason}`,
-      ),
-    );
+    if (usePretty) {
+      prettyFormatter.nodeRetry(label, attempt, maxRetries, reason);
+    } else {
+      console.log(
+        formatNodeMessage(
+          `${label} retrying (${attempt}/${maxRetries}): ${reason}`,
+        ),
+      );
+    }
   },
   nodeSkipped(label: string, reason: string): void {
-    console.log(formatNodeMessage(`${label} skipped: ${reason}`));
+    if (usePretty) {
+      prettyFormatter.nodeSkipped(label, reason);
+    } else {
+      console.log(formatNodeMessage(`${label} skipped: ${reason}`));
+    }
   },
   nodeIncomplete(label: string, detail: string): void {
-    console.log(formatNodeMessage(`${label} incomplete (${detail})`));
+    if (usePretty) {
+      prettyFormatter.nodeWarning(label, detail);
+    } else {
+      console.log(formatNodeMessage(`${label} incomplete (${detail})`));
+    }
   },
   nodeFailed(label: string, reason: string): void {
-    console.error(formatNodeMessage(`${label} failed: ${reason}`));
+    if (usePretty) {
+      prettyFormatter.nodeFailed(label, reason);
+    } else {
+      console.error(formatNodeMessage(`${label} failed: ${reason}`));
+    }
   },
-  nodePhase(label: string, phase: string): void {
-    console.log(formatNodeMessage(`${label} ${phase}`));
+
+  finalize(status: "complete" | "failed", summary?: string): void {
+    if (usePretty) {
+      prettyFormatter.finalize(status, summary);
+    } else {
+      const prefix = status === "complete" ? "✓" : "✗";
+      console.log(formatNodeMessage(`${prefix} VIDEO ${status.toUpperCase()}`));
+      if (summary) console.log(formatNodeMessage(summary));
+    }
   },
 };
 

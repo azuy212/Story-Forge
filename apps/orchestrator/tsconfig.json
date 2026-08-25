@@ -8,20 +8,20 @@
     "esModuleInterop": true,
     "noImplicitReturns": true,
     "declaration": true,
-    "rootDir": ".",
+    "rootDir": "src",
     "noFallthroughCasesInSwitch": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "useDefineForClassFields": true,
     "strictPropertyInitialization": false,
     "isolatedModules": true,
-    "allowJs": true,
+    "allowJs": false,
     "strict": true,
     "strictFunctionTypes": false,
     "outDir": "dist",
     "types": ["jest", "node"],
     "resolveJsonModule": true
   },
-  "include": ["**/*.ts", "**/*.js"],
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

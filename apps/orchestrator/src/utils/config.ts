@@ -25,6 +25,11 @@ export const config = {
   modelForRole: (roleName: string): string | undefined =>
     read(`MODEL_${roleName}`),
   isDebug: (): boolean => read("LOG_LEVEL") === "debug",
+  logFormat: (): "pretty" | "json" => {
+    const value = read("LOG_FORMAT");
+    if (value === "pretty" || value === "json") return value;
+    return process.stdout.isTTY ? "pretty" : "json";
+  },
   imageProviderUrl: (): string =>
     read("IMAGE_PROVIDER_URL") ?? "http://localhost:8020",
   ttsUrl: (): string => read("TTS_URL") ?? "http://localhost:8010",

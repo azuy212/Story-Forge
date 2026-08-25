@@ -225,12 +225,15 @@ const launcherEnv = () => ({
 });
 
 describe("runLauncher", () => {
-  let errorLines: string[];
+  let logLines: string[];
 
   beforeEach(() => {
-    errorLines = [];
+    logLines = [];
+    jest.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logLines.push(args.map(String).join(" "));
+    });
     jest.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
-      errorLines.push(args.map(String).join(" "));
+      logLines.push(args.map(String).join(" "));
     });
   });
 
@@ -268,8 +271,6 @@ describe("runLauncher", () => {
     expect(options).toEqual({
       assistantId: "ast-1",
       projectId: "abc123",
-      // Exact slot math is covered by the decideRun tests; here it just has
-      // to be a concrete seeded slot.
       youtubePublishAt: expect.stringMatching(
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
       ),
@@ -306,10 +307,10 @@ describe("runLauncher", () => {
       .mockRejectedValue(new Error("graph exploded"));
     await expect(runLauncher(deps)).resolves.toBeUndefined();
 
-    expect(errorLines).toHaveLength(1);
-    const logged = errorLines[0];
-    expect(logged).toContain("pipeline run failed");
-    expect(logged).toContain('"Unrecognized Countries"');
+    // The logger outputs JSON to console.log now
+    const logged = logLines.find((l) => l.includes("pipeline run failed"));
+    expect(logged).toBeDefined();
+    expect(logged).toContain("Unrecognized Countries");
     expect(logged).toMatch(/\d{8}-\d{6}\.\d{3}-unrecognized-countries/);
     expect(logged).toContain("graph exploded");
   });

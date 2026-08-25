@@ -28,6 +28,7 @@ import {
   COLUMN,
 } from "../src/integrations/google-sheets/sheets-format.mjs";
 import { getAssistantId, resumeRun } from "./resume.mjs";
+import { logger } from "../dist/src/utils/logger.js";
 
 const { google } = googleapis;
 
@@ -108,6 +109,7 @@ export function findRunByTopic(runsDir, topic) {
  *
  * @param {string} runsDir artifact store root
  * @param {(string | number | boolean)[][]} rows full sheet A:Q values
+ * @param {Date} [now] current time for slot calculation
  * @returns {object} decision:
  *   - { action: "none", reason: "no-pending-row" | "no-slot" }
  *   - { action: "resume", ns, pillar, topic, projectId, youtubePublishAt? }
@@ -165,6 +167,27 @@ export async function readSheetRows(client, spreadsheetId, sheetName) {
     range: `'${sheetName}'!A:Q`,
   });
   return res.data?.values ?? [];
+}
+
+// Inline buildSummary to avoid test module resolution issues
+function buildSummary(data) {
+  if (!data) return undefined;
+  
+  const parts = [];
+  
+  const scenes = data.production?.scenes?.length;
+  if (scenes) parts.push(`${scenes} scenes`);
+  
+  const duration = data.video?.durationSec;
+  if (duration !== undefined) parts.push(`${duration.toFixed(1)}s`);
+  
+  const sceneAssets = data.production?.scenes;
+  if (sceneAssets) {
+    const assets = sceneAssets.filter((s) => s.generationStatus === "complete" && s.assetUrl).length;
+    if (assets) parts.push(`${assets} assets`);
+  }
+  
+  return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
 /**
@@ -246,33 +269,34 @@ export async function runLauncher({
     youtubePublishAt: decision.youtubePublishAt,
   };
 
+  // Calculate attempt from persisted metadata (same logic as resume.mjs)
+  const existing = findRunByTopic(runsDir, decision.topic);
+  const attempt = existing ? (existing.meta?.threadHistory?.length ?? 0) + 1 : 1;
+  logger.setRunContext(decision.ns, decision.topic, attempt);
+
   try {
     if (decision.action === "resume") {
-      console.log(
-        `Resuming existing run for topic "${decision.topic}": ${decision.ns}`,
-      );
+      logger.info(`Resuming existing run for topic "${decision.topic}": ${decision.ns}`);
       if (decision.youtubePublishAt) {
-        console.log(
-          `  (Re)seeding publish slot ${decision.youtubePublishAt} for this resume.`,
-        );
+        logger.info(`  (Re)seeding publish slot ${decision.youtubePublishAt} for this resume.`);
       } else {
-        console.log("  No free publish slot within 30 days; publishing as-is.");
+        logger.info("  No free publish slot within 30 days; publishing as-is.");
       }
     } else {
-      console.log(
-        `New backlog run "${decision.topic}" (video ${decision.projectId}) at slot ${decision.youtubePublishAt}`,
-      );
+      logger.info(`New backlog run "${decision.topic}" (video ${decision.projectId}) at slot ${decision.youtubePublishAt}`);
     }
     // Resolves only when this specific graph run reached its terminal state.
-    await runPipeline(decision.ns, input, options);
-    console.log(`\nArtifacts in: runs/${decision.ns}`);
+    const { lastEvent } = await runPipeline(decision.ns, input, options);
+    const status = lastEvent?.data?.execution?.status === "complete" ? "complete" : "failed";
+    const summary = buildSummary(lastEvent?.data);
+    logger.finalize(status, summary);
+    logger.info(`Artifacts in: runs/${decision.ns}`);
   } catch (e) {
     // Recoverable pipeline failure: log it and finalize normally (exit 0).
     // Whatever state this run persisted stays authoritative; whether a later
     // invocation can resume depends on that state, not on this launcher.
-    console.error(
-      `run-next: pipeline run failed for "${decision.topic}" (${decision.ns}): ${e?.stack || e}`,
-    );
+    logger.finalize("failed", e?.message ?? String(e));
+    logger.error(`run-next: pipeline run failed for "${decision.topic}" (${decision.ns}): ${e?.stack || e}`);
   }
 }
 

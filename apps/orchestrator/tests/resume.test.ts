@@ -6,6 +6,25 @@ import {
   resumeRun,
 } from "../scripts/resume.mjs";
 
+// Mock the logger to avoid dist import issues in tests
+jest.unstable_mockModule("../dist/utils/logger.js", () => ({
+  logger: {
+    setRunContext: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    nodeStart: jest.fn(),
+    nodeDone: jest.fn(),
+    nodePhase: jest.fn(),
+    nodeRetry: jest.fn(),
+    nodeSkipped: jest.fn(),
+    nodeIncomplete: jest.fn(),
+    nodeFailed: jest.fn(),
+    finalize: jest.fn(),
+  },
+}));
+
 describe("parseArgs", () => {
   it("parses namespace, pillar, topic and dry-run", () => {
     expect(

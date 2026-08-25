@@ -265,6 +265,7 @@ export class GeminiClient {
       item.reject(error instanceof Error ? error : new Error(String(error)));
     } finally {
       this._busy = false;
+      await new Promise((r) => setTimeout(r, 2000));
       void this._processQueue();
     }
   }

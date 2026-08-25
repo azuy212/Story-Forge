@@ -1,6 +1,7 @@
 export default {
   preset: "ts-jest/presets/default-esm",
   moduleNameMapper: {
+    "^\\.\\./dist/src/utils/logger\\.js$": "<rootDir>/tests/mocks/logger.js",
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
   transform: {
