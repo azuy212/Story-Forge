@@ -3,12 +3,17 @@ import {
   subtitleGeneratorNode,
   FallbackSceneSubtitleProvider,
 } from "../src/agents/subtitle-generator.node.js";
-import type { ProjectState, Scene } from "../src/types/index.js";
+import type {
+  ProjectState,
+  Scene,
+  VideoProfileConfig,
+} from "../src/types/index.js";
 import type {
   SubtitleProvider,
   GenerateSubtitlesResult,
 } from "../src/providers/subtitle-provider.js";
 import type { SceneSubtitleProvider } from "../src/providers/scene-subtitle-provider.js";
+import { resolveVideoProfile } from "../src/utils/video-profile.js";
 import { parseSrtCues } from "../src/utils/srt.js";
 
 const mockGenerateSubtitles = jest.fn<(...args: any[]) => Promise<any>>();
@@ -53,6 +58,7 @@ const DEFAULT_AUDIO = {
   narrationUrl: "combined.wav",
   narrationDurationMs: 5000,
 };
+const DEFAULT_VIDEO_PROFILE: VideoProfileConfig = resolveVideoProfile({});
 
 beforeEach(() => {
   mockGenerateSubtitles.mockReset();
@@ -73,6 +79,7 @@ function runNode(
       production: { scenes: SCENES },
       audio: DEFAULT_AUDIO,
       execution: { version: "0.1.0" },
+      videoProfile: DEFAULT_VIDEO_PROFILE,
       ...state,
     } as ProjectState,
     {
@@ -229,6 +236,7 @@ describe("subtitleGeneratorNode", () => {
     expect(mockGenerateSceneSubtitles).toHaveBeenCalledWith(
       SCENES,
       AUDIO_SCENES,
+      DEFAULT_VIDEO_PROFILE,
     );
     expect(result.subtitles.srt).toContain("Scene");
   });
@@ -277,6 +285,7 @@ describe("FallbackSceneSubtitleProvider", () => {
     expect(primary.generateSceneSubtitles).toHaveBeenCalledWith(
       SCENES,
       AUDIO_SCENES,
+      undefined,
     );
     expect(fallback.generateSceneSubtitles).toHaveBeenCalled();
     expect(result).toEqual(ok);

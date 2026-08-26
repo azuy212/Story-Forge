@@ -4,6 +4,7 @@ import {
   thumbnailGeneratorNode,
 } from "../src/agents/thumbnail-generator.node.js";
 import type { ProjectState } from "../src/types/index.js";
+import { resolveVideoProfile } from "../src/utils/video-profile.js";
 
 const mockGenerate = jest.fn<(...args: any[]) => Promise<any>>();
 
@@ -11,7 +12,18 @@ const MOCK_PROMPT = [
   "You are a YouTube thumbnail designer.",
   "---",
   "Title: {{title}}",
+  "Hook: {{hook}}",
+  "Narration Summary: {{narration}}",
+  "Channel: {{channel}}",
+  "Visual Style: {{style}}",
+  "Color Palette: {{colorPalette}}",
+  "Format: {{formatLabel}}",
+  "Aspect Guidance: {{aspectGuidance}}",
+  "Aspect Ratio: {{aspectRatio}}",
+  "Thumbnail Dimensions: {{thumbnailWidth}}×{{thumbnailHeight}}",
 ].join("\n");
+
+const DEFAULT_VIDEO_PROFILE = resolveVideoProfile({});
 
 function makeMocks() {
   const createModel = jest.fn<
@@ -28,8 +40,8 @@ function makeMocks() {
 
 function runNode(
   state?: Partial<ProjectState>,
-  compositorOverrides?: Record<string, unknown>,
   configOverrides?: Record<string, unknown>,
+  compositorOverrides?: Record<string, unknown>,
 ) {
   const mocks = makeMocks();
   const assetProvider = {
@@ -66,13 +78,14 @@ function runNode(
         colorPalette: "Cold blue",
       },
       execution: { version: "0.1.0" },
+      videoProfile: resolveVideoProfile({}),
       ...state,
     } as ProjectState,
     {
       configurable: {
         ...mocks,
         assetProvider,
-        thumbnailCompositor: compositor,
+        thumbnailCompositor: { ...compositor, ...compositorOverrides },
         ...configOverrides,
       },
     } as any,
@@ -165,44 +178,54 @@ describe("thumbnailGeneratorNode", () => {
     mockGenerate.mockReset();
     process.env.THUMBNAIL_MODE = "overlay";
     process.env.THUMBNAIL_QA = "true";
+    process.env.ENABLE_THUMBNAIL = "true";
   });
 
   afterEach(() => {
     delete process.env.THUMBNAIL_MODE;
     delete process.env.THUMBNAIL_QA;
+    delete process.env.ENABLE_THUMBNAIL;
+    delete process.env.ENABLE_QA;
   });
 
   it("rejects cached local thumbnail paths that no longer exist", () => {
     expect(
-      isUsableThumbnailImage({
-        sourceUrl: "/tmp/source.png",
-        imageUrl: "/tmp/missing-thumbnail.png",
-        width: 1080,
-        height: 1920,
-        text: "T",
-        textPosition: "center",
-        compositorVersion: "1.0.0",
-        mode: "overlay",
-      }),
+      isUsableThumbnailImage(
+        {
+          sourceUrl: "/tmp/source.png",
+          imageUrl: "/tmp/missing-thumbnail.png",
+          width: 1080,
+          height: 1920,
+          text: "T",
+          textPosition: "center",
+          compositorVersion: "1.0.0",
+          mode: "overlay",
+        },
+        resolveVideoProfile({}),
+      ),
     ).toBe(false);
   });
 
   it("accepts cached provider thumbnail URLs", () => {
     expect(
-      isUsableThumbnailImage({
-        sourceUrl: "https://cdn.local/source.png",
-        imageUrl: "https://cdn.local/thumbnail.png",
-        width: 1080,
-        height: 1920,
-        text: "T",
-        textPosition: "center",
-        compositorVersion: "1.0.0",
-        mode: "overlay",
-      }),
+      isUsableThumbnailImage(
+        {
+          sourceUrl: "https://cdn.local/source.png",
+          imageUrl: "https://cdn.local/thumbnail.png",
+          width: 1080,
+          height: 1920,
+          text: "T",
+          textPosition: "center",
+          compositorVersion: "1.0.0",
+          mode: "overlay",
+        },
+        resolveVideoProfile({}),
+      ),
     ).toBe(true);
   });
 
   it("successful generation sets all thumbnail fields", async () => {
+    process.env.ENABLE_THUMBNAIL = "true";
     const output = {
       thumbnailPrompt:
         "High contrast aerial view of remote island. Dramatic shadows. Cold blue tones.",
@@ -232,7 +255,7 @@ describe("thumbnailGeneratorNode", () => {
     // appends pipeline overlay instructions.
     expect(generateCall.prompt).toContain(output.thumbnailPrompt);
     expect(generateCall.prompt).toContain('overlay text "Doesn\'t Exist?"');
-    expect(generateCall.prompt).toContain("1080x1920");
+    expect(generateCall.prompt).toContain("vertical portrait 9:16 image at 1080x1920 pixels");
     expect(generateCall.prompt).toContain("Do NOT render any text");
 
     expect(compositor.composite).toHaveBeenCalledWith(
@@ -246,6 +269,7 @@ describe("thumbnailGeneratorNode", () => {
   });
 
   it("persists composited image as thumbnailImage artifact", async () => {
+    process.env.ENABLE_THUMBNAIL = "true";
     const output = {
       thumbnailPrompt: "P",
       thumbnailText: "T",
@@ -276,6 +300,7 @@ describe("thumbnailGeneratorNode", () => {
 
     const { promise } = runNode(
       {},
+      { runId: "thumbnail-artifact-test", artifactStore },
       {
         composite: jest
           .fn<(...args: any[]) => Promise<any>>()
@@ -285,7 +310,6 @@ describe("thumbnailGeneratorNode", () => {
             height: 1920,
           }),
       },
-      { runId: "thumbnail-artifact-test", artifactStore },
     );
     const result = await promise;
 
@@ -340,7 +364,7 @@ describe("thumbnailGeneratorNode", () => {
         .fn<(...args: any[]) => Promise<any>>()
         .mockRejectedValue(new Error("drawtext font missing")),
     };
-    const { promise } = runNode({}, failing);
+    const { promise } = runNode({}, {}, failing);
     const result = await promise;
 
     expect(result.diagnostics?.errors).toBeDefined();
@@ -367,7 +391,7 @@ describe("thumbnailGeneratorNode", () => {
         height: 1280,
       }),
     };
-    const { promise } = runNode({}, invalid);
+    const { promise } = runNode({}, {}, invalid);
     const result = await promise;
 
     expect(result.diagnostics?.errors?.[0]).toContain("expected 1080x1920");
@@ -475,10 +499,13 @@ describe("thumbnailGeneratorNode modes", () => {
   afterEach(() => {
     delete process.env.THUMBNAIL_MODE;
     delete process.env.THUMBNAIL_QA;
+    delete process.env.ENABLE_THUMBNAIL;
+    delete process.env.ENABLE_QA;
   });
 
   it("full mode renders image model typography (empty compositor text) and skips overlay text", async () => {
     process.env.THUMBNAIL_MODE = "full";
+    process.env.ENABLE_THUMBNAIL = "true";
     mockGenerate.mockResolvedValueOnce(
       buildLLMResponse({
         thumbnailPrompt: "Cinematic close-up.",
@@ -490,7 +517,6 @@ describe("thumbnailGeneratorNode modes", () => {
 
     const { promise, assetProvider, compositor } = runNode(
       {},
-      {},
       { thumbnailQa: async () => ({ status: "pass", issues: [] }) },
     );
     const result = await promise;
@@ -498,7 +524,7 @@ describe("thumbnailGeneratorNode modes", () => {
     const [generateCall] = assetProvider.generateImage.mock.calls.at(-1)!;
     expect(generateCall.prompt).toContain('"THE DEADLY PRIZE"');
     expect(generateCall.prompt).toContain("integrated into the composition");
-    expect(generateCall.prompt).toContain("1080x1920");
+    expect(generateCall.prompt).toContain("vertical portrait 9:16 image at 1080x1920 pixels");
     expect(generateCall.prompt).not.toContain("Do NOT render any text");
 
     expect(compositor.composite).toHaveBeenCalledWith(
@@ -512,6 +538,7 @@ describe("thumbnailGeneratorNode modes", () => {
 
   it("full mode fails closed when QA rejects (no fallback)", async () => {
     process.env.THUMBNAIL_MODE = "full";
+    process.env.ENABLE_THUMBNAIL = "true";
     mockGenerate.mockResolvedValueOnce(
       buildLLMResponse({
         thumbnailPrompt: "P",
@@ -522,7 +549,6 @@ describe("thumbnailGeneratorNode modes", () => {
     );
 
     const { promise } = runNode(
-      {},
       {},
       {
         thumbnailQa: async () => ({
@@ -540,6 +566,7 @@ describe("thumbnailGeneratorNode modes", () => {
 
   it("auto mode falls back to overlay and records fallbackReason when QA fails", async () => {
     process.env.THUMBNAIL_MODE = "auto";
+    process.env.ENABLE_THUMBNAIL = "true";
     mockGenerate.mockResolvedValueOnce(
       buildLLMResponse({
         thumbnailPrompt: "P",
@@ -550,7 +577,6 @@ describe("thumbnailGeneratorNode modes", () => {
     );
 
     const { promise, compositor } = runNode(
-      {},
       {},
       {
         thumbnailQa: async () => ({
@@ -576,6 +602,7 @@ describe("thumbnailGeneratorNode modes", () => {
 
   it("auto mode distinguishes QA infrastructure failure from QA rejection", async () => {
     process.env.THUMBNAIL_MODE = "auto";
+    process.env.ENABLE_THUMBNAIL = "true";
     mockGenerate.mockResolvedValueOnce(
       buildLLMResponse({
         thumbnailPrompt: "P",
@@ -586,7 +613,6 @@ describe("thumbnailGeneratorNode modes", () => {
     );
 
     const { promise } = runNode(
-      {},
       {},
       {
         thumbnailQa: async () => {
@@ -605,6 +631,7 @@ describe("thumbnailGeneratorNode modes", () => {
 
   it("auto mode keeps the full thumbnail when QA passes", async () => {
     process.env.THUMBNAIL_MODE = "auto";
+    process.env.ENABLE_THUMBNAIL = "true";
     mockGenerate.mockResolvedValueOnce(
       buildLLMResponse({
         thumbnailPrompt: "P",
@@ -615,7 +642,6 @@ describe("thumbnailGeneratorNode modes", () => {
     );
 
     const { promise } = runNode(
-      {},
       {},
       { thumbnailQa: async () => ({ status: "pass", issues: [] }) },
     );
@@ -631,6 +657,7 @@ describe("thumbnailGeneratorNode cache behavior", () => {
     mockGenerate.mockReset();
     process.env.THUMBNAIL_MODE = "auto";
     process.env.THUMBNAIL_QA = "true";
+    process.env.ENABLE_THUMBNAIL = "true";
   });
 
   afterEach(() => {
@@ -681,7 +708,6 @@ describe("thumbnailGeneratorNode cache behavior", () => {
 
     const { promise, assetProvider } = runNode(
       {},
-      {},
       {
         thumbnailQa: async () => ({
           status: "fail",
@@ -723,6 +749,7 @@ describe("thumbnailGeneratorNode cache behavior", () => {
 
   it("full mode: QA infrastructure error → node fails (does not ship unverified)", async () => {
     process.env.THUMBNAIL_MODE = "full";
+    process.env.ENABLE_THUMBNAIL = "true";
 
     mockGenerate.mockResolvedValueOnce(
       buildLLMResponse({
@@ -734,7 +761,6 @@ describe("thumbnailGeneratorNode cache behavior", () => {
     );
 
     const { promise } = runNode(
-      {},
       {},
       {
         thumbnailQa: async () => {
@@ -759,6 +785,7 @@ describe("thumbnailGeneratorNode cache behavior", () => {
 
     async function runOnce(qaModel: string) {
       process.env.THUMBNAIL_MODE = "auto";
+      process.env.ENABLE_THUMBNAIL = "true";
       process.env.THUMBNAIL_QA = "true";
       process.env.MODEL_THUMBNAILQA = qaModel;
       mockGenerate.mockResolvedValueOnce(
@@ -770,7 +797,6 @@ describe("thumbnailGeneratorNode cache behavior", () => {
         }),
       );
       const { promise, assetProvider } = runNode(
-        {},
         {},
         { thumbnailQa: qaSpy, artifactStore: store, runId: "cache-key-test" },
       );

@@ -1331,7 +1331,9 @@ describe("Graph", () => {
     );
 
     expect(result.diagnostics?.errors).toHaveLength(0);
-    expect(result.diagnostics?.warnings).toHaveLength(0);
+    expect(result.diagnostics?.warnings).toEqual([
+      "Narration pace 2.40 wps outside 2.5-2.9 (target 2.67 wps from 160 wpm)",
+    ]);
 
     expect(result.content?.title).toBe("Mystery Island");
     expect(result.content?.hook).toBe("What if a country wasn't real?");
@@ -1415,7 +1417,9 @@ describe("Graph", () => {
     expect(result.execution.currentNode).toBe("Finalize");
     expect(result.execution.status).toBe("complete");
     expect(result.diagnostics?.errors).toHaveLength(0);
-    expect(result.diagnostics?.warnings).toHaveLength(0);
+    expect(result.diagnostics?.warnings).toEqual([
+      "Narration pace 2.40 wps outside 2.5-2.9 (target 2.67 wps from 160 wpm)",
+    ]);
   }, 30000);
 
   it("repairs a provider-rejected prompt and regenerates the asset", async () => {

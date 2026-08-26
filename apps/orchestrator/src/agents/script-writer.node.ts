@@ -1,9 +1,17 @@
+import {
+  resolveVideoProfile,
+  formatLabelFor,
+  canvasGuidanceFor,
+  wordRangeFor,
+  speakingRateWps,
+} from "../utils/video-profile.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type {
   ProjectState,
   Content,
   Diagnostics,
   Execution,
+  VideoProfileConfig,
 } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
@@ -86,6 +94,8 @@ export async function scriptWriterNode(
   const { title, hook } = state.content ?? {};
   const research = state.research;
   const storyPlan = state.storyPlan;
+  const videoProfile: VideoProfileConfig =
+    state.videoProfile ?? resolveVideoProfile({});
   const inject = (config.configurable ?? {}) as AgentInject;
 
   const retryCount = (state.execution?.retryCount?.ScriptWriter ?? 0) + 1;
@@ -146,6 +156,12 @@ export async function scriptWriterNode(
       ].join("\n")
     : "";
 
+  const targetDurationSec = videoProfile.targetDurationSec;
+  const wordRange = wordRangeFor(videoProfile);
+  const speakingRate = speakingRateWps(videoProfile);
+  const formatLabel = formatLabelFor(videoProfile);
+  const canvasGuidance = canvasGuidanceFor(videoProfile);
+
   const label = nodeLabel(AgentModel.ScriptWriter);
   logger.nodeStart(label);
   logger.nodePhase(label, "generating script");
@@ -168,6 +184,11 @@ export async function scriptWriterNode(
       previousScript: needsRevision
         ? serializePreviousScript(state.content)
         : "",
+      formatLabel,
+      canvasGuidance: canvasGuidance.canvasGuidance,
+      targetDurationSeconds: String(targetDurationSec),
+      targetWordRange: `${wordRange.min}-${wordRange.max}`,
+      speakingRateWps: String(speakingRate),
     },
     inject,
     configurable: withTopic(config, state).configurable,

@@ -176,6 +176,17 @@ export class FfmpegComposerProvider implements ComposerProvider {
     return hashObject(this.config);
   }
 
+  private resolveVideo(opts: ComposeOptions): VideoConfig {
+    if (opts.video) {
+      return {
+        width: opts.video.width,
+        height: opts.video.height,
+        fps: this.config.video.fps,
+      };
+    }
+    return this.config.video;
+  }
+
   async compose(
     opts: ComposeOptions,
     onProgress?: (stage: string, progress: number, detail?: string) => void,
@@ -237,7 +248,13 @@ export class FfmpegComposerProvider implements ComposerProvider {
       );
 
       const finalBase = branding
-        ? await this.appendOutro(audioVideo, branding.path, workDir, signal)
+        ? await this.appendOutro(
+            audioVideo,
+            branding.path,
+            workDir,
+            signal,
+            opts,
+          )
         : null;
       const finalBaseVideo = finalBase?.path ?? audioVideo;
       const finalBaseInfo = await probe(finalBaseVideo);
@@ -445,11 +462,12 @@ export class FfmpegComposerProvider implements ComposerProvider {
     const sourceInfo = await probe(sourcePath);
     const durationSeconds = sourceInfo.duration;
     const outputPath = path.join(workDir, "branding-outro.mp4");
+    const video = this.resolveVideo(opts);
     const videoFilter = [
-      `scale=${this.config.video.width}:${this.config.video.height}:force_original_aspect_ratio=decrease`,
-      `pad=${this.config.video.width}:${this.config.video.height}:(ow-iw)/2:(oh-ih)/2`,
+      `scale=${video.width}:${video.height}:force_original_aspect_ratio=decrease`,
+      `pad=${video.width}:${video.height}:(ow-iw)/2:(oh-ih)/2`,
       "setsar=1",
-      `fps=${this.config.video.fps}`,
+      `fps=${video.fps}`,
       "format=yuv420p",
       ...(opts.branding?.ctaEnabled &&
       !opts.branding.outroContainsCta &&
@@ -567,6 +585,7 @@ export class FfmpegComposerProvider implements ComposerProvider {
     onProgress: (stage: string, progress: number, detail?: string) => void,
     signal?: AbortSignal,
   ): Promise<{ filePath: string; durationSeconds: number }[]> {
+    const video = this.resolveVideo(opts);
     const items = opts.scenes.map((s) => ({
       sceneId: s.sceneId,
       assetUrl: s.assetUrl,
@@ -575,9 +594,9 @@ export class FfmpegComposerProvider implements ComposerProvider {
     }));
 
     const baseNormOpts: Omit<NormalizeOptions, "panVariant"> = {
-      width: this.config.video.width,
-      height: this.config.video.height,
-      fps: this.config.video.fps,
+      width: video.width,
+      height: video.height,
+      fps: video.fps,
       kenBurnsEnabled: this.config.kenBurns.enabled,
       kenBurnsMaxZoom: this.config.kenBurns.maxZoom,
       fastSeek: this.config.fastSeek,
@@ -737,10 +756,18 @@ export class FfmpegComposerProvider implements ComposerProvider {
     outroPath: string,
     workDir: string,
     signal?: AbortSignal,
+    opts: ComposeOptions = {
+      scenes: [],
+      narrationUrl: "",
+      srt: "",
+      totalDurationSeconds: 0,
+      branding: {},
+    },
   ): Promise<{
     path: string;
     transitionDurationMs: number;
   }> {
+    const video = this.resolveVideo(opts ?? {});
     const outputPath = path.join(workDir, "timeline-with-outro.mp4");
     const enc = this.config.encoder;
 
@@ -777,14 +804,14 @@ export class FfmpegComposerProvider implements ComposerProvider {
         `[0:v]` +
           `settb=AVTB,` +
           `setpts=PTS-STARTPTS,` +
-          `fps=${this.config.video.fps},` +
+          `fps=${video.fps},` +
           `format=yuv420p` +
           `[v0]`,
 
         `[1:v]` +
           `settb=AVTB,` +
           `setpts=PTS-STARTPTS,` +
-          `fps=${this.config.video.fps},` +
+          `fps=${video.fps},` +
           `format=yuv420p` +
           `[v1]`,
 

@@ -172,21 +172,23 @@ export async function readSheetRows(client, spreadsheetId, sheetName) {
 // Inline buildSummary to avoid test module resolution issues
 function buildSummary(data) {
   if (!data) return undefined;
-  
+
   const parts = [];
-  
+
   const scenes = data.production?.scenes?.length;
   if (scenes) parts.push(`${scenes} scenes`);
-  
+
   const duration = data.video?.durationSec;
   if (duration !== undefined) parts.push(`${duration.toFixed(1)}s`);
-  
+
   const sceneAssets = data.production?.scenes;
   if (sceneAssets) {
-    const assets = sceneAssets.filter((s) => s.generationStatus === "complete" && s.assetUrl).length;
+    const assets = sceneAssets.filter(
+      (s) => s.generationStatus === "complete" && s.assetUrl,
+    ).length;
     if (assets) parts.push(`${assets} assets`);
   }
-  
+
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
@@ -271,23 +273,32 @@ export async function runLauncher({
 
   // Calculate attempt from persisted metadata (same logic as resume.mjs)
   const existing = findRunByTopic(runsDir, decision.topic);
-  const attempt = existing ? (existing.meta?.threadHistory?.length ?? 0) + 1 : 1;
+  const attempt = existing
+    ? (existing.meta?.threadHistory?.length ?? 0) + 1
+    : 1;
   logger.setRunContext(decision.ns, decision.topic, attempt);
 
   try {
     if (decision.action === "resume") {
-      logger.info(`Resuming existing run for topic "${decision.topic}": ${decision.ns}`);
+      logger.info(
+        `Resuming existing run for topic "${decision.topic}": ${decision.ns}`,
+      );
       if (decision.youtubePublishAt) {
-        logger.info(`  (Re)seeding publish slot ${decision.youtubePublishAt} for this resume.`);
+        logger.info(
+          `  (Re)seeding publish slot ${decision.youtubePublishAt} for this resume.`,
+        );
       } else {
         logger.info("  No free publish slot within 30 days; publishing as-is.");
       }
     } else {
-      logger.info(`New backlog run "${decision.topic}" (video ${decision.projectId}) at slot ${decision.youtubePublishAt}`);
+      logger.info(
+        `New backlog run "${decision.topic}" (video ${decision.projectId}) at slot ${decision.youtubePublishAt}`,
+      );
     }
     // Resolves only when this specific graph run reached its terminal state.
     const { lastEvent } = await runPipeline(decision.ns, input, options);
-    const status = lastEvent?.data?.execution?.status === "complete" ? "complete" : "failed";
+    const status =
+      lastEvent?.data?.execution?.status === "complete" ? "complete" : "failed";
     const summary = buildSummary(lastEvent?.data);
     logger.finalize(status, summary);
     logger.info(`Artifacts in: runs/${decision.ns}`);
@@ -296,7 +307,9 @@ export async function runLauncher({
     // Whatever state this run persisted stays authoritative; whether a later
     // invocation can resume depends on that state, not on this launcher.
     logger.finalize("failed", e?.message ?? String(e));
-    logger.error(`run-next: pipeline run failed for "${decision.topic}" (${decision.ns}): ${e?.stack || e}`);
+    logger.error(
+      `run-next: pipeline run failed for "${decision.topic}" (${decision.ns}): ${e?.stack || e}`,
+    );
   }
 }
 

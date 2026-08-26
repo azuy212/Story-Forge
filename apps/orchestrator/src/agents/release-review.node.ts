@@ -9,6 +9,7 @@ import type { ReleaseValidationOutput } from "../schemas/release-validation-outp
 import { config as configUtils } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
+import { formatLabelFor, resolveVideoProfile } from "../utils/video-profile.js";
 
 function serializeMetadata(
   meta:
@@ -59,6 +60,8 @@ export async function releaseReviewNode(
   logger.nodeStart(label);
   logger.nodePhase(label, "reviewing release package");
 
+  const videoProfile = state.videoProfile ?? resolveVideoProfile({});
+
   const result = await runAgent<ReleaseValidationOutput>({
     agent: AgentModel.ReleaseReview,
     promptPath: PromptPaths.ReleaseReview,
@@ -70,6 +73,8 @@ export async function releaseReviewNode(
       narration: state.content?.narration ?? "",
       thumbnailText: state.thumbnail?.thumbnailText ?? "",
       metadata: serializeMetadata(state.metadataOutput),
+      formatLabel: formatLabelFor(videoProfile),
+      targetDurationSeconds: String(videoProfile.targetDurationSec),
     },
     inject,
     configurable: withTopic(config, state).configurable,

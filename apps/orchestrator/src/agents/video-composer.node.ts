@@ -1,3 +1,4 @@
+import { resolveVideoProfile } from "../utils/video-profile.js";
 import fs from "node:fs/promises";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type {
@@ -6,6 +7,7 @@ import type {
   Execution,
   Scene,
   SceneAudio,
+  VideoProfileConfig,
 } from "../types/index.js";
 import type { Video } from "../schemas/video.js";
 import { AgentModel } from "../models/agent-model.js";
@@ -193,6 +195,8 @@ export async function videoComposerNode(
 }> {
   const startedAt = Date.now();
   const errors = collectErrors(state);
+  const videoProfile: VideoProfileConfig =
+    state.videoProfile ?? resolveVideoProfile({});
   const label = nodeLabel(AgentModel.VideoComposer);
   logger.nodeStart(label);
   if (errors.length > 0) {
@@ -266,6 +270,7 @@ export async function videoComposerNode(
         totalDurationSeconds,
         narrativeHoldSeconds,
         narrationDurationMs: targetMs,
+        videoSize: videoProfile.videoSize,
         branding: {
           ...branding,
           outroAssetFingerprint,
@@ -290,6 +295,7 @@ export async function videoComposerNode(
             outroCta: branding.outroCta,
             outroContainsCta: branding.outroContainsCta,
           },
+          video: videoProfile.videoSize,
           runId: getArtifactNamespace(config, state),
         });
 

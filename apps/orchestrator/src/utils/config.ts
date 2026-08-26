@@ -10,7 +10,7 @@ function parsePublishAt(value: string): string | undefined {
 }
 
 export const config = {
-  defaultModel: (): string => read("DEFAULT_MODEL") ?? "openai/gpt-4o-mini",
+  defaultModel: (): string => read("DEFAULT_MODEL") ?? "openrouter/free",
   openrouterApiKey: (): string => {
     const key = read("OPENROUTER_API_KEY");
     if (!key) {

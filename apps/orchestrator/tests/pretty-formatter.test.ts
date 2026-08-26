@@ -44,7 +44,11 @@ describe("PrettyConsoleFormatter", () => {
   }
 
   it("prints header on first nodeStart", () => {
-    formatter.setRunContext({ runId: "test-run", topic: "Test Topic", attempt: 1 });
+    formatter.setRunContext({
+      runId: "test-run",
+      topic: "Test Topic",
+      attempt: 1,
+    });
     formatter.nodeStart("Research", "researching sources");
 
     const lines = getOutputLines();
@@ -57,7 +61,11 @@ describe("PrettyConsoleFormatter", () => {
   });
 
   it("prints node start with phase", () => {
-    formatter.setRunContext({ runId: "test-run", topic: "Test Topic", attempt: 1 });
+    formatter.setRunContext({
+      runId: "test-run",
+      topic: "Test Topic",
+      attempt: 1,
+    });
     formatter.nodeStart("Script", "generating script");
 
     const nodeLine = getLinesContaining("generating")[0];
@@ -65,7 +73,11 @@ describe("PrettyConsoleFormatter", () => {
   });
 
   it("prints node done with duration", () => {
-    formatter.setRunContext({ runId: "test-run", topic: "Test Topic", attempt: 1 });
+    formatter.setRunContext({
+      runId: "test-run",
+      topic: "Test Topic",
+      attempt: 1,
+    });
     formatter.nodeStart("Script", "generating script");
     formatter.nodeDone("Script", 10800);
 
@@ -76,7 +88,11 @@ describe("PrettyConsoleFormatter", () => {
   });
 
   it("prints retry with attempt info", () => {
-    formatter.setRunContext({ runId: "test-run", topic: "Test Topic", attempt: 1 });
+    formatter.setRunContext({
+      runId: "test-run",
+      topic: "Test Topic",
+      attempt: 1,
+    });
     formatter.nodeStart("Script QA", "checking script");
     formatter.nodeRetry("Script QA", 2, 3, "revision requested");
 
@@ -86,7 +102,11 @@ describe("PrettyConsoleFormatter", () => {
   });
 
   it("prints progress bar with correct counts", () => {
-    formatter.setRunContext({ runId: "test-run", topic: "Test Topic", attempt: 1 });
+    formatter.setRunContext({
+      runId: "test-run",
+      topic: "Test Topic",
+      attempt: 1,
+    });
     formatter.nodeStart("Research", "researching sources");
     formatter.nodeDone("Research", 10000);
     formatter.nodeStart("Research QA", "reviewing research quality");
@@ -99,7 +119,11 @@ describe("PrettyConsoleFormatter", () => {
   });
 
   it("prints complete footer on finalize", () => {
-    formatter.setRunContext({ runId: "test-run", topic: "Test Topic", attempt: 1 });
+    formatter.setRunContext({
+      runId: "test-run",
+      topic: "Test Topic",
+      attempt: 1,
+    });
     formatter.nodeStart("Research", "researching sources");
     formatter.nodeDone("Research", 10000);
     formatter.finalize("complete", "10 scenes · 66.2s · 9 assets");
@@ -114,9 +138,16 @@ describe("PrettyConsoleFormatter", () => {
   });
 
   it("prints failed footer on finalize with error", () => {
-    formatter.setRunContext({ runId: "test-run", topic: "Test Topic", attempt: 1 });
+    formatter.setRunContext({
+      runId: "test-run",
+      topic: "Test Topic",
+      attempt: 1,
+    });
     formatter.nodeStart("Scene Direction", "planning visual direction");
-    formatter.finalize("failed", "Failed to produce valid scenes after 3 attempts");
+    formatter.finalize(
+      "failed",
+      "Failed to produce valid scenes after 3 attempts",
+    );
 
     const lines = getOutputLines();
     const footerLine = lines.find((l) => l.includes("VIDEO FAILED"));
@@ -125,13 +156,19 @@ describe("PrettyConsoleFormatter", () => {
     expect(timeLine).toBeDefined();
     const nodeLine = lines.find((l) => l.includes("Scene Direction"));
     expect(nodeLine).toBeDefined();
-    const reasonLine = lines.find((l) => l.includes("Failed to produce valid scenes"));
+    const reasonLine = lines.find((l) =>
+      l.includes("Failed to produce valid scenes"),
+    );
     expect(reasonLine).toBeDefined();
   });
 
   it("formats duration correctly", () => {
-    formatter.setRunContext({ runId: "test-run", topic: "Test Topic", attempt: 1 });
-    
+    formatter.setRunContext({
+      runId: "test-run",
+      topic: "Test Topic",
+      attempt: 1,
+    });
+
     formatter.nodeStart("Test1", "test");
     formatter.nodeDone("Test1", 500);
     formatter.nodeStart("Test2", "test");
@@ -150,16 +187,26 @@ describe("PrettyConsoleFormatter", () => {
   });
 
   it("does not print header twice", () => {
-    formatter.setRunContext({ runId: "test-run", topic: "Test Topic", attempt: 1 });
+    formatter.setRunContext({
+      runId: "test-run",
+      topic: "Test Topic",
+      attempt: 1,
+    });
     formatter.nodeStart("Research", "researching sources");
     formatter.nodeStart("Script", "generating script");
 
-    const headerLines = getOutputLines().filter((l) => l.includes("AI VIDEO PIPELINE"));
+    const headerLines = getOutputLines().filter((l) =>
+      l.includes("AI VIDEO PIPELINE"),
+    );
     expect(headerLines.length).toBe(1);
   });
 
   it("updates phase for running node", () => {
-    formatter.setRunContext({ runId: "test-run", topic: "Test Topic", attempt: 1 });
+    formatter.setRunContext({
+      runId: "test-run",
+      topic: "Test Topic",
+      attempt: 1,
+    });
     formatter.nodeStart("Script", "generating script");
     formatter.nodePhase("Script", "revising script");
 

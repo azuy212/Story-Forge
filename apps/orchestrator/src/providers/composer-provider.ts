@@ -6,6 +6,11 @@ export interface ComposeSceneInput {
   durationSeconds: number;
 }
 
+export interface VideoSize {
+  width: number;
+  height: number;
+}
+
 export interface ComposeOptions {
   scenes: ComposeSceneInput[];
   narrationUrl: string;
@@ -22,6 +27,7 @@ export interface ComposeOptions {
     outroCta?: string;
     outroContainsCta?: boolean;
   };
+  video?: VideoSize;
   runId?: string;
 }
 

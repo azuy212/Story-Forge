@@ -1,9 +1,11 @@
+import { resolveVideoProfile } from "../utils/video-profile.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type {
   ProjectState,
   Diagnostics,
   Execution,
   Scene,
+  VideoProfileConfig,
 } from "../types/index.js";
 import type { Subtitles } from "../schemas/subtitles.js";
 import type { SceneAudio } from "../schemas/audio.js";
@@ -41,16 +43,39 @@ export class FallbackSceneSubtitleProvider implements SceneSubtitleProvider {
   async generateSceneSubtitles(
     scenes: Scene[],
     audioScenes: SceneAudio[],
+    profile?: VideoProfileConfig,
   ): Promise<GenerateSubtitlesResult> {
     try {
-      return await this.primary.generateSceneSubtitles(scenes, audioScenes);
+      return await this.primary.generateSceneSubtitles(
+        scenes,
+        audioScenes,
+        profile,
+      );
     } catch (err) {
       logger.warn(
         "WhisperX subtitle alignment failed; using deterministic subtitles",
         { error: (err as Error)?.message ?? String(err) },
       );
-      return this.fallback.generateSceneSubtitles(scenes, audioScenes);
+      return this.fallback.generateSceneSubtitles(scenes, audioScenes, profile);
     }
+  }
+}
+
+class ProfileAwareSceneSubtitleProvider implements SceneSubtitleProvider {
+  constructor(
+    private readonly inner: SceneSubtitleProvider,
+    private readonly videoProfile: VideoProfileConfig,
+  ) {}
+
+  async generateSceneSubtitles(
+    scenes: Scene[],
+    audioScenes: SceneAudio[],
+  ): Promise<GenerateSubtitlesResult> {
+    return this.inner.generateSceneSubtitles(
+      scenes,
+      audioScenes,
+      this.videoProfile,
+    );
   }
 }
 
@@ -61,6 +86,7 @@ const FALLBACK_REAL_PROVIDER = new FallbackSceneSubtitleProvider(
 
 function getSceneSubtitleProvider(
   config: RunnableConfig,
+  videoProfile: VideoProfileConfig,
 ): SceneSubtitleProvider {
   const inject = (config.configurable ?? {}) as Record<string, unknown>;
   if (inject.sceneSubtitleProvider) {
@@ -68,9 +94,10 @@ function getSceneSubtitleProvider(
   }
   // WhisperX provides real word-level alignment in real-provider mode; on
   // failure it falls back to deterministic scene-bounded timing.
-  return appConfig.useRealProviders()
+  const baseProvider = appConfig.useRealProviders()
     ? FALLBACK_REAL_PROVIDER
     : DEFAULT_PROVIDER;
+  return new ProfileAwareSceneSubtitleProvider(baseProvider, videoProfile);
 }
 
 export async function subtitleGeneratorNode(
@@ -152,7 +179,9 @@ export async function subtitleGeneratorNode(
     };
   }
 
-  const provider = getSceneSubtitleProvider(config);
+  const videoProfile: VideoProfileConfig =
+    state.videoProfile ?? resolveVideoProfile({});
+  const provider = getSceneSubtitleProvider(config, videoProfile);
   const providerName = provider.constructor.name;
 
   logger.nodePhase(label, "generating subtitles");
@@ -168,6 +197,7 @@ export async function subtitleGeneratorNode(
         audioUrl,
         sceneAudio: audioScenes,
         subtitleAlignmentVersion: SUBTITLE_ALIGNMENT_VERSION,
+        videoSize: videoProfile.videoSize,
       },
     },
     async () => {
@@ -175,6 +205,7 @@ export async function subtitleGeneratorNode(
         const providerResult = await provider.generateSceneSubtitles(
           scenes as Scene[],
           audioScenes as SceneAudio[],
+          videoProfile,
         );
         return {
           data: {

@@ -308,21 +308,23 @@ Examples:
 // Inline buildSummary to avoid test module resolution issues
 function buildSummary(data) {
   if (!data) return undefined;
-  
+
   const parts = [];
-  
+
   const scenes = data.production?.scenes?.length;
   if (scenes) parts.push(`${scenes} scenes`);
-  
+
   const duration = data.video?.durationSec;
   if (duration !== undefined) parts.push(`${duration.toFixed(1)}s`);
-  
+
   const sceneAssets = data.production?.scenes;
   if (sceneAssets) {
-    const assets = sceneAssets.filter((s) => s.generationStatus === "complete" && s.assetUrl).length;
+    const assets = sceneAssets.filter(
+      (s) => s.generationStatus === "complete" && s.assetUrl,
+    ).length;
     if (assets) parts.push(`${assets} assets`);
   }
-  
+
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
@@ -418,8 +420,13 @@ async function main() {
   }
 
   try {
-    const { lastEvent } = await resumeRun(ns, { pillar, topic }, { assistantId });
-    const status = lastEvent?.data?.execution?.status === "complete" ? "complete" : "failed";
+    const { lastEvent } = await resumeRun(
+      ns,
+      { pillar, topic },
+      { assistantId },
+    );
+    const status =
+      lastEvent?.data?.execution?.status === "complete" ? "complete" : "failed";
     const summary = buildSummary(lastEvent?.data);
     logger.finalize(status, summary);
   } catch (e) {

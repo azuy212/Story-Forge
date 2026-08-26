@@ -27,7 +27,10 @@ export const DEFAULT_ASS_STYLE: AssStyle = {
 };
 
 /** Map app config to an ASS style so subtitle appearance is configurable. */
-export function appAssStyle(): AssStyle {
+export function appAssStyle(overrides?: {
+  playResX?: number;
+  playResY?: number;
+}): AssStyle {
   return {
     fontName: config.subtitleFontName(),
     fontSize: config.subtitleFontSize(),
@@ -36,8 +39,8 @@ export function appAssStyle(): AssStyle {
     outlineColor: "&H00000000",
     outline: config.subtitleOutline(),
     marginV: config.subtitleMarginV(),
-    playResX: 1080,
-    playResY: 1920,
+    playResX: overrides?.playResX ?? 1080,
+    playResY: overrides?.playResY ?? 1920,
   };
 }
 

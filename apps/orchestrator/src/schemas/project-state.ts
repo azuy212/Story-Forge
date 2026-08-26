@@ -17,7 +17,12 @@ import { ThumbnailSchema } from "./thumbnail.js";
 import { PublishingSchema } from "./publishing.js";
 import { PublishReadyStatusSchema } from "./publish-ready.js";
 import { ResearchQAOutputSchema } from "./research-qa-output.js";
+import { VideoProfileConfigSchema } from "./video-profile.js";
 import { DEFAULT_BRANDING } from "../utils/branding.js";
+import { resolveVideoProfile } from "../utils/video-profile.js";
+
+const defaultVideoProfile = resolveVideoProfile({});
+
 export const ProjectStateSchema = z.object({
   project: ProjectSchema,
   content: ContentSchema.optional().default({}),
@@ -48,6 +53,8 @@ export const ProjectStateSchema = z.object({
   publishing: PublishingSchema.optional().default({}),
   publishReady: PublishReadyStatusSchema.optional().default({}),
   execution: ExecutionSchema,
+  videoProfile:
+    VideoProfileConfigSchema.optional().default(defaultVideoProfile),
 });
 
 export type ProjectState = z.input<typeof ProjectStateSchema>;

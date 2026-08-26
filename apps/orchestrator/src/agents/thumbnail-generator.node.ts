@@ -1,3 +1,7 @@
+import {
+  resolveVideoProfile,
+  canvasGuidanceFor,
+} from "../utils/video-profile.js";
 import fs from "node:fs";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type {
@@ -6,6 +10,7 @@ import type {
   Execution,
   Thumbnail,
   ThumbnailImageOutput,
+  VideoProfileConfig,
 } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject, type AgentResult } from "./run-agent.js";
@@ -23,19 +28,15 @@ import { nodeLabel } from "../utils/node-labels.js";
 import { getArtifactNamespace, withTopic } from "../artifacts/context.js";
 import { config as envConfig } from "../utils/config.js";
 import { getErrorMessage } from "../utils/errors.js";
-import type {
-  ThumbnailCompositor,
-  ThumbnailTextPosition,
-} from "../providers/thumbnail-compositor.js";
+import type { ThumbnailTextPosition } from "../providers/thumbnail-compositor.js";
 import {
-  createDefaultThumbnailCompositor,
   normalizeTextPosition,
+  FfmpegThumbnailCompositor,
 } from "../providers/thumbnail-compositor.js";
 import { runThumbnailQa, type ThumbnailQaResult } from "./thumbnail-qa.node.js";
 import type { ThumbnailFallbackReason } from "../schemas/thumbnail-qa.js";
 
 const DEFAULT_PROVIDER = createDefaultAssetProvider();
-const DEFAULT_COMPOSITOR = createDefaultThumbnailCompositor();
 
 const TEXT_POSITION_HINT: Record<ThumbnailTextPosition, string> = {
   "bottom-third": "bottom third of the frame",
@@ -61,7 +62,12 @@ export function buildGenerationPrompt(
   thumbnailText: string,
   textPosition: ThumbnailTextPosition,
   mode: ThumbnailRenderMode,
+  videoProfile: VideoProfileConfig,
 ): string {
+  const { width, height } = videoProfile.thumbnailSize;
+  const aspectGuidance = canvasGuidanceFor(videoProfile);
+  const aspectLabel = aspectGuidance.aspectLabel;
+
   if (mode === "full") {
     return [
       thumbnailPrompt,
@@ -74,14 +80,14 @@ export function buildGenerationPrompt(
       "- Choose the title placement based on the composition; do NOT reserve a fixed bottom strip that would weaken the focal subject.",
       "- The subject and the title must not overlap in an awkward way, but both share the frame as one composition.",
       "- Keep the focal subject and the title away from the extreme edges.",
-      "- Output a vertical 9:16 image at 1080x1920 pixels.",
+      `- Output a ${aspectLabel} image at ${width}x${height} pixels.`,
     ].join("\n");
   }
   return [
     thumbnailPrompt,
     "",
     "PIPELINE OVERLAY NOTE (authoritative, follow exactly):",
-    "- Output a vertical 9:16 image at 1080x1920 pixels.",
+    `- Output a ${aspectLabel} image at ${width}x${height} pixels.`,
     "- Do NOT render any text, letters, words, numbers, or typography anywhere in the image.",
     `- The overlay text "${thumbnailText}" will be added by the pipeline after generation; do not draw it.`,
     `- Keep the ${TEXT_POSITION_HINT[textPosition]} visually clean (plain background, no subject, no clutter) to make room for that overlay.`,
@@ -89,8 +95,12 @@ export function buildGenerationPrompt(
   ].join("\n");
 }
 
-export function isUsableThumbnailImage(data: ThumbnailImageOutput): boolean {
-  if (!data.imageUrl || data.width !== 1080 || data.height !== 1920) {
+export function isUsableThumbnailImage(
+  data: ThumbnailImageOutput,
+  videoProfile: VideoProfileConfig,
+): boolean {
+  const { width, height } = videoProfile.thumbnailSize;
+  if (!data.imageUrl || data.width !== width || data.height !== height) {
     return false;
   }
 
@@ -105,13 +115,6 @@ function getAssetProvider(config: RunnableConfig): AssetProvider {
   return (inject.assetProvider as AssetProvider) ?? DEFAULT_PROVIDER;
 }
 
-function getThumbnailCompositor(config: RunnableConfig): ThumbnailCompositor {
-  const inject = (config.configurable ?? {}) as Record<string, unknown>;
-  return (
-    (inject.thumbnailCompositor as ThumbnailCompositor) ?? DEFAULT_COMPOSITOR
-  );
-}
-
 function getThumbnailQa(
   config: RunnableConfig,
 ): (imagePath: string, thumbnailText: string) => Promise<ThumbnailQaResult> {
@@ -124,6 +127,23 @@ function getThumbnailQa(
     ((imagePath, thumbnailText) =>
       runThumbnailQa(imagePath, thumbnailText, config))
   );
+}
+
+function getThumbnailCompositor(
+  config: RunnableConfig,
+  videoProfile: VideoProfileConfig,
+): FfmpegThumbnailCompositor {
+  const inject = (config.configurable ?? {}) as Record<string, unknown>;
+  const override = inject.thumbnailCompositor as
+    | FfmpegThumbnailCompositor
+    | undefined;
+  if (override) return override;
+  const { width, height } = videoProfile.thumbnailSize;
+  return new FfmpegThumbnailCompositor({
+    fontPath: envConfig.subtitleFontPath(),
+    width: width as number,
+    height: height as number,
+  });
 }
 
 /**
@@ -154,11 +174,14 @@ export async function thumbnailGeneratorNode(
     };
   }
 
+  const videoProfile: VideoProfileConfig =
+    state.videoProfile ?? resolveVideoProfile({});
   const hook = state.content?.hook ?? "";
   const narration = state.content?.narration ?? "";
   const channel = state.branding?.channel ?? "";
   const style = state.branding?.style ?? "";
   const colorPalette = state.branding?.colorPalette ?? "";
+  const canvasGuidance = canvasGuidanceFor(videoProfile);
 
   const label = nodeLabel(AgentModel.ThumbnailGenerator);
 
@@ -188,6 +211,14 @@ export async function thumbnailGeneratorNode(
       channel,
       style,
       colorPalette,
+      formatLabel: canvasGuidance.formatLabel,
+      aspectGuidance: canvasGuidance.aspectGuidance,
+      aspectLabel: canvasGuidance.aspectLabel,
+      aspectRatio: videoProfile.aspectRatio,
+      otherAspectRatio:
+        videoProfile.aspectRatio === "16:9" ? "9:16" : "16:9",
+      thumbnailWidth: String(videoProfile.thumbnailSize.width),
+      thumbnailHeight: String(videoProfile.thumbnailSize.height),
     },
     inject,
     configurable: withTopic(config, state).configurable,
@@ -230,7 +261,8 @@ export async function thumbnailGeneratorNode(
 
   logger.nodePhase(label, "generating thumbnail image");
   const provider = getAssetProvider(config);
-  const compositor = getThumbnailCompositor(config);
+  const { width: thumbWidth, height: thumbHeight } = videoProfile.thumbnailSize;
+  const compositor = getThumbnailCompositor(config, videoProfile);
   const runId = getArtifactNamespace(config, state);
   const colorScheme = output.colorScheme;
   const mode = envConfig.thumbnailMode();
@@ -248,6 +280,7 @@ export async function thumbnailGeneratorNode(
       thumbnailText,
       textPosition,
       renderMode,
+      videoProfile,
     );
 
     try {
@@ -268,9 +301,12 @@ export async function thumbnailGeneratorNode(
         filename: "thumbnail-composited.png",
       });
 
-      if (composited.width !== 1080 || composited.height !== 1920) {
+      if (
+        composited.width !== thumbWidth ||
+        composited.height !== thumbHeight
+      ) {
         throw new Error(
-          `Thumbnail compositor returned ${composited.width}x${composited.height}; expected 1080x1920`,
+          `Thumbnail compositor returned ${composited.width}x${composited.height}; expected ${thumbWidth}x${thumbHeight}`,
         );
       }
 
@@ -308,7 +344,12 @@ export async function thumbnailGeneratorNode(
       thumbnailText,
       textPosition,
       renderMode,
+      videoProfile,
     );
+
+    const validateThumbnail = (data: ThumbnailImageOutput): boolean => {
+      return isUsableThumbnailImage(data, videoProfile);
+    };
 
     return cacheNodeResult<ThumbnailImageOutput>(
       {
@@ -322,7 +363,9 @@ export async function thumbnailGeneratorNode(
           compositor: compositor.fingerprint(),
           provider: provider.constructor.name,
         },
-        validate: isUsableThumbnailImage,
+        validate: validateThumbnail as (
+          artifact: ThumbnailImageOutput,
+        ) => boolean,
       },
       async () => generateThumbnail(renderMode),
       withTopic(config, state),
@@ -361,6 +404,7 @@ export async function thumbnailGeneratorNode(
     thumbnailText,
     textPosition,
     "full",
+    videoProfile,
   );
 
   // Full mode always requires QA. Auto mode respects THUMBNAIL_QA.
@@ -397,6 +441,10 @@ export async function thumbnailGeneratorNode(
   // model) on a prior run, so generation and QA can be skipped entirely.
   // Fresh renders are saved "pending" and only completed once QA passes, so a
   // QA-failed thumbnail is never servable from cache.
+  const validateThumbnail = (data: ThumbnailImageOutput): boolean => {
+    return isUsableThumbnailImage(data, videoProfile);
+  };
+
   const cached = await cacheNodeResult<ThumbnailImageOutput>(
     {
       type: "thumbnailImage",
@@ -412,7 +460,7 @@ export async function thumbnailGeneratorNode(
         compositor: compositor.fingerprint(),
         provider: provider.constructor.name,
       },
-      validate: isUsableThumbnailImage,
+      validate: validateThumbnail,
     },
     async () => generateThumbnail("full"),
     withTopic(config, state),

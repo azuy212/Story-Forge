@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { VideoProfileConfig } from "./video-profile.js";
 import {
   SceneTypeEnum,
   CameraShotEnum,
@@ -67,20 +68,25 @@ const ScenePlanSchema = z.object({
   references: z.array(z.string()).optional(),
 });
 
-// Timing fields (startSecond/endSecond/durationSeconds) are intentionally NOT
-// part of the LLM contract: scene timestamps are derived deterministically in
-// code from narration word counts, and the composer rescales to the real
-// narration audio duration anyway. Requiring the LLM to compute exact
-// timestamps was pure arithmetic + a rejection source.
-export const VisualDirectorOutputSchema = z.object({
-  scenes: z
+function buildScenesSchema(profile?: VideoProfileConfig) {
+  const minScenes = profile?.profile === "long" ? 25 : 4;
+  const maxScenes = profile?.profile === "long" ? 45 : 12;
+  return z
     .array(ScenePlanSchema)
-    .min(4, "must have at least 4 scenes")
-    .max(12, "must have at most 12 scenes"),
-  visualPlans: z
-    .array(VisualPlanEntrySchema)
-    .min(1, "must have at least one visual plan entry"),
-});
+    .min(minScenes, `must have at least ${minScenes} scenes`)
+    .max(maxScenes, `must have at most ${maxScenes} scenes`);
+}
+
+export function visualDirectorOutputSchema(profile?: VideoProfileConfig) {
+  return z.object({
+    scenes: buildScenesSchema(profile),
+    visualPlans: z
+      .array(VisualPlanEntrySchema)
+      .min(1, "must have at least one visual plan entry"),
+  });
+}
+
+export const VisualDirectorOutputSchema = visualDirectorOutputSchema();
 
 export type VisualDirectorOutput = z.output<typeof VisualDirectorOutputSchema>;
 export type VisualPlanEntry = z.input<typeof VisualPlanEntrySchema>;

@@ -26,7 +26,9 @@ export function buildSummary(data: RunData | undefined): string | undefined {
   // Asset count - use generationStatus to determine complete assets
   const sceneAssets = data.production?.scenes;
   if (sceneAssets) {
-    const assets = sceneAssets.filter((s) => s.generationStatus === "complete" && s.assetUrl).length;
+    const assets = sceneAssets.filter(
+      (s) => s.generationStatus === "complete" && s.assetUrl,
+    ).length;
     if (assets) parts.push(`${assets} assets`);
   }
 

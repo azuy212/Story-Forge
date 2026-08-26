@@ -1,4 +1,4 @@
-import type { Scene, SceneAudio } from "../types/index.js";
+import type { Scene, SceneAudio, VideoProfileConfig } from "../types/index.js";
 import type { SceneSubtitleProvider } from "./scene-subtitle-provider.js";
 import type { WhisperXProvider } from "./whisperx-provider.js";
 import type {
@@ -23,6 +23,7 @@ export class WhisperXSceneSubtitleProvider implements SceneSubtitleProvider {
   async generateSceneSubtitles(
     scenes: Scene[],
     audioScenes: SceneAudio[],
+    profile?: VideoProfileConfig,
   ): Promise<GenerateSubtitlesResult> {
     const sceneById = new Map(scenes.map((scene) => [scene.sceneId, scene]));
     const orderedAudio = [...audioScenes].sort((a, b) => a.sceneId - b.sceneId);
@@ -69,7 +70,13 @@ export class WhisperXSceneSubtitleProvider implements SceneSubtitleProvider {
       )
       .join("\n\n");
 
-    const ass = buildKaraokeAss(groups, appAssStyle());
+    const ass = buildKaraokeAss(
+      groups,
+      appAssStyle({
+        playResX: profile?.videoSize.width,
+        playResY: profile?.videoSize.height,
+      }),
+    );
 
     return { srt, ass, wordTimestamps };
   }

@@ -1,5 +1,6 @@
 import { StateGraph } from "@langchain/langgraph";
 import { StateAnnotation } from "./state.js";
+import { resolveProfileNode } from "../agents/resolve-profile.node.js";
 import { researchAgentNode } from "../agents/research-agent.node.js";
 import { researchQANode } from "../agents/research-qa.node.js";
 import { scriptPlannerNode } from "../agents/script-planner.node.js";
@@ -334,6 +335,7 @@ const repairRouter = (state: typeof StateAnnotation.State) => {
 };
 
 const builder = new StateGraph(StateAnnotation)
+  .addNode("ResolveProfile", resolveProfileNode)
   .addNode("ResearchAgent", researchAgentNode)
   .addNode("ResearchQA", researchQANode)
   .addNode("ScriptPlanner", scriptPlannerNode)
@@ -358,7 +360,8 @@ const builder = new StateGraph(StateAnnotation)
   .addNode(FINALIZE, finalizeNode);
 
 builder
-  .addEdge("__start__", "ResearchAgent")
+  .addEdge("__start__", "ResolveProfile")
+  .addEdge("ResolveProfile", "ResearchAgent")
   .addConditionalEdges("ResearchAgent", guard(hasResearch, "ResearchQA"))
   .addConditionalEdges("ResearchQA", researchRouter)
   .addConditionalEdges("ScriptPlanner", guard(hasStoryPlan, "ScriptWriter"))
@@ -375,10 +378,7 @@ builder
 // the output the next node needs.
 builder
   .addConditionalEdges("MetadataGenerator", guard(hasMetadata, "BranchJoin"))
-  .addConditionalEdges(
-    "ThumbnailGenerator",
-    guard(hasThumbnail, "BranchJoin"),
-  )
+  .addConditionalEdges("ThumbnailGenerator", guard(hasThumbnail, "BranchJoin"))
   .addConditionalEdges("BranchJoin", branchJoinRouter)
   .addConditionalEdges("VisualDirector", visualDirectorRouter)
   .addConditionalEdges(

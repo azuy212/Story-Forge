@@ -1,9 +1,17 @@
+import {
+  resolveVideoProfile,
+  checkNarrationDuration,
+  canvasGuidanceFor,
+  wordRangeFor,
+  speakingRateWps,
+} from "../utils/video-profile.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type {
   ProjectState,
   Diagnostics,
   Execution,
   ScriptQAOutput,
+  VideoProfileConfig,
 } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
@@ -72,6 +80,8 @@ export async function scriptQANode(
   const { script, narration, callToAction, estimatedDurationSeconds } =
     state.content ?? {};
   const research = state.research;
+  const videoProfile: VideoProfileConfig =
+    state.videoProfile ?? resolveVideoProfile({});
   const inject = (config.configurable ?? {}) as AgentInject;
 
   const retryCount = (state.execution?.retryCount?.ScriptQA ?? 0) + 1;
@@ -110,6 +120,26 @@ export async function scriptQANode(
     };
   }
 
+  // Deterministic duration/word-count gate (only when explicit profile/target requested)
+  if (videoProfile.explicit) {
+    const durationIssues = checkNarrationDuration(
+      videoProfile,
+      narration,
+      estimatedDurationSeconds ?? videoProfile.targetDurationSec,
+    );
+    if (durationIssues.length > 0) {
+      return {
+        scriptQA: {
+          status: "minor_revision",
+          feedback: `Script QA: duration/word-count mismatch.\n${durationIssues.join("\n")}`,
+          issues: durationIssues,
+        },
+        diagnostics: {},
+        execution: execution(AgentModel.ScriptQA),
+      };
+    }
+  }
+
   if (!configUtils.enableScriptQA()) {
     return {
       scriptQA: { status: "approved" } as ScriptQAOutput,
@@ -117,6 +147,10 @@ export async function scriptQANode(
       execution: {},
     };
   }
+
+  const canvasGuidance = canvasGuidanceFor(videoProfile);
+  const wordRange = wordRangeFor(videoProfile);
+  const speakingRate = speakingRateWps(videoProfile);
 
   const label = nodeLabel(AgentModel.ScriptQA);
   logger.nodeStart(label);
@@ -130,10 +164,16 @@ export async function scriptQANode(
       script: script ?? "",
       narration: narration ?? "",
       cta: callToAction ?? "",
-      estimatedDurationSeconds: String(estimatedDurationSeconds ?? 50),
+      estimatedDurationSeconds: String(
+        estimatedDurationSeconds ?? videoProfile.targetDurationSec,
+      ),
+      targetDurationSeconds: String(videoProfile.targetDurationSec),
+      targetWordRange: `${wordRange.min}-${wordRange.max}`,
+      speakingRateWps: String(speakingRate),
       researchFacts: serializeFacts(research?.facts),
       storyBeats: serializeBeats(state.storyPlan?.storyBeats),
       complexityReport: complexityFeedback,
+      canvasGuidance: canvasGuidance.formatGuidance,
     },
     inject,
     configurable: withTopic(config, state).configurable,
