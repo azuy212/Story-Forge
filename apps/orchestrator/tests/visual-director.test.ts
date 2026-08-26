@@ -1,6 +1,7 @@
 import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 import { visualDirectorNode } from "../src/agents/visual-director.node.js";
-import type { ProjectState } from "../src/types/index.js";
+import type { ProjectState, VideoProfileConfig } from "../src/types/index.js";
+import { resolveVideoProfile } from "../src/utils/video-profile.js";
 
 const mockGenerate = jest.fn<(...args: any[]) => Promise<any>>();
 
@@ -68,6 +69,7 @@ function makeMocks() {
 
 function runNode(state?: Partial<ProjectState>) {
   const mocks = makeMocks();
+  const shortProfile: VideoProfileConfig = resolveVideoProfile({ videoProfile: "short" });
   const promise = visualDirectorNode(
     {
       project: { pillar: "Geography", topic: "Test" },
@@ -79,6 +81,7 @@ function runNode(state?: Partial<ProjectState>) {
       research: { summary: "Summary.", facts: FACTS },
       branding: { channel: "C", creator: "", cta: "" },
       execution: { version: "0.1.0" },
+      videoProfile: shortProfile,
       ...state,
     } as ProjectState,
     { configurable: mocks } as any,

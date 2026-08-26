@@ -23,7 +23,7 @@ const MOCK_PROMPT = [
   "Thumbnail Dimensions: {{thumbnailWidth}}×{{thumbnailHeight}}",
 ].join("\n");
 
-const DEFAULT_VIDEO_PROFILE = resolveVideoProfile({});
+const DEFAULT_VIDEO_PROFILE = resolveVideoProfile({ videoProfile: "short" });
 
 function makeMocks() {
   const createModel = jest.fn<
@@ -78,7 +78,7 @@ function runNode(
         colorPalette: "Cold blue",
       },
       execution: { version: "0.1.0" },
-      videoProfile: resolveVideoProfile({}),
+      videoProfile: DEFAULT_VIDEO_PROFILE,
       ...state,
     } as ProjectState,
     {
@@ -219,7 +219,7 @@ describe("thumbnailGeneratorNode", () => {
           compositorVersion: "1.0.0",
           mode: "overlay",
         },
-        resolveVideoProfile({}),
+        DEFAULT_VIDEO_PROFILE,
       ),
     ).toBe(true);
   });

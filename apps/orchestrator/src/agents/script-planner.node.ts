@@ -87,6 +87,7 @@ export async function scriptPlannerNode(
 }> {
   const { pillar, topic } = state.project;
   const research = state.research;
+  const channel = state.branding?.channel;
   const videoProfile: VideoProfileConfig =
     state.videoProfile ?? resolveVideoProfile({});
   const inject = (config.configurable ?? {}) as AgentInject;
@@ -124,7 +125,9 @@ export async function scriptPlannerNode(
       topic: topic ?? "",
       researchSummary: research.summary ?? "",
       approvedFacts: formatFacts(research.facts),
+      channel: channel ?? "",
       estimatedDurationSeconds: String(targetDurationSec),
+      targetDurationSeconds: String(targetDurationSec),
       formatLabel,
       canvasGuidance: canvasGuidance.canvasGuidance,
       targetWordRange: `${wordRange.min}-${wordRange.max}`,

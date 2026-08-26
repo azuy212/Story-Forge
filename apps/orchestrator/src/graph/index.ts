@@ -215,6 +215,11 @@ const visualDirectorRouter = (state: typeof StateAnnotation.State) => {
     qaAttempts: 0,
     infraMax: PROMPT_QA_MAX_RETRIES,
   });
+  // If budget exhausted but no valid scenes, do NOT continue — fail the run.
+  // "Accepting best available result" only applies when there IS a valid result.
+  if (decision.action === "continue" && !hasScenes(state)) {
+    return FINALIZE;
+  }
   if (decision.action === "revise") return "VisualDirector";
   return FINALIZE;
 };

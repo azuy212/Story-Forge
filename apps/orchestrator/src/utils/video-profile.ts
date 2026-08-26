@@ -54,17 +54,18 @@ export function resolveVideoProfile(
   const profile = request.videoProfile ?? envVideoProfile() ?? "short";
   const base = { ...DEFAULT_PROFILES[profile] };
 
-  const targetDurationSec =
-    request.targetDurationSec ??
-    envTargetDurationSec() ??
-    base.targetDurationSec;
-  const durationToleranceSec =
-    envDurationToleranceSec() ?? base.durationToleranceSec;
-  const wordsPerMinute =
-    options.wordsPerMinute ??
-    envWordsPerMinute() ??
-    wordsPerMinuteDefault() ??
-    base.wordsPerMinute;
+  // When explicit profile/target is requested, use profile defaults for all
+  // other settings. Env vars only apply as global defaults when nothing is
+  // explicitly requested.
+  const targetDurationSec = explicit
+    ? request.targetDurationSec ?? base.targetDurationSec
+    : request.targetDurationSec ?? envTargetDurationSec() ?? base.targetDurationSec;
+  const durationToleranceSec = explicit
+    ? base.durationToleranceSec
+    : envDurationToleranceSec() ?? base.durationToleranceSec;
+  const wordsPerMinute = explicit
+    ? options.wordsPerMinute ?? wordsPerMinuteDefault() ?? base.wordsPerMinute
+    : options.wordsPerMinute ?? envWordsPerMinute() ?? wordsPerMinuteDefault() ?? base.wordsPerMinute;
 
   const aspectRatio = base.aspectRatio;
   const videoSize = base.videoSize;

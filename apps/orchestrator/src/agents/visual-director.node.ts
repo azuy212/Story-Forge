@@ -379,6 +379,14 @@ export async function visualDirectorNode(
   const speakingRate = speakingRateWps(videoProfile);
   const sceneCountRange = `${videoProfile.sceneDensity.min}-${videoProfile.sceneDensity.max}`;
 
+  // Target scene count: aim for middle of density range, capped at max
+  const targetSceneCount = Math.min(
+    Math.round((videoProfile.sceneDensity.min + videoProfile.sceneDensity.max) / 2),
+    videoProfile.sceneDensity.max - 1
+  );
+  // Hard maximum from schema
+  const maxSceneCount = videoProfile.sceneDensity.max;
+
   const label = nodeLabel(AgentModel.VisualDirector);
   logger.nodeStart(label);
   logger.nodePhase(label, "planning visual direction");
@@ -404,6 +412,8 @@ export async function visualDirectorNode(
       targetDurationSeconds: String(targetDurationSec),
       speakingRateWps: String(speakingRate),
       sceneCountRange,
+      targetSceneCount: String(targetSceneCount),
+      maxSceneCount: String(maxSceneCount),
     },
     inject,
     configurable: withTopic(config, state).configurable,

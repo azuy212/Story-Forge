@@ -476,6 +476,10 @@ const COMPOSER_PROVIDER = {
 };
 
 beforeEach(() => {
+  delete process.env.VIDEO_PROFILE;
+  delete process.env.TARGET_DURATION_SEC;
+  delete process.env.DURATION_TOLERANCE_SEC;
+  delete process.env.WORDS_PER_MINUTE;
   mockGenerate.mockReset();
 });
 
