@@ -367,15 +367,20 @@ export class FfmpegComposerProvider implements ComposerProvider {
     }
 
     if (opts.branding?.enabled) {
-      if (!opts.branding.outroAsset) {
-        errors.push("Branding is enabled but branding.outroAsset is missing");
-      } else {
+      if (!opts.branding.outroAsset && !opts.branding.outroLongAsset) {
+        errors.push(
+          "Branding is enabled but branding.outroAsset (or outroLongAsset) is missing",
+        );
+      }
+      const assetsToProbe = [
+        opts.branding.outroAsset,
+        opts.branding.outroLongAsset,
+      ].filter((a): a is string => Boolean(a));
+      for (const asset of assetsToProbe) {
         fileChecks.push(
           (async () => {
             try {
-              const outroPath = resolveBrandingAssetPath(
-                opts.branding!.outroAsset!,
-              );
+              const outroPath = resolveBrandingAssetPath(asset);
               const outroInfo = await probe(outroPath);
               if (!outroInfo.hasVideo || outroInfo.duration <= 0) {
                 errors.push(`Branding outro has no usable video: ${outroPath}`);

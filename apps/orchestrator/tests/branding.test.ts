@@ -3,6 +3,7 @@ import {
   DEFAULT_BRANDING,
   resolveBranding,
   resolveBrandingAssetPath,
+  selectOutroAssetForProfile,
 } from "../src/utils/branding.js";
 
 describe("branding configuration", () => {
@@ -14,6 +15,7 @@ describe("branding configuration", () => {
     expect(branding.creator).toBe("Ali Zain");
     expect(branding.enabled).toBe(true);
     expect(branding.outroAsset).toBe("assets/branding/outro.mp4");
+    expect(branding.outroLongAsset).toBe("assets/branding/outro-long.mp4");
     expect(branding.ctaEnabled).toBe(true);
     expect(branding.outroContainsCta).toBe(false);
   });
@@ -46,5 +48,36 @@ describe("branding configuration", () => {
     expect(() =>
       resolveBrandingAssetPath("/Users/developer/outro.mp4"),
     ).toThrow("relative repository path");
+  });
+
+  it("accepts a custom long-form outro path", () => {
+    const branding = resolveBranding({
+      outroLongAsset: "assets/custom/outro-long.mp4",
+    });
+    expect(branding.outroLongAsset).toBe("assets/custom/outro-long.mp4");
+  });
+});
+
+describe("selectOutroAssetForProfile", () => {
+  it("returns the long-form outro for long profile", () => {
+    const branding = resolveBranding();
+    expect(selectOutroAssetForProfile(branding, "long")).toBe(
+      "assets/branding/outro-long.mp4",
+    );
+  });
+
+  it("returns the short outro for short profile", () => {
+    const branding = resolveBranding();
+    expect(selectOutroAssetForProfile(branding, "short")).toBe(
+      "assets/branding/outro.mp4",
+    );
+  });
+
+  it("falls back to short outro when long asset is unset", () => {
+    const branding = resolveBranding({ outroLongAsset: undefined });
+    branding.outroLongAsset = "";
+    expect(selectOutroAssetForProfile(branding, "long")).toBe(
+      "assets/branding/outro.mp4",
+    );
   });
 });

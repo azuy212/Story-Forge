@@ -5,6 +5,7 @@ import {
   alignSceneDurationsToAudio,
 } from "../src/agents/video-composer.node.js";
 import type { ProjectState } from "../src/types/index.js";
+import { resolveVideoProfile } from "../src/utils/video-profile.js";
 import type {
   ComposerProvider,
   ComposeOptions,
@@ -243,6 +244,9 @@ describe("videoComposerNode", () => {
       expect(opts.narrativeHoldSeconds).toBe(0.5);
       expect(opts.branding.channel).toBe("TestChannel");
       expect(opts.branding.outroAsset).toBe("assets/branding/outro.mp4");
+      expect(opts.branding.outroLongAsset).toBe(
+        "assets/branding/outro-long.mp4",
+      );
       expect(opts.branding.ctaEnabled).toBe(true);
       expect(opts.branding.outroContainsCta).toBe(false);
       return DEFAULT_RESULT;
@@ -250,6 +254,31 @@ describe("videoComposerNode", () => {
 
     await runNode();
     expect(mockCompose).toHaveBeenCalledTimes(1);
+  });
+
+  it("selects long-form outro when videoProfile is long", async () => {
+    mockCompose.mockResolvedValue(DEFAULT_RESULT);
+
+    await runNode({
+      videoProfile: resolveVideoProfile({ videoProfile: "long" }),
+    });
+
+    const opts = mockCompose.mock.calls[0][0] as ComposeOptions;
+    expect(opts.branding.outroAsset).toBe("assets/branding/outro-long.mp4");
+    expect(opts.branding.outroLongAsset).toBe("assets/branding/outro-long.mp4");
+    expect(opts.video).toEqual({ width: 1920, height: 1080 });
+  });
+
+  it("keeps short outro when videoProfile is short", async () => {
+    mockCompose.mockResolvedValue(DEFAULT_RESULT);
+
+    await runNode({
+      videoProfile: resolveVideoProfile({ videoProfile: "short" }),
+    });
+
+    const opts = mockCompose.mock.calls[0][0] as ComposeOptions;
+    expect(opts.branding.outroAsset).toBe("assets/branding/outro.mp4");
+    expect(opts.video).toEqual({ width: 1080, height: 1920 });
   });
 
   it("passes branding disabled through to composer", async () => {

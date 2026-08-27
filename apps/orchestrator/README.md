@@ -93,6 +93,7 @@ Given input `{ pillar: "Geography", topic: "Unrecognized Countries" }`, the pipe
 | `branding.cta`          | no       | string   | `"Follow for more mysteries of the universe."` | Deterministic CTA configuration |
 | `branding.enabled`      | no       | boolean  | `true`                                         | Enable canonical outro          |
 | `branding.outroAsset`   | no       | string   | `"assets/branding/outro.mp4"`                  | Relative repository asset path  |
+| `branding.outroLongAsset` | no     | string   | `"assets/branding/outro-long.mp4"`             | Outro used for long-form (16:9) videos; falls back to `outroAsset` when unset |
 | `branding.ctaEnabled`   | no       | boolean  | `true`                                         | Render CTA when outro lacks one |
 | `branding.style`        | no       | string   | `"Documentary"`                                | Visual style guide              |
 | `branding.colorPalette` | no       | string   | `"Cold blue"`                                  | Color theme                     |

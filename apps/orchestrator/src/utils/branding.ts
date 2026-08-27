@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { Branding } from "../types/index.js";
+import type { Branding, VideoProfile } from "../types/index.js";
 
 const FALLBACK_BRANDING = {
   channel: "Universe Decoded by Zain",
@@ -9,6 +9,7 @@ const FALLBACK_BRANDING = {
   handle: "@UniverseDecodedByZain",
   enabled: true,
   outroAsset: "assets/branding/outro.mp4",
+  outroLongAsset: "assets/branding/outro-long.mp4",
   ctaEnabled: true,
   outroCta: "Follow for more mysteries of the universe.",
   outroContainsCta: false,
@@ -49,6 +50,7 @@ export type ResolvedBranding = Branding &
       | "handle"
       | "enabled"
       | "outroAsset"
+      | "outroLongAsset"
       | "ctaEnabled"
       | "outroCta"
       | "outroContainsCta"
@@ -73,10 +75,27 @@ export function resolveBranding(
     handle: branding?.handle ?? DEFAULT_BRANDING.handle,
     enabled: branding?.enabled ?? DEFAULT_BRANDING.enabled,
     outroAsset: branding?.outroAsset ?? DEFAULT_BRANDING.outroAsset,
+    outroLongAsset: branding?.outroLongAsset ?? DEFAULT_BRANDING.outroLongAsset,
     ctaEnabled: branding?.ctaEnabled ?? DEFAULT_BRANDING.ctaEnabled,
     outroCta: configuredCta,
     outroContainsCta,
   };
+}
+
+/**
+ * Pick the outro asset path appropriate for the given video profile. Long-form
+ * (16:9) videos get the dedicated outro when one is configured; everything else
+ * uses the short outro. Falls back to the short asset when the long variant is
+ * unset so partial config never breaks compilation.
+ */
+export function selectOutroAssetForProfile(
+  branding: Pick<ResolvedBranding, "outroAsset" | "outroLongAsset">,
+  profile: VideoProfile,
+): string {
+  if (profile === "long" && branding.outroLongAsset) {
+    return branding.outroLongAsset;
+  }
+  return branding.outroAsset;
 }
 
 /**

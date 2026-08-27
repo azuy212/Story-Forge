@@ -21,6 +21,7 @@ import { getArtifactNamespace, withTopic } from "../artifacts/context.js";
 import {
   resolveBranding,
   resolveBrandingAssetPath,
+  selectOutroAssetForProfile,
   type ResolvedBranding,
 } from "../utils/branding.js";
 import { config as appConfig } from "../utils/config.js";
@@ -48,6 +49,20 @@ async function brandingAssetFingerprint(
     return `${assetPath}:${stat.size}:${stat.mtimeMs}`;
   } catch {
     return `${branding.outroAsset}:missing`;
+  }
+}
+
+async function brandingLongAssetFingerprint(
+  branding: ResolvedBranding,
+): Promise<string> {
+  if (!branding.enabled || !branding.outroLongAsset) return "disabled";
+
+  try {
+    const assetPath = resolveBrandingAssetPath(branding.outroLongAsset);
+    const stat = await fs.stat(assetPath);
+    return `${assetPath}:${stat.size}:${stat.mtimeMs}`;
+  } catch {
+    return `${branding.outroLongAsset}:missing`;
   }
 }
 
@@ -249,6 +264,9 @@ export async function videoComposerNode(
   const branding = resolveBranding(state.branding);
   const narrativeHoldSeconds = appConfig.narrativeHoldSeconds();
   const outroAssetFingerprint = await brandingAssetFingerprint(branding);
+  const outroLongAssetFingerprint =
+    await brandingLongAssetFingerprint(branding);
+  const outroAsset = selectOutroAssetForProfile(branding, videoProfile.profile);
 
   const provider = getComposerProvider(config);
 
@@ -274,6 +292,7 @@ export async function videoComposerNode(
         branding: {
           ...branding,
           outroAssetFingerprint,
+          outroLongAssetFingerprint,
         },
       },
     },
@@ -290,7 +309,8 @@ export async function videoComposerNode(
             channel: branding.channel,
             logo: state.branding?.logo,
             enabled: branding.enabled,
-            outroAsset: branding.outroAsset,
+            outroAsset,
+            outroLongAsset: branding.outroLongAsset,
             ctaEnabled: branding.ctaEnabled,
             outroCta: branding.outroCta,
             outroContainsCta: branding.outroContainsCta,

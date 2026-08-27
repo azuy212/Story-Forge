@@ -23,6 +23,7 @@ export interface ComposeOptions {
     logo?: string;
     enabled?: boolean;
     outroAsset?: string;
+    outroLongAsset?: string;
     ctaEnabled?: boolean;
     outroCta?: string;
     outroContainsCta?: boolean;
