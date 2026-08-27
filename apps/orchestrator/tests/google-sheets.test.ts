@@ -9,6 +9,7 @@ import {
   buildSheetRow,
   formatDurationMs,
   formatLocalTimestamp,
+  nextLongPublishSlot,
   EXPECTED_HEADERS,
 } from "../src/integrations/google-sheets/sheets-format.mjs";
 
@@ -463,5 +464,82 @@ describe("syncPublishResults", () => {
     } finally {
       process.env.GOOGLE_SHEETS_SPREADSHEET_ID = previous;
     }
+  });
+
+  it("routes to the long video sheet when videoProfile is long", async () => {
+    const previousLong = process.env.GOOGLE_SHEETS_SHEET_NAME_LONG;
+    process.env.GOOGLE_SHEETS_SHEET_NAME_LONG = "Long Videos";
+    const api = makeMutableApi();
+    try {
+      await syncPublishResults({
+        state: {
+          ...baseState(),
+          videoProfile: { profile: "long" },
+        },
+        results: [pubResult("published", "yt-1", "2026-08-20T12:00:00.000Z")],
+        publishAt: "2026-08-20T12:00:00.000Z",
+        api: api as any,
+      });
+      expect(api.append).toHaveBeenCalledTimes(1);
+    } finally {
+      if (previousLong === undefined) {
+        delete process.env.GOOGLE_SHEETS_SHEET_NAME_LONG;
+      } else {
+        process.env.GOOGLE_SHEETS_SHEET_NAME_LONG = previousLong;
+      }
+    }
+  });
+});
+
+describe("nextLongPublishSlot", () => {
+  // Wednesday 2026-08-19 10:00 → next long slot is Friday 2026-08-21 20:00
+  it("returns Friday 20:00 when now is Wednesday", () => {
+    const now = new Date("2026-08-19T10:00:00"); // Wed
+    const slot = nextLongPublishSlot([], now);
+    expect(slot).toBe(new Date("2026-08-21T20:00:00").toISOString());
+  });
+
+  // Saturday 2026-08-22 10:00 → next long slot is Tuesday 2026-08-25 20:00
+  it("returns Tuesday 20:00 when now is Saturday", () => {
+    const now = new Date("2026-08-22T10:00:00"); // Sat
+    const slot = nextLongPublishSlot([], now);
+    expect(slot).toBe(new Date("2026-08-25T20:00:00").toISOString());
+  });
+
+  // Tuesday 2026-08-25 15:00 → same day 20:00 (before 20:00)
+  it("returns same-day Tuesday 20:00 when before 20:00", () => {
+    const now = new Date("2026-08-25T15:00:00"); // Tue
+    const slot = nextLongPublishSlot([], now);
+    expect(slot).toBe(new Date("2026-08-25T20:00:00").toISOString());
+  });
+
+  // Tuesday 2026-08-25 21:00 → Friday 2026-08-28 20:00 (after 20:00)
+  it("returns next Friday when now is Tuesday after 20:00", () => {
+    const now = new Date("2026-08-25T21:00:00"); // Tue
+    const slot = nextLongPublishSlot([], now);
+    expect(slot).toBe(new Date("2026-08-28T20:00:00").toISOString());
+  });
+
+  // Occupied Friday → next Tuesday
+  it("skips an occupied Friday and returns next Tuesday", () => {
+    const now = new Date("2026-08-19T10:00:00"); // Wed
+    const occupiedFriday = new Date("2026-08-21T20:00:00").toISOString();
+    const slot = nextLongPublishSlot([occupiedFriday], now);
+    expect(slot).toBe(new Date("2026-08-25T20:00:00").toISOString());
+  });
+
+  it("returns null when all slots in 30 days are occupied", () => {
+    const now = new Date("2026-08-19T10:00:00"); // Wed
+    const occupied: string[] = [];
+    for (let day = 0; day < 30; day++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + day);
+      if (d.getDay() === 2 || d.getDay() === 5) {
+        d.setHours(20, 0, 0, 0);
+        occupied.push(d.toISOString());
+      }
+    }
+    const slot = nextLongPublishSlot(occupied, now);
+    expect(slot).toBeNull();
   });
 });

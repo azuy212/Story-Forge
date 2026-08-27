@@ -13,6 +13,7 @@ import {
   decideRun,
   findRunByTopic,
   runLauncher,
+  validateProfile,
   readSheetRows,
 } from "../scripts/run-next.mjs";
 import { getAssistantId, resumeRun } from "../scripts/resume.mjs";
@@ -58,6 +59,7 @@ describe("decideRun", () => {
     const decision: any = decideRun(
       runsDir,
       [EXPECTED_HEADERS, plannedRow()],
+      "short",
       FIXED_NOW,
     );
     expect(decision).toMatchObject({
@@ -79,6 +81,7 @@ describe("decideRun", () => {
     const decision: any = decideRun(
       runsDir,
       [EXPECTED_HEADERS, plannedRow()],
+      "short",
       FIXED_NOW,
     );
     expect(decision.action).toBe("resume");
@@ -117,7 +120,7 @@ describe("decideRun", () => {
         ]);
       }
     }
-    const decision: any = decideRun(runsDir, rows, FIXED_NOW);
+    const decision: any = decideRun(runsDir, rows, "short", FIXED_NOW);
     expect(decision.action).toBe("resume");
     expect(decision.youtubePublishAt).toBeUndefined();
   });
@@ -131,6 +134,7 @@ describe("decideRun", () => {
     const decision: any = decideRun(
       runsDir,
       [EXPECTED_HEADERS, plannedRow({ 0: "row-id-9" })],
+      "short",
       FIXED_NOW,
     );
     expect(decision.action).toBe("resume");
@@ -141,6 +145,7 @@ describe("decideRun", () => {
     const decision: any = decideRun(
       runsDir,
       [EXPECTED_HEADERS, plannedRow()],
+      "short",
       FIXED_NOW,
     );
     expect(decision).toMatchObject({
@@ -157,6 +162,7 @@ describe("decideRun", () => {
     const decision: any = decideRun(
       runsDir,
       [EXPECTED_HEADERS, plannedRow({ 4: "published" })],
+      "short",
       FIXED_NOW,
     );
     expect(decision).toEqual({ action: "none", reason: "no-pending-row" });
@@ -168,7 +174,7 @@ describe("decideRun", () => {
       plannedRow({ 2: "" }),
       plannedRow({ 0: "ok-1" }),
     ];
-    const decision: any = decideRun(runsDir, rows, FIXED_NOW);
+    const decision: any = decideRun(runsDir, rows, "short", FIXED_NOW);
     expect(decision).toMatchObject({ action: "create", projectId: "ok-1" });
   });
 
@@ -191,7 +197,7 @@ describe("decideRun", () => {
         "",
       ],
     ];
-    const decision: any = decideRun(runsDir, rows, FIXED_NOW);
+    const decision: any = decideRun(runsDir, rows, "short", FIXED_NOW);
     expect(decision.action).toBe("create");
     expect(decision.youtubePublishAt).toBe(
       new Date("2026-08-20T20:00:00").toISOString(),
@@ -267,6 +273,7 @@ describe("runLauncher", () => {
     expect(input).toEqual({
       pillar: "Geography",
       topic: "Unrecognized Countries",
+      videoProfile: "short",
     });
     expect(options).toEqual({
       assistantId: "ast-1",
@@ -293,6 +300,7 @@ describe("runLauncher", () => {
     expect(input).toEqual({
       pillar: "Geography",
       topic: "Unrecognized Countries",
+      videoProfile: "short",
     });
     expect(options.projectId).toBe("legacy-1");
     expect(options.youtubePublishAt).toMatch(
@@ -349,5 +357,112 @@ describe("runLauncher", () => {
       .mockRejectedValue(new Error("No 'agent' assistant found"));
     await expect(runLauncher(deps)).rejects.toThrow("getAssistantId failed");
     expect(deps.resumeRun).not.toHaveBeenCalled();
+  });
+
+  it("reads from Long Videos sheet when profile is long", async () => {
+    const deps = baseDeps();
+    deps.env = {
+      ...launcherEnv(),
+      GOOGLE_SHEETS_SHEET_NAME_LONG: "Long Videos",
+    };
+    await runLauncher({ ...deps, profile: "long" });
+    expect(deps.readRows).toHaveBeenCalledWith(
+      expect.anything(),
+      "ssid",
+      "Long Videos",
+    );
+  });
+
+  it("reads from Sheet1 sheet when profile is short", async () => {
+    const deps = baseDeps();
+    await runLauncher({ ...deps, profile: "short" });
+    expect(deps.readRows).toHaveBeenCalledWith(
+      expect.anything(),
+      "ssid",
+      "Sheet1",
+    );
+  });
+
+  it("rejects invalid profile at the boundary", async () => {
+    const deps = baseDeps();
+    await expect(
+      runLauncher({ ...deps, profile: "invalid" }),
+    ).rejects.toThrow("invalid profile 'invalid'");
+  });
+});
+
+describe("validateProfile", () => {
+  it("accepts short", () => {
+    expect(() => validateProfile("short")).not.toThrow();
+  });
+
+  it("accepts long", () => {
+    expect(() => validateProfile("long")).not.toThrow();
+  });
+
+  it("rejects invalid values", () => {
+    expect(() => validateProfile("medium")).toThrow("invalid profile 'medium'");
+    expect(() => validateProfile("")).toThrow("invalid profile ''");
+  });
+});
+
+describe("decideRun profile routing", () => {
+  it("long profile picks a Tuesday/Friday slot", () => {
+    // Wednesday 2026-08-19 10:00 → next long slot is Friday 2026-08-21 20:00
+    const now = new Date("2026-08-19T10:00:00");
+    const decision: any = decideRun(
+      runsDir,
+      [EXPECTED_HEADERS, plannedRow()],
+      "long",
+      now,
+    );
+    expect(decision.youtubePublishAt).toBe(
+      new Date("2026-08-21T20:00:00").toISOString(),
+    );
+  });
+
+  it("short profile picks a daily 12:00 or 20:00 slot", () => {
+    // Wednesday 2026-08-19 10:00 → next short slot is Wednesday 2026-08-19 12:00
+    const now = new Date("2026-08-19T10:00:00");
+    const decision: any = decideRun(
+      runsDir,
+      [EXPECTED_HEADERS, plannedRow()],
+      "short",
+      now,
+    );
+    expect(decision.youtubePublishAt).toBe(
+      new Date("2026-08-19T12:00:00").toISOString(),
+    );
+  });
+
+  it("existing run with persisted videoProfile retains it", () => {
+    addRun("geo-run-profile", {
+      topic: "Unrecognized Countries",
+      pillar: "Geography",
+      videoProfile: "long",
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    const decision: any = decideRun(
+      runsDir,
+      [EXPECTED_HEADERS, plannedRow()],
+      "short",
+      FIXED_NOW,
+    );
+    expect(decision.profile).toBe("long");
+  });
+
+  it("legacy run without videoProfile defaults to short", () => {
+    addRun("geo-run-legacy", {
+      topic: "Unrecognized Countries",
+      pillar: "Geography",
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    const decision: any = decideRun(
+      runsDir,
+      [EXPECTED_HEADERS, plannedRow()],
+      "long",
+      FIXED_NOW,
+    );
+    expect(decision.profile).toBe("short");
   });
 });

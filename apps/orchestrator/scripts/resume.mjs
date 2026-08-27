@@ -258,6 +258,7 @@ export function parseArgs(args) {
     namespace: null,
     pillar: null,
     topic: null,
+    profile: null,
     dryRun: false,
     help: false,
   };
@@ -276,6 +277,13 @@ export function parseArgs(args) {
       if (!args[i + 1] || args[i + 1].startsWith("--"))
         throw new Error("--topic requires a value");
       parsed.topic = args[++i];
+    } else if (arg === "--profile") {
+      if (!args[i + 1] || args[i + 1].startsWith("--"))
+        throw new Error("--profile requires a value (short or long)");
+      const val = args[++i];
+      if (val !== "short" && val !== "long")
+        throw new Error("--profile must be 'short' or 'long'");
+      parsed.profile = val;
     } else if (arg.startsWith("--")) {
       throw new Error(`Unknown argument: ${arg}`);
     } else if (!parsed.namespace) {
@@ -293,15 +301,16 @@ function showHelp() {
 Usage: pnpm --filter youtube-shorts-orchestrator resume <namespace|topic> [options]
 
 Options:
-  --pillar <pillar>    Override pillar (takes precedence over run.json; warns if different)
-  --topic <topic>      Override topic (required for legacy runs without run.json)
-  --dry-run            Show status and exit without running
-  --help, -h           Show this help
+  --pillar <pillar>       Override pillar (takes precedence over run.json; warns if different)
+  --topic <topic>         Override topic (required for legacy runs without run.json)
+  --profile <short|long>  Override video profile (takes precedence over run.json)
+  --dry-run               Show status and exit without running
+  --help, -h              Show this help
 
 Examples:
   pnpm resume why-your-brain-makes-you-remember-things-that-never-happened-20260817-230021-56a1
   pnpm resume "why your brain" --pillar Psychology --topic "Why Your Brain Makes You Remember Things That Never Happened"
-  pnpm resume <ns> --dry-run
+  pnpm resume <ns> --profile long --dry-run
 `);
 }
 
@@ -372,6 +381,7 @@ async function main() {
 
   let pillar = meta?.pillar;
   let topic = meta?.topic;
+  let videoProfile = parsed.profile || meta?.videoProfile || undefined;
 
   if (pillarOverride) {
     if (pillar && pillar !== pillarOverride) {
@@ -410,6 +420,7 @@ async function main() {
   logger.info(`Resuming run: ${ns}`);
   logger.info(`  Topic: ${topic}`);
   logger.info(`  Pillar: ${pillar}`);
+  if (videoProfile) logger.info(`  Profile: ${videoProfile}`);
 
   let assistantId;
   try {
@@ -422,7 +433,7 @@ async function main() {
   try {
     const { lastEvent } = await resumeRun(
       ns,
-      { pillar, topic },
+      { pillar, topic, videoProfile },
       { assistantId },
     );
     const status =
@@ -447,7 +458,7 @@ async function main() {
  */
 export async function resumeRun(
   ns,
-  { pillar, topic },
+  { pillar, topic, videoProfile },
   {
     assistantId = "",
     projectId = "",
@@ -461,6 +472,7 @@ export async function resumeRun(
         topic,
         pillar,
         ...(projectId ? { projectId } : {}),
+        ...(videoProfile ? { videoProfile } : {}),
       });
     },
   } = {},
@@ -481,6 +493,7 @@ export async function resumeRun(
       // seeded by run-next (new or resume) and never by the manual resume CLI.
       ...(projectId ? { projectId } : {}),
       ...(youtubePublishAt ? { youtubePublishAt } : {}),
+      ...(videoProfile ? { videoProfile } : {}),
     },
   };
   logger.info("Starting run...");

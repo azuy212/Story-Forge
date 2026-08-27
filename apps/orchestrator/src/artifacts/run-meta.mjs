@@ -18,13 +18,15 @@ export function runMetaPath(runsDir, runId) {
   return join(runsDir, runId, "run.json");
 }
 
-function freshMeta({ threadId, topic, pillar, projectId }) {
+function freshMeta({ threadId, topic, pillar, projectId, videoProfile }) {
   return {
     threadId,
     topic,
     pillar,
     // Backlog identity: ties a run to its Google Sheets row (Video ID).
     ...(projectId ? { projectId } : {}),
+    // Profile determines which sheet tab and slot schedule the run uses.
+    ...(videoProfile ? { videoProfile } : {}),
     createdAt: new Date().toISOString(),
     threadHistory: [threadId],
   };
@@ -131,7 +133,7 @@ function withLock(path, fn) {
  *
  * @param {string} runsDir artifact store root
  * @param {string} runId run folder name
- * @param {{ threadId: string, topic: string, pillar?: string, projectId?: string }} meta
+ * @param {{ threadId: string, topic: string, pillar?: string, projectId?: string, videoProfile?: string }} meta
  * @returns {object} the persisted run.json content
  */
 export function createOrAppendRunMeta(runsDir, runId, meta) {

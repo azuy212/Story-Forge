@@ -5,17 +5,21 @@
 // (Video ID + Category + Topic), then:
 //   - if a run already exists for that topic, resumes it from its persisted
 //     state (the run's persisted projectId is preserved; the next free
-//     12:00 / 20:00 publish slot is (re)seeded so a resumed run still
-//     publishes at a valid schedule time),
+//     publish slot is (re)seeded so a resumed run still publishes at a
+//     valid schedule time),
 //   - otherwise creates a new run seeded with the row's projectId, pillar
-//     (Category), topic, and the next free 12:00 / 20:00 publish slot.
+//     (Category), topic, and the next free publish slot.
+//
+// Publish slots depend on the profile:
+//   - short: {12:00, 20:00} daily
+//   - long:  {20:00} on Tuesdays and Fridays only
 //
 // Requires the LangGraph dev server (pnpm dev) and a sheet whose row 1 is the
 // canonical header. Auth reuses the YOUTUBE_* OAuth credentials and must
 // carry the spreadsheets scope (see scripts/oauth-youtube.mjs).
 //
 // Usage (from apps/orchestrator):
-//   node scripts/run-next.mjs
+//   node scripts/run-next.mjs [--profile short|long]
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -25,6 +29,7 @@ import {
   assertHeaders,
   pickPendingRow,
   nextPublishSlot,
+  nextLongPublishSlot,
   COLUMN,
 } from "../src/integrations/google-sheets/sheets-format.mjs";
 import { getAssistantId, resumeRun } from "./resume.mjs";
@@ -60,6 +65,15 @@ function slugify(value) {
       .replace(/^-+|-+$/g, "")
       .slice(0, 60) || "untitled"
   );
+}
+
+/** @param {string} value */
+export function validateProfile(value) {
+  if (value !== "short" && value !== "long") {
+    throw new LauncherError(
+      `invalid profile '${value}': must be 'short' or 'long'`,
+    );
+  }
 }
 
 function formatRunStamp(date = new Date()) {
@@ -109,13 +123,14 @@ export function findRunByTopic(runsDir, topic) {
  *
  * @param {string} runsDir artifact store root
  * @param {(string | number | boolean)[][]} rows full sheet A:Q values
+ * @param {string} [profile] "short" or "long" — selects slot schedule
  * @param {Date} [now] current time for slot calculation
  * @returns {object} decision:
  *   - { action: "none", reason: "no-pending-row" | "no-slot" }
- *   - { action: "resume", ns, pillar, topic, projectId, youtubePublishAt? }
- *   - { action: "create", ns, pillar, topic, projectId, youtubePublishAt }
+ *   - { action: "resume", ns, pillar, topic, projectId, youtubePublishAt?, profile }
+ *   - { action: "create", ns, pillar, topic, projectId, youtubePublishAt, profile }
  */
-export function decideRun(runsDir, rows, now = new Date()) {
+export function decideRun(runsDir, rows, profile = "short", now = new Date()) {
   const scheduledAtValues = rows
     .slice(1)
     .filter((row) => String(row[COLUMN.STATUS] ?? "").trim() === "scheduled")
@@ -130,13 +145,15 @@ export function decideRun(runsDir, rows, now = new Date()) {
   }
 
   const existing = findRunByTopic(runsDir, pending.topic);
-  const slot = nextPublishSlot(scheduledAtValues, now);
+  const slotFn = profile === "long" ? nextLongPublishSlot : nextPublishSlot;
+  const slot = slotFn(scheduledAtValues, now);
   if (existing) {
     return {
       action: "resume",
       ns: existing.ns,
       pillar: existing.meta.pillar,
       topic: existing.meta.topic,
+      profile: existing.meta.videoProfile ?? "short",
       // Preserve the run's persisted Sheet identity; fall back to the current
       // backlog row only for legacy runs created before projectId was stored.
       projectId: existing.meta.projectId ?? pending.videoId,
@@ -156,6 +173,7 @@ export function decideRun(runsDir, rows, now = new Date()) {
     ns: buildNamespace(pending.topic),
     pillar: pending.category,
     topic: pending.topic,
+    profile,
     projectId: pending.videoId,
     youtubePublishAt: slot,
   };
@@ -211,15 +229,20 @@ function buildSummary(data) {
 export async function runLauncher({
   env = process.env,
   runsDir = RUNS_DIR,
+  profile = "short",
   readRows = readSheetRows,
   getAssistantId: getAssistant = getAssistantId,
   resumeRun: runPipeline = resumeRun,
 } = {}) {
+  validateProfile(profile);
   const clientId = env.YOUTUBE_CLIENT_ID;
   const clientSecret = env.YOUTUBE_CLIENT_SECRET;
   const refreshToken = env.YOUTUBE_REFRESH_TOKEN;
   const spreadsheetId = env.GOOGLE_SHEETS_SPREADSHEET_ID;
-  const sheetName = env.GOOGLE_SHEETS_SHEET_NAME || "Sheet1";
+  const sheetName =
+    profile === "long"
+      ? env.GOOGLE_SHEETS_SHEET_NAME_LONG || "Long Videos"
+      : env.GOOGLE_SHEETS_SHEET_NAME || "Sheet1";
 
   if (!clientId || !clientSecret || !refreshToken) {
     fail(
@@ -234,6 +257,8 @@ export async function runLauncher({
   oauth2Client.setCredentials({ refresh_token: refreshToken });
   const sheets = google.sheets({ version: "v4", auth: oauth2Client });
 
+  console.log(`Profile: ${profile} | Sheet: ${sheetName}`);
+
   let rows;
   try {
     rows = await readRows(sheets, spreadsheetId, sheetName);
@@ -247,7 +272,7 @@ export async function runLauncher({
     fail(e.message);
   }
 
-  const decision = decideRun(runsDir, rows);
+  const decision = decideRun(runsDir, rows, profile);
   if (decision.action === "none") {
     console.log(
       decision.reason === "no-pending-row"
@@ -264,7 +289,11 @@ export async function runLauncher({
     fail(`getAssistantId failed: ${e.message}`);
   }
 
-  const input = { pillar: decision.pillar, topic: decision.topic };
+  const input = {
+    pillar: decision.pillar,
+    topic: decision.topic,
+    videoProfile: decision.profile,
+  };
   const options = {
     assistantId,
     projectId: decision.projectId,
@@ -318,7 +347,33 @@ if (
   fileURLToPath(import.meta.url) ===
     fileURLToPath(pathToFileURL(process.argv[1]).href)
 ) {
-  runLauncher().catch((e) => {
+  const args = process.argv.slice(2);
+  let profile = "short";
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--profile") {
+      if (!args[i + 1] || args[i + 1].startsWith("--")) {
+        console.error("run-next: --profile requires a value (short or long)");
+        process.exitCode = 1;
+        // eslint-disable-next-line no-undef -- early return from process
+        process.exit(1);
+      }
+      const val = args[++i];
+      if (val !== "short" && val !== "long") {
+        console.error(
+          `run-next: --profile must be 'short' or 'long', got '${val}'`,
+        );
+        process.exitCode = 1;
+        process.exit(1);
+      }
+      profile = val;
+    } else if (args[i] === "--long" || args[i] === "--short") {
+      console.error(
+        `run-next: ${args[i]} is deprecated, use --profile ${args[i] === "--long" ? "long" : "short"}`,
+      );
+      profile = args[i] === "--long" ? "long" : "short";
+    }
+  }
+  runLauncher({ profile }).catch((e) => {
     if (e instanceof LauncherError) {
       console.error(`run-next: ${e.message}`);
     } else {

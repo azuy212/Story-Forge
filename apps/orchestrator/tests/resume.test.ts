@@ -33,6 +33,7 @@ describe("parseArgs", () => {
       namespace: "ns",
       pillar: "Psychology",
       topic: "T",
+      profile: null,
       dryRun: true,
       help: false,
     });

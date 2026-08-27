@@ -109,7 +109,9 @@ export async function syncPublishResults(options: {
     return;
   }
 
-  const sheetName = config.googleSheetsSheetName();
+  const sheetName = config.googleSheetsSheetNameForProfile(
+    state.videoProfile?.profile,
+  );
   const category = state.project?.pillar ?? state.metadataOutput?.category;
   const topic = state.project?.topic;
   const title = state.metadataOutput?.title;

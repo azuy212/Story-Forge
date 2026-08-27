@@ -139,6 +139,12 @@ export const config = {
   },
   googleSheetsSheetName: (): string =>
     read("GOOGLE_SHEETS_SHEET_NAME") || "Sheet1",
+  googleSheetsSheetNameForProfile: (profile?: string): string => {
+    if (profile === "long") {
+      return read("GOOGLE_SHEETS_SHEET_NAME_LONG") || "Long Videos";
+    }
+    return read("GOOGLE_SHEETS_SHEET_NAME") || "Sheet1";
+  },
   // --- Subtitle appearance (word-level karaoke rendering) ---
   // Subtitle styling is controlled here so it is configurable in one place
   // rather than hardcoded across the pipeline. Colors are ASS &HAABBGGRR.
