@@ -227,7 +227,10 @@ export async function drainStream(res) {
         }
 
         if (event.event === "values" || event.event === "updates") {
-          process.stdout.write(".");
+          // Per-event progress is the launcher's job: the in-place bar and the
+          // per-node ✓/▶ lines rendered by prettyFormatter (driven by the
+          // agents) carry the signal. A per-event dot here would interleave
+          // with those lines and destroy the readable layout, so emit nothing.
         }
       }
     }

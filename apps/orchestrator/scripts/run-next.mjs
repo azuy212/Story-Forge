@@ -18,6 +18,12 @@
 // canonical header. Auth reuses the YOUTUBE_* OAuth credentials and must
 // carry the spreadsheets scope (see scripts/oauth-youtube.mjs).
 //
+// Live progress: the launcher installs a console.log tap that observes the
+// pretty-formatter's per-node lines (▶ running, ✓ complete, ✗ failed, ↻ retry)
+// and updates a single in-place progress bar at the top of the terminal. The
+// bar advances on producer-node completions; QA gates log inline but do not
+// advance the bar. In JSON log mode the tap is a no-op so logs stay clean.
+//
 // Usage (from apps/orchestrator):
 //   node scripts/run-next.mjs [--profile short|long]
 import { readdirSync, readFileSync, existsSync } from "node:fs";
@@ -25,6 +31,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import googleapis from "googleapis";
 import dotenv from "dotenv";
+import { Command } from "commander";
 import {
   assertHeaders,
   pickPendingRow,
@@ -46,15 +53,31 @@ dotenv.config({ path: envPath });
 const RUNS_DIR =
   process.env.ARTIFACT_STORE_DIR || join(__dirname, "..", "runs");
 
+// Producer nodes in spine order. QA gates (ResearchQA, ScriptQA, PromptQA,
+// ReleaseValidation, ReleaseReview) are visible in the pretty-formatter log
+// but do not advance the bar — the bar tracks real work the user is waiting
+// for. Finalize/Publisher are the terminal producer pair.
+const PRODUCER_NODES = [
+  "ResearchAgent",
+  "StoryPlanner",
+  "ScriptWriter",
+  "VisualDirector",
+  "AssetStrategy",
+  "ImagePromptGenerator",
+  "AssetGenerator",
+  "ImagePromptRepair",
+  "NarrationGenerator",
+  "SubtitleGenerator",
+  "VideoComposer",
+  "MetadataGenerator",
+  "ThumbnailGenerator",
+  "Publisher",
+];
+
 function fail(message) {
   throw new LauncherError(message);
 }
 
-/**
- * Fatal launcher/configuration failure: missing credentials, bad sheet
- * config, unreadable sheet, invalid headers, unavailable assistant.
- * The entrypoint maps this to exit code 1.
- */
 class LauncherError extends Error {}
 
 function slugify(value) {
@@ -67,7 +90,6 @@ function slugify(value) {
   );
 }
 
-/** @param {string} value */
 export function validateProfile(value) {
   if (value !== "short" && value !== "long") {
     throw new LauncherError(
@@ -118,18 +140,6 @@ export function findRunByTopic(runsDir, topic) {
   return match;
 }
 
-/**
- * Pure decision step of the runner, separated from I/O so it is unit-testable.
- *
- * @param {string} runsDir artifact store root
- * @param {(string | number | boolean)[][]} rows full sheet A:Q values
- * @param {string} [profile] "short" or "long" — selects slot schedule
- * @param {Date} [now] current time for slot calculation
- * @returns {object} decision:
- *   - { action: "none", reason: "no-pending-row" | "no-slot" }
- *   - { action: "resume", ns, pillar, topic, projectId, youtubePublishAt?, profile }
- *   - { action: "create", ns, pillar, topic, projectId, youtubePublishAt, profile }
- */
 export function decideRun(runsDir, rows, profile = "short", now = new Date()) {
   const scheduledAtValues = rows
     .slice(1)
@@ -154,12 +164,7 @@ export function decideRun(runsDir, rows, profile = "short", now = new Date()) {
       pillar: existing.meta.pillar,
       topic: existing.meta.topic,
       profile: existing.meta.videoProfile ?? "short",
-      // Preserve the run's persisted Sheet identity; fall back to the current
-      // backlog row only for legacy runs created before projectId was stored.
       projectId: existing.meta.projectId ?? pending.videoId,
-      // (Re)seed the next free slot so a resumed run still publishes at a
-      // valid schedule time. May be absent when every slot is taken within 30
-      // days; the resume proceeds regardless.
       ...(slot ? { youtubePublishAt: slot } : {}),
     };
   }
@@ -187,7 +192,6 @@ export async function readSheetRows(client, spreadsheetId, sheetName) {
   return res.data?.values ?? [];
 }
 
-// Inline buildSummary to avoid test module resolution issues
 function buildSummary(data) {
   if (!data) return undefined;
 
@@ -210,22 +214,134 @@ function buildSummary(data) {
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
+function formatDuration(ms) {
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  const rem = secs % 60;
+  return rem ? `${mins}m${rem.toString().padStart(2, "0")}s` : `${mins}m`;
+}
+
+// Pretty-formatter node line shape: "  ICON LABEL(24p)PHASE(36p)DURATION(10p)".
+// Label is left-padded to 24 chars; strip trailing spaces and use the
+// remainder as the node name. Icons: ▶ running, ✓ complete, ✗ failed, ↻ retry.
+const NODE_LINE_RE = /^[ \t]*([▶✓✗↻])[ \t]+(\S.{0,30}?)(?:[ \t]{2,}|$)/;
+
+function parseNodeLine(line) {
+  const m = NODE_LINE_RE.exec(line);
+  if (!m) return null;
+  return { icon: m[1], label: m[2].trim() };
+}
+
+export { parseNodeLine, PRODUCER_NODES, NODE_LINE_RE };
+
 /**
- * Full launcher lifecycle: read backlog → decide create/resume → obtain
- * assistant → dispatch and wait for ONE graph run → finalize.
- *
- * Launcher/configuration failures (credentials, sheet access, headers,
- * assistant lookup) throw LauncherError and are fatal (exit 1). A failure of
- * the pipeline run itself is recoverable: it is logged with the run's
- * namespace/topic and the launcher finishes normally (exit 0); what happens
- * on the next invocation is decided by the backlog and the run's persisted
- * state, not by this launcher. The LangGraph server is never owned by this
- * process; once the dispatched run reaches its terminal state, this returns
- * and Node exits naturally.
- *
- * Deps are injectable for tests; defaults read env, Google Sheets, and hit
- * the real dev server.
+ * Live progress tracker. Renders a single in-place bar at the top of the
+ * terminal and observes pretty-formatter output (via a console.log tap) to
+ * advance the bar. The bar advances on producer-node completion; QA gates
+ * fire pretty lines but do not move the bar. No-op when stdout is not a TTY
+ * (CI / piped output) or when log format is JSON.
  */
+class RunProgress {
+  constructor(producerNodes) {
+    this.producerNodes = producerNodes;
+    this.producerIndex = new Map(producerNodes.map((n, i) => [n, i]));
+    this.completed = new Set();
+    this.failed = new Set();
+    this.running = null;
+    this.startedAt = 0;
+    this.lastChangeAt = 0;
+    this.recentDurations = [];
+    this.lastRender = "";
+    this.enabled = process.stdout.isTTY && process.env.LOG_FORMAT !== "json";
+    this._origWrite = null;
+  }
+
+  start() {
+    if (!this.enabled) return;
+    this.startedAt = Date.now();
+    this.lastChangeAt = this.startedAt;
+    this._origWrite = process.stdout.write.bind(process.stdout);
+    this._render();
+  }
+
+  stop() {
+    if (!this.enabled || !this._origWrite) return;
+    // Clear the bar line so the next pretty output starts cleanly.
+    this._origWrite("\r\x1b[2K");
+    this._origWrite = null;
+  }
+
+  observe(line) {
+    if (!this.enabled) return;
+    const parsed = parseNodeLine(line);
+    if (!parsed) return;
+    const idx = this.producerIndex.get(parsed.label);
+    if (idx === undefined) return;
+    const now = Date.now();
+    if (parsed.icon === "▶") {
+      this.running = parsed.label;
+      this._render();
+    } else if (parsed.icon === "✓") {
+      if (!this.completed.has(parsed.label)) {
+        this.completed.add(parsed.label);
+        this.recentDurations.push(now - this.lastChangeAt);
+        if (this.recentDurations.length > 5) this.recentDurations.shift();
+        this.lastChangeAt = now;
+      }
+      if (this.running === parsed.label) this.running = null;
+      this._render();
+    } else if (parsed.icon === "✗") {
+      this.failed.add(parsed.label);
+      if (this.running === parsed.label) this.running = null;
+      this._render();
+    }
+  }
+
+  _render() {
+    if (!this._origWrite) return;
+    const total = this.producerNodes.length;
+    const done = this.completed.size + this.failed.size;
+    const width = 24;
+    const filled = total > 0 ? Math.round((done / total) * width) : 0;
+    const bar = "█".repeat(filled) + "░".repeat(width - filled);
+    const label = this.running ?? this.producerNodes[done] ?? "complete";
+    const elapsed = formatDuration(Date.now() - this.startedAt);
+    const eta =
+      this.recentDurations.length >= 2
+        ? ` ETA ${formatDuration(
+            (this.recentDurations.reduce((a, b) => a + b, 0) /
+              this.recentDurations.length) *
+              (total - done),
+          )}`
+        : "";
+    const line = `\r\x1b[2K  Pipeline  [${bar}] ${done}/${total}  ${label.padEnd(20)} ${elapsed}${eta}`;
+    if (line === this.lastRender) return;
+    this._origWrite(line);
+    this.lastRender = line;
+  }
+}
+
+/**
+ * Install a console.log tap that pipes every line through `onLine` and
+ * forwards to the real `console.log`. Used to observe pretty-formatter
+ * output. Returns a teardown function.
+ */
+function tapConsoleLog(onLine) {
+  const orig = console.log;
+  console.log = (...args) => {
+    const line = args
+      .map((a) => (typeof a === "string" ? a : String(a)))
+      .join(" ");
+    onLine(line);
+    orig.apply(console, args);
+  };
+  return () => {
+    console.log = orig;
+  };
+}
+
 export async function runLauncher({
   env = process.env,
   runsDir = RUNS_DIR,
@@ -257,7 +373,7 @@ export async function runLauncher({
   oauth2Client.setCredentials({ refresh_token: refreshToken });
   const sheets = google.sheets({ version: "v4", auth: oauth2Client });
 
-  console.log(`Profile: ${profile} | Sheet: ${sheetName}`);
+  logger.info(`Profile: ${profile} | Sheet: ${sheetName}`);
 
   let rows;
   try {
@@ -274,7 +390,7 @@ export async function runLauncher({
 
   const decision = decideRun(runsDir, rows, profile);
   if (decision.action === "none") {
-    console.log(
+    logger.info(
       decision.reason === "no-pending-row"
         ? "No pending planned rows in the backlog. Done."
         : "No free publish slot within 30 days. Done.",
@@ -300,12 +416,15 @@ export async function runLauncher({
     youtubePublishAt: decision.youtubePublishAt,
   };
 
-  // Calculate attempt from persisted metadata (same logic as resume.mjs)
   const existing = findRunByTopic(runsDir, decision.topic);
   const attempt = existing
     ? (existing.meta?.threadHistory?.length ?? 0) + 1
     : 1;
   logger.setRunContext(decision.ns, decision.topic, attempt);
+
+  const progress = new RunProgress(PRODUCER_NODES);
+  const teardownTap = tapConsoleLog((line) => progress.observe(line));
+  progress.start();
 
   try {
     if (decision.action === "resume") {
@@ -324,17 +443,17 @@ export async function runLauncher({
         `New backlog run "${decision.topic}" (video ${decision.projectId}) at slot ${decision.youtubePublishAt}`,
       );
     }
-    // Resolves only when this specific graph run reached its terminal state.
     const { lastEvent } = await runPipeline(decision.ns, input, options);
     const status =
       lastEvent?.data?.execution?.status === "complete" ? "complete" : "failed";
     const summary = buildSummary(lastEvent?.data);
+    progress.stop();
+    teardownTap();
     logger.finalize(status, summary);
     logger.info(`Artifacts in: runs/${decision.ns}`);
   } catch (e) {
-    // Recoverable pipeline failure: log it and finalize normally (exit 0).
-    // Whatever state this run persisted stays authoritative; whether a later
-    // invocation can resume depends on that state, not on this launcher.
+    progress.stop();
+    teardownTap();
     logger.finalize("failed", e?.message ?? String(e));
     logger.error(
       `run-next: pipeline run failed for "${decision.topic}" (${decision.ns}): ${e?.stack || e}`,
@@ -347,32 +466,22 @@ if (
   fileURLToPath(import.meta.url) ===
     fileURLToPath(pathToFileURL(process.argv[1]).href)
 ) {
-  const args = process.argv.slice(2);
-  let profile = "short";
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--profile") {
-      if (!args[i + 1] || args[i + 1].startsWith("--")) {
-        console.error("run-next: --profile requires a value (short or long)");
-        process.exitCode = 1;
-        // eslint-disable-next-line no-undef -- early return from process
-        process.exit(1);
-      }
-      const val = args[++i];
-      if (val !== "short" && val !== "long") {
-        console.error(
-          `run-next: --profile must be 'short' or 'long', got '${val}'`,
-        );
-        process.exitCode = 1;
-        process.exit(1);
-      }
-      profile = val;
-    } else if (args[i] === "--long" || args[i] === "--short") {
-      console.error(
-        `run-next: ${args[i]} is deprecated, use --profile ${args[i] === "--long" ? "long" : "short"}`,
-      );
-      profile = args[i] === "--long" ? "long" : "short";
-    }
+  const program = new Command();
+  program
+    .name("run-next")
+    .description("Backlog-driven run launcher")
+    .option("--profile <short|long>", "video profile", "short");
+  program.parse(process.argv);
+
+  const opts = program.opts();
+  const profile = opts.profile;
+  if (profile !== "short" && profile !== "long") {
+    console.error(
+      `run-next: --profile must be 'short' or 'long', got '${profile}'`,
+    );
+    process.exit(1);
   }
+
   runLauncher({ profile }).catch((e) => {
     if (e instanceof LauncherError) {
       console.error(`run-next: ${e.message}`);

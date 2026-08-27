@@ -12,6 +12,8 @@ import { join } from "node:path";
 import {
   decideRun,
   findRunByTopic,
+  parseNodeLine,
+  PRODUCER_NODES,
   runLauncher,
   validateProfile,
   readSheetRows,
@@ -385,9 +387,9 @@ describe("runLauncher", () => {
 
   it("rejects invalid profile at the boundary", async () => {
     const deps = baseDeps();
-    await expect(
-      runLauncher({ ...deps, profile: "invalid" }),
-    ).rejects.toThrow("invalid profile 'invalid'");
+    await expect(runLauncher({ ...deps, profile: "invalid" })).rejects.toThrow(
+      "invalid profile 'invalid'",
+    );
   });
 });
 
@@ -464,5 +466,49 @@ describe("decideRun profile routing", () => {
       FIXED_NOW,
     );
     expect(decision.profile).toBe("short");
+  });
+});
+
+describe("parseNodeLine", () => {
+  it("parses a running node line (▶)", () => {
+    // Pretty formatter pads label to 24 chars, then a phase padded to 36.
+    const line = "  ▶ ResearchAgent              researching sources";
+    expect(parseNodeLine(line)).toEqual({
+      icon: "▶",
+      label: "ResearchAgent",
+    });
+  });
+
+  it("parses a completed node line with duration (✓)", () => {
+    const line =
+      "  ✓ ResearchAgent              researching sources              3.2s";
+    expect(parseNodeLine(line)).toEqual({
+      icon: "✓",
+      label: "ResearchAgent",
+    });
+  });
+
+  it("parses a failed node line (✗)", () => {
+    const line =
+      "  ✗ ScriptWriter               generating script        LLM error";
+    expect(parseNodeLine(line)).toEqual({
+      icon: "✗",
+      label: "ScriptWriter",
+    });
+  });
+
+  it("returns null for non-node lines", () => {
+    expect(parseNodeLine("Profile: short | Sheet: Sheet1")).toBeNull();
+    expect(parseNodeLine("")).toBeNull();
+    expect(parseNodeLine("  Progress  [██░░] 2/14  ResearchAgent")).toBeNull();
+  });
+
+  it("PRODUCER_NODES covers every agent node that drives the pipeline spine", () => {
+    expect(PRODUCER_NODES).toContain("ResearchAgent");
+    expect(PRODUCER_NODES).toContain("Publisher");
+    expect(PRODUCER_NODES).not.toContain("ResearchQA");
+    expect(PRODUCER_NODES).not.toContain("ScriptQA");
+    expect(PRODUCER_NODES).not.toContain("PromptQA");
+    expect(PRODUCER_NODES).not.toContain("Finalize");
   });
 });
