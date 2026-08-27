@@ -77,8 +77,12 @@ const completeEvent = {
 
 describe("drainStream", () => {
   it("resolves with the terminal event on a complete run", async () => {
-    const { lastEvent } = await drainStream(sse(completeEvent));
+    const seen: object[] = [];
+    const { lastEvent } = await drainStream(sse(completeEvent), {
+      onEvent: (e) => seen.push(e),
+    });
     expect(lastEvent.data.execution.status).toBe("complete");
+    expect(seen).toEqual([completeEvent]);
   });
 
   it("throws on an explicit graph error event", async () => {
@@ -101,18 +105,73 @@ describe("drainStream", () => {
     ).rejects.toThrow("Graph run failed: analysis failed");
   });
 
-  it("throws when the stream ends with a pending status", async () => {
+  it("cancels the stream on an error event so the socket is released", async () => {
+    let cancelCount = 0;
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode(
+            `data: ${JSON.stringify({ event: "error", data: { error: "boom" } })}\n\n`,
+          ),
+        );
+        // Do NOT close: the server keeps the connection open until the
+        // client cancels. drainStream must release it on its own.
+      },
+      cancel() {
+        cancelCount++;
+      },
+    });
     await expect(
-      drainStream(
-        sse({ event: "values", data: { execution: { status: "pending" } } }),
-      ),
-    ).rejects.toThrow("Run ended prematurely. Final status: pending");
+      drainStream(new Response(stream, { status: 200 })),
+    ).rejects.toThrow("Graph run failed");
+    expect(cancelCount).toBe(1);
   });
 
-  it("throws when the stream ends with no events", async () => {
-    await expect(drainStream(sse())).rejects.toThrow(
-      "Run ended prematurely. Final status: unknown",
+  it("cancels the stream and returns the last event on a complete run", async () => {
+    let cancelCount = 0;
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode(
+            `data: ${JSON.stringify(completeEvent)}\n\n`,
+          ),
+        );
+        // Stay open: drainStream cancels on terminal complete to release
+        // the socket instead of waiting for the server to close.
+      },
+      cancel() {
+        cancelCount++;
+      },
+    });
+    const { lastEvent } = await drainStream(
+      new Response(stream, { status: 200 }),
     );
+    expect(lastEvent.data.execution.status).toBe("complete");
+    expect(cancelCount).toBe(1);
+  });
+
+  it("cancels the stream if onEvent throws so a buggy callback cannot leak the reader", async () => {
+    let cancelCount = 0;
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode(
+            `data: ${JSON.stringify(completeEvent)}\n\n`,
+          ),
+        );
+      },
+      cancel() {
+        cancelCount++;
+      },
+    });
+    await expect(
+      drainStream(new Response(stream, { status: 200 }), {
+        onEvent: () => {
+          throw new Error("callback boom");
+        },
+      }),
+    ).rejects.toThrow("callback boom");
+    expect(cancelCount).toBe(1);
   });
 
   it("throws on a malformed data event", async () => {
@@ -159,48 +218,6 @@ describe("drainStream", () => {
       drainStream(new Response(stream, { status: 200 })),
     ).rejects.toThrow("Malformed SSE data event");
   });
-
-  it("returns on the complete terminal event and cancels the stream even when the server never closes it", async () => {
-    let cancelled = false;
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(
-          new TextEncoder().encode(
-            `data: ${JSON.stringify(completeEvent)}\n\n`,
-          ),
-        );
-        // Never closed: simulates a server holding the connection open.
-      },
-      cancel() {
-        cancelled = true;
-      },
-    });
-    const { lastEvent } = await drainStream(
-      new Response(stream, { status: 200 }),
-    );
-    expect(lastEvent.data.execution.status).toBe("complete");
-    expect(cancelled).toBe(true);
-  });
-
-  it("cancels the stream when the run fails mid-stream", async () => {
-    let cancelled = false;
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(
-          new TextEncoder().encode(
-            `data: ${JSON.stringify({ event: "error", data: { error: "boom" } })}\n\n`,
-          ),
-        );
-      },
-      cancel() {
-        cancelled = true;
-      },
-    });
-    await expect(
-      drainStream(new Response(stream, { status: 200 })),
-    ).rejects.toThrow("Graph run failed");
-    expect(cancelled).toBe(true);
-  });
 });
 
 describe("runStream", () => {
@@ -233,7 +250,7 @@ describe("runStream", () => {
           input: { project: { pillar: "P", topic: "T" } },
           config: { configurable: { runId: "my-run", thread_id: "thread-1" } },
           multitask_strategy: "interrupt",
-          stream_mode: ["values"],
+          stream_mode: ["events", "values"],
         }),
       }),
     );

@@ -18,11 +18,11 @@
 // canonical header. Auth reuses the YOUTUBE_* OAuth credentials and must
 // carry the spreadsheets scope (see scripts/oauth-youtube.mjs).
 //
-// Live progress: the launcher installs a console.log tap that observes the
-// pretty-formatter's per-node lines (▶ running, ✓ complete, ✗ failed, ↻ retry)
-// and updates a single in-place progress bar at the top of the terminal. The
+// Live progress: the launcher consumes the run's SSE stream (stream_mode
+// ["events", "values"] → resumeRun/drainStream onEvent) and, when stdout is a
+// TTY, renders a single in-place progress bar at the top of the terminal. The
 // bar advances on producer-node completions; QA gates log inline but do not
-// advance the bar. In JSON log mode the tap is a no-op so logs stay clean.
+// advance the bar. In JSON log mode the bar is a no-op so logs stay clean.
 //
 // Usage (from apps/orchestrator):
 //   node scripts/run-next.mjs [--profile short|long]
@@ -59,7 +59,7 @@ const RUNS_DIR =
 // for. Finalize/Publisher are the terminal producer pair.
 const PRODUCER_NODES = [
   "ResearchAgent",
-  "StoryPlanner",
+  "ScriptPlanner",
   "ScriptWriter",
   "VisualDirector",
   "AssetStrategy",
@@ -223,25 +223,43 @@ function formatDuration(ms) {
   return rem ? `${mins}m${rem.toString().padStart(2, "0")}s` : `${mins}m`;
 }
 
-// Pretty-formatter node line shape: "  ICON LABEL(24p)PHASE(36p)DURATION(10p)".
-// Label is left-padded to 24 chars; strip trailing spaces and use the
-// remainder as the node name. Icons: ▶ running, ✓ complete, ✗ failed, ↻ retry.
-const NODE_LINE_RE = /^[ \t]*([▶✓✗↻])[ \t]+(\S.{0,30}?)(?:[ \t]{2,}|$)/;
-
-function parseNodeLine(line) {
-  const m = NODE_LINE_RE.exec(line);
-  if (!m) return null;
-  return { icon: m[1], label: m[2].trim() };
+// SSE payload from the LangGraph dev server's /threads/{id}/runs/stream
+// endpoint when stream_mode includes "events". The server yields langchain
+// streamEvents payloads directly — the SSE envelope's `data` line IS the
+// streamEvents payload, not a wrapper. Top-level fields:
+//
+//   { event: "on_chain_start", name: "ResearchAgent",
+//     metadata: { langgraph_node: "ResearchAgent" } }
+//   { event: "on_chain_end",   name: "ResearchAgent",
+//     metadata: { langgraph_node: "ResearchAgent" },
+//     data: { output: { ... } } }
+//
+// A failed `on_chain_end` carries `status: "error"`. Values-mode frames
+// (`event: "values"`, `event: "metadata"`) are also delivered but the bar
+// only needs chain events.
+function parseSseEvent(event) {
+  if (!event) return null;
+  if (event.event === "on_chain_start" && event.metadata?.langgraph_node) {
+    return { name: event.metadata.langgraph_node, status: "running" };
+  }
+  if (event.event === "on_chain_end" && event.metadata?.langgraph_node) {
+    return {
+      name: event.metadata.langgraph_node,
+      status: event.status === "error" ? "failed" : "complete",
+    };
+  }
+  return null;
 }
 
-export { parseNodeLine, PRODUCER_NODES, NODE_LINE_RE };
+export { parseSseEvent, PRODUCER_NODES };
 
 /**
  * Live progress tracker. Renders a single in-place bar at the top of the
- * terminal and observes pretty-formatter output (via a console.log tap) to
- * advance the bar. The bar advances on producer-node completion; QA gates
- * fire pretty lines but do not move the bar. No-op when stdout is not a TTY
- * (CI / piped output) or when log format is JSON.
+ * terminal and advances it when the SSE consumer reports producer-node
+ * transitions. The bar advances on producer-node completion; QA gates emit
+ * SSE events too but are not in `producerNodes`, so they don't move the bar.
+ * No-op when stdout is not a TTY (CI / piped output) or when log format is
+ * JSON.
  */
 class RunProgress {
   constructor(producerNodes) {
@@ -268,33 +286,34 @@ class RunProgress {
 
   stop() {
     if (!this.enabled || !this._origWrite) return;
-    // Clear the bar line so the next pretty output starts cleanly.
     this._origWrite("\r\x1b[2K");
     this._origWrite = null;
   }
 
-  observe(line) {
+  observeNode(name, status) {
     if (!this.enabled) return;
-    const parsed = parseNodeLine(line);
-    if (!parsed) return;
-    const idx = this.producerIndex.get(parsed.label);
-    if (idx === undefined) return;
+    if (!this.producerIndex.has(name)) return;
     const now = Date.now();
-    if (parsed.icon === "▶") {
-      this.running = parsed.label;
+    if (status === "running") {
+      this.running = name;
+      // Reset the duration clock so a node that failed and re-ran measures
+      // from the start of its current attempt, not from the previous end.
+      this.lastChangeAt = now;
+      // A re-run supersedes an earlier failure for the same node.
+      this.failed.delete(name);
       this._render();
-    } else if (parsed.icon === "✓") {
-      if (!this.completed.has(parsed.label)) {
-        this.completed.add(parsed.label);
+    } else if (status === "complete") {
+      if (!this.completed.has(name)) {
+        this.completed.add(name);
         this.recentDurations.push(now - this.lastChangeAt);
         if (this.recentDurations.length > 5) this.recentDurations.shift();
         this.lastChangeAt = now;
       }
-      if (this.running === parsed.label) this.running = null;
+      if (this.running === name) this.running = null;
       this._render();
-    } else if (parsed.icon === "✗") {
-      this.failed.add(parsed.label);
-      if (this.running === parsed.label) this.running = null;
+    } else if (status === "failed") {
+      this.failed.add(name);
+      if (this.running === name) this.running = null;
       this._render();
     }
   }
@@ -321,25 +340,6 @@ class RunProgress {
     this._origWrite(line);
     this.lastRender = line;
   }
-}
-
-/**
- * Install a console.log tap that pipes every line through `onLine` and
- * forwards to the real `console.log`. Used to observe pretty-formatter
- * output. Returns a teardown function.
- */
-function tapConsoleLog(onLine) {
-  const orig = console.log;
-  console.log = (...args) => {
-    const line = args
-      .map((a) => (typeof a === "string" ? a : String(a)))
-      .join(" ");
-    onLine(line);
-    orig.apply(console, args);
-  };
-  return () => {
-    console.log = orig;
-  };
 }
 
 export async function runLauncher({
@@ -423,8 +423,22 @@ export async function runLauncher({
   logger.setRunContext(decision.ns, decision.topic, attempt);
 
   const progress = new RunProgress(PRODUCER_NODES);
-  const teardownTap = tapConsoleLog((line) => progress.observe(line));
   progress.start();
+  const onEvent = (event) => {
+    const parsed = parseSseEvent(event);
+    if (parsed) {
+      progress.observeNode(parsed.name, parsed.status);
+      return;
+    }
+    if (event?.event === "on_chain_start" || event?.event === "on_chain_end") {
+      logger.debug("sse: chain event (no node)", {
+        kind: event.event,
+        name: event.name,
+        keys: event ? Object.keys(event) : null,
+        metadata: event?.metadata,
+      });
+    }
+  };
 
   try {
     if (decision.action === "resume") {
@@ -443,17 +457,18 @@ export async function runLauncher({
         `New backlog run "${decision.topic}" (video ${decision.projectId}) at slot ${decision.youtubePublishAt}`,
       );
     }
-    const { lastEvent } = await runPipeline(decision.ns, input, options);
+    const { lastEvent } = await runPipeline(decision.ns, input, {
+      ...options,
+      onEvent,
+    });
     const status =
       lastEvent?.data?.execution?.status === "complete" ? "complete" : "failed";
     const summary = buildSummary(lastEvent?.data);
     progress.stop();
-    teardownTap();
     logger.finalize(status, summary);
     logger.info(`Artifacts in: runs/${decision.ns}`);
   } catch (e) {
     progress.stop();
-    teardownTap();
     logger.finalize("failed", e?.message ?? String(e));
     logger.error(
       `run-next: pipeline run failed for "${decision.topic}" (${decision.ns}): ${e?.stack || e}`,

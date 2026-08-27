@@ -156,6 +156,7 @@ export async function runStream(
   input,
   runId,
   devApi = DEV_API,
+  { streamMode = ["events", "values"] } = {},
 ) {
   const res = await fetch(`${devApi}/threads/${threadId}/runs/stream`, {
     method: "POST",
@@ -165,7 +166,7 @@ export async function runStream(
       input,
       config: { configurable: { runId, thread_id: threadId } },
       multitask_strategy: "interrupt",
-      stream_mode: ["values"],
+      stream_mode: streamMode,
     }),
   });
   if (!res.ok) {
@@ -175,20 +176,30 @@ export async function runStream(
   return res;
 }
 
-export async function drainStream(res) {
+export async function drainStream(
+  res,
+  { onEvent = () => {}, onComplete } = {},
+) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let lastEvent = null;
   let buffer = "";
-  let drained = false;
+  let cancelled = false;
+
+  const cancel = async () => {
+    if (cancelled) return;
+    cancelled = true;
+    try {
+      await reader.cancel();
+    } catch {
+      // Stream already closed or errored; nothing to release.
+    }
+  };
 
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) {
-        drained = true;
-        break;
-      }
+      if (done) break;
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";
@@ -199,10 +210,17 @@ export async function drainStream(res) {
         try {
           event = JSON.parse(line.slice(6));
         } catch {
+          await cancel();
           throw new Error(`Malformed SSE data event: ${line.slice(0, 200)}`);
         }
 
         lastEvent = event;
+        try {
+          onEvent(event);
+        } catch (e) {
+          await cancel();
+          throw e;
+        }
 
         if (
           event.event === "error" ||
@@ -213,46 +231,27 @@ export async function drainStream(res) {
             event.data?.diagnostics?.errors?.[0] ||
             event.data?.error ||
             JSON.stringify(event);
+          await cancel();
           throw new Error(`Graph run failed: ${errMsg}`);
         }
 
-        // The run's own execution status is the terminal signal: stop reading
-        // as soon as this specific graph run completes instead of waiting for
-        // the server to close the SSE connection.
         if (
           event.event === "values" &&
           event.data?.execution?.status === "complete"
         ) {
+          // Terminal signal: stop draining as soon as the run completes
+          // instead of waiting for the server to close the connection.
+          if (onComplete) onComplete(event);
+          await cancel();
           return { lastEvent };
         }
-
-        if (event.event === "values" || event.event === "updates") {
-          // Per-event progress is the launcher's job: the in-place bar and the
-          // per-node ✓/▶ lines rendered by prettyFormatter (driven by the
-          // agents) carry the signal. A per-event dot here would interleave
-          // with those lines and destroy the readable layout, so emit nothing.
-        }
       }
-    }
-
-    if (lastEvent?.data?.execution?.status !== "complete") {
-      throw new Error(
-        `Run ended prematurely. Final status: ${lastEvent?.data?.execution?.status ?? "unknown"}`,
-      );
     }
 
     return { lastEvent };
-  } finally {
-    // Cancel the body whenever we leave before the server drains it (terminal
-    // event observed or an error thrown) so no socket keeps the process alive
-    // after the run ends. A fully drained stream is already closed; skip it.
-    if (!drained) {
-      try {
-        await reader.cancel();
-      } catch {
-        // Stream already closed or errored; nothing to release.
-      }
-    }
+  } catch (e) {
+    await cancel();
+    throw e;
   }
 }
 
@@ -469,6 +468,7 @@ export async function resumeRun(
     createThread: createThreadImpl = createThread,
     runStream: runStreamImpl = runStream,
     drainStream: drainStreamImpl = drainStream,
+    onEvent = () => {},
     recordThread = async (threadId) => {
       createOrAppendRunMeta(RUNS_DIR, ns, {
         threadId,
@@ -501,7 +501,7 @@ export async function resumeRun(
   };
   logger.info("Starting run...");
   const stream = await runStreamImpl(threadId, assistantId, input, ns);
-  const { lastEvent } = await drainStreamImpl(stream);
+  const { lastEvent } = await drainStreamImpl(stream, { onEvent });
   return { threadId, lastEvent };
 }
 

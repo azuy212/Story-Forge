@@ -12,7 +12,7 @@ import { join } from "node:path";
 import {
   decideRun,
   findRunByTopic,
-  parseNodeLine,
+  parseSseEvent,
   PRODUCER_NODES,
   runLauncher,
   validateProfile,
@@ -277,13 +277,14 @@ describe("runLauncher", () => {
       topic: "Unrecognized Countries",
       videoProfile: "short",
     });
-    expect(options).toEqual({
+    expect(options).toMatchObject({
       assistantId: "ast-1",
       projectId: "abc123",
       youtubePublishAt: expect.stringMatching(
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
       ),
     });
+    expect(typeof options.onEvent).toBe("function");
   });
 
   it("resumes the persisted run and preserves its projectId (resume path)", async () => {
@@ -469,46 +470,134 @@ describe("decideRun profile routing", () => {
   });
 });
 
-describe("parseNodeLine", () => {
-  it("parses a running node line (▶)", () => {
-    // Pretty formatter pads label to 24 chars, then a phase padded to 36.
-    const line = "  ▶ ResearchAgent              researching sources";
-    expect(parseNodeLine(line)).toEqual({
-      icon: "▶",
-      label: "ResearchAgent",
-    });
+describe("parseSseEvent", () => {
+  it("returns null for non-start/end frames (metadata/values)", () => {
+    expect(
+      parseSseEvent({ event: "metadata", run_id: "r1", attempt: 1 }),
+    ).toBeNull();
+    expect(parseSseEvent({ event: "values", data: {} })).toBeNull();
+    expect(parseSseEvent(null)).toBeNull();
   });
 
-  it("parses a completed node line with duration (✓)", () => {
-    const line =
-      "  ✓ ResearchAgent              researching sources              3.2s";
-    expect(parseNodeLine(line)).toEqual({
-      icon: "✓",
-      label: "ResearchAgent",
-    });
+  it("returns null for on_chain_* without a langgraph_node metadata", () => {
+    expect(
+      parseSseEvent({ event: "on_chain_start", name: "RunnableSequence" }),
+    ).toBeNull();
   });
 
-  it("parses a failed node line (✗)", () => {
-    const line =
-      "  ✗ ScriptWriter               generating script        LLM error";
-    expect(parseNodeLine(line)).toEqual({
-      icon: "✗",
-      label: "ScriptWriter",
-    });
+  it("maps on_chain_start to running", () => {
+    expect(
+      parseSseEvent({
+        event: "on_chain_start",
+        name: "ResearchAgent",
+        metadata: { langgraph_node: "ResearchAgent" },
+      }),
+    ).toEqual({ name: "ResearchAgent", status: "running" });
   });
 
-  it("returns null for non-node lines", () => {
-    expect(parseNodeLine("Profile: short | Sheet: Sheet1")).toBeNull();
-    expect(parseNodeLine("")).toBeNull();
-    expect(parseNodeLine("  Progress  [██░░] 2/14  ResearchAgent")).toBeNull();
+  it("maps on_chain_end with no error to complete", () => {
+    expect(
+      parseSseEvent({
+        event: "on_chain_end",
+        name: "ResearchAgent",
+        metadata: { langgraph_node: "ResearchAgent" },
+        data: { output: { research: { summary: "..." } } },
+      }),
+    ).toEqual({ name: "ResearchAgent", status: "complete" });
+  });
+
+  it("maps on_chain_end with status:error to failed", () => {
+    expect(
+      parseSseEvent({
+        event: "on_chain_end",
+        name: "ScriptWriter",
+        status: "error",
+        metadata: { langgraph_node: "ScriptWriter" },
+      }),
+    ).toEqual({ name: "ScriptWriter", status: "failed" });
+  });
+
+  it("ignores on_chain_stream and other intermediate events", () => {
+    expect(
+      parseSseEvent({
+        event: "on_chain_stream",
+        name: "ResearchAgent",
+        metadata: { langgraph_node: "ResearchAgent" },
+      }),
+    ).toBeNull();
   });
 
   it("PRODUCER_NODES covers every agent node that drives the pipeline spine", () => {
     expect(PRODUCER_NODES).toContain("ResearchAgent");
+    expect(PRODUCER_NODES).toContain("ScriptPlanner");
+    expect(PRODUCER_NODES).toContain("ScriptWriter");
+    expect(PRODUCER_NODES).toContain("VisualDirector");
+    expect(PRODUCER_NODES).toContain("AssetStrategy");
+    expect(PRODUCER_NODES).toContain("ImagePromptGenerator");
+    expect(PRODUCER_NODES).toContain("AssetGenerator");
+    expect(PRODUCER_NODES).toContain("ImagePromptRepair");
+    expect(PRODUCER_NODES).toContain("VideoComposer");
+    expect(PRODUCER_NODES).toContain("MetadataGenerator");
+    expect(PRODUCER_NODES).toContain("ThumbnailGenerator");
     expect(PRODUCER_NODES).toContain("Publisher");
     expect(PRODUCER_NODES).not.toContain("ResearchQA");
     expect(PRODUCER_NODES).not.toContain("ScriptQA");
     expect(PRODUCER_NODES).not.toContain("PromptQA");
     expect(PRODUCER_NODES).not.toContain("Finalize");
+    expect(PRODUCER_NODES).not.toContain("StoryPlanner");
+  });
+});
+
+describe("runLauncher wires onEvent into resumeRun", () => {
+  let logLines: string[];
+
+  beforeEach(() => {
+    logLines = [];
+    jest.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logLines.push(args.map(String).join(" "));
+    });
+    jest.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      logLines.push(args.map(String).join(" "));
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("forwards an onEvent callback that the SSE consumer can call to tick the bar", async () => {
+    const resumeRunMock = jest
+      .fn<typeof resumeRun>()
+      .mockImplementation(async (ns, _input, opts) => {
+        expect(typeof opts?.onEvent).toBe("function");
+        opts?.onEvent?.({
+          event: "on_chain_start",
+          metadata: { langgraph_node: "ResearchAgent" },
+        });
+        return { threadId: "t-1", lastEvent: null };
+      });
+    const deps = {
+      env: {
+        YOUTUBE_CLIENT_ID: "cid",
+        YOUTUBE_CLIENT_SECRET: "sec",
+        YOUTUBE_REFRESH_TOKEN: "ref",
+        GOOGLE_SHEETS_SPREADSHEET_ID: "ssid",
+      },
+      runsDir,
+      readRows: jest
+        .fn<typeof readSheetRows>()
+        .mockResolvedValue([EXPECTED_HEADERS, plannedRow()]),
+      getAssistantId: jest
+        .fn<typeof getAssistantId>()
+        .mockResolvedValue("ast-1"),
+      resumeRun: resumeRunMock,
+    };
+    await runLauncher(deps);
+
+    expect(resumeRunMock).toHaveBeenCalledTimes(1);
+    const opts = resumeRunMock.mock.calls[0][2] as {
+      onEvent?: (e: unknown) => void;
+    };
+    expect(opts.onEvent).toBeDefined();
   });
 });
