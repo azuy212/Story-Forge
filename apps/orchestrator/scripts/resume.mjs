@@ -4,7 +4,7 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createOrAppendRunMeta } from "../src/artifacts/run-meta.mjs";
-import { logger } from "../dist/src/utils/logger.js";
+import { logger } from "../dist/utils/logger.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RUNS_DIR =

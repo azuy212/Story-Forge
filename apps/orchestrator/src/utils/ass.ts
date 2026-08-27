@@ -26,21 +26,34 @@ export const DEFAULT_ASS_STYLE: AssStyle = {
   playResY: 1920,
 };
 
+/**
+ * Reference canvas height for the configured font size. The short profile
+ * is 1080x1920 and the font was tuned to read well on that frame. The long
+ * profile is 1920x1080, so we scale the font by the frame-height ratio so
+ * the subtitle occupies the same vertical fraction of the frame on both
+ * profiles (otherwise the long profile renders the same absolute pixel
+ * font against a 1080-tall frame, which makes it look oversized).
+ */
+const REFERENCE_FRAME_HEIGHT = 1920;
+
 /** Map app config to an ASS style so subtitle appearance is configurable. */
 export function appAssStyle(overrides?: {
   playResX?: number;
   playResY?: number;
 }): AssStyle {
+  const playResX = overrides?.playResX ?? 1080;
+  const playResY = overrides?.playResY ?? 1920;
+  const fontScale = playResY / REFERENCE_FRAME_HEIGHT;
   return {
     fontName: config.subtitleFontName(),
-    fontSize: config.subtitleFontSize(),
+    fontSize: Math.round(config.subtitleFontSize() * fontScale),
     primaryColor: config.subtitlePrimaryColor(),
     accentColor: config.subtitleAccentColor(),
     outlineColor: "&H00000000",
     outline: config.subtitleOutline(),
-    marginV: config.subtitleMarginV(),
-    playResX: overrides?.playResX ?? 1080,
-    playResY: overrides?.playResY ?? 1920,
+    marginV: Math.round(config.subtitleMarginV() * fontScale),
+    playResX,
+    playResY,
   };
 }
 

@@ -149,6 +149,7 @@ export async function narrationGeneratorNode(
         voice,
         filename: `scene-${padSceneId(scene.sceneId)}.wav`,
         runId,
+        videoProfile: state.videoProfile?.profile,
       };
 
       const result = await cacheNodeResult<SceneAudio>(

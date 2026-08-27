@@ -40,7 +40,8 @@ import {
   COLUMN,
 } from "../src/integrations/google-sheets/sheets-format.mjs";
 import { getAssistantId, resumeRun } from "./resume.mjs";
-import { logger } from "../dist/src/utils/logger.js";
+import { logger } from "../dist/utils/logger.js";
+import { prettyFormatter } from "../dist/utils/pretty-formatter.js";
 
 const { google } = googleapis;
 
@@ -423,6 +424,11 @@ export async function runLauncher({
   logger.setRunContext(decision.ns, decision.topic, attempt);
 
   const progress = new RunProgress(PRODUCER_NODES);
+  // When the bar is active, suppress the formatter's per-run header box and
+  // per-node progress lines — they would otherwise share a row with the bar
+  // and break the box's rectangle (the bar's in-place render has no trailing
+  // newline, so the box top gets appended to the bar's line).
+  if (progress.enabled) prettyFormatter.setSilent(true);
   progress.start();
   const onEvent = (event) => {
     const parsed = parseSseEvent(event);
@@ -473,6 +479,8 @@ export async function runLauncher({
     logger.error(
       `run-next: pipeline run failed for "${decision.topic}" (${decision.ns}): ${e?.stack || e}`,
     );
+  } finally {
+    if (progress.enabled) prettyFormatter.setSilent(false);
   }
 }
 

@@ -175,7 +175,8 @@ export class ChatterboxTTSProvider implements TTSProvider {
 
     let durationMs = getWavDurationMs(Buffer.from(audioBuffer));
 
-    const targetWpm = config.narrationTargetWpm();
+    const targetWpm =
+      opts.videoProfile === "long" ? undefined : config.narrationTargetWpm();
     if (targetWpm) {
       const actualWpm = calculateWpm(opts.text, durationMs);
 

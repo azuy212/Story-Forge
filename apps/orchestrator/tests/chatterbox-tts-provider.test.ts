@@ -284,6 +284,37 @@ describe("ChatterboxTTSProvider", () => {
     }
   });
 
+  it("skips WPM normalization when videoProfile is long, even with NARRATION_TARGET_WPM set", async () => {
+    const wav = makeWavBytes(24000, 32, 57840, 3);
+    fetchSpy
+      .mockResolvedValueOnce(
+        makeJsonResponse(200, {
+          status: "success",
+          file: "long.wav",
+          url: "/audio/long.wav",
+        }),
+      )
+      .mockResolvedValueOnce(makeBinaryResponse(200, wav));
+
+    const prevTargetWpm = process.env.NARRATION_TARGET_WPM;
+    process.env.NARRATION_TARGET_WPM = "160";
+    mockReadFile.mockClear();
+    mockRename.mockClear();
+    try {
+      const result = await provider.synthesize({
+        text: "Hello world",
+        videoProfile: "long",
+      });
+      // Raw WAV duration; no atempo re-encode.
+      expect(result.durationMs).toBe(57840);
+      expect(mockReadFile).not.toHaveBeenCalled();
+      expect(mockRename).not.toHaveBeenCalled();
+    } finally {
+      if (prevTargetWpm === undefined) delete process.env.NARRATION_TARGET_WPM;
+      else process.env.NARRATION_TARGET_WPM = prevTargetWpm;
+    }
+  });
+
   it("falls back for unsupported WAV compression formats", async () => {
     const wav = makeWavBytes(24000, 32, 57840, 6);
     fetchSpy

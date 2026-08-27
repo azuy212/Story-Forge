@@ -36,6 +36,7 @@ interface NodeEntry {
 
 export class PrettyConsoleFormatter {
   private readonly useColors: boolean;
+  private silent = false;
   private runContext?: RunContext;
   private runStartedAt?: number;
   private nodes: NodeEntry[] = [];
@@ -45,6 +46,16 @@ export class PrettyConsoleFormatter {
 
   constructor() {
     this.useColors = process.stdout.isTTY && config.logFormat() !== "json";
+  }
+
+  /**
+   * Suppress the per-run header box and per-node progress lines. Used by
+   * the run-next launcher, which renders its own in-place progress bar and
+   * does not want the box to share a row with the bar's first render.
+   * `logger.info`/`warn`/`error` still emit their `  • message` lines.
+   */
+  setSilent(value: boolean): void {
+    this.silent = value;
   }
 
   setRunContext(context: RunContext): void {
@@ -57,7 +68,7 @@ export class PrettyConsoleFormatter {
   }
 
   private printHeader(): void {
-    if (!this.runContext || this.headerPrinted) return;
+    if (!this.runContext || this.headerPrinted || this.silent) return;
 
     const { runId, topic, attempt } = this.runContext;
     const width = 60;
@@ -123,6 +134,7 @@ export class PrettyConsoleFormatter {
   }
 
   private printProgressBar(completed: number, total: number): void {
+    if (this.silent) return;
     const barWidth = 28;
     const filled = Math.round((completed / total) * barWidth);
     const bar = "█".repeat(filled) + "░".repeat(barWidth - filled);
@@ -176,6 +188,7 @@ export class PrettyConsoleFormatter {
   }
 
   private printNodeLine(entry: NodeEntry, isCurrent = false): void {
+    if (this.silent) return;
     const icon = ICONS[entry.status];
     const iconColor = this.getIconColor(entry.status);
     const coloredIcon = this.colorize(icon, iconColor);
