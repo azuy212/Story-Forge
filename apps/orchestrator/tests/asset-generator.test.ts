@@ -75,42 +75,38 @@ function runNode(state?: Partial<ProjectState>, provider?: AssetProvider) {
 describe("assetGeneratorNode", () => {
   it("generates assets for all scenes", async () => {
     mockGenerateImage.mockResolvedValue({
-      url: "https://placeholder.local/scene-002.png",
-    });
-    mockGenerateVideo.mockResolvedValue({
-      url: "https://placeholder.local/scene-001.mp4",
+      url: "https://placeholder.local/asset",
     });
 
     const result = await runNode();
 
     expect(result.production?.scenes).toHaveLength(3);
     expect(result.production?.scenes![0].assetUrl).toBe(
-      "https://placeholder.local/scene-001.mp4",
+      "https://placeholder.local/asset",
     );
     expect(result.production?.scenes![0].assetGeneratedAt).toBeDefined();
     expect(result.production?.scenes![1].assetUrl).toBe(
-      "https://placeholder.local/scene-002.png",
+      "https://placeholder.local/asset",
     );
     expect(result.production?.scenes![1].assetGeneratedAt).toBeDefined();
     expect(result.production?.scenes![2].assetUrl).toBe(
-      "https://placeholder.local/scene-001.mp4",
+      "https://placeholder.local/asset",
     );
     expect(result.execution?.currentNode).toBe("AssetGenerator");
-    expect(mockGenerateVideo).toHaveBeenCalledTimes(2);
-    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
+    // No AI video provider is wired today; video-typed scenes fall back to
+    // image generation. Every scene hits the image path.
+    expect(mockGenerateVideo).not.toHaveBeenCalled();
+    expect(mockGenerateImage).toHaveBeenCalledTimes(3);
   });
 
-  it("calls generateVideo for video assetType", async () => {
+  it("routes video-typed scenes to image generation when no AI video provider is wired", async () => {
     mockGenerateImage.mockResolvedValue({
-      url: "https://placeholder.local/img.png",
-    });
-    mockGenerateVideo.mockResolvedValue({
-      url: "https://placeholder.local/vid.mp4",
+      url: "https://placeholder.local/asset.png",
     });
 
     await runNode();
 
-    expect(mockGenerateVideo).toHaveBeenCalledWith(
+    expect(mockGenerateImage).toHaveBeenCalledWith(
       expect.objectContaining({
         prompt: "Aerial drone footage.",
         sceneId: 1,
@@ -124,6 +120,8 @@ describe("assetGeneratorNode", () => {
         filename: "scene-002.png",
       }),
     );
+    // generateVideo is never reached because the fallback short-circuits.
+    expect(mockGenerateVideo).not.toHaveBeenCalled();
   });
 
   it("returns error when no scenes exist", async () => {
@@ -146,9 +144,11 @@ describe("assetGeneratorNode", () => {
         sceneId: 2,
       }),
     );
-    mockGenerateImage.mockRejectedValue(policyError);
-    mockGenerateVideo.mockResolvedValue({
-      url: "https://placeholder.local/scene-001.mp4",
+    // Only scene 2 (the originally image-typed scene) rejects; video-typed
+    // scenes 1 and 3 fall back to image and succeed.
+    mockGenerateImage.mockImplementation(async (opts: { sceneId: number }) => {
+      if (opts.sceneId === 2) throw policyError;
+      return { url: `https://placeholder.local/scene-${opts.sceneId}.png` };
     });
 
     const result = await runNode();
@@ -167,8 +167,9 @@ describe("assetGeneratorNode", () => {
       errorType: "content_policy",
       prompt: "Detailed map.",
     });
-    // The rejected prompt is never retried: exactly one provider call.
-    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
+    // The rejected prompt is never retried: exactly one provider call for
+    // the rejected scene.
+    expect(mockGenerateImage).toHaveBeenCalledTimes(3);
     // Sibling scenes still generate; no batch-level error.
     expect(result.production?.scenes![0].assetUrl).toBeDefined();
     expect(result.production?.scenes![2].assetUrl).toBeDefined();
@@ -215,9 +216,11 @@ describe("assetGeneratorNode", () => {
         sceneId: 2,
       }),
     );
-    mockGenerateImage.mockRejectedValue(authError);
-    mockGenerateVideo.mockResolvedValue({
-      url: "https://placeholder.local/scene-001.mp4",
+    // Only scene 2 rejects; sibling scenes 1 and 3 fall back to image and
+    // succeed before the batch abort fires.
+    mockGenerateImage.mockImplementation(async (opts: { sceneId: number }) => {
+      if (opts.sceneId === 2) throw authError;
+      return { url: `https://placeholder.local/scene-${opts.sceneId}.png` };
     });
 
     const result = await runNode();
@@ -228,9 +231,14 @@ describe("assetGeneratorNode", () => {
     expect(result.production?.scenes![1].generationStatus).toBe("failed");
     expect(result.production?.scenes![1].failureType).toBe("authentication");
     // Scenes that already generated keep their assets (partial progress
-    // survives the batch abort).
-    expect(result.production?.scenes![0].assetUrl).toBeDefined();
-    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
+    // survives the batch abort). Note: order of execution is not
+    // guaranteed under mapWithConcurrency, so check counts rather than
+    // specific scenes.
+    const completed = (result.production?.scenes ?? []).filter(
+      (s) => s.generationStatus === "complete",
+    );
+    expect(completed.length).toBeGreaterThan(0);
+    expect(mockGenerateImage).toHaveBeenCalled();
   });
 
   it("retries transient failures 4 times with stepwise backoff then marks the scene failed", async () => {
@@ -245,24 +253,33 @@ describe("assetGeneratorNode", () => {
           sceneId: 2,
         }),
       );
-      mockGenerateImage.mockRejectedValue(transient);
-      mockGenerateVideo.mockResolvedValue({
-        url: "https://placeholder.local/scene-001.mp4",
-      });
+      // Only the image scene (scene 2) hits the retry path. Video-typed
+      // siblings fall back to image and succeed immediately.
+      mockGenerateImage.mockImplementation(
+        async (opts: { sceneId: number }) => {
+          if (opts.sceneId === 2) throw transient;
+          return { url: `https://placeholder.local/scene-${opts.sceneId}.png` };
+        },
+      );
 
       const promise = runNode();
       await jest.advanceTimersByTimeAsync(2000);
-      expect(mockGenerateImage).toHaveBeenCalledTimes(2);
+      // t=0: scenes 1, 2, 3 all call generateImage once. Scene 2 throws
+      // and schedules a 2s retry. After advancing 2s, scene 2 retries
+      // (second call), so total = 3 + 1 = 4.
+      expect(mockGenerateImage).toHaveBeenCalledTimes(4);
       await jest.advanceTimersByTimeAsync(5000);
-      expect(mockGenerateImage).toHaveBeenCalledTimes(3);
+      // +5s triggers scene 2's third attempt. Total = 5.
+      expect(mockGenerateImage).toHaveBeenCalledTimes(5);
       await jest.advanceTimersByTimeAsync(15000);
+      // +15s triggers scene 2's fourth attempt (final). Total = 6.
       const result = await promise;
 
       const scene = result.production?.scenes![1];
       expect(scene?.generationStatus).toBe("failed");
       expect(scene?.failureType).toBe("provider_unavailable");
       expect(scene?.providerError?.type).toBe("rate_limit");
-      expect(mockGenerateImage).toHaveBeenCalledTimes(4);
+      expect(mockGenerateImage).toHaveBeenCalledTimes(6);
       expect(scene?.promptAttempts).toHaveLength(4);
       expect(scene?.promptAttempts?.every((a) => a.status === "rejected")).toBe(
         true,
@@ -346,8 +363,9 @@ describe("assetGeneratorNode", () => {
       { ...SCENES[0] },
       { ...SCENES[1], generationPrompt: undefined },
     ];
-    mockGenerateVideo.mockResolvedValue({
-      url: "https://placeholder.local/vid.mp4",
+    // Scene 0 is video-typed; it falls back to image generation.
+    mockGenerateImage.mockResolvedValue({
+      url: "https://placeholder.local/asset.png",
     });
 
     const result = await runNode({
@@ -357,7 +375,7 @@ describe("assetGeneratorNode", () => {
     // The missing-prompt scene is fatal: the batch aborts but completed
     // scenes keep their assets (partial progress survives the abort).
     expect(result.production?.scenes![0].assetUrl).toBe(
-      "https://placeholder.local/vid.mp4",
+      "https://placeholder.local/asset.png",
     );
     expect(result.production?.scenes![0].generationStatus).toBe("complete");
     expect(result.production?.scenes![1].assetUrl).toBeUndefined();

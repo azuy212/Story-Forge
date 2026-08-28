@@ -30,6 +30,8 @@ function getSearcher(config: RunnableConfig): SourceAssetSearcher {
   );
 }
 
+const DEFAULT_VIDEO_MIN_DURATION_SEC = 4;
+
 function normalizedEntities(
   scene: Scene,
   resolution?: VideoSize,
@@ -43,6 +45,12 @@ function normalizedEntities(
     // is requesting a video asset, otherwise image-only entities carry
     // noise the photo provider does not need.
     ...(scene.assetType === "video" && resolution ? { resolution } : {}),
+    // Default the stock-video duration floor to avoid grabbing 1-second
+    // filler clips. Mirrors MoneyPrinterTurbo's `max_clip_duration` of 5s
+    // (4s here to stay within the lower end of Pexels's stock range).
+    ...(scene.assetType === "video" && entity.minimumDurationSec === undefined
+      ? { minimumDurationSec: DEFAULT_VIDEO_MIN_DURATION_SEC }
+      : {}),
   }));
 }
 

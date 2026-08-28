@@ -195,6 +195,12 @@ export const SceneSchema = z.object({
   assetUrl: z.string().optional(),
   assetGeneratedAt: z.string().optional(),
   generationStatus: GenerationStatusEnum.optional(),
+  /**
+   * Human-readable reason why a video-typed scene was rendered as a still
+   * image (no stock match, or no AI video provider wired). Surfaced in
+   * the run's diagnostics so graceful degradation is visible to the user.
+   */
+  fallbackReason: z.string().optional(),
   failureType: z.string().optional(),
   originalPrompt: z.string().optional(),
   repairedPrompt: z.string().optional(),

@@ -60,10 +60,16 @@ function resolveAssetType(assetType: Scene["assetType"]): Scene["assetType"] {
 function buildPlan(scenes: Scene[]): Scene[] {
   return scenes.map((scene) => {
     const mode = scene.assetMode ?? "generated";
+    // source-source_composite and source_edit always run through the image
+    // generation path with a source image as a reference. source mode
+    // honours the scene's original assetType so video-typed scenes can
+    // resolve to a stock video before any provider call.
     const assetType =
-      mode === "source" || mode === "source_composite" || mode === "source_edit"
+      mode === "source_composite" || mode === "source_edit"
         ? "image"
-        : resolveAssetType(scene.assetType);
+        : mode === "source"
+          ? scene.assetType ?? "image"
+          : resolveAssetType(scene.assetType);
     const cfg = configFor(assetType);
     const padded = padSceneId(scene.sceneId);
 
@@ -263,7 +269,30 @@ async function generateScene(
       "AssetGenerator no stock video found; falling back to image generation",
       { sceneId: scene.sceneId },
     );
-    scene = { ...scene, assetType: "image" as const };
+    scene = {
+      ...scene,
+      assetType: "image" as const,
+      fallbackReason: "no stock video match",
+    };
+    assetType = "image";
+    mode = "generated";
+  }
+
+  if (assetType === "video" && mode === "generated") {
+    // Video-typed scene with no source-searchable entities (e.g. the
+    // visual planner emitted no entities that requested source). With no
+    // AI video provider wired today, calling provider.generateVideo()
+    // would throw and kill the run; degrade to a still image instead and
+    // surface the degradation to the run summary via fallbackReason.
+    logger.warn(
+      "AssetGenerator no AI video provider wired; rendering video-typed scene as a still image",
+      { sceneId: scene.sceneId },
+    );
+    scene = {
+      ...scene,
+      assetType: "image" as const,
+      fallbackReason: "no AI video provider wired",
+    };
     assetType = "image";
     mode = "generated";
   }
@@ -609,6 +638,13 @@ export async function assetGeneratorNode(
     ({ scenes: plannedScenes, sourceAssets } satisfies AssetArtifact);
 
   const warnings = artifact.scenes.flatMap((scene) => {
+    if (scene.fallbackReason) {
+      // Video-typed scenes that fell back to image generation surface
+      // here so the run summary makes graceful degradation visible.
+      return [
+        `${AgentModel.AssetGenerator}: Scene ${scene.sceneId} video-typed scene rendered as a still image (${scene.fallbackReason})`,
+      ];
+    }
     if (scene.generationStatus === "prompt_repair") {
       return [
         `${AgentModel.AssetGenerator}: Scene ${scene.sceneId} prompt rejected by provider (${scene.providerError?.type ?? "unknown"}). ${scene.providerError?.message ?? ""}`,
