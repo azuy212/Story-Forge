@@ -135,8 +135,7 @@ function getThumbnailCompositor(
 ): FfmpegThumbnailCompositor {
   const inject = (config.configurable ?? {}) as Record<string, unknown>;
   const override = inject.thumbnailCompositor as
-    | FfmpegThumbnailCompositor
-    | undefined;
+    FfmpegThumbnailCompositor | undefined;
   if (override) return override;
   const { width, height } = videoProfile.thumbnailSize;
   return new FfmpegThumbnailCompositor({
@@ -215,8 +214,7 @@ export async function thumbnailGeneratorNode(
       aspectGuidance: canvasGuidance.aspectGuidance,
       aspectLabel: canvasGuidance.aspectLabel,
       aspectRatio: videoProfile.aspectRatio,
-      otherAspectRatio:
-        videoProfile.aspectRatio === "16:9" ? "9:16" : "16:9",
+      otherAspectRatio: videoProfile.aspectRatio === "16:9" ? "9:16" : "16:9",
       thumbnailWidth: String(videoProfile.thumbnailSize.width),
       thumbnailHeight: String(videoProfile.thumbnailSize.height),
     },

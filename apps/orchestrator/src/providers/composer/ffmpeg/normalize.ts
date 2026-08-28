@@ -88,8 +88,10 @@ function kenBurnsFilter(
   const panX = pan.x.replaceAll("{progress}", progress);
   const panY = pan.y.replaceAll("{progress}", progress);
 
+  const srcW = Math.ceil(opts.width * opts.kenBurnsMaxZoom);
+  const srcH = Math.ceil(opts.height * opts.kenBurnsMaxZoom);
   return [
-    `scale=${opts.width * 2}:${opts.height * 2}:force_original_aspect_ratio=increase`,
+    `scale=${srcW}:${srcH}:force_original_aspect_ratio=increase`,
     "setsar=1",
     `zoompan=z='${zoomExpr}':x='${panX}':y='${panY}':d=${totalFrames}:s=${opts.width}x${opts.height}:fps=${opts.fps}`,
     "format=yuv420p",

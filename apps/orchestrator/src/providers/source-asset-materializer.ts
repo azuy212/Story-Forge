@@ -49,9 +49,11 @@ export async function materializeSourceAsset(
       throw new Error(`Source image download failed: HTTP ${response.status}`);
     const contentType =
       response.headers.get("content-type") ?? asset.mimeType ?? "";
-    const isImage = contentType.startsWith("image/") && !contentType.includes("svg");
+    const isImage =
+      contentType.startsWith("image/") && !contentType.includes("svg");
     const isVideo =
-      contentType.startsWith("video/mp4") || contentType.startsWith("video/webm");
+      contentType.startsWith("video/mp4") ||
+      contentType.startsWith("video/webm");
     if (!isImage && !isVideo) {
       throw new Error(`Source asset is not an image or video: ${contentType}`);
     }

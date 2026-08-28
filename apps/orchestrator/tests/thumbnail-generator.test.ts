@@ -255,7 +255,9 @@ describe("thumbnailGeneratorNode", () => {
     // appends pipeline overlay instructions.
     expect(generateCall.prompt).toContain(output.thumbnailPrompt);
     expect(generateCall.prompt).toContain('overlay text "Doesn\'t Exist?"');
-    expect(generateCall.prompt).toContain("vertical portrait 9:16 image at 1080x1920 pixels");
+    expect(generateCall.prompt).toContain(
+      "vertical portrait 9:16 image at 1080x1920 pixels",
+    );
     expect(generateCall.prompt).toContain("Do NOT render any text");
 
     expect(compositor.composite).toHaveBeenCalledWith(
@@ -524,7 +526,9 @@ describe("thumbnailGeneratorNode modes", () => {
     const [generateCall] = assetProvider.generateImage.mock.calls.at(-1)!;
     expect(generateCall.prompt).toContain('"THE DEADLY PRIZE"');
     expect(generateCall.prompt).toContain("integrated into the composition");
-    expect(generateCall.prompt).toContain("vertical portrait 9:16 image at 1080x1920 pixels");
+    expect(generateCall.prompt).toContain(
+      "vertical portrait 9:16 image at 1080x1920 pixels",
+    );
     expect(generateCall.prompt).not.toContain("Do NOT render any text");
 
     expect(compositor.composite).toHaveBeenCalledWith(

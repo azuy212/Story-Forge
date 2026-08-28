@@ -55,7 +55,9 @@ function makeMocks() {
 
 function runNode(state?: Partial<ProjectState>) {
   const mocks = makeMocks();
-  const shortProfile: VideoProfileConfig = resolveVideoProfile({ videoProfile: "short" });
+  const shortProfile: VideoProfileConfig = resolveVideoProfile({
+    videoProfile: "short",
+  });
   const promise = scriptPlannerNode(
     {
       project: { pillar: "Geography", topic: "Unrecognized Countries" },

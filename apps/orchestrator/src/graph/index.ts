@@ -416,6 +416,6 @@ builder
 builder.addEdge("Publisher", FINALIZE);
 builder.addEdge(FINALIZE, "__end__");
 
-export const graph = builder.compile().withConfig({ recursionLimit: 100 })
+export const graph = builder.compile().withConfig({ recursionLimit: 100 });
 
 graph.name = "YouTubeShortsPipeline";

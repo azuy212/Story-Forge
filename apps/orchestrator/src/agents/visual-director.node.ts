@@ -381,8 +381,10 @@ export async function visualDirectorNode(
 
   // Target scene count: aim for middle of density range, capped at max
   const targetSceneCount = Math.min(
-    Math.round((videoProfile.sceneDensity.min + videoProfile.sceneDensity.max) / 2),
-    videoProfile.sceneDensity.max - 1
+    Math.round(
+      (videoProfile.sceneDensity.min + videoProfile.sceneDensity.max) / 2,
+    ),
+    videoProfile.sceneDensity.max - 1,
   );
   // Hard maximum from schema
   const maxSceneCount = videoProfile.sceneDensity.max;

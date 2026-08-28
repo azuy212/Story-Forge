@@ -85,7 +85,19 @@ describe("normalizeAsset Ken Burns (image)", () => {
     await normalizeAsset("input.png", "out.mp4", 4, 0, { ...BASE_OPTS });
     const filter = vfFromArgs(lastCallArgs());
 
-    // Scale up to 2x then crop via zoompan's s= parameter
+    // Scale up to maxZoom-bound then crop via zoompan's s= parameter.
+    // Regression guard: must NOT pre-scale to width*2 — that oversamples by
+    // 4x and makes zoompan's resample+libx264's re-encode read as jitter.
+    const expectedSrcW = Math.ceil(BASE_OPTS.width * BASE_OPTS.kenBurnsMaxZoom);
+    const expectedSrcH = Math.ceil(
+      BASE_OPTS.height * BASE_OPTS.kenBurnsMaxZoom,
+    );
+    expect(filter).toContain(
+      `scale=${expectedSrcW}:${expectedSrcH}:force_original_aspect_ratio=increase`,
+    );
+    expect(filter).not.toContain(
+      `scale=${BASE_OPTS.width * 2}:${BASE_OPTS.height * 2}`,
+    );
     expect(filter).toContain("force_original_aspect_ratio=increase");
     expect(filter).toContain(`s=${BASE_OPTS.width}x${BASE_OPTS.height}`);
     expect(filter).not.toContain("pad=");

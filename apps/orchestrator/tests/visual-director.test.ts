@@ -69,7 +69,9 @@ function makeMocks() {
 
 function runNode(state?: Partial<ProjectState>) {
   const mocks = makeMocks();
-  const shortProfile: VideoProfileConfig = resolveVideoProfile({ videoProfile: "short" });
+  const shortProfile: VideoProfileConfig = resolveVideoProfile({
+    videoProfile: "short",
+  });
   const promise = visualDirectorNode(
     {
       project: { pillar: "Geography", topic: "Test" },
