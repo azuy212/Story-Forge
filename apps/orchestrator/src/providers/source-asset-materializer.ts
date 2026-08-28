@@ -49,11 +49,14 @@ export async function materializeSourceAsset(
       throw new Error(`Source image download failed: HTTP ${response.status}`);
     const contentType =
       response.headers.get("content-type") ?? asset.mimeType ?? "";
-    if (!contentType.startsWith("image/") || contentType.includes("svg")) {
-      throw new Error(`Source image is not an image: ${contentType}`);
+    const isImage = contentType.startsWith("image/") && !contentType.includes("svg");
+    const isVideo =
+      contentType.startsWith("video/mp4") || contentType.startsWith("video/webm");
+    if (!isImage && !isVideo) {
+      throw new Error(`Source asset is not an image or video: ${contentType}`);
     }
     const bytes = Buffer.from(await response.arrayBuffer());
-    if (bytes.length === 0) throw new Error("Source image response was empty");
+    if (bytes.length === 0) throw new Error("Source asset response was empty");
 
     const filePath = join(
       mediaDir,

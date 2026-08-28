@@ -4,7 +4,10 @@ import type { SourceAssetCache } from "./source-asset-cache.js";
 import { FileSourceAssetCache } from "./source-asset-cache.js";
 import { WikimediaSourceAssetProvider } from "./wikimedia-source-asset-provider.js";
 import { UnsplashSourceAssetProvider } from "./unsplash-source-asset-provider.js";
-import { PexelsSourceAssetProvider } from "./pexels-source-asset-provider.js";
+import {
+  PexelsSourceAssetProvider,
+  PexelsVideoSourceAssetProvider,
+} from "./pexels-source-asset-provider.js";
 import { TYPE_HINT, selectBestSourceAsset } from "./source-asset-selection.js";
 import { materializeSourceAsset } from "./source-asset-materializer.js";
 import { config as appConfig } from "../utils/config.js";
@@ -200,6 +203,13 @@ export function createDefaultSourceAssetSearcher(): SourceAssetSearcher {
   const pexelsKey = appConfig.pexelsApiKey();
   if (pexelsKey) {
     providers.push(new PexelsSourceAssetProvider(pexelsKey));
+    // Stock videos are gated by ENABLE_VIDEO_ASSETS: the Pexels video
+    // provider short-circuits on entities without a target resolution, but
+    // pushing it only when the flag is on avoids wasted lookups for runs
+    // that do not need video at all.
+    if (appConfig.supportsVideoAssets()) {
+      providers.push(new PexelsVideoSourceAssetProvider(pexelsKey));
+    }
   }
 
   return new FallbackSourceAssetSearcher(

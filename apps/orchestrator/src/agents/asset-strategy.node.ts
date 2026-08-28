@@ -4,6 +4,7 @@ import type {
   Diagnostics,
   Execution,
   Scene,
+  VideoSize,
 } from "../types/index.js";
 import type {
   AssetMode,
@@ -29,11 +30,19 @@ function getSearcher(config: RunnableConfig): SourceAssetSearcher {
   );
 }
 
-function normalizedEntities(scene: Scene): SceneEntity[] {
+function normalizedEntities(
+  scene: Scene,
+  resolution?: VideoSize,
+): SceneEntity[] {
   return (scene.entities ?? []).map((entity) => ({
     ...entity,
     requiresSourceImage:
       entity.requiresSourceImage === true || entity.type === "person",
+    // Stamp the scene's target render size so the Pexels video provider
+    // can match an exact-resolution rendition. Only attach when the scene
+    // is requesting a video asset, otherwise image-only entities carry
+    // noise the photo provider does not need.
+    ...(scene.assetType === "video" && resolution ? { resolution } : {}),
   }));
 }
 
@@ -76,9 +85,10 @@ export async function assetStrategyNode(
   const candidates = new Map<string, SourceAsset | undefined>();
   const allEntities = new Map<string, SceneEntity>();
   const diagnostics: Diagnostics = { errors: [], warnings: [] };
+  const targetResolution = state.videoProfile?.videoSize;
 
   for (const scene of scenes) {
-    for (const entity of normalizedEntities(scene)) {
+    for (const entity of normalizedEntities(scene, targetResolution)) {
       if (entity.requiresSourceImage)
         allEntities.set(sourceEntityKey(entity), entity);
     }
@@ -132,7 +142,7 @@ export async function assetStrategyNode(
   const sourceAssets = [...(state.production?.sourceAssets ?? [])];
   const byId = new Map(sourceAssets.map((asset) => [asset.id, asset]));
   const resolvedScenes = scenes.map((scene) => {
-    const entities = normalizedEntities(scene);
+    const entities = normalizedEntities(scene, targetResolution);
     const sourceAssetIds = entities
       .filter((entity) => entity.requiresSourceImage)
       .map((entity) => candidates.get(sourceEntityKey(entity)))

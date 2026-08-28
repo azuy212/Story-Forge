@@ -2,6 +2,7 @@ import { z } from "zod";
 import { VisualPlanEntrySchema } from "./visual-planner-output.js";
 import { PromptQAOutputSchema } from "./prompt-qa-output.js";
 import { ImageGenerationFailureTypeEnum } from "../providers/image-generation-error.js";
+import { VideoSizeSchema } from "./video-profile.js";
 
 export const ProviderEnum = z.enum([
   "gpt-image",
@@ -87,6 +88,17 @@ export const SceneEntitySchema = z.object({
   name: z.string().min(1),
   canonicalId: z.string().optional(),
   requiresSourceImage: z.boolean().optional().default(false),
+  /**
+   * Target render resolution for stock-asset matching. Populated by the
+   * asset-strategy node from the scene's videoProfile.videoSize so the
+   * Pexels video provider can pick an exact-resolution rendition.
+   */
+  resolution: VideoSizeSchema.optional(),
+  /**
+   * Minimum acceptable stock-video duration in seconds. Pexels video
+   * provider filters results whose reported duration is below this floor.
+   */
+  minimumDurationSec: z.number().positive().optional(),
 });
 
 export const SourceAssetSchema = z.object({
@@ -107,6 +119,7 @@ export const SourceAssetSchema = z.object({
 
 export const AssetKindEnum = z.enum([
   "source-image",
+  "source-video",
   "generated-image",
   "source-composite",
   "source-edit",

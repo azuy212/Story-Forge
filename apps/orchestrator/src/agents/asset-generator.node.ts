@@ -221,8 +221,8 @@ async function generateScene(
   }
   const prompt = scene.generationPrompt;
 
-  const assetType = scene.assetType ?? "image";
-  const mode = scene.assetMode ?? "generated";
+  let assetType = scene.assetType ?? "image";
+  let mode = scene.assetMode ?? "generated";
   const selectedSourceAssets = sourceAssetsFor(scene, sourceAssets);
   const references = referencesFor(selectedSourceAssets);
 
@@ -237,6 +237,35 @@ async function generateScene(
         generationStatus: "complete" as const,
       },
     };
+  }
+
+  if (assetType === "video" && mode === "source" && references.length > 0) {
+    return {
+      kind: "resolved",
+      scene: {
+        ...scene,
+        assetKind: "source-video" as const,
+        assetUrl: references[0].path,
+        assetGeneratedAt: new Date().toISOString(),
+        generationStatus: "complete" as const,
+      },
+    };
+  }
+
+  if (assetType === "video" && mode === "source" && references.length === 0) {
+    // No stock video matched the scene's entity keywords. Without an AI
+    // video provider wired, calling provider.generateVideo() would throw,
+    // so degrade to a still image: the video-typed scene is rendered as a
+    // generated frame and the composer uses it as a static visual. The
+    // cache key is built from the original planned scenes, so this
+    // mid-flight assetType flip does not invalidate the cache.
+    logger.info(
+      "AssetGenerator no stock video found; falling back to image generation",
+      { sceneId: scene.sceneId },
+    );
+    scene = { ...scene, assetType: "image" as const };
+    assetType = "image";
+    mode = "generated";
   }
 
   const referenceMode =
