@@ -169,4 +169,14 @@ export const config = {
     const value = Number(read("SUBTITLE_OUTLINE") ?? "2");
     return Number.isFinite(value) && value >= 0 ? value : 2;
   },
+  // --- Run diagnostic log file ---
+  runLogFileEnabled: (): boolean => read("ORCHESTRATOR_LOG_FILE") !== "false",
+  runLogMaxLineBytes: (): number => {
+    const value = Number(read("ORCHESTRATOR_LOG_MAX_LINE_BYTES") ?? "8388608");
+    return Number.isFinite(value) && value >= 1024
+      ? Math.floor(value)
+      : 8388608;
+  },
+  runLogIncludeMessages: (): boolean =>
+    read("ORCHESTRATOR_LOG_MESSAGES") !== "false",
 };

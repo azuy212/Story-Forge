@@ -12,6 +12,12 @@ const mockReadFile = jest.fn<(...args: any[]) => Promise<any>>();
 
 jest.unstable_mockModule("node:fs/promises", () => ({
   readFile: mockReadFile,
+  writeFile: jest.fn(async () => undefined),
+  appendFile: jest.fn(async () => undefined),
+  rename: jest.fn(async () => undefined),
+  mkdir: jest.fn(async () => undefined),
+  rm: jest.fn(async () => undefined),
+  stat: jest.fn(async () => undefined),
 }));
 
 const { HttpWhisperXProvider } =
@@ -51,8 +57,12 @@ function makeResponse(status: number, body: unknown): Response {
     ok: status >= 200 && status < 300,
     status,
     statusText: status === 200 ? "OK" : "Error",
-    headers: new Map() as unknown as Headers,
+    headers: {
+      get: () => null,
+      entries: () => [] as IterableIterator<[string, string]>,
+    } as unknown as Headers,
     json: () => Promise.resolve(body),
+    text: () => Promise.resolve(JSON.stringify(body)),
     arrayBuffer: () => Promise.reject(new Error("Unexpected arrayBuffer")),
   } as Response;
 }

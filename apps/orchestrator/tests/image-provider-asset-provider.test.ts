@@ -23,6 +23,10 @@ jest.unstable_mockModule("node:fs/promises", () => ({
   mkdir: mockMkdir,
   readFile: mockReadFile,
   writeFile: mockWriteFile,
+  rename: jest.fn(async () => undefined),
+  appendFile: jest.fn(async () => undefined),
+  stat: jest.fn(async () => undefined),
+  rm: jest.fn(async () => undefined),
 }));
 
 const { ImageProviderAssetProvider } =

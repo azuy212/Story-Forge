@@ -1,4 +1,10 @@
 import type { SceneEntity, SourceAsset } from "../schemas/production.js";
+import type { RunLogSink } from "../utils/run-log.js";
+
+export interface SourceAssetSearchContext {
+  sink?: RunLogSink | null;
+  runId?: string;
+}
 
 export interface SourceAssetProvider {
   readonly name: string;
@@ -6,6 +12,7 @@ export interface SourceAssetProvider {
     entity: SceneEntity,
     query: string,
     deadlineMs?: number,
+    context?: SourceAssetSearchContext,
   ): Promise<SourceAsset[]>;
 }
 

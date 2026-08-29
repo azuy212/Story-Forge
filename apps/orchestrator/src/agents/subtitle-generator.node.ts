@@ -16,10 +16,14 @@ import { WhisperXSceneSubtitleProvider } from "../providers/whisperx-scene-subti
 import { HttpWhisperXProvider } from "../providers/whisperx-provider.js";
 import type { GenerateSubtitlesResult } from "../providers/subtitle-provider.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
-import { withTopic } from "../artifacts/context.js";
+import { withTopic, getArtifactNamespace } from "../artifacts/context.js";
 import { config as appConfig } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
+import {
+  appendRunLogEvent,
+  getRunLogSinkFromConfig,
+} from "../utils/run-log.js";
 
 const SUBTITLE_ALIGNMENT_VERSION = 5;
 
@@ -183,8 +187,20 @@ export async function subtitleGeneratorNode(
     state.videoProfile ?? resolveVideoProfile({});
   const provider = getSceneSubtitleProvider(config, videoProfile);
   const providerName = provider.constructor.name;
+  const runLogSink = getRunLogSinkFromConfig(config);
+  const runId = getArtifactNamespace(config, state);
 
   logger.nodePhase(label, "generating subtitles");
+
+  appendRunLogEvent(runLogSink, {
+    event: "scene_event",
+    node: AgentModel.SubtitleGenerator,
+    sceneId: scenes.length,
+    kind: "start",
+    providerName,
+    audioSceneCount: audioScenes.length,
+    runId,
+  });
 
   const result = await cacheNodeResult<Partial<Subtitles>>(
     {
@@ -202,11 +218,21 @@ export async function subtitleGeneratorNode(
     },
     async () => {
       try {
-        const providerResult = await provider.generateSceneSubtitles(
-          scenes as Scene[],
-          audioScenes as SceneAudio[],
-          videoProfile,
-        );
+        const providerResult =
+          "run" in provider &&
+          typeof (provider as { run?: unknown }).run === "function"
+            ? await (provider as WhisperXSceneSubtitleProvider).run(
+                scenes as Scene[],
+                audioScenes as SceneAudio[],
+                videoProfile,
+                runLogSink,
+                runId,
+              )
+            : await provider.generateSceneSubtitles(
+                scenes as Scene[],
+                audioScenes as SceneAudio[],
+                videoProfile,
+              );
         return {
           data: {
             srt: providerResult.srt,
@@ -227,6 +253,16 @@ export async function subtitleGeneratorNode(
 
   if (result.error) {
     logger.nodeFailed(label, result.error);
+    appendRunLogEvent(runLogSink, {
+      event: "scene_event",
+      node: AgentModel.SubtitleGenerator,
+      sceneId: scenes.length,
+      kind: "end",
+      outcome: "failed",
+      errorReason: result.error,
+      durationMs: Date.now() - startedAt,
+      runId,
+    });
     return {
       subtitles: {},
       diagnostics: {
@@ -236,6 +272,17 @@ export async function subtitleGeneratorNode(
     };
   }
 
+  appendRunLogEvent(runLogSink, {
+    event: "scene_event",
+    node: AgentModel.SubtitleGenerator,
+    sceneId: scenes.length,
+    kind: "end",
+    outcome: "resolved",
+    durationMs: Date.now() - startedAt,
+    cacheHit: result.fromCache,
+    wordCount: result.data?.wordTimestamps?.length ?? 0,
+    runId,
+  });
   logger.nodeDone(label, Date.now() - startedAt);
 
   return {

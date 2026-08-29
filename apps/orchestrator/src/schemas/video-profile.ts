@@ -20,7 +20,7 @@ export type SceneDurationRange = z.input<typeof SceneDurationRangeSchema>;
 
 export const SceneDensitySchema = z.object({
   min: z.number().int().positive(),
-  max: z.number().int().positive(),
+  max: z.number().int().positive().nullable(),
 });
 export type SceneDensity = z.input<typeof SceneDensitySchema>;
 
@@ -59,7 +59,7 @@ export const DEFAULT_PROFILES: Record<
     durationToleranceSec: 45,
     wordsPerMinute: 160,
     sceneDurationRange: { min: 7, max: 12 },
-    sceneDensity: { min: 25, max: 42 },
+    sceneDensity: { min: 25, max: null },
     aspectRatio: "16:9",
     videoSize: { width: 1920, height: 1080 },
     thumbnailSize: { width: 1280, height: 720 },

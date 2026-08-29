@@ -32,6 +32,7 @@ import {
   WikimediaSourceAssetProvider,
   wikimediaPageUrl,
 } from "../src/providers/wikimedia-source-asset-provider.js";
+import type { RunLogSink } from "../src/utils/run-log.js";
 
 let cacheDir: string;
 let fetchSpy: jest.Spied<typeof globalThis.fetch>;
@@ -647,5 +648,50 @@ describe("fetch with retry", () => {
     );
 
     expect(response.status).toBe(200);
+  });
+});
+
+describe("assetStrategyNode run-log capture", () => {
+  it("emits scene_event start+end for each entity and a router-aware provider_call", async () => {
+    const captured: unknown[] = [];
+    const sink: RunLogSink = {
+      runId: "cap",
+      filePath: "/tmp/never",
+      appendLine: (e: unknown) => {
+        captured.push(e);
+        return Promise.resolve();
+      },
+      flush: () => Promise.resolve(),
+      close: () => Promise.resolve(),
+    };
+    const searcher: SourceAssetSearcher = {
+      search: jest.fn<() => Promise<SourceAssetOutcome>>().mockResolvedValue({
+        status: "no_match",
+        queries: ["Ada Lovelace"],
+        totalDurationMs: 5,
+      }),
+    };
+    await assetStrategyNode(
+      stateWithScenes([
+        {
+          sceneId: 1,
+          entities: [{ type: "person", name: "Ada Lovelace" }],
+        },
+      ]),
+      {
+        configurable: { sourceAssetSearcher: searcher, runLogSink: sink },
+      } as any,
+    );
+    const sceneEvents = captured.filter(
+      (e) => (e as { event: string }).event === "scene_event",
+    );
+    expect(sceneEvents.length).toBeGreaterThanOrEqual(2);
+    const kinds = sceneEvents.map((e) => (e as { kind: string }).kind);
+    expect(kinds).toContain("start");
+    expect(kinds).toContain("end");
+    const end = sceneEvents.find(
+      (e) => (e as { kind: string }).kind === "end",
+    ) as { outcome?: string } | undefined;
+    expect(end?.outcome).toBe("no_match");
   });
 });

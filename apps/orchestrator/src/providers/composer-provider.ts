@@ -30,6 +30,7 @@ export interface ComposeOptions {
   };
   video?: VideoSize;
   runId?: string;
+  runLogSink?: import("../utils/run-log.js").RunLogSink | null;
 }
 
 export interface ComposeResult {

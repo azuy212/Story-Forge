@@ -27,6 +27,10 @@ import {
 import { config as appConfig } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
+import {
+  appendRunLogEvent,
+  getRunLogSinkFromConfig,
+} from "../utils/run-log.js";
 
 const DEFAULT_PROVIDER = new FfmpegComposerProvider({
   subtitleFontSize: appConfig.subtitleFontSize(),
@@ -317,6 +321,7 @@ export async function videoComposerNode(
           },
           video: videoProfile.videoSize,
           runId: getArtifactNamespace(config, state),
+          runLogSink: getRunLogSinkFromConfig(config),
         });
 
         return {
@@ -334,6 +339,15 @@ export async function videoComposerNode(
           },
         };
       } catch (err) {
+        appendRunLogEvent(getRunLogSinkFromConfig(config), {
+          event: "scene_event",
+          node: AgentModel.VideoComposer,
+          sceneId: scenes.length,
+          kind: "end",
+          outcome: "fatal",
+          errorReason: (err as Error)?.message ?? String(err),
+          runId: getArtifactNamespace(config, state),
+        });
         return {
           data: null,
           error: `${AgentModel.VideoComposer}: Video composition failed: ${(err as Error)?.message ?? String(err)}`,

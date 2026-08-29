@@ -5,6 +5,7 @@ import {
   getArtifactStore,
   getRunId,
 } from "../../artifacts/context.js";
+import { getRunLogSinkFromConfig } from "../../utils/run-log.js";
 import type { ArtifactStore } from "../../artifacts/store.js";
 import type {
   PublicationArtifact,
@@ -89,6 +90,8 @@ async function publishToProvider(opts: {
         error: undefined,
       });
     },
+    runId,
+    runLogSink: getRunLogSinkFromConfig(config),
   };
 
   try {

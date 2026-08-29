@@ -20,14 +20,30 @@ import {
 import { sourceEntityKey } from "../providers/source-asset-provider.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
+import {
+  appendRunLogEvent,
+  getRunLogSinkFromConfig,
+} from "../utils/run-log.js";
+import { getRunId } from "../artifacts/context.js";
 
 const DEFAULT_SEARCHER = createDefaultSourceAssetSearcher();
+void DEFAULT_SEARCHER; // reserved for future direct-invocation fallback
 
-function getSearcher(config: RunnableConfig): SourceAssetSearcher {
+function getSearcher(
+  config: RunnableConfig,
+  context: {
+    sink?: ReturnType<typeof getRunLogSinkFromConfig>;
+    runId?: string;
+  } = {},
+): SourceAssetSearcher {
   const inject = (config.configurable ?? {}) as Record<string, unknown>;
-  return (
-    (inject.sourceAssetSearcher as SourceAssetSearcher) ?? DEFAULT_SEARCHER
-  );
+  if (inject.sourceAssetSearcher) {
+    return inject.sourceAssetSearcher as SourceAssetSearcher;
+  }
+  return createDefaultSourceAssetSearcher({
+    sink: context.sink ?? null,
+    runId: context.runId,
+  });
 }
 
 const DEFAULT_VIDEO_MIN_DURATION_SEC = 4;
@@ -76,6 +92,12 @@ export async function assetStrategyNode(
   const startedAt = Date.now();
   const scenes = state.production?.scenes ?? [];
   const label = nodeLabel(AgentModel.AssetStrategy);
+  const sink = getRunLogSinkFromConfig(config);
+  const runId = getRunId(config, state) ?? undefined;
+  const searcher = getSearcher(config, {
+    sink,
+    runId,
+  });
   logger.nodeStart(label);
   if (scenes.length === 0) {
     logger.nodeFailed(label, "No scenes to process");
@@ -89,7 +111,6 @@ export async function assetStrategyNode(
 
   logger.nodePhase(label, "searching source assets");
 
-  const searcher = getSearcher(config);
   const candidates = new Map<string, SourceAsset | undefined>();
   const allEntities = new Map<string, SceneEntity>();
   const diagnostics: Diagnostics = { errors: [], warnings: [] };
@@ -103,11 +124,29 @@ export async function assetStrategyNode(
   }
 
   for (const [key, entity] of allEntities) {
-    logger.info("SourceAsset searching for entity", {
-      entity: entity.name,
-      type: entity.type,
+    appendRunLogEvent(sink, {
+      event: "scene_event",
+      node: AgentModel.AssetStrategy,
+      sceneId: null,
+      entityName: entity.name,
+      kind: "start",
+      entityType: entity.type,
+      runId,
     });
     const outcome: SourceAssetOutcome = await searcher.search(entity);
+    appendRunLogEvent(sink, {
+      event: "scene_event",
+      node: AgentModel.AssetStrategy,
+      sceneId: null,
+      entityName: entity.name,
+      kind: "end",
+      outcome: outcome.status,
+      provider: "provider" in outcome ? outcome.provider : undefined,
+      durationMs: outcome.totalDurationMs,
+      errorReason:
+        outcome.status === "provider_failure" ? outcome.reason : undefined,
+      runId,
+    });
 
     switch (outcome.status) {
       case "ok": {

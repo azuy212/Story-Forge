@@ -2,7 +2,10 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { hashObject } from "../artifacts/hash.js";
 import type { SceneEntity, SourceAsset } from "../schemas/production.js";
-import type { SourceAssetProvider } from "./source-asset-provider.js";
+import type {
+  SourceAssetProvider,
+  SourceAssetSearchContext,
+} from "./source-asset-provider.js";
 import { sourceEntityKey } from "./source-asset-provider.js";
 
 export interface SourceAssetCache {
@@ -79,10 +82,16 @@ export class CachedSourceAssetProvider implements SourceAssetProvider {
     entity: SceneEntity,
     query: string,
     deadlineMs?: number,
+    context?: SourceAssetSearchContext,
   ): Promise<SourceAsset[]> {
     const cached = await this.cache.get(entity, query);
     if (cached && cached.length > 0) return cached;
-    const assets = await this.provider.search(entity, query, deadlineMs);
+    const assets = await this.provider.search(
+      entity,
+      query,
+      deadlineMs,
+      context,
+    );
     if (assets.length > 0)
       await this.cache.set(entity, query, assets).catch(() => {});
     return assets;

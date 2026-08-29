@@ -1,5 +1,11 @@
 import { runFfmpeg } from "./ffmpeg.js";
 import type { EncoderConfig } from "./ffmpeg.js";
+import type { RunLogSink } from "../../../utils/run-log.js";
+
+export interface FfmpegCallContext {
+  runLogSink?: RunLogSink | null;
+  runId?: string;
+}
 
 export interface BurnSubtitlesOptions {
   subtitlePath: string;
@@ -40,6 +46,7 @@ export async function burnSubtitles(
   videoPath: string,
   opts: BurnSubtitlesOptions,
   outputPath: string,
+  context: FfmpegCallContext = {},
 ): Promise<void> {
   const fontSize = opts.fontSize ?? 20;
   const fontName = opts.fontName;
@@ -72,5 +79,7 @@ export async function burnSubtitles(
   await runFfmpeg({
     args,
     description: "burn subtitles",
+    runLogSink: context.runLogSink,
+    runId: context.runId,
   });
 }

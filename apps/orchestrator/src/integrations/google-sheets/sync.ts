@@ -1,5 +1,6 @@
 import { logger } from "../../utils/logger.js";
 import { config } from "../../utils/config.js";
+import { appendRunLogEvent, getRunLogSink } from "../../utils/run-log.js";
 import {
   buildSheetRow,
   assertHeaders,
@@ -44,6 +45,19 @@ export async function syncVideoRecord(
   options: SyncVideoRecordOptions,
 ): Promise<SyncVideoRecordResult> {
   const { api, spreadsheetId, sheetName, videoId, record } = options;
+  const sink = getRunLogSink(logger.getCurrentSink()?.runId ?? "") ?? logger.getCurrentSink();
+  const startedAt = Date.now();
+  const event: Record<string, unknown> = {
+    event: "provider_call",
+    provider: "google_sheets",
+    operation: "sync_video_record",
+    url: "googleapis.com/sheets/v4/values",
+    method: "POST",
+    headers: {},
+    spreadsheetId,
+    sheetName,
+    videoId,
+  };
   try {
     const { data } = await api.get({
       spreadsheetId,
@@ -59,15 +73,20 @@ export async function syncVideoRecord(
 
     if (rowIndex >= 0) {
       const rowNumber = rowIndex + 1;
+      event.action = "update";
       await api.update({
         spreadsheetId,
         range: boundedCellRange(sheetName, rowNumber),
         valueInputOption: "USER_ENTERED",
         requestBody: { values },
       });
+      event.row = rowNumber;
+      event.requestDurationMs = Date.now() - startedAt;
+      appendRunLogEvent(sink, event);
       return { action: "updated", row: rowNumber };
     }
 
+    event.action = "append";
     await api.append({
       spreadsheetId,
       range: boundedRange(sheetName),
@@ -75,8 +94,17 @@ export async function syncVideoRecord(
       insertDataOption: "INSERT_ROWS",
       requestBody: { values },
     });
+    event.row = rows.length + 1;
+    event.requestDurationMs = Date.now() - startedAt;
+    appendRunLogEvent(sink, event);
     return { action: "created", row: rows.length + 1 };
   } catch (error) {
+    event.requestDurationMs = Date.now() - startedAt;
+    event.error = {
+      message: (error as Error)?.message ?? String(error),
+      name: (error as Error)?.name,
+    };
+    appendRunLogEvent(sink, event);
     throw toSheetsError(error);
   }
 }

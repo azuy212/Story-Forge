@@ -1,6 +1,7 @@
 import {
   resolveVideoProfile,
   speakingRateWps,
+  checkNarrationDuration,
 } from "../utils/video-profile.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type {
@@ -154,25 +155,13 @@ export async function validatePackage(
 
   // --- Duration validation (only when explicit profile/target requested) ---
   if (videoProfile.explicit && narrationMs) {
-    const targetSec = videoProfile.targetDurationSec;
-    const toleranceSec = videoProfile.durationToleranceSec;
-    const minTarget = targetSec - toleranceSec;
-    const maxTarget = targetSec + toleranceSec;
-    const actualSec = narrationMs / 1000;
-
-    check(
-      actualSec >= minTarget && actualSec <= maxTarget,
-      "Narration duration matches target",
-      `narration ${actualSec.toFixed(1)}s outside ${minTarget}-${maxTarget}s for ${targetSec}s target`,
+    const durationIssues = checkNarrationDuration(
+      videoProfile,
+      state.content?.narration ?? "",
+      estimated ?? videoProfile.targetDurationSec,
     );
-
-    // Also check estimated duration if present
-    if (estimated) {
-      check(
-        estimated >= minTarget && estimated <= maxTarget,
-        "Estimated duration matches target",
-        `estimated ${estimated}s outside ${minTarget}-${maxTarget}s for ${targetSec}s target`,
-      );
+    for (const issue of durationIssues) {
+      issues.push(issue);
     }
   }
 

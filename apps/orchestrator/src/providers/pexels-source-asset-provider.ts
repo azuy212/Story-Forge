@@ -1,6 +1,14 @@
 import type { SceneEntity, SourceAsset } from "../schemas/production.js";
-import type { SourceAssetProvider } from "./source-asset-provider.js";
+import type {
+  SourceAssetProvider,
+  SourceAssetSearchContext,
+} from "./source-asset-provider.js";
 import { fetchWithRetry } from "./source-asset-fetcher.js";
+import {
+  sanitizeHeaders,
+  withProviderLog,
+  type RunLogSink,
+} from "../utils/run-log.js";
 
 const PHOTO_API_URL = "https://api.pexels.com/v1/search";
 const VIDEO_API_URL = "https://api.pexels.com/v1/videos/search";
@@ -93,20 +101,47 @@ class PexelsClient {
   constructor(
     private readonly apiKey: string,
     private readonly options: PexelsRequestOptions,
+    private readonly sink: RunLogSink | null,
+    private readonly runId: string | undefined,
+    private readonly entity: SceneEntity,
+    private readonly query: string,
+    private readonly operation: "photo_search" | "video_search",
   ) {}
 
   async getJson<T>(url: string): Promise<T> {
-    const response = await fetchWithRetry(
+    const requestHeaders: Record<string, string> = {
+      Accept: "application/json",
+      Authorization: this.apiKey,
+    };
+    const event: Record<string, unknown> = {
+      event: "provider_call",
+      provider: "pexels",
+      operation: this.operation,
       url,
-      {
-        headers: {
-          Accept: "application/json",
-          Authorization: this.apiKey,
+      method: "GET",
+      headers: sanitizeHeaders(requestHeaders),
+      runId: this.runId,
+      entityName: this.entity.name,
+      query: this.query,
+    };
+    return withProviderLog(this.sink, event, async () => {
+      const response = await fetchWithRetry(
+        url,
+        {
+          headers: requestHeaders,
         },
-      },
-      this.options,
-    );
-    return (await response.json()) as T;
+        this.options,
+      );
+      const body = await response.json();
+      event.responseStatus = response.status;
+      event.responseHeaders = sanitizeHeaders(
+        Object.fromEntries(response.headers.entries()),
+      );
+      event.responseBody = body;
+      const text = JSON.stringify(body);
+      event.responseBodyBytes = Buffer.byteLength(text, "utf-8");
+      return body as T;
+    });
   }
 }
 
@@ -122,14 +157,23 @@ export class PexelsSourceAssetProvider implements SourceAssetProvider {
     entity: SceneEntity,
     query: string,
     deadlineMs?: number,
+    context?: SourceAssetSearchContext,
   ): Promise<SourceAsset[]> {
     if (!this.apiKey) return [];
 
-    const client = new PexelsClient(this.apiKey, {
-      timeoutMs: this.options.timeoutMs ?? REQUEST_TIMEOUT_MS,
-      deadlineMs,
-      retryDelaysMs: this.options.retryDelaysMs ?? RETRY_DELAYS_MS,
-    });
+    const client = new PexelsClient(
+      this.apiKey,
+      {
+        timeoutMs: this.options.timeoutMs ?? REQUEST_TIMEOUT_MS,
+        deadlineMs,
+        retryDelaysMs: this.options.retryDelaysMs ?? RETRY_DELAYS_MS,
+      },
+      context?.sink ?? null,
+      context?.runId,
+      entity,
+      query,
+      "photo_search",
+    );
     const params = new URLSearchParams({ query, per_page: "12" });
     const data = await client.getJson<PexelsPhotoResponse>(
       `${PHOTO_API_URL}?${params.toString()}`,
@@ -163,6 +207,7 @@ export class PexelsVideoSourceAssetProvider implements SourceAssetProvider {
     entity: SceneEntity,
     query: string,
     deadlineMs?: number,
+    context?: SourceAssetSearchContext,
   ): Promise<SourceAsset[]> {
     if (!this.apiKey) return [];
     if (!entity.resolution) return [];
@@ -173,11 +218,19 @@ export class PexelsVideoSourceAssetProvider implements SourceAssetProvider {
     );
     if (orientation === "square") return [];
 
-    const client = new PexelsClient(this.apiKey, {
-      timeoutMs: this.options.timeoutMs ?? REQUEST_TIMEOUT_MS,
-      deadlineMs,
-      retryDelaysMs: this.options.retryDelaysMs ?? RETRY_DELAYS_MS,
-    });
+    const client = new PexelsClient(
+      this.apiKey,
+      {
+        timeoutMs: this.options.timeoutMs ?? REQUEST_TIMEOUT_MS,
+        deadlineMs,
+        retryDelaysMs: this.options.retryDelaysMs ?? RETRY_DELAYS_MS,
+      },
+      context?.sink ?? null,
+      context?.runId,
+      entity,
+      query,
+      "video_search",
+    );
     const params = new URLSearchParams({
       query,
       per_page: "20",

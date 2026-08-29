@@ -1,6 +1,10 @@
 import type { SceneEntity, SourceAsset } from "../schemas/production.js";
-import type { SourceAssetProvider } from "./source-asset-provider.js";
+import type {
+  SourceAssetProvider,
+  SourceAssetSearchContext,
+} from "./source-asset-provider.js";
 import { fetchWithRetry } from "./source-asset-fetcher.js";
+import { sanitizeHeaders, withProviderLog } from "../utils/run-log.js";
 
 const API_URL = "https://commons.wikimedia.org/w/api.php";
 const COMMONS_URL = "https://commons.wikimedia.org";
@@ -63,6 +67,7 @@ export class WikimediaSourceAssetProvider implements SourceAssetProvider {
     entity: SceneEntity,
     query: string = entity.name,
     deadlineMs?: number,
+    context?: SourceAssetSearchContext,
   ): Promise<SourceAsset[]> {
     const params = new URLSearchParams({
       action: "query",
@@ -78,19 +83,45 @@ export class WikimediaSourceAssetProvider implements SourceAssetProvider {
       origin: "*",
     });
 
-    const response = await fetchWithRetry(
-      `${API_URL}?${params.toString()}`,
-      {
-        headers: { Accept: "application/json" },
-      },
-      {
-        timeoutMs: this.options.timeoutMs ?? REQUEST_TIMEOUT_MS,
-        deadlineMs,
-        retryDelaysMs: this.options.retryDelaysMs ?? RETRY_DELAYS_MS,
-      },
-    );
+    const url = `${API_URL}?${params.toString()}`;
+    const requestHeaders: Record<string, string> = {
+      Accept: "application/json",
+    };
+    const sink = context?.sink ?? null;
+    const event: Record<string, unknown> = {
+      event: "provider_call",
+      provider: "wikimedia",
+      operation: "photo_search",
+      url,
+      method: "GET",
+      headers: sanitizeHeaders(requestHeaders),
+      runId: context?.runId,
+      entityName: entity.name,
+      query,
+    };
+    const data = (await withProviderLog(sink, event, async () => {
+      const response = await fetchWithRetry(
+        url,
+        { headers: requestHeaders },
+        {
+          timeoutMs: this.options.timeoutMs ?? REQUEST_TIMEOUT_MS,
+          deadlineMs,
+          retryDelaysMs: this.options.retryDelaysMs ?? RETRY_DELAYS_MS,
+        },
+      );
+      const body = (await response.json()) as WikimediaResponse;
+      event.responseStatus = response.status;
+      event.responseHeaders = sanitizeHeaders(
+        Object.fromEntries(response.headers.entries()),
+      );
+      event.responseBodyBytes = Buffer.byteLength(
+        JSON.stringify(body),
+        "utf-8",
+      );
+      event.resultCount = Object.keys(body.query?.pages ?? {}).length;
+      return body;
+    })) as WikimediaResponse;
 
-    const data = (await response.json()) as WikimediaResponse;
     return Object.values(data.query?.pages ?? []).flatMap((page) => {
       const info = page.imageinfo?.[0];
       if (

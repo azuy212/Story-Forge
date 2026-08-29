@@ -100,10 +100,13 @@ export function resolveVideoProfile(
 function computeSceneDensity(
   targetDurationSec: number,
   sceneDurationRange: { min: number; max: number },
-  profileBounds: { min: number; max: number },
-): { min: number; max: number } {
+  profileBounds: { min: number; max: number | null },
+): { min: number; max: number | null } {
   const minScenes = Math.ceil(targetDurationSec / sceneDurationRange.max);
   const maxScenes = Math.floor(targetDurationSec / sceneDurationRange.min);
+  if (profileBounds.max === null) {
+    return { min: Math.max(minScenes, profileBounds.min), max: null };
+  }
   return {
     min: Math.max(minScenes, profileBounds.min),
     max: Math.min(maxScenes, profileBounds.max),
@@ -138,21 +141,39 @@ export function checkNarrationDuration(
   const words = narration.trim().split(/\s+/).filter(Boolean).length;
   const wordRange = wordRangeFor(profile);
 
-  if (words < wordRange.min || words > wordRange.max) {
-    issues.push(
-      `Narration word count ${words} outside expected range ${wordRange.min}-${wordRange.max} for ${profile.targetDurationSec}s target at ${profile.wordsPerMinute} wpm`,
-    );
+  // Long profile: only minimum word count; short profile: both min and max
+  if (profile.profile === "long") {
+    if (words < wordRange.min) {
+      issues.push(
+        `Narration word count ${words} below minimum ${wordRange.min} for ${profile.targetDurationSec}s target at ${profile.wordsPerMinute} wpm`,
+      );
+    }
+  } else {
+    if (words < wordRange.min || words > wordRange.max) {
+      issues.push(
+        `Narration word count ${words} outside expected range ${wordRange.min}-${wordRange.max} for ${profile.targetDurationSec}s target at ${profile.wordsPerMinute} wpm`,
+      );
+    }
   }
 
+  // Long profile: only minimum duration; short profile: both min and max
   const minEstimated = profile.targetDurationSec - profile.durationToleranceSec;
   const maxEstimated = profile.targetDurationSec + profile.durationToleranceSec;
-  if (
-    estimatedDurationSeconds < minEstimated ||
-    estimatedDurationSeconds > maxEstimated
-  ) {
-    issues.push(
-      `Estimated duration ${estimatedDurationSeconds}s outside tolerance ${minEstimated}-${maxEstimated}s for ${profile.targetDurationSec}s target`,
-    );
+  if (profile.profile === "long") {
+    if (estimatedDurationSeconds < minEstimated) {
+      issues.push(
+        `Estimated duration ${estimatedDurationSeconds}s below minimum ${minEstimated}s for ${profile.targetDurationSec}s target`,
+      );
+    }
+  } else {
+    if (
+      estimatedDurationSeconds < minEstimated ||
+      estimatedDurationSeconds > maxEstimated
+    ) {
+      issues.push(
+        `Estimated duration ${estimatedDurationSeconds}s outside tolerance ${minEstimated}-${maxEstimated}s for ${profile.targetDurationSec}s target`,
+      );
+    }
   }
 
   return issues;

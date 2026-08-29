@@ -26,6 +26,7 @@ import { publisherNode } from "../agents/publisher.node.js";
 import { publishReadyNode } from "../agents/publish-ready.node.js";
 import { logger } from "../utils/logger.js";
 import { config as configUtils } from "../utils/config.js";
+import { appendRunLogEvent } from "../utils/run-log.js";
 import {
   decideQaRetry,
   isRunFailed,
@@ -49,6 +50,30 @@ const POST_VD_FANOUT: [string, string] = [
 // resolves here so execution.status is finalized exactly once with one shared
 // definition of complete vs failed.
 const FINALIZE = "Finalize";
+
+function logRouterDecision(
+  from: string,
+  verdict: string | undefined,
+  next: string,
+  extra?: {
+    revisionAttempts?: number;
+    qaAttempts?: number;
+    decision?: Record<string, unknown>;
+    meta?: Record<string, unknown>;
+  },
+): void {
+  const sink = logger.getCurrentSink();
+  appendRunLogEvent(sink, {
+    event: "router",
+    from,
+    verdict: verdict ?? null,
+    next,
+    revisionAttempts: extra?.revisionAttempts,
+    qaAttempts: extra?.qaAttempts,
+    decision: extra?.decision,
+    meta: extra?.meta,
+  });
+}
 
 function retryCount(
   state: typeof StateAnnotation.State,
@@ -151,6 +176,23 @@ const researchRouter = (state: typeof StateAnnotation.State) => {
     repeated: state.researchQA?.repeated,
     infraMax: RESEARCH_QA_MAX_RETRIES,
   });
+  const next =
+    decision.action === "continue"
+      ? "ScriptPlanner"
+      : decision.action === "revise"
+        ? "ResearchAgent"
+        : decision.action === "retry"
+          ? "ResearchQA"
+          : FINALIZE;
+  logRouterDecision("ResearchQA", state.researchQA?.status, next, {
+    revisionAttempts: retryCount(state, "ResearchAgent"),
+    qaAttempts: retryCount(state, "ResearchQA"),
+    decision: {
+      action: decision.action,
+      reason: decision.reason,
+      blocking: decision.blocking,
+    },
+  });
   if (decision.action === "continue") return "ScriptPlanner";
   if (decision.action === "revise") return "ResearchAgent";
   if (decision.action === "retry") return "ResearchQA";
@@ -165,6 +207,23 @@ const scriptRouter = (state: typeof StateAnnotation.State) => {
     qaAttempts: retryCount(state, "ScriptQA"),
     repeated: state.scriptQA?.repeated,
     infraMax: SCRIPT_QA_MAX_RETRIES,
+  });
+  const next =
+    decision.action === "continue"
+      ? "VisualDirector"
+      : decision.action === "revise"
+        ? "ScriptWriter"
+        : decision.action === "retry"
+          ? "ScriptQA"
+          : FINALIZE;
+  logRouterDecision("ScriptQA", state.scriptQA?.status, next, {
+    revisionAttempts: retryCount(state, "ScriptWriter"),
+    qaAttempts: retryCount(state, "ScriptQA"),
+    decision: {
+      action: decision.action,
+      reason: decision.reason,
+      blocking: decision.blocking,
+    },
   });
   if (decision.action === "continue") return "VisualDirector";
   if (decision.action === "revise") return "ScriptWriter";
@@ -189,6 +248,28 @@ const promptRouter = (state: typeof StateAnnotation.State) => {
     repeated: state.production?.promptQA?.repeated,
     infraMax: PROMPT_QA_MAX_RETRIES,
   });
+  const next =
+    decision.action === "continue"
+      ? "AssetGenerator"
+      : decision.action === "revise"
+        ? planIssue
+          ? "VisualDirector"
+          : "ImagePromptGenerator"
+        : decision.action === "retry"
+          ? "PromptQA"
+          : FINALIZE;
+  logRouterDecision("PromptQA", status, next, {
+    revisionAttempts: retryCount(
+      state,
+      planIssue ? "VisualDirector" : "ImagePromptGenerator",
+    ),
+    qaAttempts: retryCount(state, "PromptQA"),
+    decision: {
+      action: decision.action,
+      reason: decision.reason,
+      blocking: decision.blocking,
+    },
+  });
   if (decision.action === "continue") return "AssetGenerator";
   if (decision.action === "revise")
     return planIssue ? "VisualDirector" : "ImagePromptGenerator";
@@ -206,7 +287,12 @@ const promptRouter = (state: typeof StateAnnotation.State) => {
  * Metadata/Thumbnail therefore never start unless the visual plan succeeded.
  */
 const visualDirectorRouter = (state: typeof StateAnnotation.State) => {
-  if (hasScenes(state)) return POST_VD_FANOUT;
+  if (hasScenes(state)) {
+    logRouterDecision("VisualDirector", "approved", POST_VD_FANOUT[0], {
+      meta: { fanout: POST_VD_FANOUT },
+    });
+    return POST_VD_FANOUT;
+  }
   const review = state.production?.directorReview;
   const decision = decideQaRetry({
     node: "VisualDirector",
@@ -218,9 +304,26 @@ const visualDirectorRouter = (state: typeof StateAnnotation.State) => {
   // If budget exhausted but no valid scenes, do NOT continue — fail the run.
   // "Accepting best available result" only applies when there IS a valid result.
   if (decision.action === "continue" && !hasScenes(state)) {
+    logRouterDecision("VisualDirector", review?.status, FINALIZE, {
+      revisionAttempts: retryCount(state, "VisualDirector"),
+      decision: {
+        action: "continue_no_scenes",
+        reason: "no scenes after budget",
+      },
+    });
     return FINALIZE;
   }
-  if (decision.action === "revise") return "VisualDirector";
+  if (decision.action === "revise") {
+    logRouterDecision("VisualDirector", review?.status, "VisualDirector", {
+      revisionAttempts: retryCount(state, "VisualDirector"),
+      decision: { action: "revise", reason: decision.reason },
+    });
+    return "VisualDirector";
+  }
+  logRouterDecision("VisualDirector", review?.status, FINALIZE, {
+    revisionAttempts: retryCount(state, "VisualDirector"),
+    decision: { action: "fail", reason: decision.reason },
+  });
   return FINALIZE;
 };
 
@@ -239,7 +342,21 @@ const visualDirectorRouter = (state: typeof StateAnnotation.State) => {
  * the barrier can only release on a complete, healthy pair.
  */
 const branchJoinRouter = (state: typeof StateAnnotation.State) => {
-  if (hasMetadata(state) && hasThumbnail(state)) return "AssetStrategy";
+  if (hasMetadata(state) && hasThumbnail(state)) {
+    logRouterDecision("BranchJoin", "both_ready", "AssetStrategy", {
+      meta: {
+        hasMetadata: hasMetadata(state),
+        hasThumbnail: hasThumbnail(state),
+      },
+    });
+    return "AssetStrategy";
+  }
+  logRouterDecision("BranchJoin", "partial", "__end__", {
+    meta: {
+      hasMetadata: hasMetadata(state),
+      hasThumbnail: hasThumbnail(state),
+    },
+  });
   logger.debug("BranchJoin waiting for remaining parallel branch");
   return "__end__";
 };
@@ -249,9 +366,9 @@ const finalRouter = (state: typeof StateAnnotation.State) => {
 
   logger.debug("ReleaseReview router", { status });
 
-  // Single-shot release review: approved advances, anything else (fatal or a
-  // missing decision) fails the run through the shared terminal.
-  return status === "approved" ? "PublishReady" : FINALIZE;
+  const next = status === "approved" ? "PublishReady" : FINALIZE;
+  logRouterDecision("ReleaseReview", status, next);
+  return next;
 };
 
 /**
@@ -262,8 +379,22 @@ const finalRouter = (state: typeof StateAnnotation.State) => {
  * gate (or any other non-ready outcome) is a terminal failure.
  */
 const publishReadyRouter = (state: typeof StateAnnotation.State) => {
-  if (hasPublishablePackage(state) && hasPublishReady(state))
+  if (hasPublishablePackage(state) && hasPublishReady(state)) {
+    logRouterDecision("PublishReady", state.publishReady?.status, "Publisher", {
+      meta: {
+        hasPublishablePackage: hasPublishablePackage(state),
+        hasPublishReady: hasPublishReady(state),
+      },
+    });
     return "Publisher";
+  }
+  logRouterDecision("PublishReady", state.publishReady?.status, FINALIZE, {
+    meta: {
+      hasPublishablePackage: hasPublishablePackage(state),
+      hasPublishReady: hasPublishReady(state),
+      issues: state.publishReady?.issues,
+    },
+  });
   return FINALIZE;
 };
 
@@ -284,6 +415,14 @@ function finalizeNode(state: GuardState): {
 } {
   const failed = isRunFailed(state);
   const hasErrors = (state.diagnostics?.errors?.length ?? 0) > 0;
+  const sink = logger.getCurrentSink();
+  appendRunLogEvent(sink, {
+    event: "run_final",
+    status: failed ? "failed" : "complete",
+    finishedAt: new Date().toISOString(),
+    reason: failed ? runFailureReason(state) : undefined,
+    errors: failed ? (state.diagnostics?.errors ?? []) : undefined,
+  });
   return {
     execution: {
       currentNode: FINALIZE,
@@ -316,15 +455,38 @@ const assetRouter = (state: typeof StateAnnotation.State) => {
         .filter((s) => s.generationStatus === "prompt_repair")
         .map((s) => ({ sceneId: s.sceneId, repairs: s.repairCount ?? 0 })),
     });
+    logRouterDecision("AssetGenerator", "needs_repair", "ImagePromptRepair", {
+      meta: {
+        scenes: (state.production?.scenes ?? [])
+          .filter((s) => s.generationStatus === "prompt_repair")
+          .map((s) => ({ sceneId: s.sceneId, repairs: s.repairCount ?? 0 })),
+      },
+    });
     return "ImagePromptRepair";
   }
-  if (hasSceneAssets(state)) return "NarrationGenerator";
+  if (hasSceneAssets(state)) {
+    logRouterDecision(
+      "AssetGenerator",
+      "all_assets_ready",
+      "NarrationGenerator",
+    );
+    return "NarrationGenerator";
+  }
   logger.warn("AssetGenerator router: unresolved scenes, terminating", {
     scenes: (state.production?.scenes ?? []).map((s) => ({
       sceneId: s.sceneId,
       status: s.generationStatus,
       failureType: s.failureType,
     })),
+  });
+  logRouterDecision("AssetGenerator", "unresolved", FINALIZE, {
+    meta: {
+      scenes: (state.production?.scenes ?? []).map((s) => ({
+        sceneId: s.sceneId,
+        status: s.generationStatus,
+        failureType: s.failureType,
+      })),
+    },
   });
   return FINALIZE;
 };
@@ -335,7 +497,15 @@ const assetRouter = (state: typeof StateAnnotation.State) => {
  * advance (defensive; repair only touches scenes that lack assets).
  */
 const repairRouter = (state: typeof StateAnnotation.State) => {
-  if (hasSceneAssets(state)) return "NarrationGenerator";
+  if (hasSceneAssets(state)) {
+    logRouterDecision(
+      "ImagePromptRepair",
+      "all_assets_ready",
+      "NarrationGenerator",
+    );
+    return "NarrationGenerator";
+  }
+  logRouterDecision("ImagePromptRepair", "needs_retry", "AssetGenerator");
   return "AssetGenerator";
 };
 

@@ -9,6 +9,11 @@ import { config } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 import { PipelineError } from "../utils/errors.js";
 import { runFfmpeg } from "./composer/ffmpeg/ffmpeg.js";
+import {
+  appendRunLogEvent,
+  sanitizeHeaders,
+  withProviderLog,
+} from "../utils/run-log.js";
 
 const REQUEST_TIMEOUT_MS = 600_000;
 const AUDIO_DIR = resolve("generated", "audio");
@@ -32,19 +37,44 @@ export class ChatterboxTTSProvider implements TTSProvider {
   }
 
   async synthesize(opts: SynthesizeOptions): Promise<SynthesizeResult> {
+    const sink = opts.runLogSink ?? null;
+    const startedAt = Date.now();
+    const requestBody: Record<string, unknown> = {
+      text: opts.text,
+      ...(opts.voice ? { voice: opts.voice } : {}),
+    };
+    const synthEvent: Record<string, unknown> = {
+      event: "provider_call",
+      provider: "chatterbox_tts",
+      operation: "tts_synthesize",
+      url: `${config.ttsUrl()}/generate`,
+      method: "POST",
+      headers: sanitizeHeaders({ "Content-Type": "application/json" }),
+      runId: opts.runId,
+      voice: opts.voice,
+      textLength: opts.text.length,
+      filename: opts.filename,
+      requestBodyBytes: Buffer.byteLength(JSON.stringify(requestBody), "utf-8"),
+      requestBody,
+    };
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     let response: Response;
     try {
-      response = await fetch(`${config.ttsUrl()}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: opts.text,
-          ...(opts.voice ? { voice: opts.voice } : {}),
-        }),
-        signal: controller.signal,
+      response = await withProviderLog(sink, synthEvent, async () => {
+        const r = await fetch(`${config.ttsUrl()}/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal,
+        });
+        synthEvent.responseStatus = r.status;
+        synthEvent.responseHeaders = sanitizeHeaders(
+          Object.fromEntries(r.headers.entries()),
+        );
+        return r;
       });
     } catch (err) {
       clearTimeout(timeoutId);
@@ -79,6 +109,12 @@ export class ChatterboxTTSProvider implements TTSProvider {
       );
     }
 
+    synthEvent.responseBody = body;
+    synthEvent.responseBodyBytes = Buffer.byteLength(
+      JSON.stringify(body),
+      "utf-8",
+    );
+
     if (typeof body !== "object" || body === null) {
       throw new PipelineError(
         "Invalid TTS response: expected JSON object",
@@ -111,6 +147,16 @@ export class ChatterboxTTSProvider implements TTSProvider {
     const filePath = resolve(dir, filename);
 
     const audioUrl = new URL(data.url, config.ttsUrl()).toString();
+    const downloadEvent: Record<string, unknown> = {
+      event: "provider_call",
+      provider: "chatterbox_tts",
+      operation: "tts_download",
+      url: audioUrl,
+      method: "GET",
+      headers: {},
+      runId: opts.runId,
+      filename,
+    };
 
     const downloadController = new AbortController();
     const downloadTimeoutId = setTimeout(
@@ -120,8 +166,17 @@ export class ChatterboxTTSProvider implements TTSProvider {
 
     let audioResponse: Response;
     try {
-      audioResponse = await fetch(audioUrl, {
-        signal: downloadController.signal,
+      audioResponse = await withProviderLog(sink, downloadEvent, async () => {
+        const r = await fetch(audioUrl, {
+          signal: downloadController.signal,
+        });
+        downloadEvent.responseStatus = r.status;
+        downloadEvent.responseHeaders = sanitizeHeaders(
+          Object.fromEntries(r.headers.entries()),
+        );
+        downloadEvent.responseContentType =
+          r.headers.get("content-type") ?? undefined;
+        return r;
       });
     } catch (err) {
       clearTimeout(downloadTimeoutId);
@@ -162,6 +217,8 @@ export class ChatterboxTTSProvider implements TTSProvider {
         "TTS_PROVIDER_ERROR",
       );
     }
+
+    downloadEvent.responseBodyBytes = audioBuffer.byteLength;
 
     try {
       await mkdir(dir, { recursive: true });
@@ -206,6 +263,8 @@ export class ChatterboxTTSProvider implements TTSProvider {
                 tempPath,
               ],
               description: "normalize narration WPM",
+              runLogSink: sink,
+              runId: opts.runId,
             });
 
             const normalizedBuffer = await readFile(tempPath);
@@ -226,6 +285,19 @@ export class ChatterboxTTSProvider implements TTSProvider {
         }
       }
     }
+
+    appendRunLogEvent(sink, {
+      event: "asset_written",
+      kind: "tts_audio",
+      path: filePath,
+      byteSize: audioBuffer.byteLength,
+      provider: "chatterbox_tts",
+      runId: opts.runId,
+      durationMs,
+      voice: opts.voice,
+      textLength: opts.text.length,
+      totalDurationMs: Date.now() - startedAt,
+    });
 
     return {
       audioUrl: filePath,

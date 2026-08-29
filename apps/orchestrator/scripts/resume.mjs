@@ -5,6 +5,16 @@ import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createOrAppendRunMeta } from "../src/artifacts/run-meta.mjs";
 import { logger } from "../dist/utils/logger.js";
+import { closeAllRunLogSinks } from "../dist/utils/run-log.js";
+import {
+  reemitSseEventToSink,
+  setActiveSink as setRunNextActiveSink,
+} from "./run-next.mjs";
+
+function appendRunLogEvent(sink, event) {
+  if (!sink) return;
+  void sink.appendLine(event);
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RUNS_DIR =
@@ -418,6 +428,7 @@ async function main() {
   // Calculate attempt number from thread history
   const attempt = (meta?.threadHistory?.length ?? 0) + 1;
   logger.setRunContext(ns, topic, attempt);
+  setRunNextActiveSink(logger.getCurrentSink());
 
   logger.info(`Resuming run: ${ns}`);
   logger.info(`  Topic: ${topic}`);
@@ -448,6 +459,8 @@ async function main() {
     process.exit(1);
   }
 
+  await closeAllRunLogSinks();
+  setRunNextActiveSink(null);
   logger.info(`Artifacts in: runs/${ns}`);
 }
 
@@ -501,7 +514,17 @@ export async function resumeRun(
   };
   logger.info("Starting run...");
   const stream = await runStreamImpl(threadId, assistantId, input, ns);
-  const { lastEvent } = await drainStreamImpl(stream, { onEvent });
+  // The dev server runs the graph in a separate process; nothing inside the
+  // graph nodes can write to our run.log. Re-emit every SSE chain/chat
+  // event into the sink here so post-mortem has a full per-node + per-LLM
+  // trace without needing dev-server instrumentation.
+  const combinedOnEvent = (event) => {
+    reemitSseEventToSink(event);
+    onEvent(event);
+  };
+  const { lastEvent } = await drainStreamImpl(stream, {
+    onEvent: combinedOnEvent,
+  });
   return { threadId, lastEvent };
 }
 

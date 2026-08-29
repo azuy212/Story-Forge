@@ -1,5 +1,6 @@
 import { execa } from "execa";
 import { DEFAULT_MAX_RETRIES } from "../../../utils/constants.js";
+import { appendRunLogEvent, type RunLogSink } from "../../../utils/run-log.js";
 
 export interface FfprobeResult {
   width: number;
@@ -124,6 +125,8 @@ export interface RunFfmpegOptions {
   onProgress?: (progress: number) => void;
   signal?: AbortSignal;
   totalDurationMs?: number;
+  runLogSink?: RunLogSink | null;
+  runId?: string;
 }
 
 export async function runFfmpeg(opts: RunFfmpegOptions): Promise<void> {
@@ -134,7 +137,22 @@ export async function runFfmpeg(opts: RunFfmpegOptions): Promise<void> {
     onProgress,
     signal,
     totalDurationMs,
+    runLogSink,
+    runId,
   } = opts;
+
+  const startedAt = Date.now();
+  const event: Record<string, unknown> = {
+    event: "provider_call",
+    provider: "ffmpeg",
+    operation: "ffmpeg",
+    url: "ffmpeg",
+    method: "exec",
+    headers: {},
+    runId,
+    description,
+    args,
+  };
 
   const proc = execa("ffmpeg", ["-progress", "pipe:1", "-nostats", ...args], {
     timeout,
@@ -164,7 +182,18 @@ export async function runFfmpeg(opts: RunFfmpegOptions): Promise<void> {
 
   try {
     await proc;
+    event.requestDurationMs = Date.now() - startedAt;
+    event.exitCode = proc.exitCode ?? 0;
+    appendRunLogEvent(runLogSink, event);
   } catch (err) {
+    event.requestDurationMs = Date.now() - startedAt;
+    event.exitCode = proc.exitCode ?? "unknown";
+    event.error = {
+      name: (err as Error)?.name,
+      message: (err as Error)?.message ?? String(err),
+    };
+    if (stderr) event.stderrTail = stderr.slice(-2000);
+    appendRunLogEvent(runLogSink, event);
     if (signal?.aborted || (err as { isCanceled?: boolean })?.isCanceled) {
       throw new Error("FFmpeg operation cancelled", { cause: err });
     }
@@ -215,6 +244,7 @@ export async function runFfmpegWithRetry(
   onProgress?: (progress: number) => void,
   signal?: AbortSignal,
   totalDurationMs?: number,
+  context: { runLogSink?: RunLogSink | null; runId?: string } = {},
 ): Promise<void> {
   let lastError: Error | null = null;
 
@@ -226,6 +256,8 @@ export async function runFfmpegWithRetry(
         onProgress,
         signal,
         totalDurationMs,
+        runLogSink: context.runLogSink,
+        runId: context.runId,
       });
       return;
     } catch (err) {

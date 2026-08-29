@@ -72,6 +72,8 @@ jest.unstable_mockModule("node:fs/promises", () => ({
   readFile: mockReadFile,
   rename: mockRename,
   rm: mockRm,
+  appendFile: jest.fn(async () => undefined),
+  stat: jest.fn(async () => undefined),
 }));
 
 const { ChatterboxTTSProvider } =

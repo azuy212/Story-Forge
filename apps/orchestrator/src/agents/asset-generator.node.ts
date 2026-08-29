@@ -30,6 +30,11 @@ import { padSceneId } from "../utils/scene-id.js";
 import { config as appConfig } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
+import {
+  appendRunLogEvent,
+  getRunLogSinkFromConfig,
+  type RunLogSink,
+} from "../utils/run-log.js";
 
 const DEFAULT_PROVIDER = createDefaultAssetProvider();
 
@@ -68,7 +73,7 @@ function buildPlan(scenes: Scene[]): Scene[] {
       mode === "source_composite" || mode === "source_edit"
         ? "image"
         : mode === "source"
-          ? scene.assetType ?? "image"
+          ? (scene.assetType ?? "image")
           : resolveAssetType(scene.assetType);
     const cfg = configFor(assetType);
     const padded = padSceneId(scene.sceneId);
@@ -215,6 +220,62 @@ async function generateScene(
   sourceAssets: SourceAsset[],
   provider: AssetProvider,
   runId?: string,
+  runLogSink?: RunLogSink | null,
+): Promise<GenerateOutcome> {
+  const startedAt = Date.now();
+  appendRunLogEvent(runLogSink, {
+    event: "scene_event",
+    node: AgentModel.AssetGenerator,
+    sceneId: scene.sceneId,
+    kind: "start",
+    assetType: scene.assetType,
+    assetMode: scene.assetMode,
+    promptBytes: scene.generationPrompt?.length ?? 0,
+    runId,
+  });
+  let outcome: GenerateOutcome;
+  try {
+    outcome = await generateSceneInner(
+      scene,
+      sourceAssets,
+      provider,
+      runId,
+      runLogSink,
+    );
+  } catch (err) {
+    appendRunLogEvent(runLogSink, {
+      event: "scene_event",
+      node: AgentModel.AssetGenerator,
+      sceneId: scene.sceneId,
+      kind: "end",
+      outcome: "fatal",
+      durationMs: Date.now() - startedAt,
+      errorReason: (err as Error)?.message ?? String(err),
+      runId,
+    });
+    throw err;
+  }
+  appendRunLogEvent(runLogSink, {
+    event: "scene_event",
+    node: AgentModel.AssetGenerator,
+    sceneId: outcome.scene?.sceneId ?? scene.sceneId,
+    kind: "end",
+    outcome: outcome.kind,
+    durationMs: Date.now() - startedAt,
+    failureType: outcome.scene?.failureType,
+    errorReason: outcome.kind === "fatal" ? outcome.error : undefined,
+    assetUrl: outcome.kind === "resolved" ? outcome.scene.assetUrl : undefined,
+    runId,
+  });
+  return outcome;
+}
+
+async function generateSceneInner(
+  scene: Scene,
+  sourceAssets: SourceAsset[],
+  provider: AssetProvider,
+  runId?: string,
+  runLogSink?: RunLogSink | null,
 ): Promise<GenerateOutcome> {
   if (scene.assetUrl) return { kind: "resolved", scene };
   if (scene.generationStatus === "failed") return { kind: "failed", scene };
@@ -355,12 +416,14 @@ async function generateScene(
               sceneId: scene.sceneId,
               filename: scene.filename,
               runId,
+              runLogSink,
             })
           : await provider.generateImage({
               prompt,
               sceneId: scene.sceneId,
               filename: scene.filename,
               runId,
+              runLogSink,
               ...(referenceImages && referenceImages.length > 0
                 ? { referenceImages, mode: referenceModeParam }
                 : {}),
@@ -525,6 +588,7 @@ export async function assetGeneratorNode(
 
   const plannedScenes = buildPlan(scenes);
   const runId = getRunId(config, state) ?? undefined;
+  const runLogSink = getRunLogSinkFromConfig(config);
 
   let computedArtifact: AssetArtifact | null = null;
   let fatalError: string | undefined;
@@ -574,6 +638,7 @@ export async function assetGeneratorNode(
               sourceAssets,
               provider,
               runId,
+              runLogSink,
             );
             switch (outcome.kind) {
               case "fatal":

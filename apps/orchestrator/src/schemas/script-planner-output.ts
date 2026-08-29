@@ -41,22 +41,30 @@ const ScriptBeatSchema = z.object({
 
 function buildScriptBeatsSchema(profile?: VideoProfileConfig) {
   const minBeats = profile?.profile === "long" ? 10 : 6;
-  const maxBeats = profile?.profile === "long" ? 18 : 10;
-  return z
-    .array(ScriptBeatSchema)
-    .min(minBeats, `must have at least ${minBeats} story beats`)
-    .max(maxBeats, `must have at most ${maxBeats} story beats`)
-    .superRefine((beats, ctx) => {
-      beats.forEach((beat, index) => {
-        if (beat.beatId !== index + 1) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: [index, "beatId"],
-            message: `beatId must be sequential; expected ${index + 1}, received ${beat.beatId}`,
-          });
-        }
-      });
+  const maxBeats = profile?.profile === "long" ? null : 10;
+  let arr = z.array(ScriptBeatSchema).min(minBeats, `must have at least ${minBeats} story beats`);
+  if (maxBeats !== null) {
+    arr = arr.max(maxBeats, `must have at most ${maxBeats} story beats`);
+  }
+  return arr.superRefine((beats, ctx) => {
+    beats.forEach((beat, index) => {
+      if (beat.beatId !== index + 1) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, "beatId"],
+          message: `beatId must be sequential; expected ${index + 1}, received ${beat.beatId}`,
+        });
+      }
     });
+  });
+}
+
+export function beatCountRangeFor(profile?: VideoProfileConfig): {
+  min: number;
+  max: number | null;
+} {
+  if (profile?.profile === "long") return { min: 10, max: null };
+  return { min: 6, max: 10 };
 }
 
 export function scriptPlannerOutputSchema(profile?: VideoProfileConfig) {

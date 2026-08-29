@@ -35,6 +35,7 @@ import {
 } from "../providers/thumbnail-compositor.js";
 import { runThumbnailQa, type ThumbnailQaResult } from "./thumbnail-qa.node.js";
 import type { ThumbnailFallbackReason } from "../schemas/thumbnail-qa.js";
+import { getRunLogSinkFromConfig } from "../utils/run-log.js";
 
 const DEFAULT_PROVIDER = createDefaultAssetProvider();
 
@@ -297,6 +298,7 @@ export async function thumbnailGeneratorNode(
         colorScheme,
         runId,
         filename: "thumbnail-composited.png",
+        runLogSink: getRunLogSinkFromConfig(config),
       });
 
       if (

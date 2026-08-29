@@ -10,7 +10,7 @@ import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
 import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
-import { scriptPlannerOutputSchema } from "../schemas/script-planner-output.js";
+import { scriptPlannerOutputSchema, beatCountRangeFor } from "../schemas/script-planner-output.js";
 import type { ScriptPlannerOutput } from "../schemas/script-planner-output.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
@@ -110,7 +110,10 @@ export async function scriptPlannerNode(
   const speakingRate = speakingRateWps(videoProfile);
   const formatLabel = formatLabelFor(videoProfile);
   const canvasGuidance = canvasGuidanceFor(videoProfile);
-  const beatCountRange = `${videoProfile.sceneDensity.min}-${videoProfile.sceneDensity.max}`;
+  const beatRange = beatCountRangeFor(videoProfile);
+  const beatCountRange = beatRange.max === null
+    ? `${beatRange.min}+`
+    : `${beatRange.min}-${beatRange.max}`;
 
   const label = nodeLabel(AgentModel.ScriptPlanner);
   logger.nodeStart(label);

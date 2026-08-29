@@ -42,6 +42,20 @@ import {
 import { getAssistantId, resumeRun } from "./resume.mjs";
 import { logger } from "../dist/utils/logger.js";
 import { prettyFormatter } from "../dist/utils/pretty-formatter.js";
+import {
+  closeAllRunLogSinks,
+  getRunLogSink,
+} from "../dist/utils/run-log.js";
+
+// Local appendRunLogEvent implementation. Reimplemented (instead of
+// imported from dist/utils/run-log.js) because the test mock for that
+// module is a no-op. The launcher is process-external to the rest of the
+// orchestrator — we want writes to flow into whatever sink the test
+// (or the production logger) hands us.
+function appendRunLogEvent(sink, event) {
+  if (!sink) return;
+  void sink.appendLine(event);
+}
 
 const { google } = googleapis;
 
@@ -252,7 +266,200 @@ function parseSseEvent(event) {
   return null;
 }
 
-export { parseSseEvent, PRODUCER_NODES };
+export { parseSseEvent, PRODUCER_NODES, reemitSseEventToSink };
+
+// Per-node start times captured from the SSE stream so node_end lines carry
+// a duration. Keyed by node name; the stream is single-run, so collisions
+// across concurrent runs aren't a concern.
+const NODE_START_TIMES = new Map();
+
+// The langgraph dev server fires one on_chain_start/on_chain_end pair per
+// chain in the parent path. For a node X nested under graph G and run R,
+// the server emits start/end for X, for G, for R. We only want one X.
+// Track which nodes we've already announced start/end for in this attempt.
+const STARTED_NODES = new Set();
+const ENDED_NODES = new Set();
+
+// Module-level sink handle set by the launcher's run() entry point. The
+// SSE consumer reads this directly so it doesn't depend on the logger
+// singleton (which the test mock disables). It falls back to the logger
+// singleton in production where the mock is not in play.
+let ACTIVE_SINK = null;
+
+export function setActiveSink(sink) {
+  ACTIVE_SINK = sink;
+}
+
+export function __resetReemitStateForTest() {
+  NODE_START_TIMES.clear();
+  STARTED_NODES.clear();
+  ENDED_NODES.clear();
+}
+
+/**
+ * Translate one langchain streamEvents payload into a diagnostic event on
+ * the run log. This is the bridge the orchestrator needs because the
+ * `langgraph dev` server runs the graph in a separate process — none of the
+ * in-process sinks inside the graph nodes are reachable from the launcher.
+ * The SSE stream carries enough metadata to reconstruct a useful per-node
+ * trace plus per-LLM-call token accounting.
+ *
+ * Captures:
+ *  - `on_chain_start` with langgraph_node → node_start
+ *  - `on_chain_end`   with langgraph_node → node_end / node_failed
+ *  - `on_chat_model_start` / `on_chat_model_end` → llm_call
+ *  - other chain events (BranchJoin, Finalize) fall through silently
+ */
+function reemitSseEventToSink(event) {
+  const sink =
+    ACTIVE_SINK ??
+    getRunLogSink(logger.getCurrentSink()?.runId ?? "") ??
+    logger.getCurrentSink();
+  if (!sink) return;
+  const nodeName = event.metadata?.langgraph_node;
+  const eventType = event.event;
+  const now = Date.now();
+
+  // The langgraph dev server emits one on_chain_start / on_chain_end pair
+  // per chain in the parent path. A node X nested in graph G and run R
+  // yields events for X, G, and R. We want exactly one start and one end
+  // per real node per attempt; dedupe by node name. STARTED_NODES /
+  // ENDED_NODES are reset between attempts by the launcher's setRunContext.
+  if (eventType === "on_chain_start" && nodeName) {
+    // A node can re-enter the graph (QA retry loop). When we see a fresh
+    // start for a node we already ended, allow it and reset the dedup
+    // markers so the new start/end pair is captured cleanly.
+    if (ENDED_NODES.has(nodeName)) {
+      ENDED_NODES.delete(nodeName);
+      STARTED_NODES.delete(nodeName);
+    }
+    if (STARTED_NODES.has(nodeName)) return;
+    STARTED_NODES.add(nodeName);
+    NODE_START_TIMES.set(nodeName, now);
+    const attempt =
+      (NODE_START_TIMES.get(`${nodeName}#attempts`) ?? 0) + 1;
+    NODE_START_TIMES.set(`${nodeName}#attempts`, attempt);
+    appendRunLogEvent(sink, {
+      event: "node_start",
+      node: nodeName,
+      runId: sink.runId,
+      tags: event.metadata?.tags,
+      attempt,
+    });
+    return;
+  }
+
+  if (eventType === "on_chain_end" && nodeName) {
+    // Prefer the first on_chain_end that carries a real output payload
+    // (telemetry / diagnostics). The earlier sub-chain ends have output:
+    // undefined; the real node end carries the agent's return value.
+    const output = event.data?.output;
+    const hasOutput =
+      output &&
+      typeof output === "object" &&
+      (output.research !== undefined ||
+        output.storyPlan !== undefined ||
+        output.content !== undefined ||
+        output.audio !== undefined ||
+        output.subtitles !== undefined ||
+        output.video !== undefined ||
+        output.metadataOutput !== undefined ||
+        output.thumbnail !== undefined ||
+        output.production !== undefined ||
+        output.publishing !== undefined ||
+        output.thumbnailImage !== undefined);
+    const isError = event.status === "error";
+    if (ENDED_NODES.has(nodeName) && !hasOutput && !isError) {
+      // Skip intermediate sub-chain ends that don't carry the output.
+      return;
+    }
+    ENDED_NODES.add(nodeName);
+    const startedAt = NODE_START_TIMES.get(nodeName);
+    const durationMs = startedAt ? now - startedAt : undefined;
+    if (durationMs !== undefined) NODE_START_TIMES.delete(nodeName);
+    const diagnosticsErrors = output?.diagnostics?.errors;
+    const telemetryNode = output?.diagnostics?.telemetry?.[nodeName];
+    const result = telemetryNode?.result;
+    const tokenSummary = result
+      ? {
+          promptTokens: result.promptTokens,
+          completionTokens: result.completionTokens,
+          totalTokens: result.totalTokens,
+          costUsd: result.costUsd,
+          retries: result.retries,
+        }
+      : undefined;
+    if (isError) {
+      appendRunLogEvent(sink, {
+        event: "node_failed",
+        node: nodeName,
+        runId: sink.runId,
+        durationMs,
+        status: event.status,
+        error: event.data?.error ?? event.error,
+        diagnosticsErrors,
+      });
+    } else {
+      appendRunLogEvent(sink, {
+        event: "node_end",
+        node: nodeName,
+        runId: sink.runId,
+        durationMs,
+        fromCache:
+          output?.diagnostics?.telemetry?.[nodeName]?.result?.fromCache,
+        outputKeys: output ? Object.keys(output) : undefined,
+        tokenSummary,
+        diagnosticsErrors,
+        diagnosticsWarnings: output?.diagnostics?.warnings,
+      });
+    }
+    return;
+  }
+
+  if (eventType === "on_chat_model_start" && event.name) {
+    appendRunLogEvent(sink, {
+      event: "llm_call",
+      provider: "openrouter",
+      operation: "chat_model_start",
+      runId: sink.runId,
+      agent: nodeName ?? event.name,
+      model: event.metadata?.ls_provider
+        ? `${event.metadata.ls_provider}/${event.name ?? ""}`.replace(/\/$/, "")
+        : event.name,
+      messages: event.data?.input?.messages?.length
+        ? { messageCount: event.data.input.messages.length }
+        : undefined,
+    });
+    return;
+  }
+
+  if (eventType === "on_chat_model_end" && event.name) {
+    const usage =
+      event.data?.output?.usage_metadata ?? event.data?.output?.token_usage;
+    const output = event.data?.output;
+    const responseText =
+      typeof output?.content === "string"
+        ? output.content
+        : Array.isArray(output?.content)
+          ? output.content
+              .map((c) => (typeof c?.text === "string" ? c.text : ""))
+              .join("")
+          : undefined;
+    appendRunLogEvent(sink, {
+      event: "llm_call",
+      provider: "openrouter",
+      operation: "chat_model_end",
+      runId: sink.runId,
+      agent: nodeName ?? event.name,
+      model: event.name,
+      usage,
+      responseBytes: responseText ? Buffer.byteLength(responseText, "utf-8") : undefined,
+      responseTextPreview: responseText ? responseText.slice(0, 2000) : undefined,
+      error: event.status === "error" ? event.data?.error : undefined,
+    });
+    return;
+  }
+}
 
 /**
  * Live progress tracker. Renders a single in-place bar at the top of the
@@ -422,6 +629,7 @@ export async function runLauncher({
     ? (existing.meta?.threadHistory?.length ?? 0) + 1
     : 1;
   logger.setRunContext(decision.ns, decision.topic, attempt);
+  setActiveSink(logger.getCurrentSink());
 
   const progress = new RunProgress(PRODUCER_NODES);
   // When the bar is active, suppress the formatter's per-run header box and
@@ -431,6 +639,7 @@ export async function runLauncher({
   if (progress.enabled) prettyFormatter.setSilent(true);
   progress.start();
   const onEvent = (event) => {
+    reemitSseEventToSink(event);
     const parsed = parseSseEvent(event);
     if (parsed) {
       progress.observeNode(parsed.name, parsed.status);
@@ -481,6 +690,13 @@ export async function runLauncher({
     );
   } finally {
     if (progress.enabled) prettyFormatter.setSilent(false);
+    setActiveSink(null);
+    const sinkTimeout = setTimeout(() => undefined, 2000);
+    sinkTimeout.unref?.();
+    await Promise.race([
+      closeAllRunLogSinks(),
+      new Promise((resolve) => sinkTimeout && setTimeout(resolve, 2000)),
+    ]);
   }
 }
 

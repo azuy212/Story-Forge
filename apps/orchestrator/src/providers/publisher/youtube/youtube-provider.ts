@@ -13,6 +13,7 @@ import { StubPublisherProvider } from "../stub-publisher-provider.js";
 import { config } from "../../../utils/config.js";
 import { PublishError, mapYouTubeError } from "./youtube-errors.js";
 import { buildInsertParams, buildResultStatus } from "./youtube-mapper.js";
+import { appendRunLogEvent } from "../../../utils/run-log.js";
 
 export interface YouTubeProviderOptions {
   api: YouTubeApi;
@@ -94,14 +95,17 @@ export class YouTubeProvider implements PublisherProvider {
     await this.validateVideoFile(request);
 
     const videoId = await this.uploadVideo(request, options);
-    await this.finalize(request, { ...request, videoId });
+    await this.finalize(request, { ...request, videoId }, options);
 
     return this.buildResult(request, videoId);
   }
 
-  async resume(request: ResumePublishRequest): Promise<PublishResult> {
+  async resume(
+    request: ResumePublishRequest,
+    options?: PublishCallOptions,
+  ): Promise<PublishResult> {
     await this.validateVideoFile(request);
-    await this.finalize(request, request);
+    await this.finalize(request, request, options);
     return this.buildResult(request, request.videoId);
   }
 
@@ -135,6 +139,23 @@ export class YouTubeProvider implements PublisherProvider {
         body: createReadStream(request.videoPath),
         mimeType: VIDEO_MIME,
       };
+      const startedAt = Date.now();
+      appendRunLogEvent(options?.runLogSink ?? null, {
+        event: "provider_call",
+        provider: "youtube",
+        operation: "youtube_upload",
+        url: "googleapis.com/youtube/v3/videos.insert",
+        method: "POST",
+        headers: {},
+        runId: options?.runId,
+        videoPath: request.videoPath,
+        title: request.title,
+        privacyStatus: request.privacyStatus,
+        publishAt: request.publishAt,
+        category: request.category,
+        tagsCount: request.tags.length,
+        playlistCount: request.playlistIds?.length ?? 0,
+      });
       const response = await this.api.videos.insert(
         {
           part: buildInsertParams(request, { categoryId: this.categoryId })
@@ -162,6 +183,18 @@ export class YouTubeProvider implements PublisherProvider {
         });
       }
 
+      appendRunLogEvent(options?.runLogSink ?? null, {
+        event: "provider_call",
+        provider: "youtube",
+        operation: "youtube_upload_done",
+        url: "googleapis.com/youtube/v3/videos.insert",
+        method: "POST",
+        headers: {},
+        runId: options?.runId,
+        videoId,
+        requestDurationMs: Date.now() - startedAt,
+      });
+
       await options?.onUploaded?.(videoId);
       return videoId;
     });
@@ -176,9 +209,22 @@ export class YouTubeProvider implements PublisherProvider {
   private async finalize(
     request: PublishRequest,
     current: { videoId: string },
+    options?: PublishCallOptions,
   ): Promise<void> {
     for (const playlistId of request.playlistIds ?? []) {
       await retryStep(this.maxPlaylistRetries, async () => {
+        const startedAt = Date.now();
+        appendRunLogEvent(options?.runLogSink ?? null, {
+          event: "provider_call",
+          provider: "youtube",
+          operation: "playlist_add",
+          url: "googleapis.com/youtube/v3/playlistItems.insert",
+          method: "POST",
+          headers: {},
+          runId: options?.runId,
+          videoId: current.videoId,
+          playlistId,
+        });
         await this.api.playlistItems.insert({
           part: ["snippet"],
           requestBody: {
@@ -187,6 +233,18 @@ export class YouTubeProvider implements PublisherProvider {
               resourceId: { kind: "youtube#video", videoId: current.videoId },
             },
           },
+        });
+        appendRunLogEvent(options?.runLogSink ?? null, {
+          event: "provider_call",
+          provider: "youtube",
+          operation: "playlist_add_done",
+          url: "googleapis.com/youtube/v3/playlistItems.insert",
+          method: "POST",
+          headers: {},
+          runId: options?.runId,
+          videoId: current.videoId,
+          playlistId,
+          requestDurationMs: Date.now() - startedAt,
         });
       });
     }

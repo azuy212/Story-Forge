@@ -4,6 +4,8 @@ import { mkdir } from "node:fs/promises";
 import { runFfmpeg } from "./composer/ffmpeg/ffmpeg.js";
 import { PipelineError } from "../utils/errors.js";
 import { resolveBrandingAssetPath } from "../utils/branding.js";
+import type { RunLogSink } from "../utils/run-log.js";
+import { appendRunLogEvent } from "../utils/run-log.js";
 
 export type ThumbnailTextPosition =
   "bottom-third" | "top-left" | "top-right" | "center";
@@ -29,6 +31,7 @@ export interface ThumbnailComposeOptions {
   colorScheme?: string;
   runId?: string;
   filename?: string;
+  runLogSink?: RunLogSink | null;
 }
 
 export interface ThumbnailComposeResult {
@@ -325,10 +328,21 @@ export class FfmpegThumbnailCompositor implements ThumbnailCompositor {
 
     try {
       await mkdir(dir, { recursive: true });
+      const startedAt = Date.now();
       await runFfmpeg({
         args,
         description: "composite thumbnail text",
         timeout: 120_000,
+        runLogSink: opts.runLogSink,
+        runId: opts.runId,
+      });
+      appendRunLogEvent(opts.runLogSink, {
+        event: "asset_written",
+        kind: "thumbnail_composited",
+        path: outputPath,
+        provider: "thumbnail_compositor",
+        runId: opts.runId,
+        durationMs: Date.now() - startedAt,
       });
     } catch (err) {
       throw new PipelineError(

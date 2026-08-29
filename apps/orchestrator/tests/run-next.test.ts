@@ -14,11 +14,15 @@ import {
   findRunByTopic,
   parseSseEvent,
   PRODUCER_NODES,
+  reemitSseEventToSink,
+  setActiveSink,
+  __resetReemitStateForTest,
   runLauncher,
   validateProfile,
   readSheetRows,
 } from "../scripts/run-next.mjs";
 import { getAssistantId, resumeRun } from "../scripts/resume.mjs";
+import { closeAllRunLogSinks } from "../dist/utils/run-log.js";
 import { EXPECTED_HEADERS } from "../src/integrations/google-sheets/sheets-format.mjs";
 
 let runsDir: string;
@@ -599,5 +603,201 @@ describe("runLauncher wires onEvent into resumeRun", () => {
       onEvent?: (e: unknown) => void;
     };
     expect(opts.onEvent).toBeDefined();
+  });
+});
+
+describe("reemitSseEventToSink", () => {
+  interface CapturedEvent {
+    event: string;
+    [key: string]: unknown;
+  }
+
+  function makeSink(): {
+    sink: {
+      runId: string;
+      filePath: string;
+      events: CapturedEvent[];
+      appendLine: (e: CapturedEvent) => Promise<void>;
+      flush: () => Promise<void>;
+      close: () => Promise<void>;
+    };
+    events: CapturedEvent[];
+  } {
+    const events: CapturedEvent[] = [];
+    return {
+      events,
+      sink: {
+        runId: "sse-test",
+        filePath: "/tmp/never",
+        events,
+        appendLine: (e) => {
+          events.push(e);
+          return Promise.resolve();
+        },
+        flush: () => Promise.resolve(),
+        close: () => Promise.resolve(),
+      },
+    };
+  }
+
+  // Reuse one sink per test so writes via reemitSseEventToSink land in the
+  // events array the test body checks.
+  let sharedEvents: CapturedEvent[];
+
+  beforeEach(() => {
+    __resetReemitStateForTest();
+    const { sink, events } = makeSink();
+    setActiveSink(sink);
+    sharedEvents = events;
+  });
+
+  afterEach(() => {
+    setActiveSink(null);
+    closeAllRunLogSinks();
+  });
+
+  it("emits node_start then node_end for a matching chain pair", () => {
+    reemitSseEventToSink({
+      event: "on_chain_start",
+      metadata: { langgraph_node: "ResearchAgent" },
+    });
+    reemitSseEventToSink({
+      event: "on_chain_end",
+      metadata: { langgraph_node: "ResearchAgent" },
+      status: "success",
+      data: {
+        output: {
+          diagnostics: {
+            errors: [],
+            telemetry: {
+              ResearchAgent: { result: { promptTokens: 10, totalTokens: 20 } },
+            },
+          },
+        },
+      },
+    });
+
+    const kinds = sharedEvents.map((e) => e.event);
+    expect(kinds).toEqual(["node_start", "node_end"]);
+    const end = sharedEvents[1] as Record<string, unknown> & {
+      tokenSummary?: unknown;
+    };
+    expect(end.node).toBe("ResearchAgent");
+    expect(typeof end.durationMs).toBe("number");
+    expect(end.tokenSummary).toEqual({
+      promptTokens: 10,
+      completionTokens: undefined,
+      totalTokens: 20,
+      costUsd: undefined,
+      retries: undefined,
+    });
+  });
+
+  it("emits node_failed when status is error", () => {
+    reemitSseEventToSink({
+      event: "on_chain_start",
+      metadata: { langgraph_node: "ScriptWriter" },
+    });
+    reemitSseEventToSink({
+      event: "on_chain_end",
+      metadata: { langgraph_node: "ScriptWriter" },
+      status: "error",
+      data: {
+        output: {
+          diagnostics: {
+            errors: ["ScriptWriter: model failure"],
+          },
+        },
+      },
+    });
+
+    const kinds = sharedEvents.map((e) => e.event);
+    expect(kinds).toEqual(["node_start", "node_failed"]);
+    const failed = sharedEvents[1] as Record<string, unknown>;
+    expect(failed.node).toBe("ScriptWriter");
+    expect(failed.diagnosticsErrors).toEqual(["ScriptWriter: model failure"]);
+  });
+
+  it("ignores root graph chain events (no langgraph_node)", () => {
+    reemitSseEventToSink({
+      event: "on_chain_start",
+      metadata: { langgraph_plan: "developer" },
+      name: "YouTubeShortsPipeline",
+    });
+    reemitSseEventToSink({
+      event: "on_chain_end",
+      metadata: { langgraph_plan: "developer" },
+      name: "YouTubeShortsPipeline",
+      status: "success",
+    });
+
+    expect(sharedEvents).toEqual([]);
+  });
+
+  it("deduplicates node_start when the same node fires twice (QA retry)", () => {
+    // The langgraph dev server can emit on_chain_start for the same node
+    // multiple times during a run (root chain wrapping, sub-chain). We
+    // dedupe by node name so each node gets exactly one node_start per
+    // attempt; a fresh start resets the dedup marker so QA retries that
+    // re-enter a node get their own start.
+    reemitSseEventToSink({
+      event: "on_chain_start",
+      metadata: {
+        langgraph_node: "AssetGenerator",
+        langgraph_triggers: ["__start__"],
+      },
+    });
+    reemitSseEventToSink({
+      event: "on_chain_start",
+      metadata: {
+        langgraph_node: "AssetGenerator",
+        langgraph_triggers: ["__start__"],
+      },
+    });
+
+    const starts = sharedEvents.filter((e) => e.event === "node_start");
+    expect(starts).toHaveLength(1);
+    expect(starts[0].attempt).toBe(1);
+  });
+
+  it("emits llm_call events for chat model start and end", () => {
+    reemitSseEventToSink({
+      event: "on_chat_model_start",
+      name: "openrouter/free",
+      metadata: { langgraph_node: "ScriptPlanner", ls_provider: "openai" },
+    });
+    reemitSseEventToSink({
+      event: "on_chat_model_end",
+      name: "openrouter/free",
+      metadata: { langgraph_node: "ScriptPlanner" },
+      data: {
+        output: {
+          content: "hello world",
+          usage_metadata: { prompt_tokens: 5, completion_tokens: 2 },
+        },
+      },
+    });
+
+    const llmEvents = sharedEvents.filter((e) => e.event === "llm_call");
+    expect(llmEvents).toHaveLength(2);
+    expect((llmEvents[0] as Record<string, unknown>).operation).toBe(
+      "chat_model_start",
+    );
+    expect((llmEvents[1] as Record<string, unknown>).operation).toBe(
+      "chat_model_end",
+    );
+    const end = llmEvents[1] as Record<string, unknown>;
+    expect(end.usage).toEqual({ prompt_tokens: 5, completion_tokens: 2 });
+    expect(end.responseTextPreview).toBe("hello world");
+  });
+
+  it("returns silently when no sink is set", () => {
+    setActiveSink(null);
+    expect(() =>
+      reemitSseEventToSink({
+        event: "on_chain_start",
+        metadata: { langgraph_node: "ResearchAgent" },
+      }),
+    ).not.toThrow();
   });
 });

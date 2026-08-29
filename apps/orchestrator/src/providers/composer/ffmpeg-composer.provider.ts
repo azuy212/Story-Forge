@@ -4,7 +4,7 @@ import { cpus } from "node:os";
 import { createTempDir, cleanupTempDir } from "./utils/temp.js";
 import {
   probe,
-  runFfmpegWithRetry,
+  runFfmpegWithRetry as runFfmpegWithRetryRaw,
   ENCODERS,
   type EncoderConfig,
 } from "./ffmpeg/ffmpeg.js";
@@ -12,6 +12,7 @@ import {
   normalizeAsset,
   PAN_PRESET_COUNT,
   type NormalizeOptions,
+  type FfmpegCallContext,
 } from "./ffmpeg/normalize.js";
 import {
   concatWithTransitions,
@@ -29,6 +30,28 @@ import { logger } from "../../utils/logger.js";
 import { DEFAULT_MAX_RETRIES } from "../../utils/constants.js";
 import { hashObject } from "../../artifacts/hash.js";
 import { resolveBrandingAssetPath } from "../../utils/branding.js";
+import { appendRunLogEvent } from "../../utils/run-log.js";
+
+let currentFfmpegContext: FfmpegCallContext = {};
+
+const runFfmpegWithRetry = (
+  args: string[],
+  description: string,
+  maxRetries?: number,
+  onProgress?: (progress: number) => void,
+  signal?: AbortSignal,
+  totalDurationMs?: number,
+  ctx?: FfmpegCallContext,
+): Promise<void> =>
+  runFfmpegWithRetryRaw(
+    args,
+    description,
+    maxRetries,
+    onProgress,
+    signal,
+    totalDurationMs,
+    ctx ?? currentFfmpegContext,
+  );
 
 export interface VideoConfig {
   width: number;
@@ -193,6 +216,21 @@ export class FfmpegComposerProvider implements ComposerProvider {
     signal?: AbortSignal,
   ): Promise<ComposeResult> {
     const startTime = Date.now();
+    currentFfmpegContext = {
+      runLogSink: opts.runLogSink ?? null,
+      runId: opts.runId,
+    };
+    appendRunLogEvent(opts.runLogSink ?? null, {
+      event: "provider_call",
+      provider: "ffmpeg_compose",
+      operation: "compose_start",
+      url: "ffmpeg",
+      method: "exec",
+      headers: {},
+      runId: opts.runId,
+      sceneCount: opts.scenes.length,
+      totalDurationSeconds: opts.totalDurationSeconds,
+    });
 
     await this.validateInputs(opts);
 
@@ -290,6 +328,31 @@ export class FfmpegComposerProvider implements ComposerProvider {
 
       const { durationMs, resolution } = await this.getOutputInfo(finalVideo);
 
+      appendRunLogEvent(opts.runLogSink ?? null, {
+        event: "provider_call",
+        provider: "ffmpeg_compose",
+        operation: "compose_end",
+        url: "ffmpeg",
+        method: "exec",
+        headers: {},
+        runId: opts.runId,
+        sceneCount: opts.scenes.length,
+        totalDurationSeconds: opts.totalDurationSeconds,
+        durationMs,
+        resolution,
+        elapsedMs: elapsed,
+      });
+      appendRunLogEvent(opts.runLogSink ?? null, {
+        event: "asset_written",
+        kind: "composed_video",
+        path: finalVideo,
+        byteSize: undefined,
+        provider: "ffmpeg_compose",
+        runId: opts.runId,
+        durationMs,
+        resolution,
+      });
+
       return {
         videoUrl: finalVideo,
         durationMs,
@@ -305,6 +368,7 @@ export class FfmpegComposerProvider implements ComposerProvider {
         },
       };
     } finally {
+      currentFfmpegContext = {};
       try {
         await cleanupTempDir(workDir);
       } catch (e) {
