@@ -277,8 +277,8 @@ streaming. Two seed forms are supported, auto-detected by extension and shape
 
 | Mode | Seed file | Behavior |
 | --- | --- | --- |
-| Structured | `.json` with `research.{summary,facts}` + `content.{script,...}` | Validated and fed to the graph. **No LLM convert call.** |
-| Text / paragraph | `.txt` / `.md`, or `.json` with string `research` / `script` | LLM (using `SEED_CONVERT_PROMPT`) structures it; validated and fed to the graph. Requires `OPENROUTER_API_KEY`. |
+| Structured | `.json` with `research.{summary,facts}` + `content.{script,...}` | Validated and fed to the graph. **No LLM convert call.** `pillar` + `topic` are required (in the file or via `--pillar`/`--topic`). |
+| Text / paragraph | `.txt` / `.md`, or `.json` with string `research` / `script` | LLM (using `SEED_CONVERT_PROMPT`) structures it, including `pillar` + `topic` when not supplied. Requires `OPENROUTER_API_KEY`. |
 
 ### Examples
 

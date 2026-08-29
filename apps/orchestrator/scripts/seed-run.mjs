@@ -36,13 +36,15 @@
 //   Mode A — Structured (bypasses the LLM convert call):
 //     The seed JSON matches the strict shape above (research is an object with
 //     summary + facts, content is an object with script). It's validated and
-//     fed straight to the graph. No OpenRouter call is made.
+//     fed straight to the graph. No OpenRouter call is made. pillar + topic
+//     are required (use --pillar/--topic if not in the file).
 //
 //   Mode B — Text/paragraph (LLM-converts to structured):
 //     Triggered by either a .txt / .md seed file or a JSON seed whose
 //     `research` and/or `script` field is a freeform string. The text is sent
-//     to the LLM with SEED_CONVERT_PROMPT and the result is validated and fed
-//     to the graph. Plain-text seeds require --pillar and --topic.
+//     to the LLM with SEED_CONVERT_PROMPT; the LLM returns pillar + topic
+//     (unless flags/file already supply them) plus research + content.
+//     Plain-text seeds therefore work without --pillar/--topic.
 import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -64,12 +66,14 @@ const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
 // Prompt that converts a creator's loose research notes / raw script into the
 // strict seed JSON shape this script feeds to the graph (research.{summary,
-// facts} + content.{script, narration, ...}). Used only when the seed file
-// supplies freeform strings instead of the structured form.
+// facts} + content.{script, narration, ...} + pillar + topic). Used only when
+// the seed file supplies freeform strings instead of the structured form.
 const SEED_CONVERT_PROMPT = `You convert a creator's rough research notes and optional raw script into the structured JSON a YouTube-Shorts pipeline consumes.
 
 Return ONLY JSON (no prose) with this exact shape:
 {
+  "pillar": "string — single high-level category (e.g. Geography, Psychology, History, Science, Technology)",
+  "topic": "string — the specific angle of this short, written as a short title",
   "research": {
     "summary": "string — 2-4 sentence neutral brief of the key points",
     "facts": [
@@ -88,6 +92,8 @@ Return ONLY JSON (no prose) with this exact shape:
 Rules:
 - Every fact in "facts" must be grounded in the provided notes; do not invent sources.
 - "id" is sequential f1, f2, ...
+- "pillar" is one short category label; choose the single best fit.
+- "topic" is the specific angle; mirror the creator's framing when present.
 - If a script was provided, reformat it into clean spoken narration (keep all facts, drop markdown/headings); otherwise write a tight script from the research sized for a short.
 - Keep the creator's wording and intent; do not change the topic or pillar.`;
 
@@ -160,8 +166,23 @@ ${
       "seed conversion output missing research or content.script",
     );
   }
-  // Preserve pillar/topic metadata from the original file/overrides.
-  return { ...raw, research: parsed.research, content: parsed.content };
+  if (
+    typeof parsed.pillar !== "string" ||
+    !parsed.pillar.trim() ||
+    typeof parsed.topic !== "string" ||
+    !parsed.topic.trim()
+  ) {
+    throw new Error("seed conversion output missing pillar or topic");
+  }
+  // Preserve pillar/topic metadata from the original file/overrides when
+  // present, fall back to the LLM-derived values otherwise.
+  return {
+    ...raw,
+    pillar: overrides.pillar || raw.pillar || parsed.pillar.trim(),
+    topic: overrides.topic || raw.topic || parsed.topic.trim(),
+    research: parsed.research,
+    content: parsed.content,
+  };
 }
 
 function slugify(value) {
@@ -251,13 +272,15 @@ Modes (auto-detected unless --convert / --no-convert is set):
               directly, no LLM call.
   Text        Seed is a .txt/.md file, or JSON whose research/script fields
               are freeform strings — an LLM converts it to the structured
-              form (requires OPENROUTER_API_KEY). Plain-text seeds also
-              require --pillar and --topic.
+              form (requires OPENROUTER_API_KEY). The LLM also derives
+              pillar + topic when not supplied via flags/file.
 
 Options:
   --seed <path>           Path to a seed file (.json, .txt, or .md)
-  --pillar <pillar>       Override pillar from the seed (required for text mode)
-  --topic <topic>         Override topic from the seed (required for text mode)
+  --pillar <pillar>       Override pillar from the seed (required for structured
+                          without pillar; text/loose mode lets the LLM derive it)
+  --topic <topic>         Override topic from the seed (required for structured
+                          without topic; text/loose mode lets the LLM derive it)
   --profile <short|long>  Video profile (defaults to seed file or short)
   --convert               Force LLM conversion even if input looks structured
   --no-convert            Force bypass; reject if input isn't strict structured
@@ -355,10 +378,9 @@ async function main() {
   let raw;
   if (isTextFile) {
     if (!parsed.pillar || !parsed.topic) {
-      console.error(
-        "seed: text seed (.txt/.md) requires --pillar and --topic",
+      console.log(
+        "seed: no --pillar/--topic supplied; the LLM will derive them from the text",
       );
-      process.exit(1);
     }
     raw = {
       pillar: parsed.pillar,

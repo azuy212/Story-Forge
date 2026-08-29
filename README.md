@@ -178,8 +178,8 @@ shape (override with `--convert` / `--no-convert`):
 
 | Mode | Seed file | Behavior |
 | --- | --- | --- |
-| Structured | `.json` with `research.{summary,facts}` and `content.{script,...}` | Validated and fed to the graph directly. **No LLM call.** |
-| Text / paragraph | `.txt` / `.md`, or `.json` whose `research` / `script` fields are freeform strings | An LLM call (using `SEED_CONVERT_PROMPT`) converts the text into the structured form; the result is validated and fed to the graph. Requires `OPENROUTER_API_KEY`. |
+| Structured | `.json` with `research.{summary,facts}` and `content.{script,...}` | Validated and fed to the graph directly. **No LLM call.** `pillar` + `topic` are required (in the file or via `--pillar`/`--topic`). |
+| Text / paragraph | `.txt` / `.md`, or `.json` whose `research` / `script` fields are freeform strings | An LLM call (using `SEED_CONVERT_PROMPT`) converts the text into the structured form, including `pillar` + `topic` when not supplied. Requires `OPENROUTER_API_KEY`. |
 
 ### Examples
 
