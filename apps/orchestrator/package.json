@@ -22,7 +22,8 @@
     "lint:all": "pnpm lint && pnpm lint:langgraph-json && pnpm format:check",
     "test:all": "pnpm test && pnpm test:int && pnpm lint:langgraph-json",
     "resume": "node scripts/resume.mjs",
-    "run-next": "node scripts/run-next.mjs"
+    "run-next": "node scripts/run-next.mjs",
+    "seed-run": "node scripts/seed-run.mjs"
   },
   "dependencies": {
     "@langchain/core": "^1.2.3",

@@ -478,6 +478,9 @@ export async function resumeRun(
     assistantId = "",
     projectId = "",
     youtubePublishAt = "",
+    // Extra graph-input channels to seed (e.g. { research, content }). Merged
+    // into the run input so the entry router can skip seeded producers.
+    seed = {},
     createThread: createThreadImpl = createThread,
     runStream: runStreamImpl = runStream,
     drainStream: drainStreamImpl = drainStream,
@@ -511,6 +514,9 @@ export async function resumeRun(
       ...(youtubePublishAt ? { youtubePublishAt } : {}),
       ...(videoProfile ? { videoProfile } : {}),
     },
+    // Seed channels (research/content) ride alongside project. The entry
+    // router consumes these to skip the producers that would regenerate them.
+    ...seed,
   };
   logger.info("Starting run...");
   const stream = await runStreamImpl(threadId, assistantId, input, ns);

@@ -162,6 +162,30 @@ const hasPublishablePackage = (s: GuardState) =>
 // a blocked publication cannot reach Publisher.
 const hasPublishReady = (s: GuardState) => s.publishReady?.status === "ready";
 
+/**
+ * Entry router from ResolveProfile. Lets a caller seed upstream artifacts via
+ * the graph input and skip the LLM producers that would otherwise regenerate
+ * them. Seeded data is NOT re-validated by the matching QA gate (per pipeline
+ * policy) — it flows straight to the next producer. Fail-closed guards further
+ * down the spine still apply, so a malformed seed still halts at the first
+ * gate that cannot proceed.
+ *
+ *   - research + script present → VisualDirector (skip Research/Script spine)
+ *   - research only             → ScriptPlanner  (skip ResearchAgent + ResearchQA)
+ *   - otherwise                 → ResearchAgent   (normal full flow)
+ */
+const entryRouter = (state: typeof StateAnnotation.State) => {
+  if (hasResearch(state) && hasScript(state)) {
+    logRouterDecision("ResolveProfile", "seeded_research_script", "VisualDirector");
+    return "VisualDirector";
+  }
+  if (hasResearch(state)) {
+    logRouterDecision("ResolveProfile", "seeded_research", "ScriptPlanner");
+    return "ScriptPlanner";
+  }
+  return "ResearchAgent";
+};
+
 // Fail-closed QA routing: an explicit "approved" is the ONLY verdict that
 // advances the pipeline. All routers resolve through decideQaRetry so the
 // severity budgets and after-max fallbacks are identical everywhere: minor is
@@ -536,7 +560,7 @@ const builder = new StateGraph(StateAnnotation)
 
 builder
   .addEdge("__start__", "ResolveProfile")
-  .addEdge("ResolveProfile", "ResearchAgent")
+  .addConditionalEdges("ResolveProfile", entryRouter)
   .addConditionalEdges("ResearchAgent", guard(hasResearch, "ResearchQA"))
   .addConditionalEdges("ResearchQA", researchRouter)
   .addConditionalEdges("ScriptPlanner", guard(hasStoryPlan, "ScriptWriter"))
