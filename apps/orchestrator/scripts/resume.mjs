@@ -10,6 +10,7 @@ import {
   reemitSseEventToSink,
   setActiveSink as setRunNextActiveSink,
 } from "./run-next.mjs";
+import { loadSeedFromFile } from "./seed-build.mjs";
 
 function appendRunLogEvent(sink, event) {
   if (!sink) return;
@@ -58,42 +59,11 @@ function readRunMeta(ns) {
   return JSON.parse(readFileSync(path, "utf-8"));
 }
 
-// Load a seed JSON for resume and return the exact { research, content }
-// payload to re-inject. Kept minimal (no buildSeed transformations) so the
-// artifact cache input hashes match the original injection. The graph's
-// fail-closed guards still validate the shape.
-function loadSeedFromFile(seedPath) {
-  if (!existsSync(seedPath)) {
-    throw new Error(`--seed file not found: ${seedPath}`);
-  }
-  let raw;
-  try {
-    raw = JSON.parse(readFileSync(seedPath, "utf-8"));
-  } catch (e) {
-    throw new Error(`--seed: failed to parse JSON: ${e.message}`);
-  }
-  if (!raw?.research || !raw?.content?.script) {
-    throw new Error(
-      "--seed: file must contain research and content.script",
-    );
-  }
-  const c = raw.content;
-  return {
-    research: raw.research,
-    content: {
-      script: typeof c.script === "string" ? c.script.trim() : c.script,
-      ...(c.narration
-        ? {
-            narration:
-              typeof c.narration === "string" ? c.narration.trim() : c.narration,
-          }
-        : {}),
-      ...(c.title ? { title: c.title } : {}),
-      ...(c.hook ? { hook: c.hook } : {}),
-      ...(c.ending ? { ending: c.ending } : {}),
-    },
-  };
-}
+// Re-injecting the seed for a resume needs the exact same normalization the
+// original seed-run applied, otherwise the artifact cache input hashes
+// diverge and the graph re-runs already-cached nodes (e.g. VisualDirector).
+// buildSeed / loadSeedFromFile are imported from seed-build.mjs (the single
+// source of truth) and called below where the seed is resolved.
 
 function readManifest(ns) {
   const path = join(RUNS_DIR, ns, "manifest.json");
@@ -446,7 +416,14 @@ async function main() {
       resumeSeed = meta.seed;
     } else if (parsed.seed) {
       try {
-        resumeSeed = loadSeedFromFile(parsed.seed);
+        // Apply the same buildSeed normalization the original seed-run used
+        // so the artifact cache input hashes match. pillar/topic/videoProfile
+        // come from run.json (the run already has them persisted).
+        resumeSeed = loadSeedFromFile(parsed.seed, {
+          pillar: meta?.pillar,
+          topic: meta?.topic,
+          profile: meta?.videoProfile,
+        });
       } catch (e) {
         console.error(e.message);
         process.exit(1);
