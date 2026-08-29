@@ -25,7 +25,7 @@ const MAX_ATEMPO = 1.15;
 // server-side model/voice/audio pipeline changes in a way that alters audio
 // for identical inputs, bump this constant at the same time as the deployment.
 // Forgetting the bump risks serving stale cached audio for new outputs.
-const CHATTERBOX_CACHE_VERSION = "v3";
+const CHATTERBOX_CACHE_VERSION = "v4";
 
 export class ChatterboxTTSProvider implements TTSProvider {
   cacheFingerprint(): string {

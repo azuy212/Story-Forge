@@ -160,7 +160,7 @@ describe("ChatterboxTTSProvider", () => {
     try {
       // Format: chatterbox-http-<version>:<url>:targetWpm=<wpm>
       expect(provider.cacheFingerprint()).toMatch(
-        /^chatterbox-http-v3:http:\/\/localhost:8010:targetWpm=\d+$/,
+        /^chatterbox-http-v4:http:\/\/localhost:8010:targetWpm=\d+$/,
       );
     } finally {
       if (prev === undefined) delete process.env.TTS_URL;
@@ -178,10 +178,10 @@ describe("ChatterboxTTSProvider", () => {
       const second = provider.cacheFingerprint();
 
       expect(first).toMatch(
-        /^chatterbox-http-v3:http:\/\/localhost:8010:targetWpm=\d+$/,
+        /^chatterbox-http-v4:http:\/\/localhost:8010:targetWpm=\d+$/,
       );
       expect(second).toMatch(
-        /^chatterbox-http-v3:http:\/\/tts-staging.example:9000:targetWpm=\d+$/,
+        /^chatterbox-http-v4:http:\/\/tts-staging.example:9000:targetWpm=\d+$/,
       );
       expect(second).not.toBe(first);
     } finally {
