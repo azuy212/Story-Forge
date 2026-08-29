@@ -482,7 +482,15 @@ async function main() {
     process.exit(0);
   }
 
-  createOrAppendRunMeta(RUNS_DIR, ns, { topic, pillar, videoProfile });
+  createOrAppendRunMeta(RUNS_DIR, ns, {
+    topic,
+    pillar,
+    videoProfile,
+    runSource: "seed",
+    // Persist the exact seed payload so a future `pnpm resume <ns>` can
+    // re-inject it and the artifact cache input hashes stay stable.
+    seed,
+  });
   await logger.setRunContext(ns, topic, 1);
   setRunNextActiveSink(logger.getCurrentSink());
 

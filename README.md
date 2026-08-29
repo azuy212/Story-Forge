@@ -149,6 +149,15 @@ The CLI:
 
 **Legacy runs** without `run.json` require `--pillar` and `--topic` (the topic is not reliably derivable from the folder name). Without pillar, ResearchAgent cannot hit its cache and will re-generate.
 
+**Resuming a seed run** — `pnpm resume <ns>` detects `runSource: "seed"` in
+`run.json` (persisted by `seed-run` since the persisted-seed feature) and
+re-injects the original `research` + `content` payload so the entryRouter
+jumps back to `VisualDirector` and the artifact cache replays every
+completed stage. For seed runs created before the persisted-seed feature,
+pass `--seed <seed.json>` to supply the original research/script file. The
+stage-status display marks `research` / `script` (and their QA gates) as
+`seeded` instead of `missing`.
+
 **Important:** The dev-server checkpointer (`.langgraph_api/.langgraphjs_api.checkpointer.json`) is ephemeral — it uses a `MemorySaver` with a **3-second debounced flush**. Threads are lost if:
 - The process dies before a flush (last checkpoints lost).
 - The file is unreadable at startup — `initialize()` silently resets to `{}` (all threads gone).

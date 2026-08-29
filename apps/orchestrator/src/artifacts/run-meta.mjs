@@ -18,7 +18,15 @@ export function runMetaPath(runsDir, runId) {
   return join(runsDir, runId, "run.json");
 }
 
-function freshMeta({ threadId, topic, pillar, projectId, videoProfile }) {
+function freshMeta({
+  threadId,
+  topic,
+  pillar,
+  projectId,
+  videoProfile,
+  runSource,
+  seed,
+}) {
   return {
     threadId,
     topic,
@@ -27,6 +35,15 @@ function freshMeta({ threadId, topic, pillar, projectId, videoProfile }) {
     ...(projectId ? { projectId } : {}),
     // Profile determines which sheet tab and slot schedule the run uses.
     ...(videoProfile ? { videoProfile } : {}),
+    // Identifies the launcher that created the run ("backlog" | "seed").
+    // Downstream consumers (e.g. Google Sheets writeback) read this to
+    // route to the correct sheet. Omitted for run-next to keep the legacy
+    // behavior on existing runs.
+    ...(runSource ? { runSource } : {}),
+    // Persisted seed payload for seed runs so a future resume can re-inject
+    // research/content without the original seed file. Keeps the artifact
+    // cache input hashes stable across resumes.
+    ...(seed ? { seed } : {}),
     createdAt: new Date().toISOString(),
     threadHistory: [threadId],
   };
@@ -133,7 +150,7 @@ function withLock(path, fn) {
  *
  * @param {string} runsDir artifact store root
  * @param {string} runId run folder name
- * @param {{ threadId: string, topic: string, pillar?: string, projectId?: string, videoProfile?: string }} meta
+ * @param {{ threadId: string, topic: string, pillar?: string, projectId?: string, videoProfile?: string, runSource?: "backlog"|"seed", seed?: object }} meta
  * @returns {object} the persisted run.json content
  */
 export function createOrAppendRunMeta(runsDir, runId, meta) {

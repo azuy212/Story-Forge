@@ -58,6 +58,43 @@ function readRunMeta(ns) {
   return JSON.parse(readFileSync(path, "utf-8"));
 }
 
+// Load a seed JSON for resume and return the exact { research, content }
+// payload to re-inject. Kept minimal (no buildSeed transformations) so the
+// artifact cache input hashes match the original injection. The graph's
+// fail-closed guards still validate the shape.
+function loadSeedFromFile(seedPath) {
+  if (!existsSync(seedPath)) {
+    throw new Error(`--seed file not found: ${seedPath}`);
+  }
+  let raw;
+  try {
+    raw = JSON.parse(readFileSync(seedPath, "utf-8"));
+  } catch (e) {
+    throw new Error(`--seed: failed to parse JSON: ${e.message}`);
+  }
+  if (!raw?.research || !raw?.content?.script) {
+    throw new Error(
+      "--seed: file must contain research and content.script",
+    );
+  }
+  const c = raw.content;
+  return {
+    research: raw.research,
+    content: {
+      script: typeof c.script === "string" ? c.script.trim() : c.script,
+      ...(c.narration
+        ? {
+            narration:
+              typeof c.narration === "string" ? c.narration.trim() : c.narration,
+          }
+        : {}),
+      ...(c.title ? { title: c.title } : {}),
+      ...(c.hook ? { hook: c.hook } : {}),
+      ...(c.ending ? { ending: c.ending } : {}),
+    },
+  };
+}
+
 function readManifest(ns) {
   const path = join(RUNS_DIR, ns, "manifest.json");
   if (!existsSync(path)) return null;
@@ -85,13 +122,22 @@ const STAGE_ORDER = [
   "publish",
 ];
 
-function getStageStatus(manifest) {
+function getStageStatus(manifest, isSeedRun = false) {
   if (!manifest) return {};
   const status = {};
   for (const type of STAGE_ORDER) {
     const m = manifest[type];
     if (!m) {
-      status[type] = "missing";
+      // Seed runs skip the upstream research/script producers entirely (the
+      // entryRouter jumps to VisualDirector), so a missing artifact there
+      // is expected — show "seeded" instead of "missing".
+      status[type] =
+        isSeedRun &&
+        ["research", "researchQA", "scriptPlan", "script", "scriptQA"].includes(
+          type,
+        )
+          ? "seeded"
+          : "missing";
       continue;
     }
     if (m.latest && m.versions) {
@@ -106,24 +152,27 @@ function getStageStatus(manifest) {
   return status;
 }
 
-function printStatus(ns, meta, manifest) {
+function printStatus(ns, meta, manifest, isSeedRun = false) {
   console.log(`\nRun: ${ns}`);
   console.log(`Thread: ${meta?.threadId ?? "unknown"}`);
   console.log(`Topic: ${meta?.topic ?? "unknown"}`);
   console.log(`Pillar: ${meta?.pillar ?? "unknown"}`);
+  console.log(`Source: ${isSeedRun ? "seed" : meta?.runSource ?? "backlog"}`);
   console.log(`Created: ${meta?.createdAt ?? "unknown"}`);
   console.log(`Thread history: ${meta?.threadHistory?.join(", ") ?? "none"}`);
   console.log("\nStage status:");
-  const status = getStageStatus(manifest);
+  const status = getStageStatus(manifest, isSeedRun);
   for (const [type, s] of Object.entries(status)) {
     const icon =
       s === "complete"
         ? "✓"
-        : s === "missing"
-          ? "○"
-          : s === "pending"
-            ? "⏳"
-            : "?";
+        : s === "seeded"
+          ? "◇"
+          : s === "missing"
+            ? "○"
+            : s === "pending"
+              ? "⏳"
+              : "?";
     console.log(`  ${icon} ${type}: ${s}`);
   }
 }
@@ -271,6 +320,7 @@ export function parseArgs(args) {
     pillar: null,
     topic: null,
     profile: null,
+    seed: null,
     dryRun: false,
     help: false,
   };
@@ -296,6 +346,10 @@ export function parseArgs(args) {
       if (val !== "short" && val !== "long")
         throw new Error("--profile must be 'short' or 'long'");
       parsed.profile = val;
+    } else if (arg === "--seed") {
+      if (!args[i + 1] || args[i + 1].startsWith("--"))
+        throw new Error("--seed requires a path to a seed JSON file");
+      parsed.seed = args[++i];
     } else if (arg.startsWith("--")) {
       throw new Error(`Unknown argument: ${arg}`);
     } else if (!parsed.namespace) {
@@ -316,6 +370,10 @@ Options:
   --pillar <pillar>       Override pillar (takes precedence over run.json; warns if different)
   --topic <topic>         Override topic (required for legacy runs without run.json)
   --profile <short|long>  Override video profile (takes precedence over run.json)
+  --seed <path>           Re-inject a seed JSON (research + content) for a
+                          seed-run resume. Normally auto-loaded from
+                          run.json.seed; required for older runs that predate
+                          the persisted-seed feature.
   --dry-run               Show status and exit without running
   --help, -h              Show this help
 
@@ -323,6 +381,7 @@ Examples:
   pnpm resume why-your-brain-makes-you-remember-things-that-never-happened-20260817-230021-56a1
   pnpm resume "why your brain" --pillar Psychology --topic "Why Your Brain Makes You Remember Things That Never Happened"
   pnpm resume <ns> --profile long --dry-run
+  pnpm resume <ns> --seed ./napal-flood.json   # resume a seed run (re-inject research + script)
 `);
 }
 
@@ -376,7 +435,31 @@ async function main() {
     process.exit(1);
   }
 
-  printStatus(ns, meta, manifest);
+  // Determine whether this is a seed run and resolve the seed payload to
+  // re-inject. New runs persist run.json.seed (set by seed-run); legacy runs
+  // require the user to pass --seed explicitly.
+  const isSeedRun =
+    meta?.runSource === "seed" || Boolean(parsed.seed);
+  let resumeSeed = null;
+  if (isSeedRun) {
+    if (meta?.seed) {
+      resumeSeed = meta.seed;
+    } else if (parsed.seed) {
+      try {
+        resumeSeed = loadSeedFromFile(parsed.seed);
+      } catch (e) {
+        console.error(e.message);
+        process.exit(1);
+      }
+    } else {
+      console.error(
+        `\nERROR: seed run detected but no seed payload found. Re-run with --seed <path-to-seed.json> to supply the original research + script.`,
+      );
+      process.exit(1);
+    }
+  }
+
+  printStatus(ns, meta, manifest, isSeedRun);
 
   const status = getStageStatus(manifest);
   if (status.publish === "complete") {
@@ -446,8 +529,20 @@ async function main() {
   try {
     const { lastEvent } = await resumeRun(
       ns,
-      { pillar, topic, videoProfile },
-      { assistantId },
+      {
+        pillar,
+        topic,
+        videoProfile,
+        // Preserve the run's launch source so post-publish sheet writeback
+        // routes to the matching tab (Seed Runs for seed runs).
+        runSource: isSeedRun ? "seed" : meta?.runSource || undefined,
+      },
+      {
+        assistantId,
+        // Re-inject the seed for seed runs so the entryRouter jumps to
+        // VisualDirector and the artifact cache replays completed stages.
+        ...(resumeSeed ? { seed: resumeSeed } : {}),
+      },
     );
     const status =
       lastEvent?.data?.execution?.status === "complete" ? "complete" : "failed";
