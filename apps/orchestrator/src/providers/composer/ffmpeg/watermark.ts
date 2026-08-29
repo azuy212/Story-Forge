@@ -1,5 +1,11 @@
 import { runFfmpeg } from "./ffmpeg.js";
 import type { EncoderConfig } from "./ffmpeg.js";
+import type { RunLogSink } from "../../../utils/run-log.js";
+
+export interface FfmpegCallContext {
+  runLogSink?: RunLogSink | null;
+  runId?: string;
+}
 
 export interface WatermarkOptions {
   maxLogoWidth?: number;
@@ -13,6 +19,7 @@ export async function applyWatermark(
   logoPath: string,
   outputPath: string,
   opts: WatermarkOptions,
+  context: FfmpegCallContext = {},
 ): Promise<void> {
   const maxLogoWidth = opts.maxLogoWidth ?? 150;
   const maxLogoHeight = opts.maxLogoHeight ?? 150;
@@ -50,5 +57,7 @@ export async function applyWatermark(
   await runFfmpeg({
     args,
     description: "apply watermark",
+    runLogSink: context.runLogSink,
+    runId: context.runId,
   });
 }

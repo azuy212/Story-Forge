@@ -84,6 +84,31 @@ export const config = {
     const value = Number(read("NARRATIVE_HOLD_SECONDS") ?? "0.5");
     return Number.isFinite(value) && value >= 0 ? value : 0.5;
   },
+  videoProfile: (): "short" | "long" | undefined => {
+    const value = read("VIDEO_PROFILE");
+    return value === "short" || value === "long" ? value : undefined;
+  },
+  targetDurationSec: (): number | undefined => {
+    const value = read("TARGET_DURATION_SEC");
+    if (!value) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  },
+  durationToleranceSec: (): number | undefined => {
+    const value = read("DURATION_TOLERANCE_SEC");
+    if (!value) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+  },
+  // Long-form video pacing target (used by the long video profile to plan
+  // narration word counts). Distinct from `narrationTargetWpm`, which is
+  // the TTS engine speed for the combined short-form pipeline.
+  wordsPerMinute: (): number | undefined => {
+    const value = read("WORDS_PER_MINUTE");
+    if (!value) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  },
   narrationTargetWpm: (): number | undefined => {
     const value = read("NARRATION_TARGET_WPM");
     if (!value) return undefined;
@@ -139,6 +164,12 @@ export const config = {
   },
   googleSheetsSheetName: (): string =>
     read("GOOGLE_SHEETS_SHEET_NAME") || "Sheet1",
+  googleSheetsSheetNameForProfile: (profile?: string): string => {
+    if (profile === "long") {
+      return read("GOOGLE_SHEETS_SHEET_NAME_LONG") || "Long Videos";
+    }
+    return read("GOOGLE_SHEETS_SHEET_NAME") || "Sheet1";
+  },
   // --- Subtitle appearance (word-level karaoke rendering) ---
   // Subtitle styling is controlled here so it is configurable in one place
   // rather than hardcoded across the pipeline. Colors are ASS &HAABBGGRR.
@@ -163,4 +194,14 @@ export const config = {
     const value = Number(read("SUBTITLE_OUTLINE") ?? "2");
     return Number.isFinite(value) && value >= 0 ? value : 2;
   },
+  // --- Run diagnostic log file ---
+  runLogFileEnabled: (): boolean => read("ORCHESTRATOR_LOG_FILE") !== "false",
+  runLogMaxLineBytes: (): number => {
+    const value = Number(read("ORCHESTRATOR_LOG_MAX_LINE_BYTES") ?? "8388608");
+    return Number.isFinite(value) && value >= 1024
+      ? Math.floor(value)
+      : 8388608;
+  },
+  runLogIncludeMessages: (): boolean =>
+    read("ORCHESTRATOR_LOG_MESSAGES") !== "false",
 };

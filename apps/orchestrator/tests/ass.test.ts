@@ -1,5 +1,9 @@
-import { describe, it, expect } from "@jest/globals";
-import { buildKaraokeAss, splitIntoLines } from "../src/utils/ass.js";
+import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import {
+  appAssStyle,
+  buildKaraokeAss,
+  splitIntoLines,
+} from "../src/utils/ass.js";
 import type { WordTimestamp } from "../src/providers/subtitle-provider.js";
 
 function words(entries: Array<[string, number, number]>): WordTimestamp[] {
@@ -147,5 +151,37 @@ describe("buildKaraokeAss", () => {
     for (const ev of events) {
       expect(ev.match(/\\N/g)?.length ?? 0).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+describe("appAssStyle", () => {
+  const originalFontSize = process.env.SUBTITLE_FONT_SIZE;
+  const originalMarginV = process.env.SUBTITLE_MARGIN_V;
+
+  beforeEach(() => {
+    process.env.SUBTITLE_FONT_SIZE = "48";
+    process.env.SUBTITLE_MARGIN_V = "70";
+  });
+
+  afterEach(() => {
+    if (originalFontSize === undefined) delete process.env.SUBTITLE_FONT_SIZE;
+    else process.env.SUBTITLE_FONT_SIZE = originalFontSize;
+    if (originalMarginV === undefined) delete process.env.SUBTITLE_MARGIN_V;
+    else process.env.SUBTITLE_MARGIN_V = originalMarginV;
+  });
+
+  it("keeps the configured font size on the short (1080x1920) frame", () => {
+    const style = appAssStyle({ playResX: 1080, playResY: 1920 });
+    expect(style.fontSize).toBe(48);
+    expect(style.marginV).toBe(70);
+  });
+
+  it("scales the font down on the long (1920x1080) frame so the subtitle keeps the same vertical fraction", () => {
+    const long = appAssStyle({ playResX: 1920, playResY: 1080 });
+    const short = appAssStyle({ playResX: 1080, playResY: 1920 });
+    // 1080/1920 = 0.5625 of the short font.
+    expect(long.fontSize).toBe(Math.round((48 * 1080) / 1920));
+    expect(long.fontSize).toBeLessThan(short.fontSize);
+    expect(long.marginV).toBeLessThan(short.marginV);
   });
 });

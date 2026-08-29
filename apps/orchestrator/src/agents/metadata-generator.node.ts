@@ -1,5 +1,10 @@
 import type { RunnableConfig } from "@langchain/core/runnables";
-import type { ProjectState, Diagnostics, Execution } from "../types/index.js";
+import type {
+  ProjectState,
+  Diagnostics,
+  Execution,
+  VideoProfileConfig,
+} from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
 import { withTopic } from "../artifacts/context.js";
@@ -8,6 +13,7 @@ import { MetadataOutputSchema } from "../schemas/metadata-output.js";
 import type { MetadataOutput } from "../schemas/metadata-output.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
+import { formatLabelFor, resolveVideoProfile } from "../utils/video-profile.js";
 
 function hasMetadataOutput(state: ProjectState): boolean {
   return (
@@ -26,6 +32,9 @@ export async function metadataGeneratorNode(
   execution: Partial<Execution>;
 }> {
   const inject = (config.configurable ?? {}) as AgentInject;
+  const videoProfile: VideoProfileConfig =
+    state.videoProfile ?? resolveVideoProfile({});
+  const formatLabel = formatLabelFor(videoProfile);
 
   // Idempotent on graph re-entry: any re-entry through VisualDirector
   // (e.g. a QA router sending work back) re-fires this branch, and the
@@ -63,7 +72,7 @@ export async function metadataGeneratorNode(
     agent: AgentModel.MetadataGenerator,
     promptPath: PromptPaths.MetadataGenerator,
     schema: MetadataOutputSchema,
-    variables: { script, title, hook, channel },
+    variables: { script, title, hook, channel, formatLabel },
     inject,
     configurable: withTopic(config, state).configurable,
     generateOptions: {

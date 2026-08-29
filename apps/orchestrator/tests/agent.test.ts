@@ -1,6 +1,7 @@
 import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 import { scriptPlannerNode } from "../src/agents/script-planner.node.js";
-import type { ProjectState } from "../src/types/index.js";
+import type { ProjectState, VideoProfileConfig } from "../src/types/index.js";
+import { resolveVideoProfile } from "../src/utils/video-profile.js";
 
 const mockGenerate = jest.fn<(...args: any[]) => Promise<any>>();
 
@@ -54,11 +55,15 @@ function makeMocks() {
 
 function runNode(state?: Partial<ProjectState>) {
   const mocks = makeMocks();
+  const shortProfile: VideoProfileConfig = resolveVideoProfile({
+    videoProfile: "short",
+  });
   const promise = scriptPlannerNode(
     {
       project: { pillar: "Geography", topic: "Unrecognized Countries" },
       research: { summary: "A remote island.", facts: FACTS },
       execution: { version: "0.1.0" },
+      videoProfile: shortProfile,
       ...state,
     } as ProjectState,
     { configurable: mocks } as any,

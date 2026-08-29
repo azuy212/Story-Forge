@@ -3,13 +3,24 @@ import { basename } from "node:path";
 import type { WordTimestamp } from "./subtitle-provider.js";
 import { config } from "../utils/config.js";
 import { PipelineError } from "../utils/errors.js";
+import { sanitizeHeaders, withProviderLog } from "../utils/run-log.js";
 
 export interface AlignResult {
   wordTimestamps: WordTimestamp[];
 }
 
+export interface AlignOptions {
+  runId?: string;
+  sceneId?: number;
+  runLogSink?: import("../utils/run-log.js").RunLogSink | null;
+}
+
 export interface WhisperXProvider {
-  align(audioUrl: string, narration?: string): Promise<AlignResult>;
+  align(
+    audioUrl: string,
+    narration?: string,
+    options?: AlignOptions,
+  ): Promise<AlignResult>;
 }
 
 const REQUEST_TIMEOUT_MS = 600_000;
@@ -44,7 +55,11 @@ interface WhisperXResponse {
 export class HttpWhisperXProvider implements WhisperXProvider {
   constructor(private readonly serviceUrl: string = config.transcriberUrl()) {}
 
-  async align(audioUrl: string, narration?: string): Promise<AlignResult> {
+  async align(
+    audioUrl: string,
+    narration?: string,
+    options: AlignOptions = {},
+  ): Promise<AlignResult> {
     let audioBuffer: Buffer;
     try {
       audioBuffer = await readFile(audioUrl);
@@ -54,6 +69,25 @@ export class HttpWhisperXProvider implements WhisperXProvider {
         "WHISPERX_PROVIDER_ERROR",
       );
     }
+
+    const sink = options.runLogSink ?? null;
+    const event: Record<string, unknown> = {
+      event: "provider_call",
+      provider: "whisperx",
+      operation: "align",
+      url: `${this.serviceUrl}${ALIGN_PATH}`,
+      method: "POST",
+      headers: sanitizeHeaders({
+        "Content-Type": `multipart/form-data; boundary=${BOUNDARY}`,
+      }),
+      runId: options.runId,
+      sceneId: options.sceneId,
+      audioFile: basename(audioUrl),
+      audioByteSize: audioBuffer.length,
+      narrationProvided:
+        typeof narration === "string" && narration.trim().length > 0,
+      narrationLength: narration?.length ?? 0,
+    };
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -66,13 +100,20 @@ export class HttpWhisperXProvider implements WhisperXProvider {
 
     let response: Response;
     try {
-      response = await fetch(`${this.serviceUrl}${ALIGN_PATH}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": `multipart/form-data; boundary=${BOUNDARY}`,
-        },
-        body: multipartBody as unknown as BodyInit,
-        signal: controller.signal,
+      response = await withProviderLog(sink, event, async () => {
+        const r = await fetch(`${this.serviceUrl}${ALIGN_PATH}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": `multipart/form-data; boundary=${BOUNDARY}`,
+          },
+          body: multipartBody as unknown as BodyInit,
+          signal: controller.signal,
+        });
+        event.responseStatus = r.status;
+        event.responseHeaders = sanitizeHeaders(
+          Object.fromEntries(r.headers.entries()),
+        );
+        return r;
       });
     } catch (err) {
       clearTimeout(timeoutId);
@@ -91,6 +132,8 @@ export class HttpWhisperXProvider implements WhisperXProvider {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      event.responseBody = text.slice(0, 8000);
       throw new PipelineError(
         `WhisperX alignment failed: HTTP ${response.status} ${response.statusText}`,
         "WHISPERX_PROVIDER_ERROR",
@@ -107,13 +150,32 @@ export class HttpWhisperXProvider implements WhisperXProvider {
       );
     }
 
-    const wordTimestamps = normalizeWhisperXResponse(body);
+    let wordTimestamps: WordTimestamp[];
+    try {
+      wordTimestamps = normalizeWhisperXResponse(body);
+    } catch (err) {
+      event.responseBody = (() => {
+        try {
+          return JSON.stringify(body).slice(0, 8000);
+        } catch {
+          return "[unserializable body]";
+        }
+      })();
+      throw err;
+    }
+
     if (wordTimestamps.length === 0) {
       throw new PipelineError(
         "WhisperX alignment failed: response contained no word timestamps",
         "WHISPERX_PROVIDER_ERROR",
       );
     }
+
+    event.responseWordCount = wordTimestamps.length;
+    event.responseBody = {
+      segments: (body as { segments?: unknown }).segments,
+      wordCount: wordTimestamps.length,
+    };
 
     return { wordTimestamps };
   }

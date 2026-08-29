@@ -29,6 +29,10 @@ import { AUDIO_DURATION_TOLERANCE_MS } from "../utils/constants.js";
 import { config } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
+import {
+  appendRunLogEvent,
+  getRunLogSinkFromConfig,
+} from "../utils/run-log.js";
 
 const DEFAULT_PROVIDER = config.useRealProviders()
   ? new ChatterboxTTSProvider()
@@ -141,6 +145,7 @@ export async function narrationGeneratorNode(
   const voice = state.branding?.voice ?? DEFAULT_VOICE;
   const provider = getTTSProvider(config);
   const runId = getArtifactNamespace(config, state);
+  const runLogSink = getRunLogSinkFromConfig(config);
 
   const settledJobs = await Promise.allSettled(
     scenes.map(async (scene) => {
@@ -149,7 +154,19 @@ export async function narrationGeneratorNode(
         voice,
         filename: `scene-${padSceneId(scene.sceneId)}.wav`,
         runId,
+        videoProfile: state.videoProfile?.profile,
+        runLogSink,
       };
+      const startedAt = Date.now();
+      appendRunLogEvent(runLogSink, {
+        event: "scene_event",
+        node: AgentModel.NarrationGenerator,
+        sceneId: scene.sceneId,
+        kind: "start",
+        runId,
+        voice,
+        textLength: options.text.length,
+      });
 
       const result = await cacheNodeResult<SceneAudio>(
         {
@@ -196,11 +213,34 @@ export async function narrationGeneratorNode(
       );
 
       if (!result.data) {
+        appendRunLogEvent(runLogSink, {
+          event: "scene_event",
+          node: AgentModel.NarrationGenerator,
+          sceneId: scene.sceneId,
+          kind: "end",
+          outcome: "failed",
+          errorReason: result.error,
+          durationMs: Date.now() - startedAt,
+          cacheHit: result.fromCache,
+          runId,
+        });
         return { scene, result };
       }
 
       const artifactId =
         result.ref?.artifactId ?? sceneAudioIdentity(scene, options, provider);
+      appendRunLogEvent(runLogSink, {
+        event: "scene_event",
+        node: AgentModel.NarrationGenerator,
+        sceneId: scene.sceneId,
+        kind: "end",
+        outcome: "resolved",
+        durationMs: Date.now() - startedAt,
+        cacheHit: result.fromCache,
+        durationMsAudio: result.data.durationMs,
+        url: result.data.url,
+        runId,
+      });
       return {
         scene,
         result: {

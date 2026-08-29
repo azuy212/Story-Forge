@@ -12,10 +12,17 @@ import { join } from "node:path";
 import {
   decideRun,
   findRunByTopic,
+  parseSseEvent,
+  PRODUCER_NODES,
+  reemitSseEventToSink,
+  setActiveSink,
+  __resetReemitStateForTest,
   runLauncher,
+  validateProfile,
   readSheetRows,
 } from "../scripts/run-next.mjs";
 import { getAssistantId, resumeRun } from "../scripts/resume.mjs";
+import { closeAllRunLogSinks } from "../dist/utils/run-log.js";
 import { EXPECTED_HEADERS } from "../src/integrations/google-sheets/sheets-format.mjs";
 
 let runsDir: string;
@@ -58,6 +65,7 @@ describe("decideRun", () => {
     const decision: any = decideRun(
       runsDir,
       [EXPECTED_HEADERS, plannedRow()],
+      "short",
       FIXED_NOW,
     );
     expect(decision).toMatchObject({
@@ -79,6 +87,7 @@ describe("decideRun", () => {
     const decision: any = decideRun(
       runsDir,
       [EXPECTED_HEADERS, plannedRow()],
+      "short",
       FIXED_NOW,
     );
     expect(decision.action).toBe("resume");
@@ -117,7 +126,7 @@ describe("decideRun", () => {
         ]);
       }
     }
-    const decision: any = decideRun(runsDir, rows, FIXED_NOW);
+    const decision: any = decideRun(runsDir, rows, "short", FIXED_NOW);
     expect(decision.action).toBe("resume");
     expect(decision.youtubePublishAt).toBeUndefined();
   });
@@ -131,6 +140,7 @@ describe("decideRun", () => {
     const decision: any = decideRun(
       runsDir,
       [EXPECTED_HEADERS, plannedRow({ 0: "row-id-9" })],
+      "short",
       FIXED_NOW,
     );
     expect(decision.action).toBe("resume");
@@ -141,6 +151,7 @@ describe("decideRun", () => {
     const decision: any = decideRun(
       runsDir,
       [EXPECTED_HEADERS, plannedRow()],
+      "short",
       FIXED_NOW,
     );
     expect(decision).toMatchObject({
@@ -157,6 +168,7 @@ describe("decideRun", () => {
     const decision: any = decideRun(
       runsDir,
       [EXPECTED_HEADERS, plannedRow({ 4: "published" })],
+      "short",
       FIXED_NOW,
     );
     expect(decision).toEqual({ action: "none", reason: "no-pending-row" });
@@ -168,7 +180,7 @@ describe("decideRun", () => {
       plannedRow({ 2: "" }),
       plannedRow({ 0: "ok-1" }),
     ];
-    const decision: any = decideRun(runsDir, rows, FIXED_NOW);
+    const decision: any = decideRun(runsDir, rows, "short", FIXED_NOW);
     expect(decision).toMatchObject({ action: "create", projectId: "ok-1" });
   });
 
@@ -191,7 +203,7 @@ describe("decideRun", () => {
         "",
       ],
     ];
-    const decision: any = decideRun(runsDir, rows, FIXED_NOW);
+    const decision: any = decideRun(runsDir, rows, "short", FIXED_NOW);
     expect(decision.action).toBe("create");
     expect(decision.youtubePublishAt).toBe(
       new Date("2026-08-20T20:00:00").toISOString(),
@@ -267,14 +279,16 @@ describe("runLauncher", () => {
     expect(input).toEqual({
       pillar: "Geography",
       topic: "Unrecognized Countries",
+      videoProfile: "short",
     });
-    expect(options).toEqual({
+    expect(options).toMatchObject({
       assistantId: "ast-1",
       projectId: "abc123",
       youtubePublishAt: expect.stringMatching(
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
       ),
     });
+    expect(typeof options.onEvent).toBe("function");
   });
 
   it("resumes the persisted run and preserves its projectId (resume path)", async () => {
@@ -293,6 +307,7 @@ describe("runLauncher", () => {
     expect(input).toEqual({
       pillar: "Geography",
       topic: "Unrecognized Countries",
+      videoProfile: "short",
     });
     expect(options.projectId).toBe("legacy-1");
     expect(options.youtubePublishAt).toMatch(
@@ -349,5 +364,440 @@ describe("runLauncher", () => {
       .mockRejectedValue(new Error("No 'agent' assistant found"));
     await expect(runLauncher(deps)).rejects.toThrow("getAssistantId failed");
     expect(deps.resumeRun).not.toHaveBeenCalled();
+  });
+
+  it("reads from Long Videos sheet when profile is long", async () => {
+    const deps = baseDeps();
+    deps.env = {
+      ...launcherEnv(),
+      GOOGLE_SHEETS_SHEET_NAME_LONG: "Long Videos",
+    };
+    await runLauncher({ ...deps, profile: "long" });
+    expect(deps.readRows).toHaveBeenCalledWith(
+      expect.anything(),
+      "ssid",
+      "Long Videos",
+    );
+  });
+
+  it("reads from Sheet1 sheet when profile is short", async () => {
+    const deps = baseDeps();
+    await runLauncher({ ...deps, profile: "short" });
+    expect(deps.readRows).toHaveBeenCalledWith(
+      expect.anything(),
+      "ssid",
+      "Sheet1",
+    );
+  });
+
+  it("rejects invalid profile at the boundary", async () => {
+    const deps = baseDeps();
+    await expect(runLauncher({ ...deps, profile: "invalid" })).rejects.toThrow(
+      "invalid profile 'invalid'",
+    );
+  });
+});
+
+describe("validateProfile", () => {
+  it("accepts short", () => {
+    expect(() => validateProfile("short")).not.toThrow();
+  });
+
+  it("accepts long", () => {
+    expect(() => validateProfile("long")).not.toThrow();
+  });
+
+  it("rejects invalid values", () => {
+    expect(() => validateProfile("medium")).toThrow("invalid profile 'medium'");
+    expect(() => validateProfile("")).toThrow("invalid profile ''");
+  });
+});
+
+describe("decideRun profile routing", () => {
+  it("long profile picks a Tuesday/Friday slot", () => {
+    // Wednesday 2026-08-19 10:00 → next long slot is Friday 2026-08-21 20:00
+    const now = new Date("2026-08-19T10:00:00");
+    const decision: any = decideRun(
+      runsDir,
+      [EXPECTED_HEADERS, plannedRow()],
+      "long",
+      now,
+    );
+    expect(decision.youtubePublishAt).toBe(
+      new Date("2026-08-21T20:00:00").toISOString(),
+    );
+  });
+
+  it("short profile picks a daily 12:00 or 20:00 slot", () => {
+    // Wednesday 2026-08-19 10:00 → next short slot is Wednesday 2026-08-19 12:00
+    const now = new Date("2026-08-19T10:00:00");
+    const decision: any = decideRun(
+      runsDir,
+      [EXPECTED_HEADERS, plannedRow()],
+      "short",
+      now,
+    );
+    expect(decision.youtubePublishAt).toBe(
+      new Date("2026-08-19T12:00:00").toISOString(),
+    );
+  });
+
+  it("existing run with persisted videoProfile retains it", () => {
+    addRun("geo-run-profile", {
+      topic: "Unrecognized Countries",
+      pillar: "Geography",
+      videoProfile: "long",
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    const decision: any = decideRun(
+      runsDir,
+      [EXPECTED_HEADERS, plannedRow()],
+      "short",
+      FIXED_NOW,
+    );
+    expect(decision.profile).toBe("long");
+  });
+
+  it("legacy run without videoProfile defaults to short", () => {
+    addRun("geo-run-legacy", {
+      topic: "Unrecognized Countries",
+      pillar: "Geography",
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    const decision: any = decideRun(
+      runsDir,
+      [EXPECTED_HEADERS, plannedRow()],
+      "long",
+      FIXED_NOW,
+    );
+    expect(decision.profile).toBe("short");
+  });
+});
+
+describe("parseSseEvent", () => {
+  it("returns null for non-start/end frames (metadata/values)", () => {
+    expect(
+      parseSseEvent({ event: "metadata", run_id: "r1", attempt: 1 }),
+    ).toBeNull();
+    expect(parseSseEvent({ event: "values", data: {} })).toBeNull();
+    expect(parseSseEvent(null)).toBeNull();
+  });
+
+  it("returns null for on_chain_* without a langgraph_node metadata", () => {
+    expect(
+      parseSseEvent({ event: "on_chain_start", name: "RunnableSequence" }),
+    ).toBeNull();
+  });
+
+  it("maps on_chain_start to running", () => {
+    expect(
+      parseSseEvent({
+        event: "on_chain_start",
+        name: "ResearchAgent",
+        metadata: { langgraph_node: "ResearchAgent" },
+      }),
+    ).toEqual({ name: "ResearchAgent", status: "running" });
+  });
+
+  it("maps on_chain_end with no error to complete", () => {
+    expect(
+      parseSseEvent({
+        event: "on_chain_end",
+        name: "ResearchAgent",
+        metadata: { langgraph_node: "ResearchAgent" },
+        data: { output: { research: { summary: "..." } } },
+      }),
+    ).toEqual({ name: "ResearchAgent", status: "complete" });
+  });
+
+  it("maps on_chain_end with status:error to failed", () => {
+    expect(
+      parseSseEvent({
+        event: "on_chain_end",
+        name: "ScriptWriter",
+        status: "error",
+        metadata: { langgraph_node: "ScriptWriter" },
+      }),
+    ).toEqual({ name: "ScriptWriter", status: "failed" });
+  });
+
+  it("ignores on_chain_stream and other intermediate events", () => {
+    expect(
+      parseSseEvent({
+        event: "on_chain_stream",
+        name: "ResearchAgent",
+        metadata: { langgraph_node: "ResearchAgent" },
+      }),
+    ).toBeNull();
+  });
+
+  it("PRODUCER_NODES covers every agent node that drives the pipeline spine", () => {
+    expect(PRODUCER_NODES).toContain("ResearchAgent");
+    expect(PRODUCER_NODES).toContain("ScriptPlanner");
+    expect(PRODUCER_NODES).toContain("ScriptWriter");
+    expect(PRODUCER_NODES).toContain("VisualDirector");
+    expect(PRODUCER_NODES).toContain("AssetStrategy");
+    expect(PRODUCER_NODES).toContain("ImagePromptGenerator");
+    expect(PRODUCER_NODES).toContain("AssetGenerator");
+    expect(PRODUCER_NODES).toContain("ImagePromptRepair");
+    expect(PRODUCER_NODES).toContain("VideoComposer");
+    expect(PRODUCER_NODES).toContain("MetadataGenerator");
+    expect(PRODUCER_NODES).toContain("ThumbnailGenerator");
+    expect(PRODUCER_NODES).toContain("Publisher");
+    expect(PRODUCER_NODES).not.toContain("ResearchQA");
+    expect(PRODUCER_NODES).not.toContain("ScriptQA");
+    expect(PRODUCER_NODES).not.toContain("PromptQA");
+    expect(PRODUCER_NODES).not.toContain("Finalize");
+    expect(PRODUCER_NODES).not.toContain("StoryPlanner");
+  });
+});
+
+describe("runLauncher wires onEvent into resumeRun", () => {
+  let logLines: string[];
+
+  beforeEach(() => {
+    logLines = [];
+    jest.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logLines.push(args.map(String).join(" "));
+    });
+    jest.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      logLines.push(args.map(String).join(" "));
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("forwards an onEvent callback that the SSE consumer can call to tick the bar", async () => {
+    const resumeRunMock = jest
+      .fn<typeof resumeRun>()
+      .mockImplementation(async (ns, _input, opts) => {
+        expect(typeof opts?.onEvent).toBe("function");
+        opts?.onEvent?.({
+          event: "on_chain_start",
+          metadata: { langgraph_node: "ResearchAgent" },
+        });
+        return { threadId: "t-1", lastEvent: null };
+      });
+    const deps = {
+      env: {
+        YOUTUBE_CLIENT_ID: "cid",
+        YOUTUBE_CLIENT_SECRET: "sec",
+        YOUTUBE_REFRESH_TOKEN: "ref",
+        GOOGLE_SHEETS_SPREADSHEET_ID: "ssid",
+      },
+      runsDir,
+      readRows: jest
+        .fn<typeof readSheetRows>()
+        .mockResolvedValue([EXPECTED_HEADERS, plannedRow()]),
+      getAssistantId: jest
+        .fn<typeof getAssistantId>()
+        .mockResolvedValue("ast-1"),
+      resumeRun: resumeRunMock,
+    };
+    await runLauncher(deps);
+
+    expect(resumeRunMock).toHaveBeenCalledTimes(1);
+    const opts = resumeRunMock.mock.calls[0][2] as {
+      onEvent?: (e: unknown) => void;
+    };
+    expect(opts.onEvent).toBeDefined();
+  });
+});
+
+describe("reemitSseEventToSink", () => {
+  interface CapturedEvent {
+    event: string;
+    [key: string]: unknown;
+  }
+
+  function makeSink(): {
+    sink: {
+      runId: string;
+      filePath: string;
+      events: CapturedEvent[];
+      appendLine: (e: CapturedEvent) => Promise<void>;
+      flush: () => Promise<void>;
+      close: () => Promise<void>;
+    };
+    events: CapturedEvent[];
+  } {
+    const events: CapturedEvent[] = [];
+    return {
+      events,
+      sink: {
+        runId: "sse-test",
+        filePath: "/tmp/never",
+        events,
+        appendLine: (e) => {
+          events.push(e);
+          return Promise.resolve();
+        },
+        flush: () => Promise.resolve(),
+        close: () => Promise.resolve(),
+      },
+    };
+  }
+
+  // Reuse one sink per test so writes via reemitSseEventToSink land in the
+  // events array the test body checks.
+  let sharedEvents: CapturedEvent[];
+
+  beforeEach(() => {
+    __resetReemitStateForTest();
+    const { sink, events } = makeSink();
+    setActiveSink(sink);
+    sharedEvents = events;
+  });
+
+  afterEach(() => {
+    setActiveSink(null);
+    closeAllRunLogSinks();
+  });
+
+  it("emits node_start then node_end for a matching chain pair", () => {
+    reemitSseEventToSink({
+      event: "on_chain_start",
+      metadata: { langgraph_node: "ResearchAgent" },
+    });
+    reemitSseEventToSink({
+      event: "on_chain_end",
+      metadata: { langgraph_node: "ResearchAgent" },
+      status: "success",
+      data: {
+        output: {
+          diagnostics: {
+            errors: [],
+            telemetry: {
+              ResearchAgent: { result: { promptTokens: 10, totalTokens: 20 } },
+            },
+          },
+        },
+      },
+    });
+
+    const kinds = sharedEvents.map((e) => e.event);
+    expect(kinds).toEqual(["node_start", "node_end"]);
+    const end = sharedEvents[1] as Record<string, unknown> & {
+      tokenSummary?: unknown;
+    };
+    expect(end.node).toBe("ResearchAgent");
+    expect(typeof end.durationMs).toBe("number");
+    expect(end.tokenSummary).toEqual({
+      promptTokens: 10,
+      completionTokens: undefined,
+      totalTokens: 20,
+      costUsd: undefined,
+      retries: undefined,
+    });
+  });
+
+  it("emits node_failed when status is error", () => {
+    reemitSseEventToSink({
+      event: "on_chain_start",
+      metadata: { langgraph_node: "ScriptWriter" },
+    });
+    reemitSseEventToSink({
+      event: "on_chain_end",
+      metadata: { langgraph_node: "ScriptWriter" },
+      status: "error",
+      data: {
+        output: {
+          diagnostics: {
+            errors: ["ScriptWriter: model failure"],
+          },
+        },
+      },
+    });
+
+    const kinds = sharedEvents.map((e) => e.event);
+    expect(kinds).toEqual(["node_start", "node_failed"]);
+    const failed = sharedEvents[1] as Record<string, unknown>;
+    expect(failed.node).toBe("ScriptWriter");
+    expect(failed.diagnosticsErrors).toEqual(["ScriptWriter: model failure"]);
+  });
+
+  it("ignores root graph chain events (no langgraph_node)", () => {
+    reemitSseEventToSink({
+      event: "on_chain_start",
+      metadata: { langgraph_plan: "developer" },
+      name: "YouTubeShortsPipeline",
+    });
+    reemitSseEventToSink({
+      event: "on_chain_end",
+      metadata: { langgraph_plan: "developer" },
+      name: "YouTubeShortsPipeline",
+      status: "success",
+    });
+
+    expect(sharedEvents).toEqual([]);
+  });
+
+  it("deduplicates node_start when the same node fires twice (QA retry)", () => {
+    // The langgraph dev server can emit on_chain_start for the same node
+    // multiple times during a run (root chain wrapping, sub-chain). We
+    // dedupe by node name so each node gets exactly one node_start per
+    // attempt; a fresh start resets the dedup marker so QA retries that
+    // re-enter a node get their own start.
+    reemitSseEventToSink({
+      event: "on_chain_start",
+      metadata: {
+        langgraph_node: "AssetGenerator",
+        langgraph_triggers: ["__start__"],
+      },
+    });
+    reemitSseEventToSink({
+      event: "on_chain_start",
+      metadata: {
+        langgraph_node: "AssetGenerator",
+        langgraph_triggers: ["__start__"],
+      },
+    });
+
+    const starts = sharedEvents.filter((e) => e.event === "node_start");
+    expect(starts).toHaveLength(1);
+    expect(starts[0].attempt).toBe(1);
+  });
+
+  it("emits llm_call events for chat model start and end", () => {
+    reemitSseEventToSink({
+      event: "on_chat_model_start",
+      name: "openrouter/free",
+      metadata: { langgraph_node: "ScriptPlanner", ls_provider: "openai" },
+    });
+    reemitSseEventToSink({
+      event: "on_chat_model_end",
+      name: "openrouter/free",
+      metadata: { langgraph_node: "ScriptPlanner" },
+      data: {
+        output: {
+          content: "hello world",
+          usage_metadata: { prompt_tokens: 5, completion_tokens: 2 },
+        },
+      },
+    });
+
+    const llmEvents = sharedEvents.filter((e) => e.event === "llm_call");
+    expect(llmEvents).toHaveLength(2);
+    expect((llmEvents[0] as Record<string, unknown>).operation).toBe(
+      "chat_model_start",
+    );
+    expect((llmEvents[1] as Record<string, unknown>).operation).toBe(
+      "chat_model_end",
+    );
+    const end = llmEvents[1] as Record<string, unknown>;
+    expect(end.usage).toEqual({ prompt_tokens: 5, completion_tokens: 2 });
+    expect(end.responseTextPreview).toBe("hello world");
+  });
+
+  it("returns silently when no sink is set", () => {
+    setActiveSink(null);
+    expect(() =>
+      reemitSseEventToSink({
+        event: "on_chain_start",
+        metadata: { langgraph_node: "ResearchAgent" },
+      }),
+    ).not.toThrow();
   });
 });

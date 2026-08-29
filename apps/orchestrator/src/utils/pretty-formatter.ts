@@ -1,8 +1,5 @@
 import { config } from "./config.js";
-import {
-  getTotalNodeCount,
-  getNodePhase,
-} from "./pipeline-stages.js";
+import { getTotalNodeCount, getNodePhase } from "./pipeline-stages.js";
 
 const RESET = "\x1b[0m";
 const GREEN = "\x1b[32m";
@@ -39,6 +36,7 @@ interface NodeEntry {
 
 export class PrettyConsoleFormatter {
   private readonly useColors: boolean;
+  private silent = false;
   private runContext?: RunContext;
   private runStartedAt?: number;
   private nodes: NodeEntry[] = [];
@@ -48,6 +46,16 @@ export class PrettyConsoleFormatter {
 
   constructor() {
     this.useColors = process.stdout.isTTY && config.logFormat() !== "json";
+  }
+
+  /**
+   * Suppress the per-run header box and per-node progress lines. Used by
+   * the run-next launcher, which renders its own in-place progress bar and
+   * does not want the box to share a row with the bar's first render.
+   * `logger.info`/`warn`/`error` still emit their `  • message` lines.
+   */
+  setSilent(value: boolean): void {
+    this.silent = value;
   }
 
   setRunContext(context: RunContext): void {
@@ -60,14 +68,14 @@ export class PrettyConsoleFormatter {
   }
 
   private printHeader(): void {
-    if (!this.runContext || this.headerPrinted) return;
+    if (!this.runContext || this.headerPrinted || this.silent) return;
 
     const { runId, topic, attempt } = this.runContext;
     const width = 60;
     const line = "─".repeat(width);
     const top = `╭${line}╮`;
     const mid1 = `│ ${"AI VIDEO PIPELINE".padEnd(width - 2)} │`;
-    const mid2 = `│ ${(`Run ${runId} · Attempt ${attempt}`).padEnd(width - 2)} │`;
+    const mid2 = `│ ${`Run ${runId} · Attempt ${attempt}`.padEnd(width - 2)} │`;
     const mid3 = `│ ${this.fit(topic, width - 2).padEnd(width - 2)} │`;
     const bot = `╰${line}╯`;
 
@@ -98,7 +106,9 @@ export class PrettyConsoleFormatter {
     if (secs < 60) return `${secs.toFixed(1)}s`;
     const mins = Math.floor(secs / 60);
     const rem = Math.floor(secs % 60);
-    return rem ? `${mins}m ${rem.toString().padStart(2, "0")}s` : `${mins}m 00s`;
+    return rem
+      ? `${mins}m ${rem.toString().padStart(2, "0")}s`
+      : `${mins}m 00s`;
   }
 
   private formatDetail(detail?: string): string {
@@ -108,16 +118,23 @@ export class PrettyConsoleFormatter {
 
   private getIconColor(status: NodeStatus): string {
     switch (status) {
-      case "complete": return GREEN;
-      case "running": return BLUE;
-      case "retry": return YELLOW;
-      case "warning": return YELLOW;
-      case "failed": return RED;
-      case "skipped": return GRAY;
+      case "complete":
+        return GREEN;
+      case "running":
+        return BLUE;
+      case "retry":
+        return YELLOW;
+      case "warning":
+        return YELLOW;
+      case "failed":
+        return RED;
+      case "skipped":
+        return GRAY;
     }
   }
 
   private printProgressBar(completed: number, total: number): void {
+    if (this.silent) return;
     const barWidth = 28;
     const filled = Math.round((completed / total) * barWidth);
     const bar = "█".repeat(filled) + "░".repeat(barWidth - filled);
@@ -125,7 +142,9 @@ export class PrettyConsoleFormatter {
     const barColor = this.useColors ? BLUE : "";
     const reset = this.useColors ? RESET : "";
 
-    console.log(`\n  Progress  ${barColor}[${bar}]${reset} ${completed}/${total}  ${this.currentNodeLabel ?? ""}\n`);
+    console.log(
+      `\n  Progress  ${barColor}[${bar}]${reset} ${completed}/${total}  ${this.currentNodeLabel ?? ""}\n`,
+    );
   }
 
   private renderNewEntries(): void {
@@ -144,8 +163,14 @@ export class PrettyConsoleFormatter {
 
     // Print current running node if it exists and hasn't been printed
     if (this.currentNodeLabel) {
-      const currentEntry = this.nodes.find((n) => n.label === this.currentNodeLabel);
-      if (currentEntry && currentEntry.status === "running" && !currentEntry.printed) {
+      const currentEntry = this.nodes.find(
+        (n) => n.label === this.currentNodeLabel,
+      );
+      if (
+        currentEntry &&
+        currentEntry.status === "running" &&
+        !currentEntry.printed
+      ) {
         this.printNodeLine(currentEntry, true);
         currentEntry.printed = true;
       }
@@ -163,13 +188,16 @@ export class PrettyConsoleFormatter {
   }
 
   private printNodeLine(entry: NodeEntry, isCurrent = false): void {
+    if (this.silent) return;
     const icon = ICONS[entry.status];
     const iconColor = this.getIconColor(entry.status);
     const coloredIcon = this.colorize(icon, iconColor);
 
     const label = entry.label.padEnd(24);
     const phase = entry.phase ? entry.phase.padEnd(36) : "".padEnd(36);
-    const duration = entry.durationMs ? this.formatDuration(entry.durationMs).padStart(10) : "";
+    const duration = entry.durationMs
+      ? this.formatDuration(entry.durationMs).padStart(10)
+      : "";
 
     let line = "";
     if (isCurrent) {
@@ -178,8 +206,14 @@ export class PrettyConsoleFormatter {
         line += this.colorize(`  ${entry.phase}`, GRAY);
       }
     } else {
-      const labelColor = entry.status === "failed" ? RED : entry.status === "skipped" ? GRAY : "";
-      const coloredLabel = this.useColors && labelColor ? `${labelColor}${label}${RESET}` : label;
+      const labelColor =
+        entry.status === "failed"
+          ? RED
+          : entry.status === "skipped"
+            ? GRAY
+            : "";
+      const coloredLabel =
+        this.useColors && labelColor ? `${labelColor}${label}${RESET}` : label;
       line = `  ${coloredIcon} ${coloredLabel}${phase}${duration}`;
     }
 
@@ -201,7 +235,12 @@ export class PrettyConsoleFormatter {
       existing.phase = effectivePhase;
       existing.printed = false;
     } else {
-      this.nodes.push({ label, status: "running", phase: effectivePhase, printed: false });
+      this.nodes.push({
+        label,
+        status: "running",
+        phase: effectivePhase,
+        printed: false,
+      });
     }
 
     this.currentNodeLabel = label;
@@ -228,13 +267,24 @@ export class PrettyConsoleFormatter {
       entry.detail = detail;
       entry.printed = false;
     } else {
-      this.nodes.push({ label, status: "complete", durationMs, detail, printed: false });
+      this.nodes.push({
+        label,
+        status: "complete",
+        durationMs,
+        detail,
+        printed: false,
+      });
     }
 
     this.renderNewEntries();
   }
 
-  nodeRetry(label: string, attempt: number, maxRetries: number, reason: string): void {
+  nodeRetry(
+    label: string,
+    attempt: number,
+    maxRetries: number,
+    reason: string,
+  ): void {
     const entry = this.nodes.find((n) => n.label === label);
     const detail = `retry ${attempt}/${maxRetries}: ${reason}`;
     if (entry) {
@@ -255,7 +305,12 @@ export class PrettyConsoleFormatter {
       entry.detail = reason;
       entry.printed = false;
     } else {
-      this.nodes.push({ label, status: "skipped", detail: reason, printed: false });
+      this.nodes.push({
+        label,
+        status: "skipped",
+        detail: reason,
+        printed: false,
+      });
     }
 
     this.renderNewEntries();
@@ -268,7 +323,12 @@ export class PrettyConsoleFormatter {
       entry.detail = reason;
       entry.printed = false;
     } else {
-      this.nodes.push({ label, status: "failed", detail: reason, printed: false });
+      this.nodes.push({
+        label,
+        status: "failed",
+        detail: reason,
+        printed: false,
+      });
     }
 
     this.renderNewEntries();
@@ -301,10 +361,16 @@ export class PrettyConsoleFormatter {
       const color = this.useColors ? GREEN : "";
       const reset = this.useColors ? RESET : "";
       console.log(`${color}${top}${reset}`);
-      console.log(`${color}│ ${"✓ VIDEO COMPLETE".padEnd(width - 2)} │${reset}`);
-      console.log(`${color}│ ${(`Total time: ${totalDuration}`).padEnd(width - 2)} │${reset}`);
+      console.log(
+        `${color}│ ${"✓ VIDEO COMPLETE".padEnd(width - 2)} │${reset}`,
+      );
+      console.log(
+        `${color}│ ${`Total time: ${totalDuration}`.padEnd(width - 2)} │${reset}`,
+      );
       if (summary) {
-        console.log(`${color}│ ${this.fit(summary, width - 2).padEnd(width - 2)} │${reset}`);
+        console.log(
+          `${color}│ ${this.fit(summary, width - 2).padEnd(width - 2)} │${reset}`,
+        );
       }
       console.log(`${color}${bot}${reset}`);
     } else {
@@ -312,12 +378,18 @@ export class PrettyConsoleFormatter {
       const reset = this.useColors ? RESET : "";
       console.log(`${color}${top}${reset}`);
       console.log(`${color}│ ${"✗ VIDEO FAILED".padEnd(width - 2)} │${reset}`);
-      console.log(`${color}│ ${(`Time: ${totalDuration}`).padEnd(width - 2)} │${reset}`);
+      console.log(
+        `${color}│ ${`Time: ${totalDuration}`.padEnd(width - 2)} │${reset}`,
+      );
       if (this.currentNodeLabel) {
-        console.log(`${color}│ ${(`Node: ${this.currentNodeLabel}`).padEnd(width - 2)} │${reset}`);
+        console.log(
+          `${color}│ ${`Node: ${this.currentNodeLabel}`.padEnd(width - 2)} │${reset}`,
+        );
       }
       if (summary) {
-        console.log(`${color}│ ${this.fit(summary, width - 2).padEnd(width - 2)} │${reset}`);
+        console.log(
+          `${color}│ ${this.fit(summary, width - 2).padEnd(width - 2)} │${reset}`,
+        );
       }
       console.log(`${color}${bot}${reset}`);
     }

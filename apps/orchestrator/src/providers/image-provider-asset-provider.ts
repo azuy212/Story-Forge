@@ -14,6 +14,11 @@ import {
   ImageGenerationFailureTypeEnum,
   type ImageGenerationFailureType,
 } from "./image-generation-error.js";
+import {
+  appendRunLogEvent,
+  sanitizeHeaders,
+  withProviderLog,
+} from "../utils/run-log.js";
 
 const REQUEST_TIMEOUT_MS = 600_000;
 const ASSETS_DIR = resolve("generated", "assets");
@@ -85,11 +90,28 @@ export class ImageProviderAssetProvider implements AssetProvider {
       opts.filename ?? `scene-${String(opts.sceneId).padStart(3, "0")}.png`;
     const dir = opts.runId ? resolve(ASSETS_DIR, opts.runId) : ASSETS_DIR;
     const filePath = resolve(dir, filename);
+    const startedAt = Date.now();
+    const sink = opts.runLogSink ?? null;
+    const requestEvent: Record<string, unknown> = {
+      event: "provider_call",
+      provider: "image_provider",
+      operation: "image_generate",
+      url: `${config.imageProviderUrl()}/generate`,
+      method: "POST",
+      headers: sanitizeHeaders({ "Content-Type": "application/json" }),
+      runId: opts.runId,
+      sceneId: opts.sceneId,
+      mode: opts.mode ?? "text_to_image",
+      referenceImageCount: opts.referenceImages?.length ?? 0,
+      filename,
+    };
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     let response: Response;
+    let arrayBuffer: ArrayBuffer | undefined;
+    let contentType: string | undefined;
     try {
       const referenceImages = opts.referenceImages?.length
         ? await Promise.all(
@@ -110,11 +132,38 @@ export class ImageProviderAssetProvider implements AssetProvider {
             referenceImages,
           }
         : { prompt: opts.prompt };
-      response = await fetch(`${config.imageProviderUrl()}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: controller.signal,
+      requestEvent.requestBody = {
+        prompt: body.prompt,
+        type: body.type,
+        mode: body.mode,
+        referenceImageCount: referenceImages?.length ?? 0,
+        ...(referenceImages
+          ? {
+              referenceImages: referenceImages.map((ref) => ({
+                id: ref.id,
+                filename: ref.filename,
+                mime: ref.mime,
+              })),
+            }
+          : {}),
+      };
+      requestEvent.requestBodyBytes = Buffer.byteLength(
+        JSON.stringify(body),
+        "utf-8",
+      );
+
+      response = await withProviderLog(sink, requestEvent, async () => {
+        const r = await fetch(`${config.imageProviderUrl()}/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+        requestEvent.responseStatus = r.status;
+        requestEvent.responseHeaders = sanitizeHeaders(
+          Object.fromEntries(r.headers.entries()),
+        );
+        return r;
       });
     } catch (err) {
       clearTimeout(timeoutId);
@@ -144,6 +193,7 @@ export class ImageProviderAssetProvider implements AssetProvider {
 
     if (!response.ok) {
       const raw = await response.json().catch(() => null);
+      requestEvent.responseBody = raw;
       const parsed = parseProviderErrorBody(raw, response.status);
       if (parsed) {
         throw new ImageGenerationProviderError(
@@ -169,7 +219,7 @@ export class ImageProviderAssetProvider implements AssetProvider {
       );
     }
 
-    const contentType = response.headers.get("content-type") ?? "";
+    contentType = response.headers.get("content-type") ?? "";
     if (!contentType.startsWith("image/")) {
       throw new PipelineError(
         `Unexpected image-provider content type: ${contentType}`,
@@ -177,7 +227,6 @@ export class ImageProviderAssetProvider implements AssetProvider {
       );
     }
 
-    let arrayBuffer: ArrayBuffer;
     try {
       arrayBuffer = await response.arrayBuffer();
     } catch (err) {
@@ -194,6 +243,9 @@ export class ImageProviderAssetProvider implements AssetProvider {
       );
     }
 
+    requestEvent.responseBodyBytes = arrayBuffer.byteLength;
+    requestEvent.responseContentType = contentType;
+
     try {
       await mkdir(dir, { recursive: true });
       await writeFile(filePath, Buffer.from(arrayBuffer));
@@ -203,6 +255,18 @@ export class ImageProviderAssetProvider implements AssetProvider {
         "ASSET_PROVIDER_ERROR",
       );
     }
+
+    appendRunLogEvent(sink, {
+      event: "asset_written",
+      kind: "image_provider",
+      path: filePath,
+      byteSize: arrayBuffer.byteLength,
+      provider: "image_provider",
+      runId: opts.runId,
+      sceneId: opts.sceneId,
+      contentType,
+      durationMs: Date.now() - startedAt,
+    });
 
     return { url: filePath };
   }

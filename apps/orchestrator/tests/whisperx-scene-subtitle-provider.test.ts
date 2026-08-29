@@ -56,11 +56,13 @@ describe("WhisperXSceneSubtitleProvider", () => {
       1,
       "scene-001.wav",
       "First scene.",
+      expect.objectContaining({ sceneId: 1 }),
     );
     expect(mockAlign).toHaveBeenNthCalledWith(
       2,
       "scene-002.wav",
       "Second scene.",
+      expect.objectContaining({ sceneId: 2 }),
     );
 
     // Scene 2 words are offset by scene 1 duration (2.0s).

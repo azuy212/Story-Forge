@@ -1,9 +1,14 @@
+import {
+  resolveVideoProfile,
+  canvasGuidanceFor,
+} from "../utils/video-profile.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type {
   ProjectState,
   Diagnostics,
   Execution,
   Scene,
+  VideoProfileConfig,
 } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
@@ -69,6 +74,8 @@ export async function promptQANode(
 }> {
   const scenes = state.production?.scenes ?? [];
   const visualPlan = state.production?.visualPlan ?? [];
+  const videoProfile: VideoProfileConfig =
+    state.videoProfile ?? resolveVideoProfile({});
   const inject = (config.configurable ?? {}) as AgentInject;
 
   const retryCount = (state.execution?.retryCount?.PromptQA ?? 0) + 1;
@@ -100,6 +107,8 @@ export async function promptQANode(
     };
   }
 
+  const canvasGuidance = canvasGuidanceFor(videoProfile);
+
   const label = nodeLabel(AgentModel.PromptQA);
   logger.nodeStart(label);
   logger.nodePhase(label, "reviewing scene prompts");
@@ -111,6 +120,7 @@ export async function promptQANode(
     variables: {
       scenes: formatScenes(scenes),
       visualPlan: formatVisualPlan(scenes, visualPlan),
+      formatGuidance: canvasGuidance.formatGuidance,
     },
     inject,
     configurable: withTopic(config, state).configurable,

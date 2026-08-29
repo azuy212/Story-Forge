@@ -30,6 +30,11 @@ import { padSceneId } from "../utils/scene-id.js";
 import { config as appConfig } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
+import {
+  appendRunLogEvent,
+  getRunLogSinkFromConfig,
+  type RunLogSink,
+} from "../utils/run-log.js";
 
 const DEFAULT_PROVIDER = createDefaultAssetProvider();
 
@@ -60,10 +65,16 @@ function resolveAssetType(assetType: Scene["assetType"]): Scene["assetType"] {
 function buildPlan(scenes: Scene[]): Scene[] {
   return scenes.map((scene) => {
     const mode = scene.assetMode ?? "generated";
+    // source-source_composite and source_edit always run through the image
+    // generation path with a source image as a reference. source mode
+    // honours the scene's original assetType so video-typed scenes can
+    // resolve to a stock video before any provider call.
     const assetType =
-      mode === "source" || mode === "source_composite" || mode === "source_edit"
+      mode === "source_composite" || mode === "source_edit"
         ? "image"
-        : resolveAssetType(scene.assetType);
+        : mode === "source"
+          ? (scene.assetType ?? "image")
+          : resolveAssetType(scene.assetType);
     const cfg = configFor(assetType);
     const padded = padSceneId(scene.sceneId);
 
@@ -209,6 +220,62 @@ async function generateScene(
   sourceAssets: SourceAsset[],
   provider: AssetProvider,
   runId?: string,
+  runLogSink?: RunLogSink | null,
+): Promise<GenerateOutcome> {
+  const startedAt = Date.now();
+  appendRunLogEvent(runLogSink, {
+    event: "scene_event",
+    node: AgentModel.AssetGenerator,
+    sceneId: scene.sceneId,
+    kind: "start",
+    assetType: scene.assetType,
+    assetMode: scene.assetMode,
+    promptBytes: scene.generationPrompt?.length ?? 0,
+    runId,
+  });
+  let outcome: GenerateOutcome;
+  try {
+    outcome = await generateSceneInner(
+      scene,
+      sourceAssets,
+      provider,
+      runId,
+      runLogSink,
+    );
+  } catch (err) {
+    appendRunLogEvent(runLogSink, {
+      event: "scene_event",
+      node: AgentModel.AssetGenerator,
+      sceneId: scene.sceneId,
+      kind: "end",
+      outcome: "fatal",
+      durationMs: Date.now() - startedAt,
+      errorReason: (err as Error)?.message ?? String(err),
+      runId,
+    });
+    throw err;
+  }
+  appendRunLogEvent(runLogSink, {
+    event: "scene_event",
+    node: AgentModel.AssetGenerator,
+    sceneId: outcome.scene?.sceneId ?? scene.sceneId,
+    kind: "end",
+    outcome: outcome.kind,
+    durationMs: Date.now() - startedAt,
+    failureType: outcome.scene?.failureType,
+    errorReason: outcome.kind === "fatal" ? outcome.error : undefined,
+    assetUrl: outcome.kind === "resolved" ? outcome.scene.assetUrl : undefined,
+    runId,
+  });
+  return outcome;
+}
+
+async function generateSceneInner(
+  scene: Scene,
+  sourceAssets: SourceAsset[],
+  provider: AssetProvider,
+  runId?: string,
+  runLogSink?: RunLogSink | null,
 ): Promise<GenerateOutcome> {
   if (scene.assetUrl) return { kind: "resolved", scene };
   if (scene.generationStatus === "failed") return { kind: "failed", scene };
@@ -221,8 +288,8 @@ async function generateScene(
   }
   const prompt = scene.generationPrompt;
 
-  const assetType = scene.assetType ?? "image";
-  const mode = scene.assetMode ?? "generated";
+  let assetType = scene.assetType ?? "image";
+  let mode = scene.assetMode ?? "generated";
   const selectedSourceAssets = sourceAssetsFor(scene, sourceAssets);
   const references = referencesFor(selectedSourceAssets);
 
@@ -237,6 +304,65 @@ async function generateScene(
         generationStatus: "complete" as const,
       },
     };
+  }
+
+  if (assetType === "video" && mode === "source" && references.length > 0) {
+    return {
+      kind: "resolved",
+      scene: {
+        ...scene,
+        assetKind: "source-video" as const,
+        assetUrl: references[0].path,
+        assetGeneratedAt: new Date().toISOString(),
+        generationStatus: "complete" as const,
+      },
+    };
+  }
+
+  if (assetType === "video" && mode === "source" && references.length === 0) {
+    // No stock video matched the scene's entity keywords. Without an AI
+    // video provider wired, calling provider.generateVideo() would throw,
+    // so degrade to a still image: the video-typed scene is rendered as a
+    // generated frame and the composer uses it as a static visual. The
+    // cache key is built from the original planned scenes, so this
+    // mid-flight assetType flip does not invalidate the cache.
+    logger.info(
+      "AssetGenerator no stock video found; falling back to image generation",
+      { sceneId: scene.sceneId },
+    );
+    scene = {
+      ...scene,
+      assetType: "image" as const,
+      fallbackReason: "no stock video match",
+    };
+    assetType = "image";
+    mode = "generated";
+  }
+
+  if (assetType === "video" && mode === "generated") {
+    // Video-typed scene with no source-searchable entities (e.g. the
+    // visual planner emitted no entities that requested source). With no
+    // AI video provider wired today, calling provider.generateVideo()
+    // would throw and kill the run; degrade to a still image instead and
+    // surface the degradation to the run summary via fallbackReason.
+    // Re-derive provider/filename/extension so the scene metadata matches
+    // the downgraded asset type instead of carrying video-typed fields.
+    const padded = padSceneId(scene.sceneId);
+    const imgCfg = configFor("image");
+    logger.warn(
+      "AssetGenerator no AI video provider wired; rendering video-typed scene as a still image",
+      { sceneId: scene.sceneId },
+    );
+    scene = {
+      ...scene,
+      assetType: "image" as const,
+      provider: imgCfg.provider,
+      filename: `scene-${padded}.${imgCfg.extension}`,
+      extension: imgCfg.extension,
+      fallbackReason: "no AI video provider wired",
+    };
+    assetType = "image";
+    mode = "generated";
   }
 
   const referenceMode =
@@ -297,12 +423,14 @@ async function generateScene(
               sceneId: scene.sceneId,
               filename: scene.filename,
               runId,
+              runLogSink,
             })
           : await provider.generateImage({
               prompt,
               sceneId: scene.sceneId,
               filename: scene.filename,
               runId,
+              runLogSink,
               ...(referenceImages && referenceImages.length > 0
                 ? { referenceImages, mode: referenceModeParam }
                 : {}),
@@ -467,6 +595,7 @@ export async function assetGeneratorNode(
 
   const plannedScenes = buildPlan(scenes);
   const runId = getRunId(config, state) ?? undefined;
+  const runLogSink = getRunLogSinkFromConfig(config);
 
   let computedArtifact: AssetArtifact | null = null;
   let fatalError: string | undefined;
@@ -516,6 +645,7 @@ export async function assetGeneratorNode(
               sourceAssets,
               provider,
               runId,
+              runLogSink,
             );
             switch (outcome.kind) {
               case "fatal":
@@ -580,6 +710,13 @@ export async function assetGeneratorNode(
     ({ scenes: plannedScenes, sourceAssets } satisfies AssetArtifact);
 
   const warnings = artifact.scenes.flatMap((scene) => {
+    if (scene.fallbackReason) {
+      // Video-typed scenes that fell back to image generation surface
+      // here so the run summary makes graceful degradation visible.
+      return [
+        `${AgentModel.AssetGenerator}: Scene ${scene.sceneId} video-typed scene rendered as a still image (${scene.fallbackReason})`,
+      ];
+    }
     if (scene.generationStatus === "prompt_repair") {
       return [
         `${AgentModel.AssetGenerator}: Scene ${scene.sceneId} prompt rejected by provider (${scene.providerError?.type ?? "unknown"}). ${scene.providerError?.message ?? ""}`,

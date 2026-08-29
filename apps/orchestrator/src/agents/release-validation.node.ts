@@ -1,5 +1,15 @@
+import {
+  resolveVideoProfile,
+  speakingRateWps,
+  checkNarrationDuration,
+} from "../utils/video-profile.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
-import type { ProjectState, Diagnostics, Execution } from "../types/index.js";
+import type {
+  ProjectState,
+  Diagnostics,
+  Execution,
+  VideoProfileConfig,
+} from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { config as configUtils } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
@@ -44,6 +54,8 @@ export async function validatePackage(
   const narrationMs =
     state.audio?.combinedAudio?.durationMs ?? state.audio?.narrationDurationMs;
   const timeline = state.video?.timeline;
+  const videoProfile: VideoProfileConfig =
+    state.videoProfile ?? resolveVideoProfile({});
 
   // --- Artifact existence ---
   check(!!state.video?.videoUrl, "Final video exists");
@@ -140,6 +152,18 @@ export async function validatePackage(
       ? `IDs: ${emptyPrompts.map((s) => s.sceneId).join(", ")}`
       : undefined,
   );
+
+  // --- Duration validation (only when explicit profile/target requested) ---
+  if (videoProfile.explicit && narrationMs) {
+    const durationIssues = checkNarrationDuration(
+      videoProfile,
+      state.content?.narration ?? "",
+      estimated ?? videoProfile.targetDurationSec,
+    );
+    for (const issue of durationIssues) {
+      issues.push(issue);
+    }
+  }
 
   // --- Scene timing ---
   if (scenes.length > 0) {
@@ -244,10 +268,14 @@ export async function validatePackage(
       .filter(Boolean).length;
     if (words > 0) {
       const wps = (words / narrationMs) * 1000;
-      if (wps < 2.4 || wps > 2.8) {
-        warnings.push(`Narration pace ${wps.toFixed(2)} wps outside 2.4-2.8`);
+      const targetWps = speakingRateWps(videoProfile);
+      const paceTolerance = 0.2; // ±0.2 wps around target
+      if (wps < targetWps - paceTolerance || wps > targetWps + paceTolerance) {
+        warnings.push(
+          `Narration pace ${wps.toFixed(2)} wps outside ${(targetWps - paceTolerance).toFixed(1)}-${(targetWps + paceTolerance).toFixed(1)} (target ${targetWps.toFixed(2)} wps from ${videoProfile.wordsPerMinute} wpm)`,
+        );
       } else {
-        validations.push("Narration pace 2.4-2.8 wps");
+        validations.push(`Narration pace ${targetWps.toFixed(2)} wps`);
       }
     }
   }

@@ -1,15 +1,22 @@
+import {
+  resolveVideoProfile,
+  formatLabelFor,
+  canvasGuidanceFor,
+  speakingRateWps,
+} from "../utils/video-profile.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type {
   ProjectState,
   Diagnostics,
   Execution,
   Scene,
+  VideoProfileConfig,
 } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
 import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
-import { VisualDirectorOutputSchema } from "../schemas/visual-director-output.js";
+import { visualDirectorOutputSchema } from "../schemas/visual-director-output.js";
 import type {
   VisualDirectorOutput,
   VisualPlanEntry,
@@ -301,11 +308,13 @@ export async function visualDirectorNode(
   diagnostics: Partial<Diagnostics>;
   execution: Partial<Execution>;
 }> {
-  const { title, narration, estimatedDurationSeconds } = state.content ?? {};
+  const { title, narration } = state.content ?? {};
   const ending = state.content?.ending;
   const researchSummary = state.research?.summary;
   const approvedFacts = state.research?.facts;
   const channel = state.branding?.channel;
+  const videoProfile: VideoProfileConfig =
+    state.videoProfile ?? resolveVideoProfile({});
   const inject = (config.configurable ?? {}) as AgentInject;
 
   const retryCount = (state.execution?.retryCount?.VisualDirector ?? 0) + 1;
@@ -364,6 +373,20 @@ export async function visualDirectorNode(
       )
     : "";
 
+  const targetDurationSec = videoProfile.targetDurationSec;
+  const formatLabel = formatLabelFor(videoProfile);
+  const canvasGuidance = canvasGuidanceFor(videoProfile);
+  const speakingRate = speakingRateWps(videoProfile);
+  const sceneCountRange = videoProfile.sceneDensity.max === null
+    ? `${videoProfile.sceneDensity.min}+`
+    : `${videoProfile.sceneDensity.min}-${videoProfile.sceneDensity.max}`;
+
+  // Target scene count: aim for middle of density range (long profile has no max)
+  const effectiveMax = videoProfile.sceneDensity.max ?? videoProfile.sceneDensity.min * 2;
+  const targetSceneCount = Math.round(
+    (videoProfile.sceneDensity.min + effectiveMax) / 2,
+  );
+
   const label = nodeLabel(AgentModel.VisualDirector);
   logger.nodeStart(label);
   logger.nodePhase(label, "planning visual direction");
@@ -371,18 +394,25 @@ export async function visualDirectorNode(
   const result = await runAgent<VisualDirectorOutput>({
     agent: AgentModel.VisualDirector,
     promptPath: PromptPaths.VisualDirector,
-    schema: VisualDirectorOutputSchema,
+    schema: visualDirectorOutputSchema(videoProfile),
     variables: {
       title: title ?? "",
       narration: narration ?? "",
       endingNarration: ending?.narration ?? "",
       endingVisualDirection: ending?.visualDirection ?? "",
-      estimatedDurationSeconds: String(estimatedDurationSeconds ?? 50),
+      estimatedDurationSeconds: String(targetDurationSec),
       researchSummary: researchSummary ?? "",
       approvedFacts: formatFacts(approvedFacts),
       channel: channel ?? "",
       qaFeedback,
       previousVisualPlan,
+      formatLabel,
+      canvasGuidance: canvasGuidance.canvasGuidance,
+      aspectGuidance: canvasGuidance.aspectGuidance,
+      targetDurationSeconds: String(targetDurationSec),
+      speakingRateWps: String(speakingRate),
+      sceneCountRange,
+      targetSceneCount: String(targetSceneCount),
     },
     inject,
     configurable: withTopic(config, state).configurable,
@@ -461,7 +491,7 @@ export async function visualDirectorNode(
 
   const timed = computeTiming(
     normalized.map((s) => s.narration),
-    estimatedDurationSeconds ?? 50,
+    targetDurationSec,
   );
 
   if (

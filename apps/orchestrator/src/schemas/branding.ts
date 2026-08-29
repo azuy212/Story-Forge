@@ -7,6 +7,7 @@ export const BrandingSchema = z.object({
   handle: z.string().optional(),
   enabled: z.boolean().optional(),
   outroAsset: z.string().optional(),
+  outroLongAsset: z.string().optional(),
   ctaEnabled: z.boolean().optional(),
   outroCta: z.string().optional(),
   outroContainsCta: z.boolean().optional(),

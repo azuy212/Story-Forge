@@ -1,9 +1,11 @@
+import { resolveVideoProfile } from "../utils/video-profile.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type {
   ProjectState,
   Diagnostics,
   Execution,
   Scene,
+  VideoProfileConfig,
 } from "../types/index.js";
 import type { Subtitles } from "../schemas/subtitles.js";
 import type { SceneAudio } from "../schemas/audio.js";
@@ -14,10 +16,15 @@ import { WhisperXSceneSubtitleProvider } from "../providers/whisperx-scene-subti
 import { HttpWhisperXProvider } from "../providers/whisperx-provider.js";
 import type { GenerateSubtitlesResult } from "../providers/subtitle-provider.js";
 import { cacheNodeResult } from "../artifacts/cache.js";
-import { withTopic } from "../artifacts/context.js";
+import { withTopic, getArtifactNamespace } from "../artifacts/context.js";
 import { config as appConfig } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
+import {
+  appendRunLogEvent,
+  getRunLogSinkFromConfig,
+  type RunLogSink,
+} from "../utils/run-log.js";
 
 const SUBTITLE_ALIGNMENT_VERSION = 5;
 
@@ -41,16 +48,49 @@ export class FallbackSceneSubtitleProvider implements SceneSubtitleProvider {
   async generateSceneSubtitles(
     scenes: Scene[],
     audioScenes: SceneAudio[],
+    profile?: VideoProfileConfig,
+    options?: { runLogSink?: RunLogSink | null; runId?: string },
   ): Promise<GenerateSubtitlesResult> {
     try {
-      return await this.primary.generateSceneSubtitles(scenes, audioScenes);
+      return await this.primary.generateSceneSubtitles(
+        scenes,
+        audioScenes,
+        profile,
+        options,
+      );
     } catch (err) {
       logger.warn(
         "WhisperX subtitle alignment failed; using deterministic subtitles",
         { error: (err as Error)?.message ?? String(err) },
       );
-      return this.fallback.generateSceneSubtitles(scenes, audioScenes);
+      return this.fallback.generateSceneSubtitles(
+        scenes,
+        audioScenes,
+        profile,
+        options,
+      );
     }
+  }
+}
+
+class ProfileAwareSceneSubtitleProvider implements SceneSubtitleProvider {
+  constructor(
+    private readonly inner: SceneSubtitleProvider,
+    private readonly videoProfile: VideoProfileConfig,
+  ) {}
+
+  async generateSceneSubtitles(
+    scenes: Scene[],
+    audioScenes: SceneAudio[],
+    _profile?: VideoProfileConfig,
+    options?: { runLogSink?: RunLogSink | null; runId?: string },
+  ): Promise<GenerateSubtitlesResult> {
+    return this.inner.generateSceneSubtitles(
+      scenes,
+      audioScenes,
+      this.videoProfile,
+      options,
+    );
   }
 }
 
@@ -61,6 +101,7 @@ const FALLBACK_REAL_PROVIDER = new FallbackSceneSubtitleProvider(
 
 function getSceneSubtitleProvider(
   config: RunnableConfig,
+  videoProfile: VideoProfileConfig,
 ): SceneSubtitleProvider {
   const inject = (config.configurable ?? {}) as Record<string, unknown>;
   if (inject.sceneSubtitleProvider) {
@@ -68,9 +109,10 @@ function getSceneSubtitleProvider(
   }
   // WhisperX provides real word-level alignment in real-provider mode; on
   // failure it falls back to deterministic scene-bounded timing.
-  return appConfig.useRealProviders()
+  const baseProvider = appConfig.useRealProviders()
     ? FALLBACK_REAL_PROVIDER
     : DEFAULT_PROVIDER;
+  return new ProfileAwareSceneSubtitleProvider(baseProvider, videoProfile);
 }
 
 export async function subtitleGeneratorNode(
@@ -152,10 +194,24 @@ export async function subtitleGeneratorNode(
     };
   }
 
-  const provider = getSceneSubtitleProvider(config);
+  const videoProfile: VideoProfileConfig =
+    state.videoProfile ?? resolveVideoProfile({});
+  const provider = getSceneSubtitleProvider(config, videoProfile);
   const providerName = provider.constructor.name;
+  const runLogSink = getRunLogSinkFromConfig(config);
+  const runId = getArtifactNamespace(config, state);
 
   logger.nodePhase(label, "generating subtitles");
+
+  appendRunLogEvent(runLogSink, {
+    event: "scene_event",
+    node: AgentModel.SubtitleGenerator,
+    sceneId: scenes.length,
+    kind: "start",
+    providerName,
+    audioSceneCount: audioScenes.length,
+    runId,
+  });
 
   const result = await cacheNodeResult<Partial<Subtitles>>(
     {
@@ -168,6 +224,7 @@ export async function subtitleGeneratorNode(
         audioUrl,
         sceneAudio: audioScenes,
         subtitleAlignmentVersion: SUBTITLE_ALIGNMENT_VERSION,
+        videoSize: videoProfile.videoSize,
       },
     },
     async () => {
@@ -175,6 +232,8 @@ export async function subtitleGeneratorNode(
         const providerResult = await provider.generateSceneSubtitles(
           scenes as Scene[],
           audioScenes as SceneAudio[],
+          videoProfile,
+          { runLogSink, runId },
         );
         return {
           data: {
@@ -196,6 +255,16 @@ export async function subtitleGeneratorNode(
 
   if (result.error) {
     logger.nodeFailed(label, result.error);
+    appendRunLogEvent(runLogSink, {
+      event: "scene_event",
+      node: AgentModel.SubtitleGenerator,
+      sceneId: scenes.length,
+      kind: "end",
+      outcome: "failed",
+      errorReason: result.error,
+      durationMs: Date.now() - startedAt,
+      runId,
+    });
     return {
       subtitles: {},
       diagnostics: {
@@ -205,6 +274,17 @@ export async function subtitleGeneratorNode(
     };
   }
 
+  appendRunLogEvent(runLogSink, {
+    event: "scene_event",
+    node: AgentModel.SubtitleGenerator,
+    sceneId: scenes.length,
+    kind: "end",
+    outcome: "resolved",
+    durationMs: Date.now() - startedAt,
+    cacheHit: result.fromCache,
+    wordCount: result.data?.wordTimestamps?.length ?? 0,
+    runId,
+  });
   logger.nodeDone(label, Date.now() - startedAt);
 
   return {

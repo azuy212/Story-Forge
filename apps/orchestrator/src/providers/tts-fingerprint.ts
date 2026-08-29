@@ -27,6 +27,7 @@ export function canonicalTTSFingerprint(
     voice: opts.voice ?? null,
     speed: opts.speed ?? null,
     parameters: canonicalValue(opts.parameters ?? {}),
+    videoProfile: opts.videoProfile ?? null,
     provider: provider.constructor.name,
     providerFingerprint: provider.cacheFingerprint?.() ?? null,
   });

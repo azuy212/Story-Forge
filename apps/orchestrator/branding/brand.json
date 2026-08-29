@@ -5,6 +5,7 @@
   "cta": "Follow for more mysteries of the universe.",
   "enabled": true,
   "outroAsset": "assets/branding/outro.mp4",
+  "outroLongAsset": "assets/branding/outro-long.mp4",
   "ctaEnabled": true,
   "outroCta": "Follow for more mysteries of the universe.",
   "outroContainsCta": false,

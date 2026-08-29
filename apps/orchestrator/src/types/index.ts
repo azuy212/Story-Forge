@@ -52,6 +52,15 @@ export type {
   FactVerdict,
 } from "../schemas/research-qa-output.js";
 
+export type {
+  VideoProfile,
+  AspectRatio,
+  VideoSize,
+  SceneDurationRange,
+  SceneDensity,
+  VideoProfileConfig,
+} from "../schemas/video-profile.js";
+
 export { AgentModel } from "../models/agent-model.js";
 export type {
   ArtifactReference,

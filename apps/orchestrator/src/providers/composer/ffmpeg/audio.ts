@@ -1,6 +1,12 @@
 import fs from "node:fs/promises";
 import { probe, runFfmpeg, runFfmpegWithRetry } from "./ffmpeg.js";
 import { DEFAULT_MAX_RETRIES } from "../../../utils/constants.js";
+import type { RunLogSink } from "../../../utils/run-log.js";
+
+export interface FfmpegCallContext {
+  runLogSink?: RunLogSink | null;
+  runId?: string;
+}
 
 export type AudioDurationMode = "shortest" | "pad";
 export type AudioMixDuration = "first" | "longest" | "shortest";
@@ -20,6 +26,7 @@ export interface AudioConcatResult {
 export async function concatAudio(
   inputs: AudioConcatInput[],
   outputPath: string,
+  context: FfmpegCallContext = {},
 ): Promise<AudioConcatResult> {
   const ordered = [...inputs].sort((a, b) => a.sceneId - b.sceneId);
   if (ordered.length === 0)
@@ -66,6 +73,10 @@ export async function concatAudio(
     ],
     "concatenate scene narration audio",
     DEFAULT_MAX_RETRIES,
+    undefined,
+    undefined,
+    undefined,
+    context,
   );
 
   const result = await probe(outputPath);
@@ -86,6 +97,7 @@ export async function addNarration(
   narrationPath: string,
   outputPath: string,
   durationMode?: AudioDurationMode,
+  context: FfmpegCallContext = {},
 ): Promise<void> {
   const mode = durationMode ?? "shortest";
 
@@ -114,7 +126,12 @@ export async function addNarration(
 
   args.push(outputPath);
 
-  await runFfmpeg({ args, description: "add narration audio" });
+  await runFfmpeg({
+    args,
+    description: "add narration audio",
+    runLogSink: context.runLogSink,
+    runId: context.runId,
+  });
 }
 
 export interface AudioMixOptions {
@@ -129,6 +146,7 @@ export async function mixNarrationWithBgm(
   videoPath: string,
   opts: AudioMixOptions,
   outputPath: string,
+  context: FfmpegCallContext = {},
 ): Promise<void> {
   const bgmVolume = opts.bgmVolume ?? 0.15;
   const mode = opts.durationMode ?? "shortest";
@@ -162,5 +180,10 @@ export async function mixNarrationWithBgm(
     outputPath,
   ];
 
-  await runFfmpeg({ args, description: "mix narration with background music" });
+  await runFfmpeg({
+    args,
+    description: "mix narration with background music",
+    runLogSink: context.runLogSink,
+    runId: context.runId,
+  });
 }

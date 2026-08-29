@@ -51,6 +51,9 @@ export const PLANNED_STATUS = "planned";
 
 export const SLOT_HOURS = [12, 20];
 
+/** Days of the week for long-form publish slots (Tue=2, Fri=5). */
+export const LONG_SLOT_DAYS = [2, 5];
+
 /**
  * Validate the first row of the sheet. Throws a descriptive error on
  * mismatch so callers fail closed instead of writing into an unexpected
@@ -129,6 +132,33 @@ export function nextPublishSlot(scheduledAtValues = [], now = new Date()) {
       if (occupied.has(key)) continue;
       return slot.toISOString();
     }
+  }
+  return null;
+}
+
+/**
+ * Earliest future publish slot at 20:00 on a Tuesday or Friday, that is not
+ * already occupied by a scheduled row's `Scheduled At`.
+ *
+ * @param {string[]} scheduledAtValues ISO strings from rows already scheduled.
+ * @param {Date} now
+ * @returns {string | null} ISO-8601 slot, or null if none found within 30 days.
+ */
+export function nextLongPublishSlot(scheduledAtValues = [], now = new Date()) {
+  const occupied = new Set(
+    scheduledAtValues
+      .filter(Boolean)
+      .map((value) => new Date(value).setMinutes(0, 0, 0)),
+  );
+
+  for (let day = 0; day < 30; day++) {
+    const slot = new Date(now);
+    slot.setDate(slot.getDate() + day);
+    if (!LONG_SLOT_DAYS.includes(slot.getDay())) continue;
+    slot.setHours(20, 0, 0, 0);
+    if (slot.getTime() <= now.getTime()) continue;
+    if (occupied.has(slot.getTime())) continue;
+    return slot.toISOString();
   }
   return null;
 }

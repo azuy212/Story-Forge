@@ -1,19 +1,27 @@
-import type { Scene, SceneAudio } from "../types/index.js";
+import type { Scene, SceneAudio, VideoProfileConfig } from "../types/index.js";
 import { formatSrtTime } from "../utils/subtitle-format.js";
 import { buildKaraokeAss, appAssStyle } from "../utils/ass.js";
 import type {
   GenerateSubtitlesResult,
   WordTimestamp,
 } from "./subtitle-provider.js";
+import type { RunLogSink } from "../utils/run-log.js";
 
 const MIN_WORDS_PER_CUE = 3;
 const MAX_WORDS_PER_CUE = 5;
 const PUNCTUATION_RE = /[.,!?;:…]$/;
 
+export interface SceneSubtitleOptions {
+  runLogSink?: RunLogSink | null;
+  runId?: string;
+}
+
 export interface SceneSubtitleProvider {
   generateSceneSubtitles(
     scenes: Scene[],
     audioScenes: SceneAudio[],
+    profile?: VideoProfileConfig,
+    options?: SceneSubtitleOptions,
   ): Promise<GenerateSubtitlesResult>;
 }
 
@@ -28,6 +36,8 @@ export class DeterministicSceneSubtitleProvider implements SceneSubtitleProvider
   async generateSceneSubtitles(
     scenes: Scene[],
     audioScenes: SceneAudio[],
+    profile?: VideoProfileConfig,
+    _options?: SceneSubtitleOptions,
   ): Promise<GenerateSubtitlesResult> {
     const sceneById = new Map(scenes.map((scene) => [scene.sceneId, scene]));
     const orderedAudio = [...audioScenes].sort((a, b) => a.sceneId - b.sceneId);
@@ -61,7 +71,13 @@ export class DeterministicSceneSubtitleProvider implements SceneSubtitleProvider
         return `${index + 1}\n${formatSrtTime(startMs)} --> ${formatSrtTime(endMs)}\n${group.map((w) => w.word).join(" ")}`;
       })
       .join("\n\n");
-    const ass = buildKaraokeAss(groups, appAssStyle());
+    const ass = buildKaraokeAss(
+      groups,
+      appAssStyle({
+        playResX: profile?.videoSize.width,
+        playResY: profile?.videoSize.height,
+      }),
+    );
 
     return { srt, ass, wordTimestamps };
   }

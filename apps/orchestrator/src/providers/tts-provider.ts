@@ -5,6 +5,12 @@ export interface SynthesizeOptions {
   parameters?: Record<string, unknown>;
   filename?: string;
   runId?: string;
+  runLogSink?: import("../utils/run-log.js").RunLogSink | null;
+  /**
+   * Video profile of the run. Providers use this to skip post-processing
+   * (e.g. WPM normalization) that only applies to short-form output.
+   */
+  videoProfile?: "short" | "long";
 }
 
 export interface SynthesizeResult {

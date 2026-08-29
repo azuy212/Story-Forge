@@ -2,6 +2,12 @@ import path from "node:path";
 import { runFfmpegWithRetry } from "./ffmpeg.js";
 import type { EncoderConfig } from "./ffmpeg.js";
 import { DEFAULT_MAX_RETRIES } from "../../../utils/constants.js";
+import type { RunLogSink } from "../../../utils/run-log.js";
+
+export interface FfmpegCallContext {
+  runLogSink?: RunLogSink | null;
+  runId?: string;
+}
 
 const IMAGE_EXTENSIONS = new Set([
   ".png",
@@ -50,9 +56,17 @@ export async function normalizeAsset(
   startSecond: number,
   opts: NormalizeOptions,
   signal?: AbortSignal,
+  context: FfmpegCallContext = {},
 ): Promise<void> {
   if (isImage(inputPath)) {
-    await normalizeImage(inputPath, outputPath, durationSeconds, opts, signal);
+    await normalizeImage(
+      inputPath,
+      outputPath,
+      durationSeconds,
+      opts,
+      signal,
+      context,
+    );
   } else {
     await normalizeVideo(
       inputPath,
@@ -61,6 +75,7 @@ export async function normalizeAsset(
       startSecond,
       opts,
       signal,
+      context,
     );
   }
 }
@@ -88,8 +103,10 @@ function kenBurnsFilter(
   const panX = pan.x.replaceAll("{progress}", progress);
   const panY = pan.y.replaceAll("{progress}", progress);
 
+  const srcW = Math.ceil(opts.width * opts.kenBurnsMaxZoom);
+  const srcH = Math.ceil(opts.height * opts.kenBurnsMaxZoom);
   return [
-    `scale=${opts.width * 2}:${opts.height * 2}:force_original_aspect_ratio=increase`,
+    `scale=${srcW}:${srcH}:force_original_aspect_ratio=increase`,
     "setsar=1",
     `zoompan=z='${zoomExpr}':x='${panX}':y='${panY}':d=${totalFrames}:s=${opts.width}x${opts.height}:fps=${opts.fps}`,
     "format=yuv420p",
@@ -102,6 +119,7 @@ async function normalizeImage(
   durationSeconds: number,
   opts: NormalizeOptions,
   signal?: AbortSignal,
+  context: FfmpegCallContext = {},
 ): Promise<void> {
   const enc = opts.encoder;
 
@@ -138,6 +156,8 @@ async function normalizeImage(
       DEFAULT_MAX_RETRIES,
       undefined,
       signal,
+      undefined,
+      context,
     );
   } else {
     const baseArgs = [
@@ -175,6 +195,8 @@ async function normalizeImage(
       DEFAULT_MAX_RETRIES,
       undefined,
       signal,
+      undefined,
+      context,
     );
   }
 }
@@ -186,6 +208,7 @@ async function normalizeVideo(
   startSecond: number,
   opts: NormalizeOptions,
   signal?: AbortSignal,
+  context: FfmpegCallContext = {},
 ): Promise<void> {
   const enc = opts.encoder;
   const scaleFilter = staticScaleFilter(opts);
@@ -221,6 +244,8 @@ async function normalizeVideo(
     DEFAULT_MAX_RETRIES,
     undefined,
     signal,
+    undefined,
+    context,
   );
 }
 

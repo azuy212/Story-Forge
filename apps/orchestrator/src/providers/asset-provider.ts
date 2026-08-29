@@ -3,6 +3,7 @@ export interface GenerateImageOptions {
   sceneId: number;
   filename?: string;
   runId?: string;
+  runLogSink?: import("../utils/run-log.js").RunLogSink | null;
   referenceImages?: AssetReference[];
   mode?: ImageGenerationMode;
 }
@@ -20,6 +21,7 @@ export interface GenerateVideoOptions {
   sceneId: number;
   filename?: string;
   runId?: string;
+  runLogSink?: import("../utils/run-log.js").RunLogSink | null;
 }
 
 export interface AssetResult {

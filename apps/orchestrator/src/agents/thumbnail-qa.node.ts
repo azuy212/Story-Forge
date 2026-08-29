@@ -13,6 +13,7 @@ import { logger } from "../utils/logger.js";
 import { persistLlmUsage } from "../artifacts/usage.js";
 import { newInvocationId } from "../models/usage.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
+import type { RunLogSink } from "../utils/run-log.js";
 
 export interface ThumbnailQaResult {
   status: "pass" | "fail";
@@ -22,7 +23,11 @@ export interface ThumbnailQaResult {
 const QA_MAX_EDGE = 432;
 const QA_DIR = path.resolve("generated", "assets", "qa");
 
-async function downscaleToDataUrl(inputPath: string): Promise<string> {
+async function downscaleToDataUrl(
+  inputPath: string,
+  sink: RunLogSink | null = null,
+  runId?: string,
+): Promise<string> {
   const uniqueName = `${path.basename(inputPath, path.extname(inputPath))}-${randomUUID()}.qa.png`;
   const out = path.join(QA_DIR, uniqueName);
   await fs.promises.mkdir(QA_DIR, { recursive: true });
@@ -41,6 +46,8 @@ async function downscaleToDataUrl(inputPath: string): Promise<string> {
     ],
     description: "downscale thumbnail for QA",
     timeout: 60_000,
+    runLogSink: sink,
+    runId,
   });
   const buffer = await fs.promises.readFile(out);
   return `data:image/png;base64,${buffer.toString("base64")}`;
@@ -53,9 +60,25 @@ export async function runThumbnailQa(
 ): Promise<ThumbnailQaResult> {
   const template = await loadPrompt(PromptPaths.ThumbnailQA);
   const userPrompt = renderPrompt(template, { thumbnailText });
+  const inject = (config?.configurable ?? {}) as Record<string, unknown>;
+  const sink =
+    (inject.runLogSink as { appendLine?: unknown } | null | undefined) ?? null;
+  const runId =
+    typeof inject.runId === "string"
+      ? (inject.runId as string)
+      : undefined;
 
-  const imageDataUrl = await downscaleToDataUrl(imagePath);
-  const model = createModel(AgentModel.ThumbnailQA);
+  const imageDataUrl = await downscaleToDataUrl(
+    imagePath,
+    sink as RunLogSink | null,
+    runId,
+  );
+  const model = createModel(AgentModel.ThumbnailQA, {
+    runLogSink: sink as never,
+    runId,
+    promptPath: PromptPaths.ThumbnailQA,
+    promptVersion: PromptPaths.ThumbnailQA.replace(/\.md$/, ""),
+  });
   const genOpts: GenerateOptions = {
     temperature: 0.0,
     responseFormat: { type: "json_object" },

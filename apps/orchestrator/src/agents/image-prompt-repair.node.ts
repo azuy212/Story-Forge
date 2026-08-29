@@ -7,7 +7,7 @@ import type {
 } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
-import { withTopic } from "../artifacts/context.js";
+import { withTopic, getRunId } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { ImagePromptRepairOutputSchema } from "../schemas/image-prompt-repair-output.js";
 import type { ImagePromptRepairOutput } from "../schemas/image-prompt-repair-output.js";
@@ -15,6 +15,10 @@ import type { ImageGenerationError } from "../providers/image-generation-error.j
 import { MAX_PROMPT_REPAIRS } from "../utils/constants.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
+import {
+  appendRunLogEvent,
+  getRunLogSinkFromConfig,
+} from "../utils/run-log.js";
 
 const UNRESOLVED_REJECTION = "unresolved_provider_rejection";
 const REPAIR_LLM_FAILURE = "prompt_repair_failed";
@@ -80,6 +84,8 @@ export async function imagePromptRepairNode(
   }
 
   const label = nodeLabel(AgentModel.ImagePromptRepair);
+  const sink = getRunLogSinkFromConfig(config);
+  const runId = getRunId(config, state) ?? undefined;
   logger.nodeStart(label);
   logger.nodePhase(label, "repairing rejected prompts");
 
@@ -89,6 +95,15 @@ export async function imagePromptRepairNode(
     const targetId = scene.sceneId;
     const index = repaired.findIndex((s) => s.sceneId === targetId);
     const current = repaired[index];
+    appendRunLogEvent(sink, {
+      event: "scene_event",
+      node: AgentModel.ImagePromptRepair,
+      sceneId: targetId,
+      kind: "start",
+      repairCount: scene.repairCount ?? 0,
+      failureType: scene.failureType,
+      runId,
+    });
 
     const providerError = providerErrorForScene(scene);
     if (!providerError) {
@@ -197,6 +212,16 @@ export async function imagePromptRepairNode(
       changes: output.changes,
       reason: output.reason,
       exhausted: repairCount >= MAX_PROMPT_REPAIRS,
+    });
+    appendRunLogEvent(sink, {
+      event: "scene_event",
+      node: AgentModel.ImagePromptRepair,
+      sceneId: scene.sceneId,
+      kind: "end",
+      outcome: "resolved",
+      repairCount,
+      exhausted: repairCount >= MAX_PROMPT_REPAIRS,
+      runId,
     });
   }
 

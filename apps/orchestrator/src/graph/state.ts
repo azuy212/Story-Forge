@@ -18,8 +18,10 @@ import type {
   Publishing,
   ResearchQAOutput,
   PublishReadyStatus,
+  VideoProfileConfig,
 } from "../types/index.js";
 import { DEFAULT_BRANDING } from "../utils/branding.js";
+import { resolveVideoProfile } from "../utils/video-profile.js";
 
 function merge<T>(current: T, update: Partial<T>): T {
   return { ...current, ...update };
@@ -133,5 +135,9 @@ export const StateAnnotation = Annotation.Root({
   }),
   researchQA: Annotation<ResearchQAOutput, Partial<ResearchQAOutput>>({
     reducer: merge,
+  }),
+  videoProfile: Annotation<VideoProfileConfig, Partial<VideoProfileConfig>>({
+    reducer: merge,
+    default: () => resolveVideoProfile({}),
   }),
 });

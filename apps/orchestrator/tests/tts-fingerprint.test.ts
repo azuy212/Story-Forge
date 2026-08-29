@@ -47,4 +47,17 @@ describe("canonicalTTSFingerprint", () => {
 
     expect(changed).not.toBe(base);
   });
+
+  it("changes when videoProfile changes", () => {
+    const short = canonicalTTSFingerprint(
+      { text: "Hello", voice: "voice-a", videoProfile: "short" },
+      provider,
+    );
+    const long = canonicalTTSFingerprint(
+      { text: "Hello", voice: "voice-a", videoProfile: "long" },
+      provider,
+    );
+
+    expect(long).not.toBe(short);
+  });
 });

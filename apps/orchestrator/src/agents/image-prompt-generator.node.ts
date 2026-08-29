@@ -1,9 +1,14 @@
+import {
+  resolveVideoProfile,
+  canvasGuidanceFor,
+} from "../utils/video-profile.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type {
   ProjectState,
   Diagnostics,
   Execution,
   Scene,
+  VideoProfileConfig,
 } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
@@ -29,6 +34,8 @@ export async function imagePromptGeneratorNode(
   const promptQA = state.production?.promptQA;
   const { pillar, topic } = state.project;
   const { style, colorPalette, logo } = state.branding ?? {};
+  const videoProfile: VideoProfileConfig =
+    state.videoProfile ?? resolveVideoProfile({});
   const inject = (config.configurable ?? {}) as AgentInject;
 
   const retryCount =
@@ -48,6 +55,8 @@ export async function imagePromptGeneratorNode(
       },
     };
   }
+
+  const canvasGuidance = canvasGuidanceFor(videoProfile);
 
   const planMap = new Map(visualPlan.map((p) => [p.sceneId, p]));
 
@@ -146,6 +155,9 @@ export async function imagePromptGeneratorNode(
         scenes: scenesJson,
         qaFeedback: `${qaFeedback}${missingHint}`,
         previousPrompts,
+        canvasGuidance: canvasGuidance.canvasGuidance,
+        aspectLabel: canvasGuidance.aspectLabel,
+        formatGuidance: canvasGuidance.formatGuidance,
       },
       inject,
       configurable: withTopic(config, state).configurable,

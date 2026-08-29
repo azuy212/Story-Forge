@@ -45,6 +45,8 @@ export interface PublishCallOptions {
    * resumes rather than re-uploading.
    */
   onUploaded?: (platformVideoId: string) => Promise<void> | void;
+  runId?: string;
+  runLogSink?: import("../../utils/run-log.js").RunLogSink | null;
 }
 
 export interface PublishResult {

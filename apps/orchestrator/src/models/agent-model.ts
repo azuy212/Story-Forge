@@ -24,4 +24,5 @@ export enum AgentModel {
   ThumbnailGenerator = "ThumbnailGenerator",
   ThumbnailQA = "ThumbnailQA",
   Publisher = "Publisher",
+  ResolveProfile = "ResolveProfile",
 }

@@ -1,3 +1,4 @@
+import { resolveVideoProfile } from "../utils/video-profile.js";
 import fs from "node:fs/promises";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type {
@@ -6,6 +7,7 @@ import type {
   Execution,
   Scene,
   SceneAudio,
+  VideoProfileConfig,
 } from "../types/index.js";
 import type { Video } from "../schemas/video.js";
 import { AgentModel } from "../models/agent-model.js";
@@ -19,11 +21,16 @@ import { getArtifactNamespace, withTopic } from "../artifacts/context.js";
 import {
   resolveBranding,
   resolveBrandingAssetPath,
+  selectOutroAssetForProfile,
   type ResolvedBranding,
 } from "../utils/branding.js";
 import { config as appConfig } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
+import {
+  appendRunLogEvent,
+  getRunLogSinkFromConfig,
+} from "../utils/run-log.js";
 
 const DEFAULT_PROVIDER = new FfmpegComposerProvider({
   subtitleFontSize: appConfig.subtitleFontSize(),
@@ -46,6 +53,20 @@ async function brandingAssetFingerprint(
     return `${assetPath}:${stat.size}:${stat.mtimeMs}`;
   } catch {
     return `${branding.outroAsset}:missing`;
+  }
+}
+
+async function brandingLongAssetFingerprint(
+  branding: ResolvedBranding,
+): Promise<string> {
+  if (!branding.enabled || !branding.outroLongAsset) return "disabled";
+
+  try {
+    const assetPath = resolveBrandingAssetPath(branding.outroLongAsset);
+    const stat = await fs.stat(assetPath);
+    return `${assetPath}:${stat.size}:${stat.mtimeMs}`;
+  } catch {
+    return `${branding.outroLongAsset}:missing`;
   }
 }
 
@@ -193,6 +214,8 @@ export async function videoComposerNode(
 }> {
   const startedAt = Date.now();
   const errors = collectErrors(state);
+  const videoProfile: VideoProfileConfig =
+    state.videoProfile ?? resolveVideoProfile({});
   const label = nodeLabel(AgentModel.VideoComposer);
   logger.nodeStart(label);
   if (errors.length > 0) {
@@ -245,6 +268,9 @@ export async function videoComposerNode(
   const branding = resolveBranding(state.branding);
   const narrativeHoldSeconds = appConfig.narrativeHoldSeconds();
   const outroAssetFingerprint = await brandingAssetFingerprint(branding);
+  const outroLongAssetFingerprint =
+    await brandingLongAssetFingerprint(branding);
+  const outroAsset = selectOutroAssetForProfile(branding, videoProfile.profile);
 
   const provider = getComposerProvider(config);
 
@@ -266,9 +292,11 @@ export async function videoComposerNode(
         totalDurationSeconds,
         narrativeHoldSeconds,
         narrationDurationMs: targetMs,
+        videoSize: videoProfile.videoSize,
         branding: {
           ...branding,
           outroAssetFingerprint,
+          outroLongAssetFingerprint,
         },
       },
     },
@@ -281,16 +309,21 @@ export async function videoComposerNode(
           ass: state.subtitles!.ass,
           totalDurationSeconds,
           narrativeHoldSeconds,
+          // Pass only the selected outro asset; outroLongAsset is reserved
+          // for cache-key invalidation. The provider must not probe both
+          // fields, otherwise a broken long asset fails a short run.
           branding: {
             channel: branding.channel,
             logo: state.branding?.logo,
             enabled: branding.enabled,
-            outroAsset: branding.outroAsset,
+            outroAsset,
             ctaEnabled: branding.ctaEnabled,
             outroCta: branding.outroCta,
             outroContainsCta: branding.outroContainsCta,
           },
+          video: videoProfile.videoSize,
           runId: getArtifactNamespace(config, state),
+          runLogSink: getRunLogSinkFromConfig(config),
         });
 
         return {
@@ -308,6 +341,15 @@ export async function videoComposerNode(
           },
         };
       } catch (err) {
+        appendRunLogEvent(getRunLogSinkFromConfig(config), {
+          event: "scene_event",
+          node: AgentModel.VideoComposer,
+          sceneId: scenes.length,
+          kind: "end",
+          outcome: "fatal",
+          errorReason: (err as Error)?.message ?? String(err),
+          runId: getArtifactNamespace(config, state),
+        });
         return {
           data: null,
           error: `${AgentModel.VideoComposer}: Video composition failed: ${(err as Error)?.message ?? String(err)}`,

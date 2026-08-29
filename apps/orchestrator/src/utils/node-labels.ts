@@ -20,6 +20,7 @@ const LABELS: Record<string, string> = {
   [AgentModel.ReleaseValidation]: "Release validation",
   [AgentModel.ReleaseReview]: "Release review",
   [AgentModel.Publisher]: "Publishing",
+  [AgentModel.ResolveProfile]: "Resolve profile",
   PublishReady: "Publish readiness",
 };
 

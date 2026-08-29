@@ -122,7 +122,7 @@ describe("releaseValidationNode", () => {
     );
     expect(result.releaseValidation.validations).toContain("FPS > 0");
     expect(result.releaseValidation.validations).toContain(
-      "Narration pace 2.4-2.8 wps",
+      "Narration pace 2.67 wps",
     );
     expect(result.execution?.currentNode).toBe("ReleaseValidation");
   });

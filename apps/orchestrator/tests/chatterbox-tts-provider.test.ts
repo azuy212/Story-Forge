@@ -72,6 +72,8 @@ jest.unstable_mockModule("node:fs/promises", () => ({
   readFile: mockReadFile,
   rename: mockRename,
   rm: mockRm,
+  appendFile: jest.fn(async () => undefined),
+  stat: jest.fn(async () => undefined),
 }));
 
 const { ChatterboxTTSProvider } =
@@ -158,7 +160,7 @@ describe("ChatterboxTTSProvider", () => {
     try {
       // Format: chatterbox-http-<version>:<url>:targetWpm=<wpm>
       expect(provider.cacheFingerprint()).toMatch(
-        /^chatterbox-http-v3:http:\/\/localhost:8010:targetWpm=\d+$/,
+        /^chatterbox-http-v4:http:\/\/localhost:8010:targetWpm=\d+$/,
       );
     } finally {
       if (prev === undefined) delete process.env.TTS_URL;
@@ -176,10 +178,10 @@ describe("ChatterboxTTSProvider", () => {
       const second = provider.cacheFingerprint();
 
       expect(first).toMatch(
-        /^chatterbox-http-v3:http:\/\/localhost:8010:targetWpm=\d+$/,
+        /^chatterbox-http-v4:http:\/\/localhost:8010:targetWpm=\d+$/,
       );
       expect(second).toMatch(
-        /^chatterbox-http-v3:http:\/\/tts-staging.example:9000:targetWpm=\d+$/,
+        /^chatterbox-http-v4:http:\/\/tts-staging.example:9000:targetWpm=\d+$/,
       );
       expect(second).not.toBe(first);
     } finally {
@@ -278,6 +280,37 @@ describe("ChatterboxTTSProvider", () => {
     try {
       const result = await provider.synthesize({ text: "Hello world" });
       expect(result.durationMs).toBe(57840);
+    } finally {
+      if (prevTargetWpm === undefined) delete process.env.NARRATION_TARGET_WPM;
+      else process.env.NARRATION_TARGET_WPM = prevTargetWpm;
+    }
+  });
+
+  it("skips WPM normalization when videoProfile is long, even with NARRATION_TARGET_WPM set", async () => {
+    const wav = makeWavBytes(24000, 32, 57840, 3);
+    fetchSpy
+      .mockResolvedValueOnce(
+        makeJsonResponse(200, {
+          status: "success",
+          file: "long.wav",
+          url: "/audio/long.wav",
+        }),
+      )
+      .mockResolvedValueOnce(makeBinaryResponse(200, wav));
+
+    const prevTargetWpm = process.env.NARRATION_TARGET_WPM;
+    process.env.NARRATION_TARGET_WPM = "160";
+    mockReadFile.mockClear();
+    mockRename.mockClear();
+    try {
+      const result = await provider.synthesize({
+        text: "Hello world",
+        videoProfile: "long",
+      });
+      // Raw WAV duration; no atempo re-encode.
+      expect(result.durationMs).toBe(57840);
+      expect(mockReadFile).not.toHaveBeenCalled();
+      expect(mockRename).not.toHaveBeenCalled();
     } finally {
       if (prevTargetWpm === undefined) delete process.env.NARRATION_TARGET_WPM;
       else process.env.NARRATION_TARGET_WPM = prevTargetWpm;

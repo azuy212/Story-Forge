@@ -1,6 +1,7 @@
 import type { ProjectState } from "../types/index.js";
 import { logger } from "./logger.js";
 import { MINOR_REVISION_MAX, MAJOR_REVISION_MAX } from "./constants.js";
+import { appendRunLogEvent } from "./run-log.js";
 
 /**
  * Single source of truth for the QA retry + pipeline continuation policy.
@@ -134,6 +135,20 @@ export function decideQaRetry(input: QaRetryInput): QaDecision {
     maxRevisionAttempts,
     qaAttempts,
     qaInfraMax: input.infraMax,
+    repeated,
+    action,
+    reason,
+  });
+
+  appendRunLogEvent(logger.getCurrentSink(), {
+    event: "qa_decision",
+    node,
+    status,
+    revisionAttempts,
+    maxRevisionAttempts,
+    qaAttempts,
+    qaInfraMax: input.infraMax,
+    blocking,
     repeated,
     action,
     reason,

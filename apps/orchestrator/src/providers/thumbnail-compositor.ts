@@ -4,6 +4,8 @@ import { mkdir } from "node:fs/promises";
 import { runFfmpeg } from "./composer/ffmpeg/ffmpeg.js";
 import { PipelineError } from "../utils/errors.js";
 import { resolveBrandingAssetPath } from "../utils/branding.js";
+import type { RunLogSink } from "../utils/run-log.js";
+import { appendRunLogEvent } from "../utils/run-log.js";
 
 export type ThumbnailTextPosition =
   "bottom-third" | "top-left" | "top-right" | "center";
@@ -29,6 +31,7 @@ export interface ThumbnailComposeOptions {
   colorScheme?: string;
   runId?: string;
   filename?: string;
+  runLogSink?: RunLogSink | null;
 }
 
 export interface ThumbnailComposeResult {
@@ -54,7 +57,8 @@ const OUTPUT_DIR = path.resolve("generated", "assets");
 
 export const THUMBNAIL_DIMENSIONS = { width: 1080, height: 1920 } as const;
 
-// Layout constants tuned for a 1080x1920 Shorts thumbnail.
+// Layout constants tuned for the reference 1080x1920 Shorts thumbnail.
+// They are scaled by `layoutScale(width, height)` for other aspect ratios.
 const MARGIN_X = 72;
 const MARGIN_TOP = 160;
 const MARGIN_BOTTOM = 240;
@@ -69,6 +73,13 @@ const REGION_HEIGHT: Record<ThumbnailTextPosition, number> = {
   "top-right": 400,
   center: 700,
 };
+
+function layoutScale(width: number, height: number): number {
+  return Math.min(
+    width / THUMBNAIL_DIMENSIONS.width,
+    height / THUMBNAIL_DIMENSIONS.height,
+  );
+}
 
 function estimateTextWidth(text: string, fontSize: number): number {
   return text.length * fontSize * CHAR_WIDTH_FACTOR;
@@ -103,12 +114,19 @@ interface TextLayout {
 function fitTextLayout(
   text: string,
   position: ThumbnailTextPosition,
+  width: number,
+  height: number,
 ): TextLayout {
   const words = text.split(/\s+/).filter(Boolean);
-  const maxWidth = THUMBNAIL_DIMENSIONS.width - MARGIN_X * 2;
-  const maxHeight = REGION_HEIGHT[position];
+  const scale = layoutScale(width, height);
+  const maxWidth = width - MARGIN_X * 2 * scale;
+  const maxHeight = REGION_HEIGHT[position] * scale;
 
-  let fontSize = BASE_FONT_SIZE;
+  let fontSize = Math.round(BASE_FONT_SIZE * scale);
+  const minFontSize = Math.max(
+    MIN_FONT_SIZE,
+    Math.round(MIN_FONT_SIZE * scale),
+  );
   for (;;) {
     const lines =
       words.length === 0 ? [] : wrapLines(words, fontSize, maxWidth);
@@ -125,7 +143,7 @@ function fitTextLayout(
     ) {
       return { lines, fontSize, lineHeight };
     }
-    if (fontSize <= MIN_FONT_SIZE) {
+    if (fontSize <= minFontSize) {
       return { lines, fontSize, lineHeight };
     }
     fontSize -= 6;
@@ -141,20 +159,26 @@ interface PositionedLine {
 function layoutLines(
   layout: TextLayout,
   position: ThumbnailTextPosition,
+  width: number,
+  height: number,
 ): PositionedLine[] {
   const totalHeight = layout.lines.length * layout.lineHeight;
+  const scale = layoutScale(width, height);
+  const marginX = MARGIN_X * scale;
+  const marginTop = MARGIN_TOP * scale;
+  const marginBottom = MARGIN_BOTTOM * scale;
 
   let blockTop: number;
   switch (position) {
     case "bottom-third":
-      blockTop = THUMBNAIL_DIMENSIONS.height - MARGIN_BOTTOM - totalHeight;
+      blockTop = height - marginBottom - totalHeight;
       break;
     case "top-left":
     case "top-right":
-      blockTop = MARGIN_TOP;
+      blockTop = marginTop;
       break;
     case "center":
-      blockTop = (THUMBNAIL_DIMENSIONS.height - totalHeight) / 2;
+      blockTop = (height - totalHeight) / 2;
       break;
   }
 
@@ -164,10 +188,10 @@ function layoutLines(
     let x: string;
     switch (position) {
       case "top-left":
-        x = String(MARGIN_X);
+        x = String(marginX);
         break;
       case "top-right":
-        x = `w-text_w-${MARGIN_X}`;
+        x = `w-text_w-${marginX}`;
         break;
       case "bottom-third":
       case "center":
@@ -272,8 +296,8 @@ export class FfmpegThumbnailCompositor implements ThumbnailCompositor {
     if (isStubPlaceholder(opts.sourceUrl)) {
       return {
         url: opts.sourceUrl,
-        width: THUMBNAIL_DIMENSIONS.width,
-        height: THUMBNAIL_DIMENSIONS.height,
+        width: this.width,
+        height: this.height,
       };
     }
     if (isHttpSource(opts.sourceUrl)) {
@@ -325,10 +349,21 @@ export class FfmpegThumbnailCompositor implements ThumbnailCompositor {
 
     try {
       await mkdir(dir, { recursive: true });
+      const startedAt = Date.now();
       await runFfmpeg({
         args,
         description: "composite thumbnail text",
         timeout: 120_000,
+        runLogSink: opts.runLogSink,
+        runId: opts.runId,
+      });
+      appendRunLogEvent(opts.runLogSink, {
+        event: "asset_written",
+        kind: "thumbnail_composited",
+        path: outputPath,
+        provider: "thumbnail_compositor",
+        runId: opts.runId,
+        durationMs: Date.now() - startedAt,
       });
     } catch (err) {
       throw new PipelineError(
@@ -359,8 +394,8 @@ export function buildThumbnailFilterGraph(
   const width = opts.width ?? THUMBNAIL_DIMENSIONS.width;
   const height = opts.height ?? THUMBNAIL_DIMENSIONS.height;
   const position = normalizeTextPosition(opts.textPosition);
-  const layout = fitTextLayout(opts.text.trim(), position);
-  const lines = layoutLines(layout, position);
+  const layout = fitTextLayout(opts.text.trim(), position, width, height);
+  const lines = layoutLines(layout, position, width, height);
 
   if (lines.length === 0) {
     return `[0:v]${normalizeFilter(width, height)}[out]`;

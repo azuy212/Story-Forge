@@ -4,15 +4,23 @@ import type {
   Content,
   Diagnostics,
   Execution,
+  VideoProfileConfig,
 } from "../types/index.js";
 import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
 import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
-import { ScriptPlannerOutputSchema } from "../schemas/script-planner-output.js";
+import { scriptPlannerOutputSchema, beatCountRangeFor } from "../schemas/script-planner-output.js";
 import type { ScriptPlannerOutput } from "../schemas/script-planner-output.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
+import {
+  formatLabelFor,
+  canvasGuidanceFor,
+  wordRangeFor,
+  speakingRateWps,
+  resolveVideoProfile,
+} from "../utils/video-profile.js";
 
 function formatFacts(
   facts: {
@@ -79,6 +87,9 @@ export async function scriptPlannerNode(
 }> {
   const { pillar, topic } = state.project;
   const research = state.research;
+  const channel = state.branding?.channel;
+  const videoProfile: VideoProfileConfig =
+    state.videoProfile ?? resolveVideoProfile({});
   const inject = (config.configurable ?? {}) as AgentInject;
 
   if (!research?.summary || !research?.facts || research.facts.length === 0) {
@@ -94,8 +105,15 @@ export async function scriptPlannerNode(
     };
   }
 
-  const estimatedDurationSeconds =
-    state.content?.estimatedDurationSeconds ?? 50;
+  const targetDurationSec = videoProfile.targetDurationSec;
+  const wordRange = wordRangeFor(videoProfile);
+  const speakingRate = speakingRateWps(videoProfile);
+  const formatLabel = formatLabelFor(videoProfile);
+  const canvasGuidance = canvasGuidanceFor(videoProfile);
+  const beatRange = beatCountRangeFor(videoProfile);
+  const beatCountRange = beatRange.max === null
+    ? `${beatRange.min}+`
+    : `${beatRange.min}-${beatRange.max}`;
 
   const label = nodeLabel(AgentModel.ScriptPlanner);
   logger.nodeStart(label);
@@ -104,13 +122,20 @@ export async function scriptPlannerNode(
   const result = await runAgent<ScriptPlannerOutput>({
     agent: AgentModel.ScriptPlanner,
     promptPath: PromptPaths.ScriptPlanner,
-    schema: ScriptPlannerOutputSchema,
+    schema: scriptPlannerOutputSchema(videoProfile),
     variables: {
       pillar: pillar ?? "",
       topic: topic ?? "",
       researchSummary: research.summary ?? "",
       approvedFacts: formatFacts(research.facts),
-      estimatedDurationSeconds: String(estimatedDurationSeconds),
+      channel: channel ?? "",
+      estimatedDurationSeconds: String(targetDurationSec),
+      targetDurationSeconds: String(targetDurationSec),
+      formatLabel,
+      canvasGuidance: canvasGuidance.canvasGuidance,
+      targetWordRange: `${wordRange.min}-${wordRange.max}`,
+      speakingRateWps: String(speakingRate),
+      beatCountRange,
     },
     inject,
     configurable: withTopic(config, state).configurable,

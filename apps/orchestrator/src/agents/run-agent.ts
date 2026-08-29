@@ -20,6 +20,12 @@ import { newInvocationId } from "../models/usage.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
 
 import { DEFAULT_MAX_RETRIES } from "../utils/constants.js";
+import { hashPrompt } from "../artifacts/hash.js";
+import {
+  appendRunLogEvent,
+  getRunLogSinkFromConfig,
+  type RunLogSink,
+} from "../utils/run-log.js";
 
 const AGENT_VERSION = "1.0.0";
 const DEFAULT_OPTIONS: GenerateOptions = {
@@ -233,6 +239,14 @@ export async function runAgent<T>({
     const createModel = inject.createModel ?? defaultCreateModel;
     const loadPrompt = inject.loadPrompt ?? defaultLoadPrompt;
     const attempts = singleAttempt ? 1 : maxRetries;
+    const runLogSink: RunLogSink | null = getRunLogSinkFromConfig({
+      configurable,
+    } as Parameters<typeof getRunLogSinkFromConfig>[0]);
+    const runId =
+      typeof (configurable as Record<string, unknown>).runId === "string"
+        ? ((configurable as Record<string, unknown>).runId as string)
+        : undefined;
+    const promptVersion = promptPath.replace(/\.md$/, "");
 
     logger.debug(`${agent} variables`, {
       keys: Object.keys(variables),
@@ -242,10 +256,16 @@ export async function runAgent<T>({
       ),
     });
 
-    const model = createModel(agent);
-    const opts: GenerateOptions = { ...DEFAULT_OPTIONS, ...generateOptions };
-
     const promptContent = await loadPrompt(promptPath);
+    const promptHash = hashPrompt(promptContent);
+    const model = createModel(agent, {
+      runLogSink,
+      promptPath,
+      promptVersion,
+      promptHash,
+      runId,
+    });
+    const opts: GenerateOptions = { ...DEFAULT_OPTIONS, ...generateOptions };
     const parts = promptContent.split(/\n---\n/);
     const systemTemplate = (parts[0] ?? "").trim();
     const userTemplate = parts[1]?.trim();
@@ -289,6 +309,9 @@ export async function runAgent<T>({
       // stale content is attached) for timeout/transient failures.
       let rawContent: string | undefined;
       const invocationId = newInvocationId();
+      if (typeof model.setCallContext === "function") {
+        model.setCallContext({ attempt, invocationId });
+      }
 
       try {
         const llmResult = await model.generate(attemptMessages, opts);
@@ -337,7 +360,6 @@ export async function runAgent<T>({
           costUsd: llmResult.usage?.costUsd,
         });
 
-        const promptVersion = promptPath.replace(/\.md$/, "");
         return {
           data: result.data,
           telemetry: {
@@ -363,6 +385,20 @@ export async function runAgent<T>({
 
         if (failureClass === "parse" || failureClass === "schema") {
           retryFeedback = buildRetryFeedback(lastError, rawContent);
+          appendRunLogEvent(runLogSink, {
+            event: "log_message",
+            level: "warn",
+            message: `${agent} ${failureClass} rejection`,
+            meta: {
+              attempt,
+              errorClass: failureClass,
+              error: lastError,
+              rawContentLength: rawContent?.length ?? 0,
+              rawContentPreview: rawContent
+                ? rawContent.slice(0, 2000)
+                : undefined,
+            },
+          });
         }
 
         if (
@@ -397,7 +433,6 @@ export async function runAgent<T>({
     }
 
     const durationMs = Date.now() - startedAt;
-    const promptVersion = promptPath.replace(/\.md$/, "");
     return {
       data: null as T | null,
       telemetry: {
@@ -413,6 +448,7 @@ export async function runAgent<T>({
   }
 
   const runConfig: RunnableConfig = { configurable };
+  const promptVersion = promptPath.replace(/\.md$/, "");
 
   const cacheOptions = def
     ? {
@@ -431,8 +467,6 @@ export async function runAgent<T>({
         validate: validateArtifact,
       }
     : null;
-
-  const promptVersion = promptPath.replace(/\.md$/, "");
 
   if (cacheOptions) {
     try {

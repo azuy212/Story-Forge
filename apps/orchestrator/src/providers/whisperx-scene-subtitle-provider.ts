@@ -1,5 +1,8 @@
-import type { Scene, SceneAudio } from "../types/index.js";
-import type { SceneSubtitleProvider } from "./scene-subtitle-provider.js";
+import type { Scene, SceneAudio, VideoProfileConfig } from "../types/index.js";
+import type {
+  SceneSubtitleOptions,
+  SceneSubtitleProvider,
+} from "./scene-subtitle-provider.js";
 import type { WhisperXProvider } from "./whisperx-provider.js";
 import type {
   GenerateSubtitlesResult,
@@ -8,6 +11,8 @@ import type {
 import { groupWords } from "./whisperx-subtitle-provider.js";
 import { formatSrtTime } from "../utils/subtitle-format.js";
 import { buildKaraokeAss, appAssStyle } from "../utils/ass.js";
+import type { RunLogSink } from "../utils/run-log.js";
+import { appendRunLogEvent } from "../utils/run-log.js";
 
 /**
  * Real-provider scene subtitle generator. Aligns each scene's narration audio
@@ -23,6 +28,25 @@ export class WhisperXSceneSubtitleProvider implements SceneSubtitleProvider {
   async generateSceneSubtitles(
     scenes: Scene[],
     audioScenes: SceneAudio[],
+    profile?: VideoProfileConfig,
+    options?: SceneSubtitleOptions,
+  ): Promise<GenerateSubtitlesResult> {
+    return this.run(
+      scenes,
+      audioScenes,
+      profile,
+      options?.runLogSink ?? null,
+      options?.runId,
+    );
+  }
+
+  /** @deprecated Use {@link generateSceneSubtitles} with options. */
+  async run(
+    scenes: Scene[],
+    audioScenes: SceneAudio[],
+    profile: VideoProfileConfig | undefined,
+    sink: RunLogSink | null,
+    runId?: string,
   ): Promise<GenerateSubtitlesResult> {
     const sceneById = new Map(scenes.map((scene) => [scene.sceneId, scene]));
     const orderedAudio = [...audioScenes].sort((a, b) => a.sceneId - b.sceneId);
@@ -34,10 +58,22 @@ export class WhisperXSceneSubtitleProvider implements SceneSubtitleProvider {
       const scene = sceneById.get(audio.sceneId);
       if (!scene) throw new Error(`Missing production scene ${audio.sceneId}`);
 
+      const startedAt = Date.now();
       const { wordTimestamps: sceneWords } = await this.whisperx.align(
         audio.url,
         audio.narration,
+        { runId, sceneId: audio.sceneId, runLogSink: sink },
       );
+      appendRunLogEvent(sink, {
+        event: "scene_event",
+        node: "WhisperXSceneSubtitleProvider",
+        sceneId: audio.sceneId,
+        kind: "end",
+        outcome: "resolved",
+        wordCount: sceneWords.length,
+        durationMs: Date.now() - startedAt,
+        runId,
+      });
       for (const w of sceneWords) {
         wordTimestamps.push({
           word: w.word,
@@ -69,7 +105,13 @@ export class WhisperXSceneSubtitleProvider implements SceneSubtitleProvider {
       )
       .join("\n\n");
 
-    const ass = buildKaraokeAss(groups, appAssStyle());
+    const ass = buildKaraokeAss(
+      groups,
+      appAssStyle({
+        playResX: profile?.videoSize.width,
+        playResY: profile?.videoSize.height,
+      }),
+    );
 
     return { srt, ass, wordTimestamps };
   }

@@ -9,7 +9,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-mjs.mjs",
     "dev": "npx @langchain/langgraph-cli dev --server-log-level warn",
     "clean": "rm -rf dist",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns=\\.test\\.ts$ --testPathIgnorePatterns=\\.int\\.test\\.ts$",
@@ -22,11 +22,13 @@
     "lint:all": "pnpm lint && pnpm lint:langgraph-json && pnpm format:check",
     "test:all": "pnpm test && pnpm test:int && pnpm lint:langgraph-json",
     "resume": "node scripts/resume.mjs",
-    "run-next": "node scripts/run-next.mjs"
+    "run-next": "node scripts/run-next.mjs",
+    "seed-run": "node scripts/seed-run.mjs"
   },
   "dependencies": {
     "@langchain/core": "^1.2.3",
     "@langchain/langgraph": "^1.4.8",
+    "commander": "^15.0.0",
     "execa": "^9.5.2",
     "googleapis": "^174.0.1",
     "openai": "^4.96.0",

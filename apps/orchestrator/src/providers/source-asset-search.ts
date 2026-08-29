@@ -1,16 +1,22 @@
 import type { SceneEntity, SourceAsset } from "../schemas/production.js";
-import type { SourceAssetProvider } from "./source-asset-provider.js";
+import type {
+  SourceAssetProvider,
+  SourceAssetSearchContext,
+} from "./source-asset-provider.js";
 import type { SourceAssetCache } from "./source-asset-cache.js";
 import { FileSourceAssetCache } from "./source-asset-cache.js";
 import { WikimediaSourceAssetProvider } from "./wikimedia-source-asset-provider.js";
 import { UnsplashSourceAssetProvider } from "./unsplash-source-asset-provider.js";
-import { PexelsSourceAssetProvider } from "./pexels-source-asset-provider.js";
+import {
+  PexelsSourceAssetProvider,
+  PexelsVideoSourceAssetProvider,
+} from "./pexels-source-asset-provider.js";
 import { TYPE_HINT, selectBestSourceAsset } from "./source-asset-selection.js";
 import { materializeSourceAsset } from "./source-asset-materializer.js";
 import { config as appConfig } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 
-export type { SourceAssetProvider };
+export type { SourceAssetProvider, SourceAssetSearchContext };
 
 export type SourceAssetOutcome =
   | {
@@ -49,6 +55,7 @@ export class FallbackSourceAssetSearcher implements SourceAssetSearcher {
     private readonly providers: SourceAssetProvider[],
     private readonly cache: SourceAssetCache | null,
     private readonly deadlineMs: number,
+    private readonly context: SourceAssetSearchContext = {},
   ) {}
 
   async search(entity: SceneEntity): Promise<SourceAssetOutcome> {
@@ -81,13 +88,23 @@ export class FallbackSourceAssetSearcher implements SourceAssetSearcher {
             const cached = await this.cache.get(entity, query);
             assets = cached && cached.length > 0 ? cached : [];
             if (assets.length === 0) {
-              assets = await provider.search(entity, query, deadline);
+              assets = await provider.search(
+                entity,
+                query,
+                deadline,
+                this.context,
+              );
               if (assets.length > 0) {
                 await this.cache.set(entity, query, assets).catch(() => {});
               }
             }
           } else {
-            assets = await provider.search(entity, query, deadline);
+            assets = await provider.search(
+              entity,
+              query,
+              deadline,
+              this.context,
+            );
           }
         } catch (error) {
           const reason = error instanceof Error ? error.message : String(error);
@@ -130,6 +147,11 @@ export class FallbackSourceAssetSearcher implements SourceAssetSearcher {
             selected,
             appConfig.sourceAssetCacheDir(),
             deadline,
+            {
+              sink: this.context.sink,
+              runId: this.context.runId,
+              entityName: entity.name,
+            },
           );
           logger.info("SourceAsset materialized", {
             entity: entity.name,
@@ -189,7 +211,9 @@ export class FallbackSourceAssetSearcher implements SourceAssetSearcher {
   }
 }
 
-export function createDefaultSourceAssetSearcher(): SourceAssetSearcher {
+export function createDefaultSourceAssetSearcher(
+  context: SourceAssetSearchContext = {},
+): SourceAssetSearcher {
   const providers: SourceAssetProvider[] = [new WikimediaSourceAssetProvider()];
 
   const unsplashKey = appConfig.unsplashAccessKey();
@@ -200,11 +224,19 @@ export function createDefaultSourceAssetSearcher(): SourceAssetSearcher {
   const pexelsKey = appConfig.pexelsApiKey();
   if (pexelsKey) {
     providers.push(new PexelsSourceAssetProvider(pexelsKey));
+    // Stock videos are gated by ENABLE_VIDEO_ASSETS: the Pexels video
+    // provider short-circuits on entities without a target resolution, but
+    // pushing it only when the flag is on avoids wasted lookups for runs
+    // that do not need video at all.
+    if (appConfig.supportsVideoAssets()) {
+      providers.push(new PexelsVideoSourceAssetProvider(pexelsKey));
+    }
   }
 
   return new FallbackSourceAssetSearcher(
     providers,
     new FileSourceAssetCache(appConfig.sourceAssetCacheDir()),
     appConfig.sourceAssetDeadlineMs(),
+    context,
   );
 }

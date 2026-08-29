@@ -5,6 +5,23 @@ export { ProjectSchema } from "./project.js";
 export type { ProjectInfo } from "./project.js";
 
 export {
+  VideoProfileEnum,
+  AspectRatioEnum,
+  VideoSizeSchema,
+  SceneDurationRangeSchema,
+  SceneDensitySchema,
+  VideoProfileConfigSchema,
+} from "./video-profile.js";
+export type {
+  VideoProfile,
+  AspectRatio,
+  VideoSize,
+  SceneDurationRange,
+  SceneDensity,
+  VideoProfileConfig,
+} from "./video-profile.js";
+
+export {
   ContentSchema,
   NarrativeEndingSchema,
   NarrativeEndingTypeEnum,

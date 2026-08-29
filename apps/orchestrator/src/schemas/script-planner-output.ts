@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { VideoProfileConfig } from "./video-profile.js";
 
 const ScriptPlannerContentSchema = z.object({
   title: z
@@ -38,11 +39,14 @@ const ScriptBeatSchema = z.object({
     .positive("estimatedDurationSeconds must be positive"),
 });
 
-const ScriptBeatsSchema = z
-  .array(ScriptBeatSchema)
-  .min(6, "must have at least 6 story beats")
-  .max(10, "must have at most 10 story beats")
-  .superRefine((beats, ctx) => {
+function buildScriptBeatsSchema(profile?: VideoProfileConfig) {
+  const minBeats = profile?.profile === "long" ? 10 : 6;
+  const maxBeats = profile?.profile === "long" ? null : 10;
+  let arr = z.array(ScriptBeatSchema).min(minBeats, `must have at least ${minBeats} story beats`);
+  if (maxBeats !== null) {
+    arr = arr.max(maxBeats, `must have at most ${maxBeats} story beats`);
+  }
+  return arr.superRefine((beats, ctx) => {
     beats.forEach((beat, index) => {
       if (beat.beatId !== index + 1) {
         ctx.addIssue({
@@ -53,13 +57,26 @@ const ScriptBeatsSchema = z
       }
     });
   });
+}
 
-export const ScriptPlannerOutputSchema = z.object({
-  content: ScriptPlannerContentSchema,
-  storyType: StoryTypeEnum,
-  storySummary: z.string().min(1, "storySummary must not be empty"),
-  storyBeats: ScriptBeatsSchema,
-});
+export function beatCountRangeFor(profile?: VideoProfileConfig): {
+  min: number;
+  max: number | null;
+} {
+  if (profile?.profile === "long") return { min: 10, max: null };
+  return { min: 6, max: 10 };
+}
+
+export function scriptPlannerOutputSchema(profile?: VideoProfileConfig) {
+  return z.object({
+    content: ScriptPlannerContentSchema,
+    storyType: StoryTypeEnum,
+    storySummary: z.string().min(1, "storySummary must not be empty"),
+    storyBeats: buildScriptBeatsSchema(profile),
+  });
+}
+
+export const ScriptPlannerOutputSchema = scriptPlannerOutputSchema();
 
 export type ScriptPlannerOutput = z.input<typeof ScriptPlannerOutputSchema>;
 export type StoryType = z.input<typeof StoryTypeEnum>;

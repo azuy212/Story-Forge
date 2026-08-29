@@ -19,6 +19,7 @@ export class GeminiClient {
   private downloader: AssetDownloader;
   private cache: AssetCache;
   private _shuttingDown = false;
+  private _createModeActive = new Set<AssetType>();
 
   constructor(
     private readonly config: Config,
@@ -56,6 +57,8 @@ export class GeminiClient {
 
     this.page.setDefaultTimeout(this.config.timeout);
     this.page.setDefaultNavigationTimeout(this.config.navigationTimeout);
+
+    this._createModeActive.clear();
 
     await this.page.goto(this.config.geminiUrl, {
       waitUntil: 'load',
@@ -349,6 +352,7 @@ export class GeminiClient {
       }));
     } finally {
       page.off('response', onResponse);
+      this._createModeActive.delete(assetType);
     }
   }
 
@@ -376,25 +380,54 @@ export class GeminiClient {
   private async selectCreateMode(assetType: AssetType): Promise<void> {
     if (!this.page) throw new Error('Page closed');
 
-    const label = assetType === 'video' ? 'Create video' : 'Create image';
-    const item = this.page.locator('[role="menuitemcheckbox"]').filter({ hasText: label }).first();
+    if (this._createModeActive.has(assetType)) {
+      this.logger.debug('Create mode already active (cached)', { assetType });
+      return;
+    }
 
-    const checked = await item.getAttribute('aria-checked', { timeout: 2000 }).catch(() => null);
-    if (checked === 'true') {
+    const label = assetType === 'video' ? 'Create video' : 'Create image';
+    const expectedPlaceholder =
+      assetType === 'video' ? 'Describe your video' : 'Describe your image';
+
+    const isComposerInMode = async (): Promise<boolean> => {
+      if (!this.page) return false;
+      return this.page.evaluate((expected) => {
+        const e = document.querySelector('[contenteditable="true"]');
+        const ph = e?.getAttribute('data-placeholder') ?? '';
+        return ph === expected;
+      }, expectedPlaceholder);
+    };
+
+    if (await isComposerInMode()) {
+      this._createModeActive.add(assetType);
       this.logger.debug('Create mode already active', { assetType, label });
       return;
     }
 
     const plusBtn = this.page.locator('button[aria-label="Upload & tools"]').first();
-    await plusBtn.click();
+    const item = this.page.locator('[role="menuitemcheckbox"]').filter({ hasText: label }).first();
 
-    await item.waitFor({ state: 'visible', timeout: 15000 });
-    await item.click();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await plusBtn.click();
+      await item.waitFor({ state: 'visible', timeout: 5000 });
+      await item.click();
+      await this.page.keyboard.press('Escape').catch(() => {});
 
-    await this.page.keyboard.press('Escape').catch(() => {});
-    await new Promise((r) => setTimeout(r, 1000));
+      for (let v = 0; v < 8; v += 1) {
+        await new Promise((r) => setTimeout(r, 500));
+        if (await isComposerInMode()) {
+          this._createModeActive.add(assetType);
+          this.logger.debug('Selected create mode', { assetType, label, attempt, verify: v });
+          return;
+        }
+      }
+    }
 
-    this.logger.debug('Selected create mode', { assetType, label });
+    throw new ProviderError(
+      `Failed to select ${label} in Gemini menu`,
+      'server_error',
+      `composer placeholder did not become "${expectedPlaceholder}" after retries`,
+    );
   }
 
   private async resolveInput(): Promise<Locator> {

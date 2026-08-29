@@ -2,6 +2,12 @@ import fs from "node:fs/promises";
 import { runFfmpeg, runFfmpegWithRetry } from "./ffmpeg.js";
 import type { EncoderConfig } from "./ffmpeg.js";
 import { DEFAULT_MAX_RETRIES } from "../../../utils/constants.js";
+import type { RunLogSink } from "../../../utils/run-log.js";
+
+export interface FfmpegCallContext {
+  runLogSink?: RunLogSink | null;
+  runId?: string;
+}
 
 export type FadeTransition =
   | "fade"
@@ -67,6 +73,7 @@ export async function concatWithoutTransitions(
   outputPath: string,
   encoder: EncoderConfig,
   signal?: AbortSignal,
+  context: FfmpegCallContext = {},
 ): Promise<void> {
   const listPath = `${outputPath}.concat.txt`;
   const list = inputs
@@ -92,6 +99,8 @@ export async function concatWithoutTransitions(
       DEFAULT_MAX_RETRIES,
       undefined,
       signal,
+      undefined,
+      context,
     );
   } catch {
     // Fallback: filter concat with re-encode. Deterministic failures (codec
@@ -99,6 +108,8 @@ export async function concatWithoutTransitions(
     await runFfmpeg({
       args: buildFilterConcatArgs(inputs, outputPath, encoder),
       description: "concatenate scenes (filter concat fallback)",
+      runLogSink: context.runLogSink,
+      runId: context.runId,
     });
   }
 }
@@ -140,6 +151,7 @@ export async function concatWithTransitions(
   transitionType: FadeTransition,
   encoder: EncoderConfig,
   signal?: AbortSignal,
+  context: FfmpegCallContext = {},
 ): Promise<void> {
   const inputArgs = inputs.flatMap((i) => ["-i", i.filePath]);
   const { filter } = buildXfadeFilter(
@@ -173,5 +185,7 @@ export async function concatWithTransitions(
     DEFAULT_MAX_RETRIES,
     undefined,
     signal,
+    undefined,
+    context,
   );
 }

@@ -18,9 +18,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
   },
   {
     name: "Story Plan",
-    nodes: [
-      { label: "Story Plan", phase: "building story structure" },
-    ],
+    nodes: [{ label: "Story Plan", phase: "building story structure" }],
   },
   {
     name: "Script",
@@ -31,9 +29,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
   },
   {
     name: "Scene Direction",
-    nodes: [
-      { label: "Scene Direction", phase: "planning visual direction" },
-    ],
+    nodes: [{ label: "Scene Direction", phase: "planning visual direction" }],
   },
   {
     name: "Enrichment",
@@ -44,9 +40,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
   },
   {
     name: "Asset Strategy",
-    nodes: [
-      { label: "Asset Strategy", phase: "searching source assets" },
-    ],
+    nodes: [{ label: "Asset Strategy", phase: "searching source assets" }],
   },
   {
     name: "Scene Prompts",
@@ -57,33 +51,23 @@ export const PIPELINE_STAGES: PipelineStage[] = [
   },
   {
     name: "Scene Assets",
-    nodes: [
-      { label: "Scene Assets", phase: "generating images" },
-    ],
+    nodes: [{ label: "Scene Assets", phase: "generating images" }],
   },
   {
     name: "Prompt Repair",
-    nodes: [
-      { label: "Prompt Repair", phase: "repairing rejected prompts" },
-    ],
+    nodes: [{ label: "Prompt Repair", phase: "repairing rejected prompts" }],
   },
   {
     name: "Narration",
-    nodes: [
-      { label: "Narration", phase: "generating voice audio" },
-    ],
+    nodes: [{ label: "Narration", phase: "generating voice audio" }],
   },
   {
     name: "Subtitles",
-    nodes: [
-      { label: "Subtitles", phase: "generating subtitles" },
-    ],
+    nodes: [{ label: "Subtitles", phase: "generating subtitles" }],
   },
   {
     name: "Video Composition",
-    nodes: [
-      { label: "Video Composition", phase: "rendering video" },
-    ],
+    nodes: [{ label: "Video Composition", phase: "rendering video" }],
   },
   {
     name: "Release Validation",
@@ -93,21 +77,15 @@ export const PIPELINE_STAGES: PipelineStage[] = [
   },
   {
     name: "Release Review",
-    nodes: [
-      { label: "Release Review", phase: "reviewing release package" },
-    ],
+    nodes: [{ label: "Release Review", phase: "reviewing release package" }],
   },
   {
     name: "Publish Ready",
-    nodes: [
-      { label: "Publish Ready", phase: "checking publish readiness" },
-    ],
+    nodes: [{ label: "Publish Ready", phase: "checking publish readiness" }],
   },
   {
     name: "Publisher",
-    nodes: [
-      { label: "Publisher", phase: "uploading video" },
-    ],
+    nodes: [{ label: "Publisher", phase: "uploading video" }],
   },
 ];
 
