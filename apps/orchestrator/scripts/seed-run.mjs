@@ -490,7 +490,7 @@ async function main() {
   try {
     const { lastEvent } = await resumeRun(
       ns,
-      { pillar, topic, videoProfile },
+      { pillar, topic, videoProfile, runSource: "seed" },
       {
         assistantId,
         seed,

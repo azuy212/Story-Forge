@@ -181,6 +181,15 @@ shape (override with `--convert` / `--no-convert`):
 | Structured | `.json` with `research.{summary,facts}` and `content.{script,...}` | Validated and fed to the graph directly. **No LLM call.** `pillar` + `topic` are required (in the file or via `--pillar`/`--topic`). |
 | Text / paragraph | `.txt` / `.md`, or `.json` whose `research` / `script` fields are freeform strings | An LLM call (using `SEED_CONVERT_PROMPT`) converts the text into the structured form, including `pillar` + `topic` when not supplied. Requires `OPENROUTER_API_KEY`. |
 
+### Sheet writeback
+
+Publish records from `seed-run` land on a **dedicated third sheet** named
+**`Seed Runs`** (override with `GOOGLE_SHEETS_SHEET_NAME_SEED`). They never
+touch the run-next backlog sheets (`Sheet1` / `Long Videos`). To match an
+existing row, create it in the `Seed Runs` tab with the same headers as the
+backlog sheets and pass `--project-id <that row's Video ID>`. Without a
+`--project-id` the publish result is logged but not written to the sheet.
+
 ### Examples
 
 ```bash

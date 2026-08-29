@@ -280,6 +280,14 @@ streaming. Two seed forms are supported, auto-detected by extension and shape
 | Structured | `.json` with `research.{summary,facts}` + `content.{script,...}` | Validated and fed to the graph. **No LLM convert call.** `pillar` + `topic` are required (in the file or via `--pillar`/`--topic`). |
 | Text / paragraph | `.txt` / `.md`, or `.json` with string `research` / `script` | LLM (using `SEED_CONVERT_PROMPT`) structures it, including `pillar` + `topic` when not supplied. Requires `OPENROUTER_API_KEY`. |
 
+### Sheet writeback
+
+Publish records land on a dedicated **`Seed Runs`** sheet (override with
+`GOOGLE_SHEETS_SHEET_NAME_SEED`), never on the run-next backlog sheets
+(`Sheet1` / `Long Videos`). To match an existing row in the `Seed Runs` tab,
+pass `--project-id <that row's Video ID>`. Without it, the publish result is
+logged but not written to the sheet.
+
 ### Examples
 
 ```bash

@@ -132,12 +132,13 @@ export async function syncPublishResults(options: {
   const projectId = state.project?.projectId;
   if (!projectId) {
     logger.warn(
-      "Google Sheets sync skipped: project has no projectId (seeded by run-next.mjs)",
+      "Google Sheets sync skipped: project has no projectId (seeded by run-next.mjs or --project-id)",
     );
     return;
   }
 
-  const sheetName = config.googleSheetsSheetNameForProfile(
+  const sheetName = config.googleSheetsSheetNameForSource(
+    state.project?.runSource,
     state.videoProfile?.profile,
   );
   const category = state.project?.pillar ?? state.metadataOutput?.category;

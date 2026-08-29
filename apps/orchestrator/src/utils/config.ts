@@ -164,10 +164,27 @@ export const config = {
   },
   googleSheetsSheetName: (): string =>
     read("GOOGLE_SHEETS_SHEET_NAME") || "Sheet1",
+  // Dedicated sheet for seed-run launches so they don't pollute the run-next
+  // backlog sheets. Override via GOOGLE_SHEETS_SHEET_NAME_SEED.
+  googleSheetsSheetNameSeed: (): string =>
+    read("GOOGLE_SHEETS_SHEET_NAME_SEED") || "Seed Runs",
   googleSheetsSheetNameForProfile: (profile?: string): string => {
     if (profile === "long") {
       return read("GOOGLE_SHEETS_SHEET_NAME_LONG") || "Long Videos";
     }
+    return read("GOOGLE_SHEETS_SHEET_NAME") || "Sheet1";
+  },
+  // Resolves the Google Sheets tab for a run. Seed runs always land on the
+  // dedicated seed sheet regardless of profile; everything else uses the
+  // profile-based backlog sheet.
+  googleSheetsSheetNameForSource: (
+    source?: string,
+    profile?: string,
+  ): string => {
+    if (source === "seed")
+      return read("GOOGLE_SHEETS_SHEET_NAME_SEED") || "Seed Runs";
+    if (profile === "long")
+      return read("GOOGLE_SHEETS_SHEET_NAME_LONG") || "Long Videos";
     return read("GOOGLE_SHEETS_SHEET_NAME") || "Sheet1";
   },
   // --- Subtitle appearance (word-level karaoke rendering) ---

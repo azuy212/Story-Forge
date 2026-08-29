@@ -473,7 +473,7 @@ async function main() {
  */
 export async function resumeRun(
   ns,
-  { pillar, topic, videoProfile },
+  { pillar, topic, videoProfile, runSource },
   {
     assistantId = "",
     projectId = "",
@@ -492,6 +492,7 @@ export async function resumeRun(
         pillar,
         ...(projectId ? { projectId } : {}),
         ...(videoProfile ? { videoProfile } : {}),
+        ...(runSource ? { runSource } : {}),
       });
     },
   } = {},
@@ -513,6 +514,9 @@ export async function resumeRun(
       ...(projectId ? { projectId } : {}),
       ...(youtubePublishAt ? { youtubePublishAt } : {}),
       ...(videoProfile ? { videoProfile } : {}),
+      // runSource routes the post-publish sheet writeback to the matching
+      // sheet ("seed" -> Seed Runs; otherwise profile-based backlog sheet).
+      ...(runSource ? { runSource } : {}),
     },
     // Seed channels (research/content) ride alongside project. The entry
     // router consumes these to skip the producers that would regenerate them.
