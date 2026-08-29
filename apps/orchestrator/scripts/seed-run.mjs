@@ -222,6 +222,8 @@ function parseArgs(args) {
     topic: null,
     profile: null,
     convert: null, // null=auto, true=force LLM convert, false=force bypass
+    publishAt: null,
+    projectId: null,
     dryRun: false,
     help: false,
   };
@@ -252,6 +254,18 @@ function parseArgs(args) {
       if (val !== "short" && val !== "long")
         throw new Error("--profile must be 'short' or 'long'");
       parsed.profile = val;
+    } else if (arg === "--publish-at") {
+      if (!args[i + 1] || args[i + 1].startsWith("--"))
+        throw new Error("--publish-at requires an ISO 8601 datetime");
+      const val = args[++i];
+      const t = Date.parse(val);
+      if (Number.isNaN(t))
+        throw new Error(`--publish-at: invalid ISO 8601 datetime: ${val}`);
+      parsed.publishAt = new Date(t).toISOString();
+    } else if (arg === "--project-id") {
+      if (!args[i + 1] || args[i + 1].startsWith("--"))
+        throw new Error("--project-id requires a value");
+      parsed.projectId = args[++i];
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -282,6 +296,9 @@ Options:
   --topic <topic>         Override topic from the seed (required for structured
                           without topic; text/loose mode lets the LLM derive it)
   --profile <short|long>  Video profile (defaults to seed file or short)
+  --publish-at <iso>      Schedule the YouTube publish at an ISO 8601 datetime
+                          (requires YOUTUBE_PRIVACY_STATUS=private)
+  --project-id <id>       Sheet row id to link this run to (for backlog sync)
   --convert               Force LLM conversion even if input looks structured
   --no-convert            Force bypass; reject if input isn't strict structured
   --dry-run               Validate + show plan, do not run
@@ -444,6 +461,9 @@ async function main() {
   console.log(
     `  Plan: ${seed.content.script ? "research + script → VisualDirector" : "research → ScriptPlanner"}`,
   );
+  console.log(
+    `  Publish: ${parsed.publishAt ? `scheduled at ${parsed.publishAt}` : "immediate (uploads as configured privacy)"}`,
+  );
 
   if (parsed.dryRun) {
     console.log("\nDry run complete. Remove --dry-run to run.");
@@ -474,6 +494,8 @@ async function main() {
       {
         assistantId,
         seed,
+        ...(parsed.publishAt ? { youtubePublishAt: parsed.publishAt } : {}),
+        ...(parsed.projectId ? { projectId: parsed.projectId } : {}),
         onEvent: (event) => reemitSseEventToSink(event),
       },
     );
