@@ -342,6 +342,18 @@ function buildSeed(raw, overrides) {
   if (typeof script !== "string" || !script.trim())
     throw new Error("seed: content.script is required (non-empty)");
 
+  // If a seeded ending is present, guarantee the narration ends with its exact
+  // text so VisualDirector's suffix check (`endsWithTokens(finalScene, ending)`)
+  // passes deterministically. Without this, proportional re-segmentation can
+  // drop the trailing tokens and the spine fails with "Final visual scene must
+  // contain exact narrative ending...".
+  const narrationTrimmed = narration.trim();
+  const endingText = content.ending?.narration?.trim();
+  const narrationWithEnding =
+    endingText && !narrationTrimmed.endsWith(endingText)
+      ? `${narrationTrimmed} ${endingText}`.trim()
+      : narrationTrimmed;
+
   const seed = {
     research: {
       summary: research.summary,
@@ -354,7 +366,7 @@ function buildSeed(raw, overrides) {
     },
     content: {
       script: script.trim(),
-      narration: narration.trim(),
+      narration: narrationWithEnding,
       ...(content.title ? { title: content.title } : {}),
       ...(content.hook ? { hook: content.hook } : {}),
       ...(content.ending ? { ending: content.ending } : {}),
