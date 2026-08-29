@@ -158,6 +158,43 @@ describe("buildThumbnailFilterGraph", () => {
     }
   });
 
+  it("lays out text on a 1920x1080 long-form canvas without spilling off-frame", () => {
+    // The compositor's reference frame is 1080x1920. Long-form profile
+    // thumbnails are 1920x1080 (landscape), and the layout constants must
+    // scale so the text region stays inside the smaller 1080-tall canvas.
+    const positions = [
+      "bottom-third",
+      "top-left",
+      "top-right",
+      "center",
+    ] as const;
+    for (const position of positions) {
+      const graph = buildThumbnailFilterGraph({
+        text: "GHOST SHIP MYSTERY",
+        textPosition: position,
+        fontPath: FONT,
+        width: 1920,
+        height: 1080,
+      });
+      const chains = drawtextChains(graph);
+      expect(chains.length).toBeGreaterThan(0);
+      const parsed = chains.map(parseChain);
+      const lineHeight = parsed[0].fontSize * 1.18;
+      const blockTop = Math.min(...parsed.map((p) => p.y));
+      const blockBottom = blockTop + parsed.length * lineHeight;
+
+      // The whole text block must stay inside the 1080-tall frame.
+      expect(blockTop).toBeGreaterThanOrEqual(0);
+      expect(blockBottom).toBeLessThanOrEqual(1080);
+
+      // Text must not exceed the 1920-wide frame (drawtext x is relative).
+      const maxEstWidth = Math.max(
+        ...parsed.map((p) => p.text.length * p.fontSize * 0.63),
+      );
+      expect(maxEstWidth).toBeLessThanOrEqual(1920 - 144);
+    }
+  });
+
   it("emits only a normalize filter when text is empty (no drawtext)", () => {
     const graph = buildThumbnailFilterGraph({ text: "", fontPath: FONT });
     expect(drawtextChains(graph)).toHaveLength(0);

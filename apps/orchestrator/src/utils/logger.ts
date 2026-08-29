@@ -45,7 +45,7 @@ const totals = {
   llmCostUsd: 0,
   providerCalls: 0,
   retries: 0,
-  nodes: 0,
+  nodeStarts: 0,
   scenes: 0,
 };
 
@@ -54,7 +54,7 @@ function resetTotals(): void {
   totals.llmCostUsd = 0;
   totals.providerCalls = 0;
   totals.retries = 0;
-  totals.nodes = 0;
+  totals.nodeStarts = 0;
   totals.scenes = 0;
 }
 
@@ -76,7 +76,7 @@ function writeSinkEvent(extra: Record<string, unknown>): void {
 function recordTotals(event: string, meta?: LogMeta): void {
   switch (event) {
     case "node_start":
-      totals.nodes += 1;
+      totals.nodeStarts += 1;
       break;
     case "scene_event":
       totals.scenes += 1;

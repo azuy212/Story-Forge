@@ -110,7 +110,7 @@ describe("assetGeneratorNode", () => {
       expect.objectContaining({
         prompt: "Aerial drone footage.",
         sceneId: 1,
-        filename: "scene-001.mp4",
+        filename: "scene-001.png",
       }),
     );
     expect(mockGenerateImage).toHaveBeenCalledWith(

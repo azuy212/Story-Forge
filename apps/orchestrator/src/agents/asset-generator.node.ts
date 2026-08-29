@@ -345,6 +345,10 @@ async function generateSceneInner(
     // AI video provider wired today, calling provider.generateVideo()
     // would throw and kill the run; degrade to a still image instead and
     // surface the degradation to the run summary via fallbackReason.
+    // Re-derive provider/filename/extension so the scene metadata matches
+    // the downgraded asset type instead of carrying video-typed fields.
+    const padded = padSceneId(scene.sceneId);
+    const imgCfg = configFor("image");
     logger.warn(
       "AssetGenerator no AI video provider wired; rendering video-typed scene as a still image",
       { sceneId: scene.sceneId },
@@ -352,6 +356,9 @@ async function generateSceneInner(
     scene = {
       ...scene,
       assetType: "image" as const,
+      provider: imgCfg.provider,
+      filename: `scene-${padded}.${imgCfg.extension}`,
+      extension: imgCfg.extension,
       fallbackReason: "no AI video provider wired",
     };
     assetType = "image";
