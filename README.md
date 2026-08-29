@@ -156,6 +156,76 @@ The CLI:
 
 **The `runs/` artifact store is the durable source of truth.** Do not run two dev servers against the same `runs/` directory.
 
+## Seeding Runs (Pre-Written Research and Script)
+
+When you already have research (or a finished script) and want to skip the LLM
+research/script producers, the orchestrator's graph accepts those as **seed
+input channels** alongside `project`. The `seed-run` launcher creates a run,
+opens a LangGraph thread, and feeds the seeded channels. The graph's
+`entryRouter` (`apps/orchestrator/src/graph/index.ts`) detects them and
+jumps past the producers that would regenerate them:
+
+- `research` + `content.script` present → **VisualDirector** (skips
+  ResearchAgent, ResearchQA, ScriptPlanner, ScriptWriter, ScriptQA)
+- `research` only → **ScriptPlanner** (skips ResearchAgent + ResearchQA)
+- otherwise → full normal flow
+
+Downstream fail-closed guards still apply, so a malformed seed halts at the
+first gate that cannot proceed.
+
+Two seed forms are supported, auto-detected by file extension and content
+shape (override with `--convert` / `--no-convert`):
+
+| Mode | Seed file | Behavior |
+| --- | --- | --- |
+| Structured | `.json` with `research.{summary,facts}` and `content.{script,...}` | Validated and fed to the graph directly. **No LLM call.** |
+| Text / paragraph | `.txt` / `.md`, or `.json` whose `research` / `script` fields are freeform strings | An LLM call (using `SEED_CONVERT_PROMPT`) converts the text into the structured form; the result is validated and fed to the graph. Requires `OPENROUTER_API_KEY`. |
+
+### Examples
+
+```bash
+# Structured JSON (bypasses the LLM convert call)
+pnpm --filter youtube-shorts-orchestrator seed-run --seed ./my-seed.json
+
+# Plain-text research notes (LLM converts + writes a script)
+pnpm --filter youtube-shorts-orchestrator seed-run \
+  --seed ./notes.txt \
+  --pillar Psychology \
+  --topic "Why Your Brain Remembers Things That Never Happened"
+
+# Force LLM conversion on a partial JSON
+pnpm --filter youtube-shorts-orchestrator seed-run --seed ./partial.json --convert
+
+# Validate without running
+pnpm --filter youtube-shorts-orchestrator seed-run --seed ./my-seed.json --dry-run
+```
+
+### Structured seed shape
+
+```json
+{
+  "pillar": "Psychology",
+  "topic": "Why Your Brain Remembers Things That Never Happened",
+  "videoProfile": "short",
+  "research": {
+    "summary": "One-paragraph brief.",
+    "facts": [
+      { "id": "f1", "fact": "...", "confidence": "high", "classification": "study" }
+    ]
+  },
+  "content": {
+    "script": "Full narration text.",
+    "title": "Optional short title",
+    "ending": { "type": "twist", "narration": "Optional payoff line" }
+  }
+}
+```
+
+`content.narration` defaults to `content.script` when omitted. `--pillar`,
+`--topic`, and `--profile` override values from the file. Run
+`pnpm --filter youtube-shorts-orchestrator seed-run --help` for the full
+option list.
+
 ## Environment Configuration
 
 Each application reads environment values from its own directory:
@@ -373,6 +443,7 @@ pnpm --filter youtube-shorts-orchestrator format
 pnpm --filter youtube-shorts-orchestrator format:check
 pnpm --filter youtube-shorts-orchestrator lint:all
 pnpm --filter youtube-shorts-orchestrator resume <namespace|topic> [--pillar X] [--topic X] [--dry-run]
+pnpm --filter youtube-shorts-orchestrator seed-run --seed <seed.json|txt> [--convert] [--no-convert] [--pillar X] [--topic X] [--profile short|long] [--dry-run]
 ```
 
 Image-provider commands:

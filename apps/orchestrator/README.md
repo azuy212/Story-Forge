@@ -259,6 +259,69 @@ npx @langchain/langgraph-cli dev
 
 **Without an API key** — all agents support dependency injection. See tests for mock patterns. Set `OPENROUTER_API_KEY` to any value + mock the `createModel` function via `configurable`.
 
+## Seed-Driven Runs (Pre-Written Research / Script)
+
+When you already have research (or a finished script) and want to skip the LLM
+research/script producers, pass them as **seed channels** alongside
+`project`. The graph's `entryRouter` (`src/graph/index.ts`) detects them and
+jumps past the producers that would regenerate them:
+
+- `research` + `content.script` present → VisualDirector (skips
+  ResearchAgent, ResearchQA, ScriptPlanner, ScriptWriter, ScriptQA)
+- `research` only → ScriptPlanner (skips ResearchAgent + ResearchQA)
+- otherwise → full normal flow
+
+The `seed-run` launcher handles thread creation, run-folder naming, and SSE
+streaming. Two seed forms are supported, auto-detected by extension and shape
+(override with `--convert` / `--no-convert`):
+
+| Mode | Seed file | Behavior |
+| --- | --- | --- |
+| Structured | `.json` with `research.{summary,facts}` + `content.{script,...}` | Validated and fed to the graph. **No LLM convert call.** |
+| Text / paragraph | `.txt` / `.md`, or `.json` with string `research` / `script` | LLM (using `SEED_CONVERT_PROMPT`) structures it; validated and fed to the graph. Requires `OPENROUTER_API_KEY`. |
+
+### Examples
+
+```bash
+# Structured JSON
+pnpm seed-run --seed ./my-seed.json
+
+# Plain-text research notes (LLM converts + writes a script)
+pnpm seed-run --seed ./notes.txt \
+  --pillar Psychology \
+  --topic "Why Your Brain Remembers Things That Never Happened"
+
+# Force LLM conversion on a partial JSON
+pnpm seed-run --seed ./partial.json --convert
+
+# Validate without running
+pnpm seed-run --seed ./my-seed.json --dry-run
+```
+
+### Structured seed shape
+
+```json
+{
+  "pillar": "Psychology",
+  "topic": "Why Your Brain Remembers Things That Never Happened",
+  "videoProfile": "short",
+  "research": {
+    "summary": "One-paragraph brief.",
+    "facts": [
+      { "id": "f1", "fact": "...", "confidence": "high", "classification": "study" }
+    ]
+  },
+  "content": {
+    "script": "Full narration text.",
+    "title": "Optional short title",
+    "ending": { "type": "twist", "narration": "Optional payoff line" }
+  }
+}
+```
+
+`content.narration` defaults to `content.script` when omitted. See
+`pnpm seed-run --help` for the full option list.
+
 ## How It Works
 
 ### Data Flow
