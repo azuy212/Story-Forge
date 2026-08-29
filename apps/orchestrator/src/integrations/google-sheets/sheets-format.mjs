@@ -156,9 +156,8 @@ export function nextLongPublishSlot(scheduledAtValues = [], now = new Date()) {
     slot.setDate(slot.getDate() + day);
     if (!LONG_SLOT_DAYS.includes(slot.getDay())) continue;
     slot.setHours(20, 0, 0, 0);
-    const key = slot.setMinutes(0, 0, 0);
-    if (key <= now.getTime()) continue;
-    if (occupied.has(key)) continue;
+    if (slot.getTime() <= now.getTime()) continue;
+    if (occupied.has(slot.getTime())) continue;
     return slot.toISOString();
   }
   return null;

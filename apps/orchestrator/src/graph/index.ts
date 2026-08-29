@@ -146,11 +146,15 @@ const hasMetadata = (s: GuardState) =>
   !!s.metadataOutput?.title &&
   !!s.metadataOutput?.description &&
   (s.metadataOutput?.tags?.length ?? 0) > 0;
-const thumbnailEnabled = configUtils.enableThumbnail();
 // Require the actual thumbnail image only when thumbnails are enabled.
 // When disabled, the prompt-only thumbnail is sufficient for the package.
+// Read `enableThumbnail()` per-evaluation so changes to ENABLE_THUMBNAIL /
+// ENABLE_QA after the graph is loaded (e.g. in the langgraph dev server)
+// still affect the finalize gate.
 const hasThumbnail = (s: GuardState) =>
-  thumbnailEnabled ? !!s.thumbnail?.imageUrl : !!s.thumbnail?.thumbnailPrompt;
+  configUtils.enableThumbnail()
+    ? !!s.thumbnail?.imageUrl
+    : !!s.thumbnail?.thumbnailPrompt;
 // Publisher requires video + metadata + thumbnail to all exist. This is the
 // final gate on PublishReady's conditional edge: PublishReady fires once after
 // ReleaseReview approval, and can only advance to Publisher once the full
@@ -176,7 +180,11 @@ const hasPublishReady = (s: GuardState) => s.publishReady?.status === "ready";
  */
 const entryRouter = (state: typeof StateAnnotation.State) => {
   if (hasResearch(state) && hasScript(state)) {
-    logRouterDecision("ResolveProfile", "seeded_research_script", "VisualDirector");
+    logRouterDecision(
+      "ResolveProfile",
+      "seeded_research_script",
+      "VisualDirector",
+    );
     return "VisualDirector";
   }
   if (hasResearch(state)) {

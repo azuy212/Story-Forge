@@ -49,7 +49,8 @@ import {
 import { config } from "../dist/utils/config.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const RUNS_DIR = process.env.ARTIFACT_STORE_DIR || join(__dirname, "..", "runs");
+const RUNS_DIR =
+  process.env.ARTIFACT_STORE_DIR || join(__dirname, "..", "runs");
 const DEV_API = process.env.LANGGRAPH_URL || "http://localhost:2024";
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
@@ -96,14 +97,13 @@ async function convertLooseSeed(raw, overrides) {
   const model = config.defaultModel();
   const pillar = overrides.pillar || raw.pillar || "";
   const topic = overrides.topic || raw.topic || "";
-  const researchText =
-    typeof raw.research === "string" ? raw.research : "";
+  const researchText = typeof raw.research === "string" ? raw.research : "";
   const scriptText =
     typeof raw.script === "string"
       ? raw.script
       : raw.content && typeof raw.content === "string"
         ? raw.content
-        : raw.content?.script ?? "";
+        : (raw.content?.script ?? "");
 
   const userContent = `Pillar: ${pillar}
 Topic: ${topic}
@@ -112,10 +112,10 @@ Research notes:
 ${researchText}
 
 ${
-    scriptText
-      ? `Provided script (reformat into clean narration, keep all facts):\n${scriptText}`
-      : "No script provided — write a tight script from the research."
-  }`;
+  scriptText
+    ? `Provided script (reformat into clean narration, keep all facts):\n${scriptText}`
+    : "No script provided — write a tight script from the research."
+}`;
 
   const res = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
     method: "POST",
@@ -378,7 +378,9 @@ async function main() {
   setRunNextActiveSink(logger.getCurrentSink());
 
   logger.info(`Seeding run: ${ns}`);
-  logger.info(`  Topic: ${topic} | Pillar: ${pillar} | Profile: ${videoProfile}`);
+  logger.info(
+    `  Topic: ${topic} | Pillar: ${pillar} | Profile: ${videoProfile}`,
+  );
 
   let assistantId;
   try {
@@ -407,9 +409,9 @@ async function main() {
     process.exit(1);
   }
 
+  logger.info(`Artifacts in: runs/${ns}`);
   await closeAllRunLogSinks();
   setRunNextActiveSink(null);
-  logger.info(`Artifacts in: runs/${ns}`);
 }
 
 if (

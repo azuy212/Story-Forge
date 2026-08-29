@@ -309,12 +309,14 @@ export async function videoComposerNode(
           ass: state.subtitles!.ass,
           totalDurationSeconds,
           narrativeHoldSeconds,
+          // Pass only the selected outro asset; outroLongAsset is reserved
+          // for cache-key invalidation. The provider must not probe both
+          // fields, otherwise a broken long asset fails a short run.
           branding: {
             channel: branding.channel,
             logo: state.branding?.logo,
             enabled: branding.enabled,
             outroAsset,
-            outroLongAsset: branding.outroLongAsset,
             ctaEnabled: branding.ctaEnabled,
             outroCta: branding.outroCta,
             outroContainsCta: branding.outroContainsCta,

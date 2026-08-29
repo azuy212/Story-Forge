@@ -1,5 +1,8 @@
 import type { Scene, SceneAudio, VideoProfileConfig } from "../types/index.js";
-import type { SceneSubtitleProvider } from "./scene-subtitle-provider.js";
+import type {
+  SceneSubtitleOptions,
+  SceneSubtitleProvider,
+} from "./scene-subtitle-provider.js";
 import type { WhisperXProvider } from "./whisperx-provider.js";
 import type {
   GenerateSubtitlesResult,
@@ -26,10 +29,18 @@ export class WhisperXSceneSubtitleProvider implements SceneSubtitleProvider {
     scenes: Scene[],
     audioScenes: SceneAudio[],
     profile?: VideoProfileConfig,
+    options?: SceneSubtitleOptions,
   ): Promise<GenerateSubtitlesResult> {
-    return this.run(scenes, audioScenes, profile, null);
+    return this.run(
+      scenes,
+      audioScenes,
+      profile,
+      options?.runLogSink ?? null,
+      options?.runId,
+    );
   }
 
+  /** @deprecated Use {@link generateSceneSubtitles} with options. */
   async run(
     scenes: Scene[],
     audioScenes: SceneAudio[],

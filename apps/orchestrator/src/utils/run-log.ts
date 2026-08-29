@@ -86,6 +86,7 @@ export interface RunLogSink {
 
 const sinks = new Map<string, RunLogSink>();
 let exitHandlersRegistered = false;
+let exitHandler: (() => void) | null = null;
 
 function safeJsonStringify(value: unknown, maxBytes: number): string {
   let serialized: string;
@@ -344,6 +345,7 @@ export async function closeAllRunLogSinks(): Promise<void> {
   const all = [...sinks.values()];
   sinks.clear();
   await Promise.all(all.map((s) => s.close()));
+  unregisterProcessExitHandlers();
 }
 
 export function resetRunLogSinks(): void {
@@ -432,7 +434,17 @@ function registerProcessExitHandlers(): void {
     // so any in-flight line lands before the process actually exits.
     void closeAllRunLogSinks();
   };
+  exitHandler = handler;
   process.on("beforeExit", handler);
   process.on("SIGTERM", handler);
   process.on("SIGINT", handler);
+}
+
+function unregisterProcessExitHandlers(): void {
+  if (!exitHandlersRegistered || !exitHandler) return;
+  process.off("beforeExit", exitHandler);
+  process.off("SIGTERM", exitHandler);
+  process.off("SIGINT", exitHandler);
+  exitHandler = null;
+  exitHandlersRegistered = false;
 }

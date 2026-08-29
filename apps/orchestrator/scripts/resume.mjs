@@ -427,7 +427,7 @@ async function main() {
 
   // Calculate attempt number from thread history
   const attempt = (meta?.threadHistory?.length ?? 0) + 1;
-  logger.setRunContext(ns, topic, attempt);
+  await logger.setRunContext(ns, topic, attempt);
   setRunNextActiveSink(logger.getCurrentSink());
 
   logger.info(`Resuming run: ${ns}`);
@@ -452,9 +452,9 @@ async function main() {
     const status =
       lastEvent?.data?.execution?.status === "complete" ? "complete" : "failed";
     const summary = buildSummary(lastEvent?.data);
-    logger.finalize(status, summary);
+    await logger.finalize(status, summary);
   } catch (e) {
-    logger.finalize("failed", e.message);
+    await logger.finalize("failed", e.message);
     logger.error(e.message);
     process.exit(1);
   }

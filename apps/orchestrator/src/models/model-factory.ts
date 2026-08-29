@@ -32,6 +32,9 @@ const AGENT_ROLES: Record<AgentModel, string> = {
   [AgentModel.ThumbnailGenerator]: "METADATA",
   [AgentModel.ThumbnailQA]: "QA",
   [AgentModel.Publisher]: "SYSTEM",
+  // ResolveProfile is non-LLM (deterministic) — see resolve-profile.node.ts.
+  // Listed here for type completeness; never resolves to a real model.
+  [AgentModel.ResolveProfile]: "SYSTEM",
 };
 
 function resolveModel(agent: AgentModel): string {

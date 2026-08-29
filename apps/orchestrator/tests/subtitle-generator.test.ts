@@ -237,6 +237,7 @@ describe("subtitleGeneratorNode", () => {
       SCENES,
       AUDIO_SCENES,
       DEFAULT_VIDEO_PROFILE,
+      expect.objectContaining({ runId: expect.any(String) }),
     );
     expect(result.subtitles.srt).toContain("Scene");
   });
@@ -285,6 +286,7 @@ describe("FallbackSceneSubtitleProvider", () => {
     expect(primary.generateSceneSubtitles).toHaveBeenCalledWith(
       SCENES,
       AUDIO_SCENES,
+      undefined,
       undefined,
     );
     expect(fallback.generateSceneSubtitles).toHaveBeenCalled();

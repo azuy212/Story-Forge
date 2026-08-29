@@ -97,7 +97,7 @@ function recordTotals(event: string, meta?: LogMeta): void {
 }
 
 export const logger = {
-  setRunContext(
+  async setRunContext(
     runId: string,
     topic: string,
     attempt: number,
@@ -108,14 +108,14 @@ export const logger = {
       pillar?: string;
       runDir?: string;
     },
-  ): void {
+  ): Promise<void> {
     if (usePretty) {
       prettyFormatter.setRunContext({ runId, topic, attempt });
     }
     resetTotals();
     currentContext = { runId, topic, attempt };
     if (currentSink) {
-      void closeRunLogSink(currentSink.runId);
+      await closeRunLogSink(currentSink.runId);
       currentSink = null;
     }
     if (!runId) {
@@ -133,10 +133,7 @@ export const logger = {
       ...(extra?.projectId ? { projectId: extra.projectId } : {}),
       ...(extra?.pillar ? { pillar: extra.pillar } : {}),
     };
-    void openRunLogSink(context).then((sink) => {
-      currentSink = sink;
-      return undefined;
-    });
+    currentSink = await openRunLogSink(context);
   },
 
   getCurrentSink(): RunLogSink | null {
@@ -271,7 +268,10 @@ export const logger = {
     }
   },
 
-  finalize(status: "complete" | "failed", summary?: string): void {
+  async finalize(
+    status: "complete" | "failed",
+    summary?: string,
+  ): Promise<void> {
     const finishedAt = new Date().toISOString();
     writeSinkEvent({
       event: "run_final",
@@ -290,7 +290,15 @@ export const logger = {
     if (currentSink) {
       const sink = currentSink;
       currentSink = null;
-      void sink.flush().then(() => sink.close());
+      // Drain and close are best-effort: a failed flush must not reject the
+      // caller's await, since the run has already ended. Errors are swallowed
+      // to honor the doc invariant on appendRunLogEvent (never throws).
+      try {
+        await sink.flush();
+        await sink.close();
+      } catch {
+        // intentional no-op
+      }
     }
   },
 };

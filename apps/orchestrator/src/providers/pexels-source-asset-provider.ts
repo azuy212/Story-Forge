@@ -242,13 +242,20 @@ export class PexelsVideoSourceAssetProvider implements SourceAssetProvider {
 
     const targetW = entity.resolution.width;
     const targetH = entity.resolution.height;
+    const targetRatio = targetW / targetH;
+    const aspectTolerance = 0.15; // ponytail: ±15% aspect; tighten once we have a
+    // quality signal from real runs.
     const minDuration = entity.minimumDurationSec ?? 0;
     const results: SourceAsset[] = [];
 
     for (const video of data.videos) {
       if (minDuration > 0 && video.duration < minDuration) continue;
       for (const file of video.video_files) {
-        if (file.width !== targetW || file.height !== targetH) continue;
+        if (file.width <= 0 || file.height <= 0) continue;
+        const ratio = file.width / file.height;
+        if (Math.abs(ratio - targetRatio) / targetRatio > aspectTolerance) {
+          continue;
+        }
         results.push({
           id: `pexels-video:${video.id}:${file.id}`,
           entityId: entity.canonicalId ?? entity.name,

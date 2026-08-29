@@ -26,9 +26,6 @@ import {
 } from "../utils/run-log.js";
 import { getRunId } from "../artifacts/context.js";
 
-const DEFAULT_SEARCHER = createDefaultSourceAssetSearcher();
-void DEFAULT_SEARCHER; // reserved for future direct-invocation fallback
-
 function getSearcher(
   config: RunnableConfig,
   context: {

@@ -10,7 +10,7 @@ function parsePublishAt(value: string): string | undefined {
 }
 
 export const config = {
-  defaultModel: (): string => read("DEFAULT_MODEL") ?? "openrouter/free",
+  defaultModel: (): string => read("DEFAULT_MODEL") ?? "openai/gpt-4o-mini",
   openrouterApiKey: (): string => {
     const key = read("OPENROUTER_API_KEY");
     if (!key) {
@@ -83,6 +83,31 @@ export const config = {
   narrativeHoldSeconds: (): number => {
     const value = Number(read("NARRATIVE_HOLD_SECONDS") ?? "0.5");
     return Number.isFinite(value) && value >= 0 ? value : 0.5;
+  },
+  videoProfile: (): "short" | "long" | undefined => {
+    const value = read("VIDEO_PROFILE");
+    return value === "short" || value === "long" ? value : undefined;
+  },
+  targetDurationSec: (): number | undefined => {
+    const value = read("TARGET_DURATION_SEC");
+    if (!value) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  },
+  durationToleranceSec: (): number | undefined => {
+    const value = read("DURATION_TOLERANCE_SEC");
+    if (!value) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+  },
+  // Long-form video pacing target (used by the long video profile to plan
+  // narration word counts). Distinct from `narrationTargetWpm`, which is
+  // the TTS engine speed for the combined short-form pipeline.
+  wordsPerMinute: (): number | undefined => {
+    const value = read("WORDS_PER_MINUTE");
+    if (!value) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
   },
   narrationTargetWpm: (): number | undefined => {
     const value = read("NARRATION_TARGET_WPM");

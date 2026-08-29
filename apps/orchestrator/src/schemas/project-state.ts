@@ -19,9 +19,6 @@ import { PublishReadyStatusSchema } from "./publish-ready.js";
 import { ResearchQAOutputSchema } from "./research-qa-output.js";
 import { VideoProfileConfigSchema } from "./video-profile.js";
 import { DEFAULT_BRANDING } from "../utils/branding.js";
-import { resolveVideoProfile } from "../utils/video-profile.js";
-
-const defaultVideoProfile = resolveVideoProfile({});
 
 export const ProjectStateSchema = z.object({
   project: ProjectSchema,
@@ -53,8 +50,7 @@ export const ProjectStateSchema = z.object({
   publishing: PublishingSchema.optional().default({}),
   publishReady: PublishReadyStatusSchema.optional().default({}),
   execution: ExecutionSchema,
-  videoProfile:
-    VideoProfileConfigSchema.optional().default(defaultVideoProfile),
+  videoProfile: VideoProfileConfigSchema.optional(),
 });
 
 export type ProjectState = z.input<typeof ProjectStateSchema>;

@@ -265,7 +265,7 @@ describe("videoComposerNode", () => {
 
     const opts = mockCompose.mock.calls[0][0] as ComposeOptions;
     expect(opts.branding.outroAsset).toBe("assets/branding/outro-long.mp4");
-    expect(opts.branding.outroLongAsset).toBe("assets/branding/outro-long.mp4");
+    expect(opts.branding.outroLongAsset).toBeUndefined();
     expect(opts.video).toEqual({ width: 1920, height: 1080 });
   });
 

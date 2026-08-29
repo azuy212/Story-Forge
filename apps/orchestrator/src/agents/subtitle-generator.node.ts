@@ -23,6 +23,7 @@ import { nodeLabel } from "../utils/node-labels.js";
 import {
   appendRunLogEvent,
   getRunLogSinkFromConfig,
+  type RunLogSink,
 } from "../utils/run-log.js";
 
 const SUBTITLE_ALIGNMENT_VERSION = 5;
@@ -48,19 +49,26 @@ export class FallbackSceneSubtitleProvider implements SceneSubtitleProvider {
     scenes: Scene[],
     audioScenes: SceneAudio[],
     profile?: VideoProfileConfig,
+    options?: { runLogSink?: RunLogSink | null; runId?: string },
   ): Promise<GenerateSubtitlesResult> {
     try {
       return await this.primary.generateSceneSubtitles(
         scenes,
         audioScenes,
         profile,
+        options,
       );
     } catch (err) {
       logger.warn(
         "WhisperX subtitle alignment failed; using deterministic subtitles",
         { error: (err as Error)?.message ?? String(err) },
       );
-      return this.fallback.generateSceneSubtitles(scenes, audioScenes, profile);
+      return this.fallback.generateSceneSubtitles(
+        scenes,
+        audioScenes,
+        profile,
+        options,
+      );
     }
   }
 }
@@ -74,11 +82,14 @@ class ProfileAwareSceneSubtitleProvider implements SceneSubtitleProvider {
   async generateSceneSubtitles(
     scenes: Scene[],
     audioScenes: SceneAudio[],
+    _profile?: VideoProfileConfig,
+    options?: { runLogSink?: RunLogSink | null; runId?: string },
   ): Promise<GenerateSubtitlesResult> {
     return this.inner.generateSceneSubtitles(
       scenes,
       audioScenes,
       this.videoProfile,
+      options,
     );
   }
 }
@@ -218,21 +229,12 @@ export async function subtitleGeneratorNode(
     },
     async () => {
       try {
-        const providerResult =
-          "run" in provider &&
-          typeof (provider as { run?: unknown }).run === "function"
-            ? await (provider as WhisperXSceneSubtitleProvider).run(
-                scenes as Scene[],
-                audioScenes as SceneAudio[],
-                videoProfile,
-                runLogSink,
-                runId,
-              )
-            : await provider.generateSceneSubtitles(
-                scenes as Scene[],
-                audioScenes as SceneAudio[],
-                videoProfile,
-              );
+        const providerResult = await provider.generateSceneSubtitles(
+          scenes as Scene[],
+          audioScenes as SceneAudio[],
+          videoProfile,
+          { runLogSink, runId },
+        );
         return {
           data: {
             srt: providerResult.srt,

@@ -6,34 +6,7 @@ import type {
 } from "../schemas/video-profile.js";
 
 function wordsPerMinuteDefault(): number {
-  return config.narrationTargetWpm() ?? 160;
-}
-
-function envVideoProfile(): VideoProfile | undefined {
-  const value = process.env.VIDEO_PROFILE;
-  if (value === "short" || value === "long") return value;
-  return undefined;
-}
-
-function envTargetDurationSec(): number | undefined {
-  const value = process.env.TARGET_DURATION_SEC;
-  if (!value) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-}
-
-function envDurationToleranceSec(): number | undefined {
-  const value = process.env.DURATION_TOLERANCE_SEC;
-  if (!value) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
-}
-
-function envWordsPerMinute(): number | undefined {
-  const value = process.env.WORDS_PER_MINUTE;
-  if (!value) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  return config.wordsPerMinute() ?? config.narrationTargetWpm() ?? 160;
 }
 
 export interface ResolveVideoProfileRequest {
@@ -51,7 +24,7 @@ export function resolveVideoProfile(
 ): VideoProfileConfig {
   const explicit = !!(request.videoProfile || request.targetDurationSec);
 
-  const profile = request.videoProfile ?? envVideoProfile() ?? "short";
+  const profile = request.videoProfile ?? config.videoProfile() ?? "short";
   const base = { ...DEFAULT_PROFILES[profile] };
 
   // When explicit profile/target is requested, use profile defaults for all
@@ -60,17 +33,16 @@ export function resolveVideoProfile(
   const targetDurationSec = explicit
     ? (request.targetDurationSec ?? base.targetDurationSec)
     : (request.targetDurationSec ??
-      envTargetDurationSec() ??
+      config.targetDurationSec() ??
       base.targetDurationSec);
   const durationToleranceSec = explicit
     ? base.durationToleranceSec
-    : (envDurationToleranceSec() ?? base.durationToleranceSec);
+    : (config.durationToleranceSec() ?? base.durationToleranceSec);
   const wordsPerMinute = explicit
-    ? (options.wordsPerMinute ?? wordsPerMinuteDefault() ?? base.wordsPerMinute)
+    ? (options.wordsPerMinute ?? wordsPerMinuteDefault())
     : (options.wordsPerMinute ??
-      envWordsPerMinute() ??
-      wordsPerMinuteDefault() ??
-      base.wordsPerMinute);
+      config.wordsPerMinute() ??
+      wordsPerMinuteDefault());
 
   const aspectRatio = base.aspectRatio;
   const videoSize = base.videoSize;

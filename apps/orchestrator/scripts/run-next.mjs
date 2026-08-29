@@ -42,10 +42,7 @@ import {
 import { getAssistantId, resumeRun } from "./resume.mjs";
 import { logger } from "../dist/utils/logger.js";
 import { prettyFormatter } from "../dist/utils/pretty-formatter.js";
-import {
-  closeAllRunLogSinks,
-  getRunLogSink,
-} from "../dist/utils/run-log.js";
+import { closeAllRunLogSinks, getRunLogSink } from "../dist/utils/run-log.js";
 
 // Local appendRunLogEvent implementation. Reimplemented (instead of
 // imported from dist/utils/run-log.js) because the test mock for that
@@ -336,8 +333,7 @@ function reemitSseEventToSink(event) {
     if (STARTED_NODES.has(nodeName)) return;
     STARTED_NODES.add(nodeName);
     NODE_START_TIMES.set(nodeName, now);
-    const attempt =
-      (NODE_START_TIMES.get(`${nodeName}#attempts`) ?? 0) + 1;
+    const attempt = (NODE_START_TIMES.get(`${nodeName}#attempts`) ?? 0) + 1;
     NODE_START_TIMES.set(`${nodeName}#attempts`, attempt);
     appendRunLogEvent(sink, {
       event: "node_start",
@@ -350,10 +346,14 @@ function reemitSseEventToSink(event) {
   }
 
   if (eventType === "on_chain_end" && nodeName) {
-    // Prefer the first on_chain_end that carries a real output payload
-    // (telemetry / diagnostics). The earlier sub-chain ends have output:
-    // undefined; the real node end carries the agent's return value.
+    // LangGraph wraps each node in a sub-chain; the first on_chain_end is the
+    // wrapper end with `output: undefined`, the second carries the real agent
+    // return value. Skip wrapper ends (no payload, not an error) entirely so
+    // every node emits exactly one node_end/node_failed. We treat any output
+    // that carries diagnostics, telemetry, or any of the canonical state
+    // channels as a real node end.
     const output = event.data?.output;
+    const isError = event.status === "error";
     const hasOutput =
       output &&
       typeof output === "object" &&
@@ -367,10 +367,10 @@ function reemitSseEventToSink(event) {
         output.thumbnail !== undefined ||
         output.production !== undefined ||
         output.publishing !== undefined ||
-        output.thumbnailImage !== undefined);
-    const isError = event.status === "error";
-    if (ENDED_NODES.has(nodeName) && !hasOutput && !isError) {
-      // Skip intermediate sub-chain ends that don't carry the output.
+        output.thumbnailImage !== undefined ||
+        output.diagnostics !== undefined ||
+        output.execution !== undefined);
+    if (!hasOutput && !isError) {
       return;
     }
     ENDED_NODES.add(nodeName);
@@ -453,8 +453,12 @@ function reemitSseEventToSink(event) {
       agent: nodeName ?? event.name,
       model: event.name,
       usage,
-      responseBytes: responseText ? Buffer.byteLength(responseText, "utf-8") : undefined,
-      responseTextPreview: responseText ? responseText.slice(0, 2000) : undefined,
+      responseBytes: responseText
+        ? Buffer.byteLength(responseText, "utf-8")
+        : undefined,
+      responseTextPreview: responseText
+        ? responseText.slice(0, 2000)
+        : undefined,
       error: event.status === "error" ? event.data?.error : undefined,
     });
     return;
@@ -628,7 +632,7 @@ export async function runLauncher({
   const attempt = existing
     ? (existing.meta?.threadHistory?.length ?? 0) + 1
     : 1;
-  logger.setRunContext(decision.ns, decision.topic, attempt);
+  await logger.setRunContext(decision.ns, decision.topic, attempt);
   setActiveSink(logger.getCurrentSink());
 
   const progress = new RunProgress(PRODUCER_NODES);
@@ -680,11 +684,11 @@ export async function runLauncher({
       lastEvent?.data?.execution?.status === "complete" ? "complete" : "failed";
     const summary = buildSummary(lastEvent?.data);
     progress.stop();
-    logger.finalize(status, summary);
     logger.info(`Artifacts in: runs/${decision.ns}`);
+    await logger.finalize(status, summary);
   } catch (e) {
     progress.stop();
-    logger.finalize("failed", e?.message ?? String(e));
+    await logger.finalize("failed", e?.message ?? String(e));
     logger.error(
       `run-next: pipeline run failed for "${decision.topic}" (${decision.ns}): ${e?.stack || e}`,
     );

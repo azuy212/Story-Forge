@@ -5,16 +5,23 @@ import type {
   GenerateSubtitlesResult,
   WordTimestamp,
 } from "./subtitle-provider.js";
+import type { RunLogSink } from "../utils/run-log.js";
 
 const MIN_WORDS_PER_CUE = 3;
 const MAX_WORDS_PER_CUE = 5;
 const PUNCTUATION_RE = /[.,!?;:…]$/;
+
+export interface SceneSubtitleOptions {
+  runLogSink?: RunLogSink | null;
+  runId?: string;
+}
 
 export interface SceneSubtitleProvider {
   generateSceneSubtitles(
     scenes: Scene[],
     audioScenes: SceneAudio[],
     profile?: VideoProfileConfig,
+    options?: SceneSubtitleOptions,
   ): Promise<GenerateSubtitlesResult>;
 }
 
@@ -30,6 +37,7 @@ export class DeterministicSceneSubtitleProvider implements SceneSubtitleProvider
     scenes: Scene[],
     audioScenes: SceneAudio[],
     profile?: VideoProfileConfig,
+    _options?: SceneSubtitleOptions,
   ): Promise<GenerateSubtitlesResult> {
     const sceneById = new Map(scenes.map((scene) => [scene.sceneId, scene]));
     const orderedAudio = [...audioScenes].sort((a, b) => a.sceneId - b.sceneId);
