@@ -30,11 +30,19 @@
 //   }
 // }
 //
-// Loose mode: instead of the structured form above, supply freeform strings and
-// an LLM converts them (uses SEED_CONVERT_PROMPT):
-//   { "pillar": "...", "topic": "...", "research": "your raw notes...", "script": "raw script..." }
-// The conversion runs before validation; the result is fed to the graph like
-// the structured form.
+// Two modes are supported; the script auto-detects which one applies, or
+// --convert / --no-convert force a choice:
+//
+//   Mode A — Structured (bypasses the LLM convert call):
+//     The seed JSON matches the strict shape above (research is an object with
+//     summary + facts, content is an object with script). It's validated and
+//     fed straight to the graph. No OpenRouter call is made.
+//
+//   Mode B — Text/paragraph (LLM-converts to structured):
+//     Triggered by either a .txt / .md seed file or a JSON seed whose
+//     `research` and/or `script` field is a freeform string. The text is sent
+//     to the LLM with SEED_CONVERT_PROMPT and the result is validated and fed
+//     to the graph. Plain-text seeds require --pillar and --topic.
 import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -192,6 +200,7 @@ function parseArgs(args) {
     pillar: null,
     topic: null,
     profile: null,
+    convert: null, // null=auto, true=force LLM convert, false=force bypass
     dryRun: false,
     help: false,
   };
@@ -201,6 +210,10 @@ function parseArgs(args) {
       parsed.help = true;
     } else if (arg === "--dry-run") {
       parsed.dryRun = true;
+    } else if (arg === "--convert") {
+      parsed.convert = true;
+    } else if (arg === "--no-convert") {
+      parsed.convert = false;
     } else if (arg === "--seed") {
       if (!args[i + 1] || args[i + 1].startsWith("--"))
         throw new Error("--seed requires a path to a JSON file");
@@ -227,26 +240,34 @@ function parseArgs(args) {
 
 function showHelp() {
   console.log(`
-Usage: node scripts/seed-run.mjs --seed <seed.json> [options]
+Usage: node scripts/seed-run.mjs --seed <seed.json|txt> [options]
 
 Feeds your own research (and script) into the pipeline, skipping the LLM
 research and script producers.
 
+Modes (auto-detected unless --convert / --no-convert is set):
+  Structured  Seed is strict JSON (research.{summary,facts},
+              content.{script,...}) — validated and passed to the graph
+              directly, no LLM call.
+  Text        Seed is a .txt/.md file, or JSON whose research/script fields
+              are freeform strings — an LLM converts it to the structured
+              form (requires OPENROUTER_API_KEY). Plain-text seeds also
+              require --pillar and --topic.
+
 Options:
-  --seed <path>           Path to a JSON seed file (required)
-  --pillar <pillar>       Override pillar from the seed file
-  --topic <topic>         Override topic from the seed file
+  --seed <path>           Path to a seed file (.json, .txt, or .md)
+  --pillar <pillar>       Override pillar from the seed (required for text mode)
+  --topic <topic>         Override topic from the seed (required for text mode)
   --profile <short|long>  Video profile (defaults to seed file or short)
+  --convert               Force LLM conversion even if input looks structured
+  --no-convert            Force bypass; reject if input isn't strict structured
   --dry-run               Validate + show plan, do not run
   --help, -h              Show this help
 
-Seed JSON needs at least: pillar, topic, research.summary, research.facts[],
-and content.script (or content.narration). Loose form (research/script as raw
-strings) is also accepted and LLM-converted.
-
 Examples:
   node scripts/seed-run.mjs --seed structured.json
-  node scripts/seed-run.mjs --seed notes.json   # research/script as strings
+  node scripts/seed-run.mjs --seed notes.txt --pillar Psychology --topic "Why..."
+  node scripts/seed-run.mjs --seed partial.json --convert
 `);
 }
 
@@ -326,17 +347,49 @@ async function main() {
     process.exit(1);
   }
 
+  // Read the seed. Two file kinds:
+  //   - .txt / .md  → text mode (whole file is the research paragraph; convert
+  //                   via LLM). Requires --pillar and --topic.
+  //   - .json       → JSON mode (structured or loose; auto-detected below).
+  const isTextFile = /\.(txt|md)$/i.test(parsed.seed);
   let raw;
-  try {
-    raw = JSON.parse(readFileSync(parsed.seed, "utf-8"));
-  } catch (e) {
-    console.error(`Failed to parse seed JSON: ${e.message}`);
-    process.exit(1);
+  if (isTextFile) {
+    if (!parsed.pillar || !parsed.topic) {
+      console.error(
+        "seed: text seed (.txt/.md) requires --pillar and --topic",
+      );
+      process.exit(1);
+    }
+    raw = {
+      pillar: parsed.pillar,
+      topic: parsed.topic,
+      research: readFileSync(parsed.seed, "utf-8"),
+    };
+  } else {
+    try {
+      raw = JSON.parse(readFileSync(parsed.seed, "utf-8"));
+    } catch (e) {
+      console.error(`Failed to parse seed JSON: ${e.message}`);
+      process.exit(1);
+    }
   }
 
-  if (isLooseSeed(raw)) {
+  // Decide conversion: explicit flag wins; otherwise auto (loose → convert,
+  // strict → bypass). Text files always convert regardless of --no-convert,
+  // since there's no other way to produce a structured seed.
+  const loose = isTextFile || isLooseSeed(raw);
+  const doConvert = parsed.convert === true
+    ? true
+    : parsed.convert === false
+      ? isTextFile
+        ? true
+        : false
+      : loose;
+
+  if (doConvert) {
+    const mode = isTextFile ? "text/paragraph" : "loose JSON";
     console.log(
-      "Seed is loose text — converting research/script into pipeline format via LLM...",
+      `Seed is ${mode} — converting research/script into pipeline format via LLM...`,
     );
     try {
       raw = await convertLooseSeed(raw, {
@@ -347,6 +400,8 @@ async function main() {
       console.error(e.message);
       process.exit(1);
     }
+  } else {
+    console.log("Seed is structured — bypassing LLM conversion.");
   }
 
   let built;
