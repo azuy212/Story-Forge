@@ -34,6 +34,7 @@ describe("parseArgs", () => {
       pillar: "Psychology",
       topic: "T",
       profile: null,
+      seed: null,
       dryRun: true,
       help: false,
     });
