@@ -39,39 +39,24 @@ function spawnScript(script, args, ns, onEvent) {
   return child;
 }
 
-async function precomputeRunNext(profile) {
-  const m = await import(join(SCRIPT_PATH, "run-next.mjs"));
-  const rows = await m.readSheetRows(
-    await sheetsClient(),
-    process.env.GOOGLE_SHEETS_SPREADSHEET_ID,
-    profile === "long"
-      ? process.env.GOOGLE_SHEETS_SHEET_NAME_LONG || "Long Videos"
-      : process.env.GOOGLE_SHEETS_SHEET_NAME || "Sheet1",
-  );
-  try {
-    m.assertHeaders(rows);
-  } catch (e) {
-    return { error: e.message };
-  }
-  const decision = m.decideRun(PATHS.RUNS, rows, profile);
-  if (decision.action === "none") {
-    return {
-      none: true,
-      reason: decision.reason,
+function watchForNewNamespace(before, timeoutMs = 4000) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const check = () => {
+      const now = listNamespaces();
+      const fresh = now.filter((n) => !before.includes(n));
+      if (fresh.length > 0) {
+        resolve(fresh[0]);
+        return;
+      }
+      if (Date.now() - start > timeoutMs) {
+        resolve(null);
+        return;
+      }
+      setTimeout(check, 100);
     };
-  }
-  return { decision };
-}
-
-async function sheetsClient() {
-  const { default: googleapis } = await import("googleapis");
-  const { google } = googleapis;
-  const oauth2 = new google.auth.OAuth2(
-    process.env.YOUTUBE_CLIENT_ID,
-    process.env.YOUTUBE_CLIENT_SECRET,
-  );
-  oauth2.setCredentials({ refresh_token: process.env.YOUTUBE_REFRESH_TOKEN });
-  return google.sheets({ version: "v4", auth: oauth2 });
+    check();
+  });
 }
 
 function tailEmitter(ns, send, onClose) {
@@ -157,26 +142,21 @@ export async function orchestratorRouter(app) {
     if (profile !== "short" && profile !== "long") {
       return reply.code(400).send({ error: "invalid_profile" });
     }
-    const pre = await precomputeRunNext(profile);
-    if (pre.error) return reply.code(400).send({ error: pre.error });
-    if (pre.none) {
-      return {
-        none: true,
-        reason: pre.reason,
-      };
-    }
-    const decision = pre.decision;
+    // run-next.mjs reads the sheet, picks a row, and creates the run dir
+    // itself. We don't know the namespace up front, so we snapshot the
+    // directory before spawn and watch for a new entry. Avoids pulling
+    // googleapis into admin-ui's deps.
+    const before = listNamespaces();
     const controller = makeController();
-    register(decision.ns, controller);
-    const child = spawnScript(
-      "run-next.mjs",
-      [`--profile=${profile}`],
-      decision.ns,
-      (ev) => {
-        if (ev.event === "stderr") sseSend(reply.raw, "stderr", { data: ev.data });
-      },
-    );
-    return { ns: decision.ns, action: decision.action, profile, decision };
+    register(`run-next-${Date.now()}`, controller);
+    spawnScript("run-next.mjs", [`--profile=${profile}`], `run-next-${Date.now()}`, () => {});
+    const ns = await watchForNewNamespace(before, 5000);
+    if (!ns) {
+      return { none: true, reason: "no-pending-row-or-no-slot" };
+    }
+    // Re-register under the real namespace so /stream and /cancel can find it.
+    const meta = readRunMeta(ns);
+    return { ns, action: meta?.threadHistory ? "resume" : "create", profile };
   });
 
   app.post("/launch/seed", async (req, reply) => {
