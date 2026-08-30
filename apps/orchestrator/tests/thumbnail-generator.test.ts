@@ -270,6 +270,35 @@ describe("thumbnailGeneratorNode", () => {
     );
   });
 
+  it("returns LLM-generated prompt only when ENABLE_THUMBNAIL=false, no provider call", async () => {
+    process.env.ENABLE_THUMBNAIL = "false";
+    const output = {
+      thumbnailPrompt: "High contrast aerial view. Dramatic shadows.",
+      thumbnailText: "Test Title",
+      textPosition: "bottom-third",
+      colorScheme: "cold blue",
+    };
+    mockGenerate.mockResolvedValueOnce(buildLLMResponse(output));
+
+    const { promise, mocks, assetProvider, compositor } = runNode();
+    const result = await promise;
+
+    // LLM call IS made — the prompt is what we want; only the image-provider
+    // call is skipped when thumbnails are disabled.
+    expect(mocks.createModel).toHaveBeenCalled();
+    expect(mockGenerate).toHaveBeenCalledTimes(1);
+    expect(assetProvider.generateImage).not.toHaveBeenCalled();
+    expect(compositor.composite).not.toHaveBeenCalled();
+    // The LLM-generated prompt is returned as-is.
+    expect(result.thumbnail.thumbnailPrompt).toBe(output.thumbnailPrompt);
+    expect(result.thumbnail.thumbnailText).toBe(output.thumbnailText);
+    expect(result.thumbnail.textPosition).toBe("bottom-third");
+    expect(result.thumbnail.colorScheme).toBe(output.colorScheme);
+    expect(result.thumbnail.imageUrl).toBeUndefined();
+    expect(result.diagnostics?.errors ?? []).toEqual([]);
+    expect(result.execution?.currentNode).toBe("ThumbnailGenerator");
+  });
+
   it("persists composited image as thumbnailImage artifact", async () => {
     process.env.ENABLE_THUMBNAIL = "true";
     const output = {

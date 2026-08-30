@@ -243,7 +243,8 @@ export async function thumbnailGeneratorNode(
   const thumbnailText = output.thumbnailText.trim();
   const textPosition = normalizeTextPosition(output.textPosition);
 
-  // Thumbnail generation disabled via ENABLE_THUMBNAIL — return prompt only
+  // Thumbnail image generation disabled via ENABLE_THUMBNAIL — return the
+  // LLM-generated prompt only, skip the image-provider call entirely.
   if (!envConfig.enableThumbnail()) {
     logger.nodeDone(label, Date.now() - startedAt);
     return {
