@@ -1,3 +1,4 @@
 packages:
   - apps/orchestrator
   - apps/image-provider
+  - apps/admin-ui
