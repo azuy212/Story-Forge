@@ -7,6 +7,7 @@ import {
   aggregateUsage,
   type LLMAggregate,
   type LLMUsage,
+  type LLMMessageRecord,
 } from "../models/usage.js";
 
 /**
@@ -25,17 +26,74 @@ export interface LlmUsageContext {
 export type LlmUsageRecord = LLMUsage & Required<LlmUsageContext>;
 
 /**
+ * Sanitize the caller-provided chat messages down to the
+ * `LLMMessageRecord` shape persisted on the usage artifact. Text content is
+ * passed through verbatim; multimodal content parts (image_url blocks) are
+ * collapsed to their URL so the artifact stays text-only. Anything we don't
+ * recognize is JSON-stringified. Undefined entries are skipped.
+ */
+function sanitizeInput(messages: unknown): LLMMessageRecord[] | undefined {
+  if (!Array.isArray(messages)) return undefined;
+  const out: LLMMessageRecord[] = [];
+  for (const m of messages) {
+    if (!m || typeof m !== "object") continue;
+    const role = (m as { role?: unknown }).role;
+    if (
+      role !== "system" &&
+      role !== "user" &&
+      role !== "assistant" &&
+      role !== "tool"
+    ) {
+      continue;
+    }
+    const raw = (m as { content?: unknown }).content;
+    let content: string;
+    if (typeof raw === "string") {
+      content = raw;
+    } else if (Array.isArray(raw)) {
+      content = raw
+        .map((part) => {
+          if (!part || typeof part !== "object") return "";
+          const p = part as Record<string, unknown>;
+          if (typeof p.type === "string" && p.type === "text") {
+            return typeof p.text === "string" ? p.text : "";
+          }
+          if (typeof p.type === "string" && p.type === "image_url") {
+            const url = (p.image_url as { url?: unknown } | undefined)?.url;
+            return typeof url === "string" ? url : "";
+          }
+          return "";
+        })
+        .filter((s) => s.length > 0)
+        .join("\n");
+    } else {
+      content = JSON.stringify(raw ?? null);
+    }
+    out.push({ role, content });
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+/**
  * Best-effort persist of one normalized usage record into the artifact store
  * (type `llmUsage`). Never throws — accounting must not fail generation.
  * No-op when no store/runId (usage tracking rides the artifact store, the
  * same persistence the cache uses), when `usage` is undefined (a request that
  * failed before returning a response has nothing to record), or when the
  * invocation was already recorded (resume idempotency).
+ *
+ * `debugInput` (the chat messages sent on the wire) and `debugOutput` (the
+ * raw model output) are persisted alongside the record when provided so a
+ * debug session can reproduce the exact exchange without re-rendering the
+ * prompt template or replaying the model call. Both are optional and
+ * sanitized through `sanitizeInput` before being stored.
  */
 export async function persistLlmUsage(
   config: RunnableConfig | undefined,
   ctx: LlmUsageContext,
   usage: LLMUsage | undefined,
+  debugInput?: unknown,
+  debugOutput?: string,
 ): Promise<void> {
   if (!usage) return;
   try {
@@ -55,12 +113,18 @@ export async function persistLlmUsage(
     );
     if (existing) return;
 
+    const sanitizedInput = sanitizeInput(debugInput);
+
     const record: LlmUsageRecord = {
       ...usage,
       runId,
       node: ctx.node,
       attempt: ctx.attempt,
       invocationId: ctx.invocationId,
+      ...(sanitizedInput ? { input: sanitizedInput } : {}),
+      ...(typeof debugOutput === "string" && debugOutput.length > 0
+        ? { output: debugOutput }
+        : {}),
     };
 
     await store.save(

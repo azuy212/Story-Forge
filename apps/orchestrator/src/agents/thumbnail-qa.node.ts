@@ -64,9 +64,7 @@ export async function runThumbnailQa(
   const sink =
     (inject.runLogSink as { appendLine?: unknown } | null | undefined) ?? null;
   const runId =
-    typeof inject.runId === "string"
-      ? (inject.runId as string)
-      : undefined;
+    typeof inject.runId === "string" ? (inject.runId as string) : undefined;
 
   const imageDataUrl = await downscaleToDataUrl(
     imagePath,
@@ -104,6 +102,8 @@ export async function runThumbnailQa(
         invocationId: newInvocationId(),
       },
       llmResult.usage,
+      messages,
+      typeof llmResult.output === "string" ? llmResult.output : undefined,
     );
     if (!llmResult.usage) {
       logger.warn(`${AgentModel.ThumbnailQA} response did not include usage`, {

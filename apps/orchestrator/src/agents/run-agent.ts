@@ -313,6 +313,18 @@ export async function runAgent<T>({
         model.setCallContext({ attempt, invocationId });
       }
 
+      // DEBUG: dump complete LLM request payload for inspection. Set
+      // DEBUG_LLM_PAYLOAD=1 to enable (off by default to keep logs small).
+      if (process.env.DEBUG_LLM_PAYLOAD === "1") {
+        logger.debug(`${agent} LLM request payload`, {
+          model: model.model,
+          attempt,
+          invocationId,
+          generateOptions: opts,
+          messages: attemptMessages,
+        });
+      }
+
       try {
         const llmResult = await model.generate(attemptMessages, opts);
 
@@ -323,6 +335,8 @@ export async function runAgent<T>({
           { configurable },
           { node: agent, attempt, invocationId },
           llmResult.usage,
+          attemptMessages,
+          llmResult.output,
         );
         if (!llmResult.usage) {
           logger.warn(`${agent} response did not include usage`, {
@@ -427,6 +441,7 @@ export async function runAgent<T>({
 
         logger.debug(`${agent} attempt failed`, {
           attempt,
+          model: model.model,
           error: lastError,
         });
       }

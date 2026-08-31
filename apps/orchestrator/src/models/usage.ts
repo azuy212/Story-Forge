@@ -23,6 +23,29 @@ export interface LLMUsage {
   /** Cost in USD reported by the provider, when available. */
   costUsd?: number;
   timestamp: string;
+  /**
+   * Debug capture of the prompt messages sent on this request. Set by
+   * `persistLlmUsage` from the caller's actual payload so a rejected or
+   * unexpected response can be reproduced offline without re-rendering the
+   * prompt template. Optional: the model layer never fabricates it.
+   */
+  input?: LLMMessageRecord[];
+  /**
+   * Raw model output (post-stream concatenation, pre-parse) captured for the
+   * same debugging purpose as `input`. Optional.
+   */
+  output?: string;
+}
+
+/**
+ * One persisted message in an LLM exchange (system/user/assistant/tool).
+ * Kept narrow so prompt dumps stay compact: only the role + text content
+ * are kept. Multimodal content parts (image_url blocks, etc.) are stringified
+ * to their URL so the artifact stays text-only and grep-friendly.
+ */
+export interface LLMMessageRecord {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
 }
 
 /** Normalized result of one model request: output plus usage (if reported). */
