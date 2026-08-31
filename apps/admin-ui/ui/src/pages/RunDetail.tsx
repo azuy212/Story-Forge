@@ -1,8 +1,15 @@
-import { useEffect, useState, useMemo } from "react";
-import { api, type LogEvent, type RunDetail as RunDetailT, type RunStatus } from "../api";
+import { useEffect, useState, useMemo, useRef } from "react";
+import {
+  api,
+  type LogEvent,
+  type RunDetail as RunDetailT,
+  type RunStatus,
+  type AssetsPayload,
+} from "../api";
 import { StageGrid } from "../components/StageGrid";
 import { LogStream } from "../components/LogStream";
 import { ProgressBar, type NodeStatus } from "../components/ProgressBar";
+import { AssetsGallery } from "../components/AssetsGallery";
 
 const STATUS_COLOR: Record<RunStatus, string> = {
   new: "bg-zinc-700 text-zinc-200",
@@ -17,6 +24,7 @@ type Props = { ns: string; onBack: () => void };
 
 export function RunDetail({ ns, onBack }: Props) {
   const [detail, setDetail] = useState<RunDetailT | null>(null);
+  const [assets, setAssets] = useState<AssetsPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -35,9 +43,14 @@ export function RunDetail({ ns, onBack }: Props) {
     dryRun: false,
   });
   const [actionError, setActionError] = useState<string | null>(null);
+  const statusRef = useRef<RunStatus | null>(null);
+  useEffect(() => {
+    statusRef.current = detail?.status ?? null;
+  }, [detail?.status]);
 
   useEffect(() => {
     let alive = true;
+    let t: ReturnType<typeof setInterval> | null = null;
     const load = () =>
       api
         .getRun(ns)
@@ -51,10 +64,32 @@ export function RunDetail({ ns, onBack }: Props) {
             projectId: (d.meta.projectId as string) ?? "",
             youtubePublishAt: (d.meta.youtubePublishAt as string) ?? "",
           });
+          if (d.status === "published" && t) {
+            clearInterval(t);
+            t = null;
+          }
         })
         .catch((e) => alive && setError(e.message));
     load();
-    const t = setInterval(load, 4000);
+    t = setInterval(load, 4000);
+    return () => {
+      alive = false;
+      if (t) clearInterval(t);
+    };
+  }, [ns]);
+
+  useEffect(() => {
+    let alive = true;
+    const tick = () => {
+      if (!alive) return;
+      if (statusRef.current === "published") return;
+      api
+        .getAssets(ns)
+        .then((a) => alive && setAssets(a))
+        .catch(() => alive && setAssets(null));
+    };
+    tick();
+    const t = setInterval(tick, 4000);
     return () => {
       alive = false;
       clearInterval(t);
@@ -398,6 +433,13 @@ export function RunDetail({ ns, onBack }: Props) {
           Stage status
         </h2>
         <StageGrid stages={detail.stages} />
+      </div>
+
+      <div className="mb-4">
+        <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+          Generated assets
+        </h2>
+        <AssetsGallery assets={assets} />
       </div>
 
       <div className="mb-4">

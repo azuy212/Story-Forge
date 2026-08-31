@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, isAbsolute, basename } from "node:path";
 import { readFileSync, writeFileSync, existsSync, copyFileSync, rmSync, renameSync, statSync, readdirSync } from "node:fs";
 import { createOrAppendRunMeta } from "../../../orchestrator/src/artifacts/run-meta.mjs";
 import {
@@ -116,6 +116,100 @@ export async function orchestratorRouter(app) {
     const from = Number(req.query.from ?? 0);
     const tail = readLogTail(ns, from, 1024 * 1024);
     return { lines: tail.lines, nextOffset: tail.nextOffset };
+  });
+
+  app.get("/runs/:ns/assets", async (req, reply) => {
+    const { ns } = req.params;
+    const meta = readRunMeta(ns);
+    if (!meta) return reply.code(404).send({ error: "run_not_found" });
+
+    const readArtifact = (type) => {
+      const p = join(PATHS.RUNS, ns, "artifacts", type, "v1.json");
+      if (!existsSync(p)) return null;
+      try {
+        return JSON.parse(readFileSync(p, "utf-8"));
+      } catch {
+        return null;
+      }
+    };
+
+    const toFileUrl = (p) => {
+      if (!p) return null;
+      const abs = isAbsolute(p) ? p : join(PATHS.RUNS, ns, p);
+      if (!existsSync(abs)) return null;
+      return `/api/orchestrator/file?path=${encodeURIComponent(abs)}`;
+    };
+
+    const assetsRec = readArtifact("assets");
+    const scenes = (assetsRec?.data?.scenes ?? []).map((s) => ({
+      sceneId: s.sceneId,
+      assetUrl: toFileUrl(s.assetUrl ?? s.filename),
+      filename: s.filename ?? s.assetUrl ?? null,
+      provider: s.provider ?? null,
+      generationStatus: s.generationStatus ?? null,
+      generationMode: s.generationMode ?? null,
+      durationSeconds: s.durationSeconds ?? null,
+      narration: s.narration ?? null,
+    }));
+
+    const thumbRec = readArtifact("thumbnailImage");
+    const thumbnail = thumbRec?.data
+      ? {
+          url: toFileUrl(thumbRec.data.imageUrl ?? thumbRec.data.sourceUrl),
+          width: thumbRec.data.width,
+          height: thumbRec.data.height,
+          text: thumbRec.data.text,
+        }
+      : null;
+
+    const audioRec = readArtifact("audio");
+    const audio = audioRec?.data
+      ? {
+          combinedUrl: toFileUrl(audioRec.data.combinedAudio?.url ?? audioRec.data.narrationUrl),
+          combinedDurationMs: audioRec.data.combinedAudio?.durationMs ?? audioRec.data.narrationDurationMs,
+          voice: audioRec.data.voice ?? null,
+          scenes: (audioRec.data.scenes ?? []).map((a) => ({
+            sceneId: a.sceneId,
+            url: toFileUrl(a.url),
+            durationMs: a.durationMs,
+            narration: a.narration,
+          })),
+        }
+      : null;
+
+    const subRec = readArtifact("subtitles");
+    const subtitles = subRec?.data
+      ? {
+          srt: subRec.data.srt ?? subRec.data.ass ?? null,
+          format: subRec.data.srt ? "srt" : subRec.data.ass ? "ass" : null,
+          cueCount: subRec.data.srt
+            ? subRec.data.srt.split(/\r?\n\r?\n/).filter((b) => b.trim()).length
+            : null,
+          wordCount: Array.isArray(subRec.data.wordTimestamps)
+            ? subRec.data.wordTimestamps.length
+            : null,
+        }
+      : null;
+
+    const vidRec = readArtifact("videoPlan");
+    const video = vidRec?.data
+      ? {
+          url: toFileUrl(vidRec.data.videoUrl),
+          durationMs: vidRec.data.durationMs ?? null,
+          resolution: vidRec.data.resolution ?? null,
+        }
+      : null;
+
+    const metaRec = readArtifact("metadata");
+    const metadata = metaRec?.data
+      ? {
+          title: metaRec.data.title ?? null,
+          description: metaRec.data.description ?? null,
+          tags: metaRec.data.tags ?? null,
+        }
+      : null;
+
+    return { ns, scenes, thumbnail, audio, subtitles, video, metadata };
   });
 
   app.get("/runs/:ns/stream", async (req, reply) => {
@@ -267,6 +361,20 @@ export async function orchestratorRouter(app) {
     if (!full.startsWith(root)) return reply.code(400).send({ error: "bad_path" });
     if (!existsSync(full)) return reply.code(404).send({ error: "not_found" });
     return reply.sendFile(safe, root.endsWith(full) ? root : join(PATHS.RUNS, ns));
+  });
+
+  app.get("/file", async (req, reply) => {
+    const p = String(req.query.path ?? "");
+    if (!p) return reply.code(400).send({ error: "path_required" });
+    const abs = isAbsolute(p) ? p : join(PATHS.ORCHESTRATOR, p);
+    const root = PATHS.ORCHESTRATOR;
+    if (!abs.startsWith(root + "/") && abs !== root) {
+      return reply.code(400).send({ error: "bad_path" });
+    }
+    if (!existsSync(abs)) return reply.code(404).send({ error: "not_found" });
+    const stat = statSync(abs);
+    if (!stat.isFile()) return reply.code(400).send({ error: "not_a_file" });
+    return reply.sendFile(basename(abs), dirname(abs));
   });
 
   app.get("/active", async () => list());

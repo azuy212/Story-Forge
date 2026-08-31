@@ -39,6 +39,67 @@ export type ActiveChild = {
   lastError?: string | null;
 };
 
+export type SceneAsset = {
+  sceneId: number;
+  assetUrl: string | null;
+  filename: string | null;
+  provider: string | null;
+  generationStatus: string | null;
+  generationMode: string | null;
+  durationSeconds: number | null;
+  narration: string | null;
+};
+
+export type SceneAudioT = {
+  sceneId: number;
+  url: string | null;
+  durationMs: number;
+  narration: string;
+};
+
+export type ThumbnailAsset = {
+  url: string | null;
+  width: number;
+  height: number;
+  text: string;
+};
+
+export type AudioAsset = {
+  combinedUrl: string | null;
+  combinedDurationMs: number | null;
+  voice: string | null;
+  scenes: SceneAudioT[];
+};
+
+export type SubtitlesAsset = {
+  srt: string | null;
+  format: "srt" | "ass" | null;
+  cueCount: number | null;
+  wordCount: number | null;
+};
+
+export type VideoAsset = {
+  url: string | null;
+  durationMs: number | null;
+  resolution: string | null;
+};
+
+export type MetadataAsset = {
+  title: string | null;
+  description: string | null;
+  tags: string[] | null;
+};
+
+export type AssetsPayload = {
+  ns: string;
+  scenes: SceneAsset[];
+  thumbnail: ThumbnailAsset | null;
+  audio: AudioAsset | null;
+  subtitles: SubtitlesAsset | null;
+  video: VideoAsset | null;
+  metadata: MetadataAsset | null;
+};
+
 export type Health = Record<string, string>;
 
 async function jsonFetch<T>(input: string, init?: RequestInit): Promise<T> {
@@ -95,6 +156,8 @@ export const api = {
       { method: "DELETE" },
     ),
   activeChildren: () => jsonFetch<ActiveChild[]>("/api/orchestrator/active"),
+  getAssets: (ns: string) =>
+    jsonFetch<AssetsPayload>(`/api/orchestrator/runs/${encodeURIComponent(ns)}/assets`),
 
   oauthStart: () =>
     jsonFetch<{ id: string; authUrl: string }>("/api/orchestrator/auth/youtube/start", {
