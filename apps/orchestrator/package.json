@@ -26,22 +26,22 @@
     "seed-run": "node scripts/seed-run.mjs"
   },
   "dependencies": {
-    "@langchain/core": "^1.2.3",
-    "@langchain/langgraph": "^1.4.8",
+    "@langchain/core": "^1.2.9",
+    "@langchain/langgraph": "^1.4.13",
     "commander": "^15.0.0",
     "execa": "^9.5.2",
     "googleapis": "^174.0.1",
     "openai": "^4.96.0",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@jest/globals": "^30.4.1",
+    "@jest/globals": "^30.5.0",
     "@tsconfig/recommended": "^1.0.13",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.14.0",
     "dotenv": "^17.4.2",
-    "jest": "^30.4.2",
-    "oxlint": "^1.78.0",
+    "jest": "^30.5.0",
+    "oxlint": "^1.80.0",
     "prettier": "^3.9.5",
     "ts-jest": "^29.4.11",
     "typescript": "^6.0.3"
