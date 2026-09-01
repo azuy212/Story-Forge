@@ -1,4 +1,8 @@
 import { useMemo } from "react";
+import { Loader2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 const PRODUCER_NODES = [
   "ResearchAgent",
@@ -15,9 +19,20 @@ const PRODUCER_NODES = [
   "MetadataGenerator",
   "ThumbnailGenerator",
   "Publisher",
-];
+] as const;
 
 export type NodeStatus = "complete" | "failed" | "running" | "pending";
+
+const STATE_META: Record<NodeStatus, { dot: string; chip: string }> = {
+  complete: { dot: "bg-success", chip: "bg-success/15 text-success" },
+  failed: { dot: "bg-destructive", chip: "bg-destructive/15 text-destructive" },
+  running: { dot: "bg-primary animate-pulse", chip: "bg-primary/15 text-primary" },
+  pending: { dot: "bg-muted-foreground/30", chip: "bg-muted text-muted-foreground" },
+};
+
+function humanize(name: string): string {
+  return name.replace(/([A-Z])/g, " $1").trim();
+}
 
 export function ProgressBar({ nodeStates }: { nodeStates: Record<string, NodeStatus> }) {
   const stats = useMemo(() => {
@@ -27,46 +42,58 @@ export function ProgressBar({ nodeStates }: { nodeStates: Record<string, NodeSta
     for (const n of PRODUCER_NODES) {
       const s = nodeStates[n] ?? "pending";
       if (s === "complete") done++;
-      if (s === "failed") failed++;
-      if (s === "running") running++;
+      else if (s === "failed") failed++;
+      else if (s === "running") running++;
     }
     return { done, failed, running, total: PRODUCER_NODES.length };
   }, [nodeStates]);
 
-  const width = 24;
-  const filled = Math.round(((stats.done + stats.failed) / stats.total) * width);
-  const bar = "█".repeat(filled) + "░".repeat(width - filled);
+  const percent = Math.round(((stats.done + stats.failed) / stats.total) * 100);
   const current =
     PRODUCER_NODES.find((n) => nodeStates[n] === "running") ??
-    PRODUCER_NODES[stats.done] ??
-    "idle";
+    PRODUCER_NODES[Math.min(stats.done, PRODUCER_NODES.length - 1)];
 
   return (
-    <div className="bg-ink-900 border border-zinc-800 rounded-lg p-3">
-      <div className="flex items-center justify-between text-xs text-zinc-400 mb-2">
-        <span>Pipeline</span>
-        <span>
-          {stats.done}/{stats.total}
-          {stats.failed > 0 && <span className="text-rose-400"> · {stats.failed} failed</span>}
-        </span>
+    <div className="rounded-lg border border-border bg-card">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="font-semibold text-foreground">Pipeline</span>
+          <Badge variant="muted" className="font-mono">
+            {stats.done}/{stats.total}
+          </Badge>
+          {stats.running > 0 && (
+            <Badge variant="default" className="gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {humanize(current)}
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          {stats.failed > 0 && (
+            <span className="text-destructive">{stats.failed} failed</span>
+          )}
+          {stats.running > 0 && <span className="text-primary">{stats.running} running</span>}
+          <span className="font-mono">{percent}%</span>
+        </div>
       </div>
-      <div className="mono text-sm text-cyan-300">
-        [{bar}] {current}
+      <div className="px-4 py-3">
+        <Progress value={percent} />
       </div>
-      <div className="mt-2 flex flex-wrap gap-1 text-[10px]">
+      <div className="flex flex-wrap gap-1.5 border-t border-border/60 px-4 py-3">
         {PRODUCER_NODES.map((n) => {
           const s = nodeStates[n] ?? "pending";
-          const color =
-            s === "complete"
-              ? "bg-emerald-700 text-emerald-100"
-              : s === "failed"
-                ? "bg-rose-700 text-rose-100"
-                : s === "running"
-                  ? "bg-cyan-700 text-cyan-100 animate-pulse"
-                  : "bg-ink-800 text-zinc-500";
+          const meta = STATE_META[s];
           return (
-            <span key={n} className={`px-1.5 py-0.5 rounded ${color}`}>
-              {n.replace(/([A-Z])/g, " $1").trim()}
+            <span
+              key={n}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[10px] font-medium",
+                meta.chip,
+              )}
+              title={`${n} — ${s}`}
+            >
+              <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
+              {humanize(n)}
             </span>
           );
         })}

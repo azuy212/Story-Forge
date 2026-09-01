@@ -1,44 +1,13 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Admin UI — YouTube Shorts Pipeline</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              ink: { 950: "#0b0d12", 900: "#11141a", 800: "#1a1e27" },
-            },
-          },
-        },
-      };
-    </script>
-    <style>
-      :root {
-        color-scheme: dark;
-      }
-      body {
-        font-family:
-          ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      }
-      .mono {
-        font-family:
-          ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-      }
-      .scroll-thin::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      .scroll-thin::-webkit-scrollbar-thumb {
-        background: #2a2f3a;
-        border-radius: 4px;
-      }
-    </style>
+    <meta name="color-scheme" content="dark light" />
+    <title>StoryForge — Shorts Production Control Plane</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b0f12'/%3E%3Cpath d='M9 22V10l7 12V10' stroke='%2300d4c5' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
   </head>
-  <body class="bg-ink-950 text-zinc-100 min-h-screen">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

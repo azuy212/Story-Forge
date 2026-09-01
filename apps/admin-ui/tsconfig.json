@@ -16,7 +16,11 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
-    "allowImportingTsExtensions": false
+    "allowImportingTsExtensions": false,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./ui/src/*"]
+    }
   },
   "include": ["ui/src", "server"],
   "exclude": ["node_modules", "dist"]

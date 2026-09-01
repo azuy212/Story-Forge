@@ -1,32 +1,86 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, type RunSummary, type RunStatus } from "../api";
-
-const STATUS_COLOR: Record<RunStatus, string> = {
-  new: "bg-zinc-700 text-zinc-200",
-  running: "bg-cyan-700 text-cyan-100 animate-pulse",
-  incomplete: "bg-amber-700 text-amber-100",
-  failed: "bg-rose-700 text-rose-100",
-  published: "bg-emerald-700 text-emerald-100",
-  aborted: "bg-zinc-600 text-zinc-300",
-};
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  MoreHorizontal,
+  Trash2,
+  Eye,
+  RefreshCw,
+} from "lucide-react";
+import { api, type RunSummary, type RunStatus } from "@/lib/api";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { PageHeader } from "@/components/shared/page-header";
+import { SearchInput } from "@/components/shared/search-input";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { EmptyState } from "@/components/shared/empty-state";
+import { formatRelativeTime, truncate } from "@/lib/utils";
+import { toast } from "@/components/ui/toast";
 
 const STATUSES: RunStatus[] = ["new", "running", "incomplete", "failed", "published", "aborted"];
+
+type SortKey = "ns" | "topic" | "status" | "createdAt" | "videoProfile" | "runSource";
+type SortDir = "asc" | "desc";
 
 export function Runs({ onOpen }: { onOpen: (ns: string) => void }) {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<RunStatus | "all">("all");
   const [profileFilter, setProfileFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [refreshTick, setRefreshTick] = useState(0);
+  const [sortKey, setSortKey] = useState<SortKey>("createdAt");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
+    setLoading(true);
     api
       .listRuns()
-      .then((r) => alive && setRuns(r))
-      .catch((e) => alive && setError(e.message));
+      .then((r) => {
+        if (alive) setRuns(r);
+        if (alive) setError(null);
+      })
+      .catch((e) => alive && setError(e.message))
+      .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
@@ -39,7 +93,7 @@ export function Runs({ onOpen }: { onOpen: (ns: string) => void }) {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return runs.filter((r) => {
+    const list = runs.filter((r) => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
       if (profileFilter !== "all" && (r.videoProfile ?? "short") !== profileFilter) return false;
       if (sourceFilter !== "all" && r.runSource !== sourceFilter) return false;
@@ -49,135 +103,287 @@ export function Runs({ onOpen }: { onOpen: (ns: string) => void }) {
       }
       return true;
     });
-  }, [runs, statusFilter, profileFilter, sourceFilter, search]);
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...list].sort((a, b) => {
+      const av = (a[sortKey] ?? "") as string;
+      const bv = (b[sortKey] ?? "") as string;
+      if (sortKey === "createdAt") {
+        const at = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bt = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return (at - bt) * dir;
+      }
+      return av.localeCompare(bv) * dir;
+    });
+  }, [runs, statusFilter, profileFilter, sourceFilter, search, sortKey, sortDir]);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "createdAt" ? "desc" : "asc");
+    }
+  }
 
   async function onDelete(ns: string) {
-    if (!confirm(`Delete run ${ns}? This removes runs/${ns}/ permanently.`)) return;
     try {
       await api.deleteRun(ns);
+      toast.success(`Run ${ns} deleted`);
       setRefreshTick((n) => n + 1);
     } catch (e) {
-      alert((e as Error).message);
+      toast.error("Delete failed", (e as Error).message);
+    } finally {
+      setConfirmDelete(null);
     }
   }
 
   return (
-    <div className="p-6 max-w-7xl">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-semibold">Runs ({runs.length})</h1>
-        <button
-          onClick={() => setRefreshTick((n) => n + 1)}
-          className="text-sm px-3 py-1.5 rounded bg-ink-800 hover:bg-ink-700 border border-zinc-700"
-        >
-          Refresh
-        </button>
-      </div>
+    <div className="space-y-4">
+      <PageHeader
+        title="Runs"
+        description={`${runs.length} run${runs.length === 1 ? "" : "s"} on disk`}
+        actions={
+          <Button variant="outline" size="sm" onClick={() => setRefreshTick((n) => n + 1)}>
+            <RefreshCw className="h-3.5 w-3.5" /> Refresh
+          </Button>
+        }
+      />
 
-      <div className="flex flex-wrap gap-2 mb-4">
-        <input
-          type="search"
-          placeholder="Search ns, topic, pillar, project id…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 min-w-64 bg-ink-900 border border-zinc-700 rounded px-3 py-1.5 text-sm"
-        />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as RunStatus | "all")}
-          className="bg-ink-900 border border-zinc-700 rounded px-3 py-1.5 text-sm"
-        >
-          <option value="all">All statuses</option>
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-        <select
-          value={profileFilter}
-          onChange={(e) => setProfileFilter(e.target.value)}
-          className="bg-ink-900 border border-zinc-700 rounded px-3 py-1.5 text-sm"
-        >
-          <option value="all">All profiles</option>
-          <option value="short">short</option>
-          <option value="long">long</option>
-        </select>
-        <select
-          value={sourceFilter}
-          onChange={(e) => setSourceFilter(e.target.value)}
-          className="bg-ink-900 border border-zinc-700 rounded px-3 py-1.5 text-sm"
-        >
-          <option value="all">All sources</option>
-          <option value="backlog">backlog</option>
-          <option value="seed">seed</option>
-        </select>
-      </div>
+      <div className="space-y-3 px-4 sm:px-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search ns, topic, pillar, project id…"
+            className="min-w-60 flex-1"
+          />
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as RunStatus | "all")}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={profileFilter} onValueChange={setProfileFilter}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="All profiles" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All profiles</SelectItem>
+              <SelectItem value="short">short</SelectItem>
+              <SelectItem value="long">long</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={sourceFilter} onValueChange={setSourceFilter}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="All sources" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All sources</SelectItem>
+              <SelectItem value="backlog">backlog</SelectItem>
+              <SelectItem value="seed">seed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-      {error && <div className="text-rose-400 mb-3 text-sm">Error: {error}</div>}
+        {error && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </div>
+        )}
 
-      <div className="bg-ink-900 rounded-lg border border-zinc-800 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-ink-800 text-zinc-400 text-xs uppercase tracking-wider">
-            <tr>
-              <th className="text-left px-3 py-2">Namespace</th>
-              <th className="text-left px-3 py-2">Topic</th>
-              <th className="text-left px-3 py-2">Pillar</th>
-              <th className="text-left px-3 py-2">Profile</th>
-              <th className="text-left px-3 py-2">Source</th>
-              <th className="text-left px-3 py-2">Status</th>
-              <th className="text-left px-3 py-2">Created</th>
-              <th className="text-right px-3 py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={8} className="text-center text-zinc-500 py-12">
-                  No runs match the current filters.
-                </td>
-              </tr>
-            )}
-            {filtered.map((r) => (
-              <tr key={r.ns} className="border-t border-zinc-800 hover:bg-ink-800/50">
-                <td className="px-3 py-2 mono text-cyan-300">
-                  <button
-                    onClick={() => onOpen(r.ns)}
-                    className="hover:underline text-left"
-                  >
-                    {r.ns}
-                  </button>
-                </td>
-                <td className="px-3 py-2 max-w-xs truncate" title={r.topic ?? ""}>
-                  {r.topic ?? <span className="text-zinc-600">—</span>}
-                </td>
-                <td className="px-3 py-2">{r.pillar ?? <span className="text-zinc-600">—</span>}</td>
-                <td className="px-3 py-2">{r.videoProfile ?? "—"}</td>
-                <td className="px-3 py-2">
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-ink-700 text-zinc-300">
-                    {r.runSource}
-                  </span>
-                </td>
-                <td className="px-3 py-2">
-                  <span className={`text-xs px-2 py-0.5 rounded ${STATUS_COLOR[r.status]}`}>
-                    {r.status}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-zinc-400 text-xs">
-                  {r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  <button
-                    onClick={() => onDelete(r.ns)}
-                    className="text-xs text-rose-400 hover:text-rose-300"
-                  >
-                    delete
-                  </button>
-                </td>
-              </tr>
+        {loading && runs.length === 0 ? (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full" />
             ))}
-          </tbody>
-        </table>
+          </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            title="No runs match"
+            description={
+              runs.length === 0
+                ? "Launch a run from the Launch page or trigger the backlog."
+                : "Try adjusting filters or clearing the search."
+            }
+          />
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <SortableHead
+                    label="Namespace"
+                    active={sortKey === "ns"}
+                    dir={sortDir}
+                    onClick={() => toggleSort("ns")}
+                  />
+                  <SortableHead
+                    label="Topic"
+                    active={sortKey === "topic"}
+                    dir={sortDir}
+                    onClick={() => toggleSort("topic")}
+                  />
+                  <TableHead>Pillar</TableHead>
+                  <SortableHead
+                    label="Profile"
+                    active={sortKey === "videoProfile"}
+                    dir={sortDir}
+                    onClick={() => toggleSort("videoProfile")}
+                  />
+                  <SortableHead
+                    label="Source"
+                    active={sortKey === "runSource"}
+                    dir={sortDir}
+                    onClick={() => toggleSort("runSource")}
+                  />
+                  <SortableHead
+                    label="Status"
+                    active={sortKey === "status"}
+                    dir={sortDir}
+                    onClick={() => toggleSort("status")}
+                  />
+                  <SortableHead
+                    label="Created"
+                    active={sortKey === "createdAt"}
+                    dir={sortDir}
+                    onClick={() => toggleSort("createdAt")}
+                  />
+                  <TableHead className="w-12 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((r) => (
+                  <TableRow key={r.ns} className="group">
+                    <TableCell>
+                      <button
+                        onClick={() => onOpen(r.ns)}
+                        className="font-mono text-xs text-primary hover:underline focus-visible:outline-none"
+                        title={r.ns}
+                      >
+                        {truncate(r.ns, 28)}
+                      </button>
+                    </TableCell>
+                    <TableCell className="max-w-xs">
+                      <span className="block truncate" title={r.topic ?? ""}>
+                        {r.topic ?? <span className="text-muted-foreground/60">—</span>}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {r.pillar ? (
+                        <Badge variant="outline">{r.pillar}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground/60">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {r.videoProfile ?? "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="muted">{r.runSource}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={r.status} />
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {r.createdAt ? formatRelativeTime(r.createdAt) : "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="h-7 w-7 opacity-60 group-hover:opacity-100"
+                            aria-label="Row actions"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => onOpen(r.ns)}>
+                            <Eye className="h-4 w-4" /> Open
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => setConfirmDelete(r.ns)}
+                          >
+                            <Trash2 className="h-4 w-4" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
+
+      <AlertDialog open={confirmDelete !== null} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete run?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove <span className="font-mono text-foreground">{confirmDelete}</span>{" "}
+              and all its assets. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmDelete && onDelete(confirmDelete)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+  );
+}
+
+function SortableHead({
+  label,
+  active,
+  dir,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
+}) {
+  return (
+    <TableHead>
+      <button
+        type="button"
+        onClick={onClick}
+        className="inline-flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+      >
+        {label}
+        {active ? (
+          dir === "asc" ? (
+            <ArrowUp className="h-3 w-3" />
+          ) : (
+            <ArrowDown className="h-3 w-3" />
+          )
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-40" />
+        )}
+      </button>
+    </TableHead>
   );
 }

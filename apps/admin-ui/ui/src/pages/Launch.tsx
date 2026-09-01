@@ -1,32 +1,50 @@
 import { useState } from "react";
-import { api } from "../api";
+import { ArrowRight, FileUp, Play, Rocket, Sparkles } from "lucide-react";
+import { api } from "@/lib/api";
+import { PageHeader } from "@/components/shared/page-header";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 
 type Tab = "next" | "seed";
 
 export function Launch({ onLaunched }: { onLaunched: (ns: string) => void }) {
   const [tab, setTab] = useState<Tab>("next");
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-4">Launch</h1>
-      <div className="flex gap-1 mb-4 bg-ink-900 rounded p-1 border border-zinc-800 inline-flex">
-        <button
-          onClick={() => setTab("next")}
-          className={`px-3 py-1.5 rounded text-sm ${
-            tab === "next" ? "bg-ink-800 text-cyan-300" : "text-zinc-400"
-          }`}
-        >
-          Run Next (backlog)
-        </button>
-        <button
-          onClick={() => setTab("seed")}
-          className={`px-3 py-1.5 rounded text-sm ${
-            tab === "seed" ? "bg-ink-800 text-cyan-300" : "text-zinc-400"
-          }`}
-        >
-          Seed Run
-        </button>
+    <div className="space-y-6">
+      <PageHeader
+        title="Launch"
+        description="Trigger the pipeline — pull from the backlog or feed pre-written research via a seed file."
+      />
+      <div className="px-4 sm:px-6">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
+          <TabsList>
+            <TabsTrigger value="next">
+              <Rocket className="h-3.5 w-3.5" /> Run Next
+            </TabsTrigger>
+            <TabsTrigger value="seed">
+              <FileUp className="h-3.5 w-3.5" /> Seed Run
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="next">
+            <RunNextForm onLaunched={onLaunched} />
+          </TabsContent>
+          <TabsContent value="seed">
+            <SeedForm onLaunched={onLaunched} />
+          </TabsContent>
+        </Tabs>
       </div>
-      {tab === "next" ? <RunNextForm onLaunched={onLaunched} /> : <SeedForm onLaunched={onLaunched} />}
     </div>
   );
 }
@@ -34,58 +52,62 @@ export function Launch({ onLaunched }: { onLaunched: (ns: string) => void }) {
 function RunNextForm({ onLaunched }: { onLaunched: (ns: string) => void }) {
   const [profile, setProfile] = useState<"short" | "long">("short");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
 
   async function onSubmit() {
     setBusy(true);
-    setError(null);
-    setInfo(null);
     try {
       const r = await api.launchRunNext(profile);
       if (r.none) {
-        setInfo(
+        toast.warning(
+          "Nothing to launch",
           r.reason === "no-pending-row"
             ? "No pending planned rows in the backlog."
             : "No free publish slot within 30 days.",
         );
         return;
       }
+      toast.success("Run launched", r.ns);
       onLaunched(r.ns);
     } catch (e) {
-      setError((e as Error).message);
+      toast.error("Launch failed", (e as Error).message);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="bg-ink-900 border border-zinc-800 rounded-lg p-4 space-y-4">
-      <p className="text-sm text-zinc-400">
-        Reads the Google Sheets backlog, picks the first pending planned row, and runs it. If a
-        run already exists for that topic, resumes it.
-      </p>
-      <div className="flex items-center gap-3">
-        <label className="text-sm text-zinc-400">Profile</label>
-        <select
-          value={profile}
-          onChange={(e) => setProfile(e.target.value as "short" | "long")}
-          className="bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm"
-        >
-          <option value="short">short</option>
-          <option value="long">long</option>
-        </select>
-      </div>
-      {error && <div className="text-rose-400 text-sm">Error: {error}</div>}
-      {info && <div className="text-amber-300 text-sm">{info}</div>}
-      <button
-        onClick={onSubmit}
-        disabled={busy}
-        className="px-4 py-2 rounded bg-cyan-700 hover:bg-cyan-600 disabled:opacity-50 text-sm font-medium"
-      >
-        {busy ? "Launching…" : "Launch next"}
-      </button>
-    </div>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-muted-foreground" />
+          <CardTitle>Run next from backlog</CardTitle>
+        </div>
+        <CardDescription>
+          Reads the Google Sheets backlog, picks the first pending planned row, and runs it. If a run
+          already exists for that topic, resumes it.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[200px_1fr]">
+          <div className="space-y-1.5">
+            <Label>Profile</Label>
+            <Select value={profile} onValueChange={(v) => setProfile(v as "short" | "long")}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="short">short</SelectItem>
+                <SelectItem value="long">long</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <Button onClick={onSubmit} disabled={busy}>
+          {busy ? "Launching…" : "Launch next"}
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -99,17 +121,13 @@ function SeedForm({ onLaunched }: { onLaunched: (ns: string) => void }) {
   const [convertMode, setConvertMode] = useState<"auto" | "convert" | "bypass">("auto");
   const [dryRun, setDryRun] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
 
   async function onSubmit() {
     if (!seedPath) {
-      setError("Seed path is required");
+      toast.error("Seed path is required");
       return;
     }
     setBusy(true);
-    setError(null);
-    setInfo(null);
     try {
       const body: Record<string, unknown> = { seedPath, profile, dryRun };
       if (pillar) body.pillar = pillar;
@@ -118,112 +136,128 @@ function SeedForm({ onLaunched }: { onLaunched: (ns: string) => void }) {
       if (projectId) body.projectId = projectId;
       if (convertMode !== "auto") body.convert = convertMode === "convert";
       const r = await api.launchSeed(body);
-      setInfo(`Seeded ${r.ns}`);
+      toast.success("Seed run launched", r.ns);
       onLaunched(r.ns);
     } catch (e) {
-      setError((e as Error).message);
+      toast.error("Launch failed", (e as Error).message);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="bg-ink-900 border border-zinc-800 rounded-lg p-4 space-y-3">
-      <p className="text-sm text-zinc-400">
-        Feeds pre-written research (and optional script) into the pipeline. Skips the LLM research
-        and script producers.
-      </p>
-      <Field label="Seed file path (.json, .txt, .md)" required>
-        <input
-          value={seedPath}
-          onChange={(e) => setSeedPath(e.target.value)}
-          placeholder="/absolute/path/to/seed.json"
-          className="w-full bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm mono"
-        />
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Pillar (optional)">
-          <input
-            value={pillar}
-            onChange={(e) => setPillar(e.target.value)}
-            placeholder="Psychology"
-            className="w-full bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm"
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Play className="h-4 w-4 text-muted-foreground" />
+          <CardTitle>Seed run from pre-written research</CardTitle>
+        </div>
+        <CardDescription>
+          Feeds pre-written research (and optional script) into the pipeline. Skips the LLM research
+          and script producers.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-1.5">
+          <Label>Seed file path *</Label>
+          <Input
+            value={seedPath}
+            onChange={(e) => setSeedPath(e.target.value)}
+            placeholder="/absolute/path/to/seed.json"
+            className="font-mono"
           />
-        </Field>
-        <Field label="Topic (optional)">
+          <p className="text-xs text-muted-foreground">Accepts .json, .txt, .md.</p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Pillar (optional)">
+            <Input
+              value={pillar}
+              onChange={(e) => setPillar(e.target.value)}
+              placeholder="Psychology"
+            />
+          </Field>
+          <Field label="Topic (optional)">
+            <Input
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder="Why your brain…"
+            />
+          </Field>
+          <Field label="Profile">
+            <Select value={profile} onValueChange={(v) => setProfile(v as "short" | "long")}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="short">short</SelectItem>
+                <SelectItem value="long">long</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Publish at (ISO 8601, optional)">
+            <Input
+              type="datetime-local"
+              value={publishAt}
+              onChange={(e) => setPublishAt(e.target.value)}
+            />
+          </Field>
+          <Field label="Sheet row id (project-id, optional)">
+            <Input
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              placeholder="row id"
+            />
+          </Field>
+          <Field label="Mode">
+            <Select
+              value={convertMode}
+              onValueChange={(v) => setConvertMode(v as "auto" | "convert" | "bypass")}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">auto-detect</SelectItem>
+                <SelectItem value="convert">force LLM convert</SelectItem>
+                <SelectItem value="bypass">force structured bypass</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm text-foreground/90">
           <input
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            placeholder="Why your brain…"
-            className="w-full bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm"
+            type="checkbox"
+            checked={dryRun}
+            onChange={(e) => setDryRun(e.target.checked)}
+            className="h-4 w-4 rounded border-input bg-background accent-primary"
           />
-        </Field>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Profile">
-          <select
-            value={profile}
-            onChange={(e) => setProfile(e.target.value as "short" | "long")}
-            className="w-full bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm"
-          >
-            <option value="short">short</option>
-            <option value="long">long</option>
-          </select>
-        </Field>
-        <Field label="Publish at (ISO 8601, optional)">
-          <input
-            type="datetime-local"
-            value={publishAt}
-            onChange={(e) => setPublishAt(e.target.value)}
-            className="w-full bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm"
-          />
-        </Field>
-      </div>
-      <Field label="Sheet row id (project-id, optional)">
-        <input
-          value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-          className="w-full bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm"
-        />
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Mode">
-          <select
-            value={convertMode}
-            onChange={(e) => setConvertMode(e.target.value as "auto" | "convert" | "bypass")}
-            className="w-full bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm"
-          >
-            <option value="auto">auto-detect</option>
-            <option value="convert">force LLM convert</option>
-            <option value="bypass">force structured bypass</option>
-          </select>
-        </Field>
-        <label className="flex items-center gap-2 text-sm text-zinc-300 mt-6">
-          <input type="checkbox" checked={dryRun} onChange={(e) => setDryRun(e.target.checked)} />
-          dry-run (validate only)
+          Dry-run (validate only)
         </label>
-      </div>
-      {error && <div className="text-rose-400 text-sm">Error: {error}</div>}
-      {info && <div className="text-emerald-300 text-sm">{info}</div>}
-      <button
-        onClick={onSubmit}
-        disabled={busy}
-        className="px-4 py-2 rounded bg-cyan-700 hover:bg-cyan-600 disabled:opacity-50 text-sm font-medium"
-      >
-        {busy ? "Launching…" : "Launch seed run"}
-      </button>
-    </div>
+
+        <Button onClick={onSubmit} disabled={busy}>
+          {busy ? "Launching…" : "Launch seed run"}
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <label className="block">
-      <span className="text-xs text-zinc-400 mb-1 block">
-        {label}
-        {required && <span className="text-rose-400"> *</span>}
-      </span>
+    <div className={cn("space-y-1.5", className)}>
+      <Label>{label}</Label>
       {children}
-    </label>
+    </div>
   );
 }

@@ -1,48 +1,79 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  api,
-  type LogEvent,
-  type RunDetail as RunDetailT,
-  type RunStatus,
-  type AssetsPayload,
-} from "../api";
-import { StageGrid } from "../components/StageGrid";
-import { LogStream } from "../components/LogStream";
-import { ProgressBar, type NodeStatus } from "../components/ProgressBar";
-import { AssetsGallery } from "../components/AssetsGallery";
-
-const STATUS_COLOR: Record<RunStatus, string> = {
-  new: "bg-zinc-700 text-zinc-200",
-  running: "bg-cyan-700 text-cyan-100",
-  incomplete: "bg-amber-700 text-amber-100",
-  failed: "bg-rose-700 text-rose-100",
-  published: "bg-emerald-700 text-emerald-100",
-  aborted: "bg-zinc-600 text-zinc-300",
-};
+  ArrowLeft,
+  CheckCircle2,
+  Edit,
+  FileSearch,
+  FlaskConical,
+  History,
+  Info,
+  MoreHorizontal,
+  Pause,
+  Play,
+  Plus,
+  StopCircle,
+  Trash2,
+  Workflow,
+} from "lucide-react";
+import { api, type LogEvent, type RunDetail as RunDetailT, type RunStatus } from "@/lib/api";
+import { StageGrid } from "@/components/StageGrid";
+import { LogStream } from "@/components/LogStream";
+import { ProgressBar, type NodeStatus } from "@/components/ProgressBar";
+import { AssetsGallery } from "@/components/AssetsGallery";
+import { PageHeader } from "@/components/shared/page-header";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { MetaRow } from "@/components/shared/copy-button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "@/components/ui/toast";
+import { cn, formatDateTime, truncate } from "@/lib/utils";
 
 type Props = { ns: string; onBack: () => void };
 
 export function RunDetail({ ns, onBack }: Props) {
   const [detail, setDetail] = useState<RunDetailT | null>(null);
-  const [assets, setAssets] = useState<AssetsPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({
-    pillar: "",
-    topic: "",
-    videoProfile: "short",
-    projectId: "",
-    youtubePublishAt: "",
-  });
-  const [resumeOverrides, setResumeOverrides] = useState({
-    open: false,
-    pillar: "",
-    topic: "",
-    profile: "short",
-    seed: "",
-    dryRun: false,
-  });
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"cancel" | "abort" | "delete" | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [resumeOpen, setResumeOpen] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
   const statusRef = useRef<RunStatus | null>(null);
   useEffect(() => {
     statusRef.current = detail?.status ?? null;
@@ -57,13 +88,6 @@ export function RunDetail({ ns, onBack }: Props) {
         .then((d) => {
           if (!alive) return;
           setDetail(d);
-          setEditForm({
-            pillar: (d.meta.pillar as string) ?? "",
-            topic: (d.meta.topic as string) ?? "",
-            videoProfile: (d.meta.videoProfile as string) ?? "short",
-            projectId: (d.meta.projectId as string) ?? "",
-            youtubePublishAt: (d.meta.youtubePublishAt as string) ?? "",
-          });
           if (d.status === "published" && t) {
             clearInterval(t);
             t = null;
@@ -78,11 +102,403 @@ export function RunDetail({ ns, onBack }: Props) {
     };
   }, [ns]);
 
+  if (error) {
+    return (
+      <div className="space-y-4 p-6">
+        <Button variant="ghost" onClick={onBack} className="gap-1.5">
+          <ArrowLeft className="h-3.5 w-3.5" /> Runs
+        </Button>
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
+  if (!detail) {
+    return (
+      <div className="space-y-4 p-6">
+        <Button variant="ghost" onClick={onBack} className="gap-1.5">
+          <ArrowLeft className="h-3.5 w-3.5" /> Runs
+        </Button>
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  const meta = detail.meta;
+  const threadHistory = (meta.threadHistory as string[] | undefined) ?? [];
+
+  async function withAction(fn: () => Promise<unknown>, success: string) {
+    setActionBusy(true);
+    try {
+      await fn();
+      toast.success(success);
+    } catch (e) {
+      toast.error("Action failed", (e as Error).message);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  const primary = pickPrimary(detail.status, ns);
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title={meta.topic as string ?? "Run detail"}
+        description={
+          <span className="flex flex-wrap items-center gap-1.5">
+            <span className="font-mono text-xs">{ns}</span>
+            <StatusBadge status={detail.status} />
+            {detail.childStatus && (
+              <Badge variant="muted" className="font-mono text-[10px]">
+                child: {detail.childStatus}
+              </Badge>
+            )}
+            {typeof meta.videoProfile === "string" && meta.videoProfile && (
+              <Badge variant="outline" className="font-mono text-[10px]">
+                {meta.videoProfile}
+              </Badge>
+            )}
+          </span>
+        }
+        actions={
+          <>
+            <Button variant="ghost" onClick={onBack} className="gap-1.5">
+              <ArrowLeft className="h-3.5 w-3.5" /> Back
+            </Button>
+            {primary && (
+              <Button
+                variant={primary.variant}
+                disabled={actionBusy}
+                onClick={primary.onClick}
+                className="gap-1.5"
+              >
+                <primary.icon className="h-4 w-4" /> {primary.label}
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" disabled={actionBusy} aria-label="More actions">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Run actions</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() =>
+                    withAction(() => api.resumeRun(ns), "Resumed")
+                  }
+                >
+                  <Play className="h-4 w-4" /> Resume
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setResumeOpen(true)}>
+                  <Plus className="h-4 w-4" /> Resume with overrides
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() =>
+                    withAction(() => api.resumeRun(ns, { dryRun: true }), "Dry-run complete")
+                  }
+                >
+                  <FlaskConical className="h-4 w-4" /> Dry-run resume
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setConfirmAction("cancel")}
+                  disabled={detail.status !== "running"}
+                >
+                  <Pause className="h-4 w-4" /> Cancel child
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setConfirmAction("abort")}
+                  variant="destructive"
+                >
+                  <StopCircle className="h-4 w-4" /> Abort
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                  <Edit className="h-4 w-4" /> Edit metadata
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setConfirmAction("delete")}
+                  variant="destructive"
+                >
+                  <Trash2 className="h-4 w-4" /> Delete run
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        }
+      />
+
+      <div className="space-y-6 px-4 pb-10 sm:px-6">
+        <Section title="Pipeline progress" icon={Workflow} description="Producer node status from live SSE events.">
+          <PipelineProgress ns={ns} />
+        </Section>
+
+        <Section title="Stage status" icon={CheckCircle2} description="Per-stage artifact availability.">
+          <StageGrid stages={detail.stages} />
+        </Section>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Info className="h-4 w-4 text-muted-foreground" />
+                <CardTitle>Run metadata</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <MetaRow label="Topic" value={(meta.topic as string) ?? null} copyable />
+              <MetaRow label="Pillar" value={(meta.pillar as string) ?? null} />
+              <MetaRow label="Profile" value={(meta.videoProfile as string) ?? null} />
+              <MetaRow label="Source" value={(meta.runSource as string) ?? "backlog"} />
+              <MetaRow label="Project ID" value={(meta.projectId as string) ?? null} mono />
+              <MetaRow
+                label="Publish at"
+                value={formatDateTime(meta.youtubePublishAt as string | null)}
+              />
+              <MetaRow label="Created" value={formatDateTime(meta.createdAt as string | null)} />
+              <MetaRow label="Aborted" value={formatDateTime(meta.abortedAt as string | null)} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <History className="h-4 w-4 text-muted-foreground" />
+                <CardTitle>Thread history</CardTitle>
+                <Badge variant="muted" className="font-mono">
+                  {threadHistory.length}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {threadHistory.length === 0 ? (
+                <div className="text-sm text-muted-foreground/60">No thread history yet.</div>
+              ) : (
+                <ol className="space-y-1 font-mono text-xs text-foreground/80">
+                  {threadHistory.map((t, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="w-6 shrink-0 text-right text-muted-foreground/60">
+                        {i + 1}.
+                      </span>
+                      <span className="break-words">{t}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <Section
+          title="Generated assets"
+          icon={FileSearch}
+          description="Video, audio, subtitles, scene images, thumbnail, and metadata."
+        >
+          <AssetsPanel ns={ns} />
+        </Section>
+
+        <Section title="Live log" icon={Workflow} description="Streaming SSE console for this run.">
+          <LogPanel ns={ns} />
+        </Section>
+      </div>
+
+      <EditDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        meta={meta}
+        ns={ns}
+        onSaved={() => {
+          toast.success("Run metadata saved");
+        }}
+      />
+
+      <ResumeDialog
+        open={resumeOpen}
+        onOpenChange={setResumeOpen}
+        ns={ns}
+        onResumed={() => toast.success("Resume queued")}
+      />
+
+      <AlertDialog
+        open={confirmAction !== null}
+        onOpenChange={(o) => !o && setConfirmAction(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmAction === "delete" && "Delete run"}
+              {confirmAction === "abort" && "Abort run"}
+              {confirmAction === "cancel" && "Cancel running child"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmAction === "delete" &&
+                `This will permanently remove ${ns} and all generated assets. This action cannot be undone.`}
+              {confirmAction === "abort" &&
+                `Stops the child process (if running) and writes abortedAt to run.json for ${ns}.`}
+              {confirmAction === "cancel" &&
+                `Sends SIGTERM to the running child for ${ns}. The run stays on disk and can be resumed.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmAction === "delete") {
+                  withAction(() => api.deleteRun(ns).then(onBack), "Run deleted");
+                } else if (confirmAction === "abort") {
+                  withAction(() => api.abortRun(ns), "Run aborted");
+                } else if (confirmAction === "cancel") {
+                  withAction(() => api.cancelRun(ns), "Child cancelled");
+                }
+                setConfirmAction(null);
+              }}
+              className={cn(
+                confirmAction === "delete" || confirmAction === "abort"
+                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  : "",
+              )}
+            >
+              {confirmAction === "delete" && "Delete"}
+              {confirmAction === "abort" && "Abort"}
+              {confirmAction === "cancel" && "Cancel child"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function pickPrimary(
+  status: RunStatus,
+  ns: string,
+): {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  variant: "default" | "destructive" | "outline" | "secondary";
+  onClick: () => void;
+} | null {
+  if (status === "running" || status === "published") return null;
+  return {
+    label: "Resume",
+    icon: Play,
+    variant: "default",
+    onClick: () => {
+      api
+        .resumeRun(ns)
+        .then(() => toast.success("Resumed"))
+        .catch((e) => toast.error("Resume failed", (e as Error).message));
+    },
+  };
+}
+
+function Section({
+  title,
+  description,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  description?: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+}) {
+  return (
+    <section>
+      <div className="mb-3 flex items-end justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground">
+            {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
+            {title}
+          </h2>
+          {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function PipelineProgress({ ns }: { ns: string }) {
+  const [events, setEvents] = useState<LogEvent[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    api.tailLog(ns, 0).then((t) => {
+      if (alive) setEvents(t.lines);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [ns]);
+
+  useEffect(() => {
+    let alive = true;
+    const es = new EventSource(`/api/orchestrator/runs/${encodeURIComponent(ns)}/stream`);
+    const onMsg = (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data) as LogEvent;
+        if (
+          data.event === "node_start" ||
+          data.event === "node_end" ||
+          data.event === "node_failed"
+        ) {
+          if (alive) setEvents((prev) => [...prev, data]);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    es.addEventListener("log", onMsg);
+    es.addEventListener("stderr", onMsg);
+    es.addEventListener("error", onMsg);
+    return () => {
+      alive = false;
+      es.close();
+    };
+  }, [ns]);
+
+  const nodeStates = useMemo(() => {
+    const states: Record<string, NodeStatus> = {};
+    for (const ev of events) {
+      const n = (ev as Record<string, unknown>).node as string | undefined;
+      if (!n) continue;
+      if (ev.event === "node_start") states[n] = "running";
+      else if (ev.event === "node_end") states[n] = "complete";
+      else if (ev.event === "node_failed") states[n] = "failed";
+    }
+    return states;
+  }, [events]);
+
+  return <ProgressBar nodeStates={nodeStates} />;
+}
+
+function LogPanel({ ns }: { ns: string }) {
+  const [initial, setInitial] = useState<LogEvent[]>([]);
+  useEffect(() => {
+    let alive = true;
+    api.tailLog(ns, 0).then((t) => {
+      if (alive) setInitial(t.lines);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [ns]);
+  return <LogStream initial={initial} streamUrl={`/api/orchestrator/runs/${encodeURIComponent(ns)}/stream`} />;
+}
+
+function AssetsPanel({ ns }: { ns: string }) {
+  const [assets, setAssets] = useState<Awaited<ReturnType<typeof api.getAssets>> | null>(null);
   useEffect(() => {
     let alive = true;
     const tick = () => {
-      if (!alive) return;
-      if (statusRef.current === "published") return;
       api
         .getAssets(ns)
         .then((a) => alive && setAssets(a))
@@ -95,359 +511,250 @@ export function RunDetail({ ns, onBack }: Props) {
       clearInterval(t);
     };
   }, [ns]);
+  return <AssetsGallery assets={assets} />;
+}
 
-  const [initialLog, setInitialLog] = useState<LogEvent[]>([]);
+function EditDialog({
+  open,
+  onOpenChange,
+  meta,
+  ns,
+  onSaved,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  meta: Record<string, unknown>;
+  ns: string;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState({
+    pillar: "",
+    topic: "",
+    videoProfile: "short",
+    projectId: "",
+    youtubePublishAt: "",
+  });
+  const [busy, setBusy] = useState(false);
+
   useEffect(() => {
-    let alive = true;
-    api.tailLog(ns, 0).then((t) => {
-      if (alive) setInitialLog(t.lines);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [ns]);
-
-  const [logEvents, setLogEvents] = useState<LogEvent[]>(initialLog);
-  useEffect(() => {
-    setLogEvents(initialLog);
-  }, [initialLog]);
-
-  const nodeStates = useMemo(() => {
-    const states: Record<string, NodeStatus> = {};
-    for (const ev of logEvents) {
-      if (ev.event === "node_start") {
-        const n = ev.node as string | undefined;
-        if (n) states[n] = "running";
-      } else if (ev.event === "node_end") {
-        const n = ev.node as string | undefined;
-        if (n) states[n] = "complete";
-      } else if (ev.event === "node_failed") {
-        const n = ev.node as string | undefined;
-        if (n) states[n] = "failed";
-      }
+    if (open) {
+      setForm({
+        pillar: (meta.pillar as string) ?? "",
+        topic: (meta.topic as string) ?? "",
+        videoProfile: (meta.videoProfile as string) ?? "short",
+        projectId: (meta.projectId as string) ?? "",
+        youtubePublishAt: (meta.youtubePublishAt as string) ?? "",
+      });
     }
-    return states;
-  }, [logEvents]);
+  }, [open, meta]);
 
-  const streamUrl = `/api/orchestrator/runs/${encodeURIComponent(ns)}/stream`;
-
-  async function withAction(fn: () => Promise<unknown>, msg: string) {
-    setActionError(null);
+  async function onSave() {
+    setBusy(true);
     try {
-      await fn();
+      await api.patchRun(ns, {
+        pillar: form.pillar || null,
+        topic: form.topic || null,
+        videoProfile: form.videoProfile,
+        projectId: form.projectId || null,
+        youtubePublishAt: form.youtubePublishAt || null,
+      });
+      onOpenChange(false);
+      onSaved();
     } catch (e) {
-      setActionError(`${msg}: ${(e as Error).message}`);
+      toast.error("Save failed", (e as Error).message);
+    } finally {
+      setBusy(false);
     }
   }
-
-  function onResume() {
-    withAction(() => api.resumeRun(ns), "Resume failed");
-  }
-  function onResumeDry() {
-    withAction(() => api.resumeRun(ns, { dryRun: true }), "Dry-run failed");
-  }
-  function onResumeWithOverrides() {
-    const body: Record<string, unknown> = {};
-    if (resumeOverrides.pillar) body.pillar = resumeOverrides.pillar;
-    if (resumeOverrides.topic) body.topic = resumeOverrides.topic;
-    if (resumeOverrides.profile) body.profile = resumeOverrides.profile;
-    if (resumeOverrides.seed) body.seed = resumeOverrides.seed;
-    if (resumeOverrides.dryRun) body.dryRun = true;
-    withAction(
-      () => api.resumeRun(ns, body).then(() => setResumeOverrides((s) => ({ ...s, open: false }))),
-      "Resume failed",
-    );
-  }
-  function onCancel() {
-    if (!confirm(`Cancel running child for ${ns}?`)) return;
-    withAction(() => api.cancelRun(ns), "Cancel failed");
-  }
-  function onAbort() {
-    if (
-      !confirm(
-        `Mark ${ns} as aborted? Stops the child (if running) and writes abortedAt to run.json.`,
-      )
-    )
-      return;
-    withAction(() => api.abortRun(ns), "Abort failed");
-  }
-  function onSaveEdit() {
-    const body: Record<string, unknown> = {
-      pillar: editForm.pillar || null,
-      topic: editForm.topic || null,
-      videoProfile: editForm.videoProfile,
-      projectId: editForm.projectId || null,
-      youtubePublishAt: editForm.youtubePublishAt || null,
-    };
-    withAction(
-      () => api.patchRun(ns, body).then(() => setEditing(false)),
-      "Save failed",
-    );
-  }
-  function onDelete() {
-    if (!confirm(`Delete run ${ns}? This removes runs/${ns}/ permanently.`)) return;
-    withAction(() => api.deleteRun(ns).then(onBack), "Delete failed");
-  }
-
-  if (error) {
-    return (
-      <div className="p-8 text-rose-400">
-        <button onClick={onBack} className="text-cyan-400 underline mr-3">
-          ← Runs
-        </button>
-        Error: {error}
-      </div>
-    );
-  }
-  if (!detail) {
-    return <div className="p-8 text-zinc-400">Loading {ns}…</div>;
-  }
-
-  const meta = detail.meta;
-  const threadHistory = (meta.threadHistory as string[] | undefined) ?? [];
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <button onClick={onBack} className="text-cyan-400 text-sm hover:underline">
-            ← Runs
-          </button>
-          <h1 className="text-xl font-semibold mono text-cyan-300">{ns}</h1>
-          <span className={`text-xs px-2 py-0.5 rounded ${STATUS_COLOR[detail.status]}`}>
-            {detail.status}
-          </span>
-          {detail.childStatus && (
-            <span className="text-xs px-2 py-0.5 rounded bg-ink-800 text-zinc-400">
-              child: {detail.childStatus}
-            </span>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={onResume}
-            className="text-sm px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600"
-          >
-            Resume
-          </button>
-          <button
-            onClick={() => setResumeOverrides((s) => ({ ...s, open: !s.open }))}
-            className="text-sm px-3 py-1.5 rounded bg-ink-800 hover:bg-ink-700 border border-zinc-700"
-          >
-            Resume…
-          </button>
-          <button
-            onClick={onResumeDry}
-            className="text-sm px-3 py-1.5 rounded bg-ink-800 hover:bg-ink-700 border border-zinc-700"
-          >
-            Dry-run
-          </button>
-          <button
-            onClick={onCancel}
-            className="text-sm px-3 py-1.5 rounded bg-ink-800 hover:bg-ink-700 border border-zinc-700"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onAbort}
-            className="text-sm px-3 py-1.5 rounded bg-ink-800 hover:bg-ink-700 border border-zinc-700"
-          >
-            Abort
-          </button>
-          <button
-            onClick={() => setEditing((e) => !e)}
-            className="text-sm px-3 py-1.5 rounded bg-ink-800 hover:bg-ink-700 border border-zinc-700"
-          >
-            Edit
-          </button>
-          <button
-            onClick={onDelete}
-            className="text-sm px-3 py-1.5 rounded bg-rose-700 hover:bg-rose-600"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-
-      {actionError && (
-        <div className="text-rose-400 text-sm mb-3">Error: {actionError}</div>
-      )}
-
-      {resumeOverrides.open && (
-        <div className="bg-ink-900 border border-zinc-700 rounded p-3 mb-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-          <input
-            placeholder="pillar override"
-            value={resumeOverrides.pillar}
-            onChange={(e) => setResumeOverrides((s) => ({ ...s, pillar: e.target.value }))}
-            className="bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm"
-          />
-          <input
-            placeholder="topic override"
-            value={resumeOverrides.topic}
-            onChange={(e) => setResumeOverrides((s) => ({ ...s, topic: e.target.value }))}
-            className="bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm"
-          />
-          <select
-            value={resumeOverrides.profile}
-            onChange={(e) => setResumeOverrides((s) => ({ ...s, profile: e.target.value }))}
-            className="bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm"
-          >
-            <option value="short">short</option>
-            <option value="long">long</option>
-          </select>
-          <input
-            placeholder="--seed path (optional)"
-            value={resumeOverrides.seed}
-            onChange={(e) => setResumeOverrides((s) => ({ ...s, seed: e.target.value }))}
-            className="bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm"
-          />
-          <label className="flex items-center gap-2 text-xs text-zinc-300 col-span-2">
-            <input
-              type="checkbox"
-              checked={resumeOverrides.dryRun}
-              onChange={(e) => setResumeOverrides((s) => ({ ...s, dryRun: e.target.checked }))}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit run metadata</DialogTitle>
+          <DialogDescription>
+            Update pillar, topic, video profile, project ID, or scheduled publish time.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Pillar">
+            <Input
+              value={form.pillar}
+              onChange={(e) => setForm((s) => ({ ...s, pillar: e.target.value }))}
+              placeholder="Psychology"
             />
-            dry-run only
-          </label>
-          <div className="col-span-2 flex gap-2 justify-end">
-            <button
-              onClick={() => setResumeOverrides((s) => ({ ...s, open: false }))}
-              className="text-xs px-2 py-1 rounded bg-ink-800 hover:bg-ink-700"
+          </Field>
+          <Field label="Topic">
+            <Input
+              value={form.topic}
+              onChange={(e) => setForm((s) => ({ ...s, topic: e.target.value }))}
+              placeholder="Why your brain…"
+            />
+          </Field>
+          <Field label="Profile">
+            <Select
+              value={form.videoProfile}
+              onValueChange={(v) => setForm((s) => ({ ...s, videoProfile: v }))}
             >
-              Cancel
-            </button>
-            <button
-              onClick={onResumeWithOverrides}
-              className="text-xs px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600"
-            >
-              Run
-            </button>
-          </div>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="short">short</SelectItem>
+                <SelectItem value="long">long</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Project ID">
+            <Input
+              value={form.projectId}
+              onChange={(e) => setForm((s) => ({ ...s, projectId: e.target.value }))}
+              placeholder="row id"
+            />
+          </Field>
+          <Field label="Publish at (ISO 8601)" className="sm:col-span-2">
+            <Input
+              value={form.youtubePublishAt}
+              onChange={(e) => setForm((s) => ({ ...s, youtubePublishAt: e.target.value }))}
+              placeholder="2025-01-01T00:00:00Z"
+              className="font-mono"
+            />
+          </Field>
         </div>
-      )}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={onSave} disabled={busy}>
+            Save changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
-      {editing && (
-        <div className="bg-ink-900 border border-zinc-700 rounded p-3 mb-4 grid grid-cols-2 md:grid-cols-5 gap-2">
-          <input
-            placeholder="pillar"
-            value={editForm.pillar}
-            onChange={(e) => setEditForm((s) => ({ ...s, pillar: e.target.value }))}
-            className="bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm"
-          />
-          <input
-            placeholder="topic"
-            value={editForm.topic}
-            onChange={(e) => setEditForm((s) => ({ ...s, topic: e.target.value }))}
-            className="bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm"
-          />
-          <select
-            value={editForm.videoProfile}
-            onChange={(e) => setEditForm((s) => ({ ...s, videoProfile: e.target.value }))}
-            className="bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm"
-          >
-            <option value="short">short</option>
-            <option value="long">long</option>
-          </select>
-          <input
-            placeholder="projectId"
-            value={editForm.projectId}
-            onChange={(e) => setEditForm((s) => ({ ...s, projectId: e.target.value }))}
-            className="bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm"
-          />
-          <input
-            placeholder="youtubePublishAt (ISO 8601)"
-            value={editForm.youtubePublishAt}
-            onChange={(e) => setEditForm((s) => ({ ...s, youtubePublishAt: e.target.value }))}
-            className="bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm"
-          />
-          <div className="col-span-2 md:col-span-5 flex gap-2 justify-end">
-            <button
-              onClick={() => setEditing(false)}
-              className="text-xs px-2 py-1 rounded bg-ink-800 hover:bg-ink-700"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onSaveEdit}
-              className="text-xs px-2 py-1 rounded bg-cyan-700 hover:bg-cyan-600"
-            >
-              Save
-            </button>
-          </div>
+function ResumeDialog({
+  open,
+  onOpenChange,
+  ns,
+  onResumed,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  ns: string;
+  onResumed: () => void;
+}) {
+  const [form, setForm] = useState({
+    pillar: "",
+    topic: "",
+    profile: "short",
+    seed: "",
+    dryRun: false,
+  });
+  const [busy, setBusy] = useState(false);
+
+  async function onRun() {
+    setBusy(true);
+    try {
+      const body: Record<string, unknown> = {};
+      if (form.pillar) body.pillar = form.pillar;
+      if (form.topic) body.topic = form.topic;
+      if (form.profile) body.profile = form.profile;
+      if (form.seed) body.seed = form.seed;
+      if (form.dryRun) body.dryRun = true;
+      await api.resumeRun(ns, body);
+      onOpenChange(false);
+      onResumed();
+    } catch (e) {
+      toast.error("Resume failed", (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Resume with overrides</DialogTitle>
+          <DialogDescription>
+            Override pillar, topic, profile, or pass a seed file. Empty fields are ignored.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Pillar">
+            <Input
+              value={form.pillar}
+              onChange={(e) => setForm((s) => ({ ...s, pillar: e.target.value }))}
+              placeholder="Psychology"
+            />
+          </Field>
+          <Field label="Topic">
+            <Input
+              value={form.topic}
+              onChange={(e) => setForm((s) => ({ ...s, topic: e.target.value }))}
+              placeholder="Why your brain…"
+            />
+          </Field>
+          <Field label="Profile">
+            <Select value={form.profile} onValueChange={(v) => setForm((s) => ({ ...s, profile: v }))}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="short">short</SelectItem>
+                <SelectItem value="long">long</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Seed path">
+            <Input
+              value={form.seed}
+              onChange={(e) => setForm((s) => ({ ...s, seed: e.target.value }))}
+              placeholder="/abs/path/to/seed.json"
+              className="font-mono"
+            />
+          </Field>
         </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <div className="bg-ink-900 border border-zinc-800 rounded-lg p-3 text-sm space-y-1">
-          <div>
-            <span className="text-zinc-500">Topic:</span> {meta.topic as string ?? "—"}
-          </div>
-          <div>
-            <span className="text-zinc-500">Pillar:</span> {meta.pillar as string ?? "—"}
-          </div>
-          <div>
-            <span className="text-zinc-500">Profile:</span> {meta.videoProfile as string ?? "—"}
-          </div>
-          <div>
-            <span className="text-zinc-500">Source:</span> {meta.runSource as string ?? "backlog"}
-          </div>
-          <div>
-            <span className="text-zinc-500">Project ID:</span>{" "}
-            {meta.projectId as string ?? "—"}
-          </div>
-          <div>
-            <span className="text-zinc-500">Publish at:</span>{" "}
-            {meta.youtubePublishAt as string ?? "—"}
-          </div>
-          <div>
-            <span className="text-zinc-500">Created:</span>{" "}
-            {meta.createdAt as string ?? "—"}
-          </div>
-          <div>
-            <span className="text-zinc-500">Aborted:</span>{" "}
-            {meta.abortedAt as string ?? "—"}
-          </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="dry-run"
+            checked={form.dryRun}
+            onChange={(e) => setForm((s) => ({ ...s, dryRun: e.target.checked }))}
+            className="h-4 w-4 rounded border-input bg-background accent-primary"
+          />
+          <Label htmlFor="dry-run" className="cursor-pointer normal-case tracking-normal">
+            Dry-run only
+          </Label>
         </div>
-        <div className="bg-ink-900 border border-zinc-800 rounded-lg p-3 text-sm">
-          <div className="text-zinc-500 mb-1">Thread history ({threadHistory.length})</div>
-          <div className="mono text-xs space-y-0.5 max-h-32 overflow-auto scroll-thin">
-            {threadHistory.length === 0 && <div className="text-zinc-600">none</div>}
-            {threadHistory.map((t, i) => (
-              <div key={i} className="text-zinc-300">
-                {i + 1}. {t}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={onRun} disabled={busy}>
+            {form.dryRun ? "Run dry-resume" : "Resume"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
-      <div className="mb-4">
-        <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-          Pipeline progress
-        </h2>
-        <ProgressBar nodeStates={nodeStates} />
-      </div>
-
-      <div className="mb-4">
-        <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-          Stage status
-        </h2>
-        <StageGrid stages={detail.stages} />
-      </div>
-
-      <div className="mb-4">
-        <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-          Generated assets
-        </h2>
-        <AssetsGallery assets={assets} />
-      </div>
-
-      <div className="mb-4">
-        <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-          Live log
-        </h2>
-        <LogStream initial={initialLog} streamUrl={streamUrl} />
-      </div>
+function Field({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("space-y-1.5", className)}>
+      <Label>{label}</Label>
+      {children}
     </div>
   );
 }

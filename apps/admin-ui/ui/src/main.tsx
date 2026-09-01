@@ -1,5 +1,13 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
+import { createRoot } from "react-dom/client";
+import { ThemeProvider } from "@/hooks/use-theme";
 import { App } from "./App";
+import "@/styles/globals.css";
 
-ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
+const root = document.getElementById("root");
+if (!root) throw new Error("#root element missing");
+
+createRoot(root).render(
+  <ThemeProvider>
+    <App />
+  </ThemeProvider>,
+);

@@ -1,7 +1,25 @@
 import { useEffect, useState } from "react";
+import { Download, Loader2, Mic2, Play, Sparkles } from "lucide-react";
+import { PageHeader } from "@/components/shared/page-header";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { EmptyState } from "@/components/shared/empty-state";
+import { toast } from "@/components/ui/toast";
+import { truncate } from "@/lib/utils";
 
 type Voice = { name: string; size: number };
 type Health = "ok" | "down" | "unknown";
+type HistoryItem = { url: string; text: string; voice: string };
 
 export function Tts() {
   const [health, setHealth] = useState<Health>("unknown");
@@ -9,12 +27,16 @@ export function Tts() {
   const [text, setText] = useState("");
   const [voice, setVoice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<{ url: string; text: string; voice: string }[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
 
   useEffect(() => {
     const tick = async () => {
-      setHealth(await healthCheck());
+      try {
+        const r = await fetch("/api/tts/");
+        setHealth(r.ok ? "ok" : "down");
+      } catch {
+        setHealth("down");
+      }
       try {
         const r = await fetch("/api/tts/voices");
         if (r.ok) {
@@ -31,19 +53,12 @@ export function Tts() {
     return () => clearInterval(t);
   }, [voice]);
 
-  async function healthCheck(): Promise<Health> {
-    try {
-      const r = await fetch("/api/tts/");
-      return r.ok ? "ok" : "down";
-    } catch {
-      return "down";
-    }
-  }
-
   async function onGenerate() {
-    if (!text.trim()) return;
+    if (!text.trim()) {
+      toast.warning("Enter some text first");
+      return;
+    }
     setBusy(true);
-    setError(null);
     try {
       const r = await fetch("/api/tts/generate", {
         method: "POST",
@@ -53,78 +68,118 @@ export function Tts() {
       if (!r.ok) throw new Error(`${r.status}: ${await r.text()}`);
       const d = (await r.json()) as { url: string };
       setHistory((h) => [{ url: d.url, text, voice }, ...h].slice(0, 20));
+      toast.success("Audio generated");
     } catch (e) {
-      setError((e as Error).message);
+      toast.error("Generation failed", (e as Error).message);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-semibold">TTS</h1>
-        <span
-          className={`text-xs px-2 py-0.5 rounded ${
-            health === "ok" ? "bg-emerald-700" : health === "down" ? "bg-rose-700" : "bg-zinc-700"
-          }`}
-        >
-          {health}
-        </span>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Text to Speech"
+        description="Synthesize narration with the configured TTS provider."
+        meta={<StatusBadge status={health} />}
+      />
 
-      <div className="bg-ink-900 border border-zinc-800 rounded-lg p-4 mb-4 space-y-3">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          rows={3}
-          placeholder="Text to synthesize…"
-          className="w-full bg-ink-950 border border-zinc-700 rounded px-3 py-2 text-sm"
-        />
-        <div className="flex items-center gap-3 flex-wrap">
-          <select
-            value={voice}
-            onChange={(e) => setVoice(e.target.value)}
-            className="bg-ink-950 border border-zinc-700 rounded px-2 py-1 text-sm"
-          >
-            <option value="">(default)</option>
-            {voices.map((v) => (
-              <option key={v.name} value={v.name.replace(/\.[^.]+$/, "")}>
-                {v.name}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={onGenerate}
-            disabled={busy || health === "down"}
-            className="px-4 py-2 rounded bg-cyan-700 hover:bg-cyan-600 disabled:opacity-50 text-sm font-medium"
-          >
-            {busy ? "Generating…" : "Generate"}
-          </button>
-        </div>
-        {error && <div className="text-rose-400 text-sm">Error: {error}</div>}
-      </div>
-
-      {history.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">History</h2>
-          {history.map((h, i) => (
-            <div key={i} className="bg-ink-900 border border-zinc-800 rounded p-3 space-y-2">
-              <div className="text-xs text-zinc-400 line-clamp-1">
-                {h.voice || "default"} — {h.text}
-              </div>
-              <audio src={h.url} controls className="w-full" />
-              <a
-                href={h.url}
-                download
-                className="text-xs text-cyan-400 hover:underline inline-block"
-              >
-                download
-              </a>
+      <div className="space-y-6 px-4 pb-10 sm:px-6">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Mic2 className="h-4 w-4 text-muted-foreground" />
+              <CardTitle>Synthesize</CardTitle>
             </div>
-          ))}
-        </div>
-      )}
+            <CardDescription>
+              Voice list is loaded from <span className="font-mono text-foreground/80">apps/tts/app/voices/</span>.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Text
+              </label>
+              <Textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                rows={3}
+                placeholder="Paste narration here…"
+              />
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="w-56 space-y-1.5">
+                <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Voice
+                </label>
+                <Select value={voice || "default"} onValueChange={setVoice}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">(default)</SelectItem>
+                    {voices.map((v) => (
+                      <SelectItem key={v.name} value={v.name.replace(/\.[^.]+$/, "")}>
+                        {v.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={onGenerate} disabled={busy || health === "down"} className="ml-auto">
+                {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {busy ? "Generating…" : "Generate"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {history.length === 0 && !busy && (
+          <EmptyState
+            icon={<Sparkles className="h-6 w-6" />}
+            title="No history yet"
+            description="Generated audio appears here. Last 20 entries are kept."
+          />
+        )}
+
+        {history.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Play className="h-4 w-4 text-muted-foreground" />
+                <CardTitle>History</CardTitle>
+                <Badge variant="muted">{history.length}</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {history.map((h, i) => (
+                <div
+                  key={i}
+                  className="flex flex-col gap-2 rounded-md border border-border/60 bg-card/40 p-3 sm:flex-row sm:items-center sm:gap-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="line-clamp-2 text-sm">{h.text}</div>
+                    <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="font-mono">{h.voice || "default"}</span>
+                    </div>
+                  </div>
+                  <audio src={h.url} controls className="h-9 w-full sm:w-64" />
+                  <a
+                    href={h.url}
+                    download
+                    className="inline-flex shrink-0"
+                    title={truncate(h.url, 60)}
+                  >
+                    <Button variant="outline" size="sm">
+                      <Download className="h-3 w-3" /> Download
+                    </Button>
+                  </a>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

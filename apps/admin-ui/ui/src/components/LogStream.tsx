@@ -1,18 +1,56 @@
-import { useEffect, useRef, useState } from "react";
-import type { LogEvent } from "../api";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  CircleDashed,
+  Loader2,
+  Pause,
+  Play,
+  Sparkles,
+  TerminalSquare,
+  Trash2,
+} from "lucide-react";
+import type { LogEvent } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
-const COLOR: Record<string, string> = {
-  node_start: "text-cyan-300",
-  node_end: "text-emerald-300",
-  node_failed: "text-rose-300",
-  llm_call: "text-violet-300",
-  stderr: "text-amber-300",
-  raw: "text-zinc-500",
-  error: "text-rose-400",
+const ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  node_start: Loader2,
+  node_end: CheckCircle2,
+  node_failed: AlertCircle,
+  llm_call: Sparkles,
+  stderr: AlertTriangle,
+  raw: TerminalSquare,
+  error: AlertCircle,
+  log: TerminalSquare,
 };
 
-function fmt(event: LogEvent): string {
-  const ev = event.event ?? "log";
+const TONE: Record<string, string> = {
+  node_start: "text-primary",
+  node_end: "text-success",
+  node_failed: "text-destructive",
+  llm_call: "text-chart-4",
+  stderr: "text-warning",
+  raw: "text-muted-foreground",
+  error: "text-destructive",
+  log: "text-foreground/80",
+};
+
+function fmtTime(ts?: number): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const hh = d.getHours().toString().padStart(2, "0");
+  const mm = d.getMinutes().toString().padStart(2, "0");
+  const ss = d.getSeconds().toString().padStart(2, "0");
+  const ms = d.getMilliseconds().toString().padStart(3, "0");
+  return `${hh}:${mm}:${ss}.${ms}`;
+}
+
+function fmtEvent(event: LogEvent): React.ReactNode {
+  const ev = String(event.event ?? "log");
   const node = (event as Record<string, unknown>).node as string | undefined;
   const dur = (event as Record<string, unknown>).durationMs as number | undefined;
   const model = (event as Record<string, unknown>).model as string | undefined;
@@ -21,22 +59,35 @@ function fmt(event: LogEvent): string {
     | undefined;
   const err = (event as Record<string, unknown>).error as string | undefined;
   const data = (event as Record<string, unknown>).data as string | undefined;
-  const ts = event.ts ? new Date(event.ts).toLocaleTimeString() : "";
-  const head = `[${ts}] ${ev}${node ? ` ${node}` : ""}`;
-  const tail: string[] = [];
-  if (typeof dur === "number") tail.push(`${dur}ms`);
-  if (model) tail.push(String(model));
-  if (usage?.totalTokens) tail.push(`${usage.totalTokens} tok`);
-  if (err) tail.push(String(err).slice(0, 200));
-  if (data) tail.push(String(data).slice(0, 200));
-  return tail.length ? `${head} — ${tail.join(" · ")}` : head;
+
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+      <span className="font-semibold text-foreground/90">{ev}</span>
+      {node && <span className="text-primary">{node}</span>}
+      {typeof dur === "number" && (
+        <span className="text-muted-foreground">· {dur}ms</span>
+      )}
+      {model && <span className="text-muted-foreground">· {String(model)}</span>}
+      {usage?.totalTokens != null && (
+        <span className="text-muted-foreground">· {usage.totalTokens} tok</span>
+      )}
+      {err && <span className="text-destructive">· {String(err).slice(0, 200)}</span>}
+      {data && <span className="text-muted-foreground">· {String(data).slice(0, 200)}</span>}
+    </span>
+  );
 }
 
-export function LogStream({ initial, streamUrl }: { initial: LogEvent[]; streamUrl: string | null }) {
+export function LogStream({
+  initial,
+  streamUrl,
+}: {
+  initial: LogEvent[];
+  streamUrl: string | null;
+}) {
   const [events, setEvents] = useState<LogEvent[]>(initial);
   const [paused, setPaused] = useState(false);
   const [connected, setConnected] = useState(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const eventsRef = useRef<LogEvent[]>(initial);
   eventsRef.current = events;
 
@@ -68,54 +119,110 @@ export function LogStream({ initial, streamUrl }: { initial: LogEvent[]; streamU
 
   useEffect(() => {
     if (paused) return;
-    const el = containerRef.current;
+    const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [events, paused]);
 
-  function clear() {
-    setEvents([]);
-  }
+  const counts = useMemo(() => {
+    let info = 0,
+      warn = 0,
+      err = 0;
+    for (const e of events) {
+      if (e.event === "error" || e.event === "node_failed") err++;
+      else if (e.event === "stderr") warn++;
+      else info++;
+    }
+    return { info, warn, err };
+  }, [events]);
 
   return (
-    <div className="bg-ink-900 border border-zinc-800 rounded-lg overflow-hidden flex flex-col h-96">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 bg-ink-800 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="text-zinc-400">Live log</span>
+    <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border/60 bg-card/60 px-3 py-2 text-xs">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <span className="font-semibold text-foreground">Live log</span>
           <span
-            className={`inline-block w-2 h-2 rounded-full ${
-              connected ? "bg-emerald-400" : "bg-zinc-600"
-            }`}
-            title={connected ? "connected" : "disconnected"}
+            className={cn(
+              "inline-block h-1.5 w-1.5 rounded-full",
+              connected ? "bg-success animate-pulse" : "bg-muted-foreground/40",
+            )}
+            title={connected ? "Connected" : "Disconnected"}
           />
-          <span className="text-zinc-500">({events.length} events)</span>
+          <span className="text-muted-foreground">
+            {events.length} {events.length === 1 ? "event" : "events"}
+          </span>
         </div>
-        <div className="flex gap-2">
-          <button
+        <div className="ml-auto flex items-center gap-2">
+          {counts.err > 0 && (
+            <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">
+              {counts.err} error{counts.err === 1 ? "" : "s"}
+            </Badge>
+          )}
+          {counts.warn > 0 && (
+            <Badge variant="warning" className="h-5 px-1.5 text-[10px]">
+              {counts.warn} warn
+            </Badge>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setPaused((p) => !p)}
-            className="px-2 py-0.5 rounded bg-ink-700 hover:bg-ink-600"
+            className="h-7 px-2 text-xs"
           >
-            {paused ? "Resume" : "Pause"}
-          </button>
-          <button onClick={clear} className="px-2 py-0.5 rounded bg-ink-700 hover:bg-ink-600">
-            Clear
-          </button>
+            {paused ? (
+              <>
+                <Play className="h-3 w-3" /> Resume
+              </>
+            ) : (
+              <>
+                <Pause className="h-3 w-3" /> Pause
+              </>
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setEvents([])}
+            className="h-7 px-2 text-xs"
+            disabled={events.length === 0}
+          >
+            <Trash2 className="h-3 w-3" /> Clear
+          </Button>
         </div>
       </div>
-      <div
-        ref={containerRef}
-        className="flex-1 overflow-y-auto scroll-thin p-2 text-xs mono leading-5"
-      >
-        {events.length === 0 ? (
-          <div className="text-zinc-600 italic p-4">No log events yet.</div>
-        ) : (
-          events.map((e, i) => (
-            <div key={i} className={COLOR[e.event] ?? "text-zinc-300"}>
-              {fmt(e)}
+      <ScrollArea className="h-96">
+        <div
+          ref={scrollRef}
+          className="min-h-full space-y-0.5 px-3 py-2 font-mono text-xs leading-relaxed"
+        >
+          {events.length === 0 ? (
+            <div className="flex h-96 flex-col items-center justify-center gap-1 text-muted-foreground">
+              <CircleDashed className="h-5 w-5 opacity-60" />
+              <span>No log events yet</span>
+              <span className="text-[10px] text-muted-foreground/70">
+                Connect a stream to begin
+              </span>
             </div>
-          ))
-        )}
-      </div>
+          ) : (
+            events.map((e, i) => {
+              const ev = String(e.event ?? "log");
+              const Icon = ICON[ev] ?? TerminalSquare;
+              return (
+                <div
+                  key={i}
+                  className="grid grid-cols-[88px_16px_1fr] items-center gap-2 rounded px-1 py-0.5 hover:bg-muted/30"
+                >
+                  <span className="select-none text-muted-foreground/70">
+                    {fmtTime(e.ts)}
+                  </span>
+                  <Icon className={cn("h-3 w-3 shrink-0", TONE[ev] ?? "text-muted-foreground")} />
+                  <span className="break-words">{fmtEvent(e)}</span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </ScrollArea>
     </div>
   );
 }

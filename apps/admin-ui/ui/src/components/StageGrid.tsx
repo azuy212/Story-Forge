@@ -1,4 +1,7 @@
-import type { StageStatus } from "../api";
+import type { StageStatus } from "@/lib/api";
+import { CheckCircle2, Circle, CircleDashed, Clock, XCircle, HelpCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 const STAGES = [
   { key: "research", label: "Research" },
@@ -19,43 +22,85 @@ const STAGES = [
   { key: "releaseValidation", label: "Release Validation" },
   { key: "releaseReview", label: "Release Review" },
   { key: "publish", label: "Publish" },
-];
+] as const;
 
-const ICON: Record<StageStatus, string> = {
-  complete: "✓",
-  seeded: "◇",
-  missing: "○",
-  pending: "⏳",
-  failed: "✗",
-  unknown: "?",
-};
-
-const COLOR: Record<StageStatus, string> = {
-  complete: "bg-emerald-700/40 border-emerald-600 text-emerald-200",
-  seeded: "bg-sky-700/30 border-sky-600 text-sky-200",
-  missing: "bg-ink-800 border-zinc-700 text-zinc-400",
-  pending: "bg-amber-700/30 border-amber-600 text-amber-200",
-  failed: "bg-rose-700/40 border-rose-600 text-rose-200",
-  unknown: "bg-ink-800 border-zinc-700 text-zinc-500",
+const META: Record<
+  StageStatus,
+  { icon: React.ComponentType<{ className?: string }>; tone: string; ring: string; chip: string }
+> = {
+  complete: {
+    icon: CheckCircle2,
+    tone: "text-success",
+    ring: "ring-success/40 bg-success/10",
+    chip: "bg-success/15 text-success",
+  },
+  seeded: {
+    icon: CircleDashed,
+    tone: "text-chart-4",
+    ring: "ring-chart-4/40 bg-chart-4/10",
+    chip: "bg-chart-4/15 text-chart-4",
+  },
+  missing: {
+    icon: Circle,
+    tone: "text-muted-foreground/50",
+    ring: "ring-border/50 bg-card/40",
+    chip: "bg-muted text-muted-foreground",
+  },
+  pending: {
+    icon: Clock,
+    tone: "text-warning",
+    ring: "ring-warning/40 bg-warning/5",
+    chip: "bg-warning/15 text-warning",
+  },
+  failed: {
+    icon: XCircle,
+    tone: "text-destructive",
+    ring: "ring-destructive/40 bg-destructive/10",
+    chip: "bg-destructive/15 text-destructive",
+  },
+  unknown: {
+    icon: HelpCircle,
+    tone: "text-muted-foreground/40",
+    ring: "ring-border/50 bg-card/40",
+    chip: "bg-muted text-muted-foreground",
+  },
 };
 
 export function StageGrid({ stages }: { stages: Record<string, StageStatus> }) {
   return (
-    <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
       {STAGES.map((s) => {
         const status = stages[s.key] ?? "missing";
+        const meta = META[status];
+        const Icon = meta.icon;
         return (
-          <div
-            key={s.key}
-            className={`rounded border px-2 py-2 text-xs flex items-center gap-2 ${COLOR[status]}`}
-            title={`${s.key}: ${status}`}
-          >
-            <span className="text-base leading-none">{ICON[status]}</span>
-            <div className="flex-1 min-w-0">
-              <div className="font-medium truncate">{s.label}</div>
-              <div className="opacity-60 text-[10px] uppercase tracking-wider">{status}</div>
-            </div>
-          </div>
+          <Tooltip key={s.key}>
+            <TooltipTrigger asChild>
+              <div
+                className={cn(
+                  "group flex items-center gap-2.5 rounded-md border border-transparent px-2.5 py-2 text-left transition-colors hover:border-border/60 hover:bg-card/60",
+                  "ring-1 ring-inset",
+                  meta.ring,
+                )}
+              >
+                <Icon className={cn("h-4 w-4 shrink-0", meta.tone)} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-xs font-medium text-foreground">{s.label}</div>
+                  <div
+                    className={cn(
+                      "mt-0.5 inline-flex items-center gap-1 rounded px-1.5 py-0 text-[10px] font-medium uppercase tracking-wider",
+                      meta.chip,
+                    )}
+                  >
+                    {status}
+                  </div>
+                </div>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <span className="font-mono">{s.key}</span> · {status}
+            </TooltipContent>
+          </Tooltip>
         );
       })}
     </div>

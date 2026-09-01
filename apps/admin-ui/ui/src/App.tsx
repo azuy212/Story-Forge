@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Home } from "./pages/Home";
 import { Runs } from "./pages/Runs";
 import { RunDetail } from "./pages/RunDetail";
@@ -7,6 +7,13 @@ import { Auth } from "./pages/Auth";
 import { ImageProvider } from "./pages/ImageProvider";
 import { Tts } from "./pages/Tts";
 import { Transcriber } from "./pages/Transcriber";
+import { AppSidebar } from "@/components/shared/app-sidebar";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/toast";
+import { Menu, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type Route = { name: string; ns?: string };
 
@@ -17,21 +24,26 @@ function parseHash(): Route {
   return { name, ns: rest.join("/") };
 }
 
-const NAV = [
-  { name: "home", label: "Home" },
-  { name: "runs", label: "Runs" },
-  { name: "launch", label: "Launch" },
-  { name: "image", label: "Image Provider" },
-  { name: "tts", label: "TTS" },
-  { name: "transcriber", label: "Transcriber" },
-  { name: "auth", label: "YouTube Auth" },
-];
+const ROUTE_META: Record<string, { title: string; group: string }> = {
+  home: { title: "Dashboard", group: "Overview" },
+  runs: { title: "Runs", group: "Overview" },
+  run: { title: "Run detail", group: "Overview" },
+  launch: { title: "Launch", group: "Production" },
+  image: { title: "Image Provider", group: "Services" },
+  tts: { title: "Text to Speech", group: "Services" },
+  transcriber: { title: "Transcriber", group: "Services" },
+  auth: { title: "Google Auth", group: "Publishing" },
+};
 
 export function App() {
-  const [route, setRoute] = useState<Route>(parseHash());
+  const [route, setRoute] = useState<Route>(parseHash);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
-    const onHash = () => setRoute(parseHash());
+    const onHash = () => {
+      setRoute(parseHash());
+      setMobileNavOpen(false);
+    };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
@@ -40,37 +52,111 @@ export function App() {
     window.location.hash = ns ? `/${name}/${ns}` : `/${name}`;
   }
 
+  const meta = ROUTE_META[route.name] ?? { title: route.name, group: "" };
+
   return (
-    <div className="min-h-screen flex">
-      <aside className="w-56 bg-ink-900 border-r border-zinc-800 p-4 flex flex-col gap-1">
-        <div className="text-lg font-semibold mb-4 px-2">
-          <span className="text-cyan-400">▣</span> admin-ui
+    <TooltipProvider delayDuration={250}>
+      <div className="flex min-h-svh bg-background text-foreground">
+        <AppSidebar />
+
+        {mobileNavOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/60 md:hidden"
+            onClick={() => setMobileNavOpen(false)}
+          />
+        )}
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border/60 bg-background/70 px-4 backdrop-blur-md sm:px-6">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              aria-label="Toggle navigation"
+              onClick={() => setMobileNavOpen((s) => !s)}
+            >
+              {mobileNavOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </Button>
+            <Breadcrumbs meta={meta} route={route} />
+            <div className="ml-auto flex items-center gap-1">
+              <ThemeToggle />
+            </div>
+          </header>
+
+          <main className="flex-1 overflow-x-hidden">
+            <MobileNav open={mobileNavOpen} />
+            <div className={cn("mx-auto w-full", "max-w-7xl")}>
+              {route.name === "home" && <Home />}
+              {route.name === "runs" && <Runs onOpen={(ns) => go("run", ns)} />}
+              {route.name === "run" && route.ns && (
+                <RunDetail ns={route.ns} onBack={() => go("runs")} />
+              )}
+              {route.name === "launch" && <Launch onLaunched={(ns) => go("run", ns)} />}
+              {route.name === "image" && <ImageProvider />}
+              {route.name === "tts" && <Tts />}
+              {route.name === "transcriber" && <Transcriber />}
+              {route.name === "auth" && <Auth />}
+            </div>
+          </main>
         </div>
-        {NAV.map((n) => (
-          <button
-            key={n.name}
-            onClick={() => go(n.name)}
-            className={`text-left text-sm px-3 py-2 rounded transition ${
-              route.name === n.name
-                ? "bg-ink-800 text-cyan-300"
-                : "text-zinc-300 hover:bg-ink-800"
-            }`}
+
+        <Toaster />
+      </div>
+    </TooltipProvider>
+  );
+}
+
+function Breadcrumbs({
+  meta,
+  route,
+}: {
+  meta: { title: string; group: string };
+  route: Route;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2 text-sm">
+      {meta.group && (
+        <span className="hidden text-xs uppercase tracking-wider text-muted-foreground sm:inline">
+          {meta.group}
+        </span>
+      )}
+      {meta.group && <span className="hidden h-3 w-px bg-border sm:inline-block" />}
+      <h2 className="truncate font-semibold tracking-tight">{meta.title}</h2>
+      {route.ns && (
+        <>
+          <span className="hidden h-3 w-px bg-border sm:inline-block" />
+          <span className="hidden truncate font-mono text-xs text-muted-foreground sm:inline">
+            {route.ns}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
+function MobileNav({ open }: { open: boolean }) {
+  if (!open) return null;
+  return (
+    <div className="border-b border-border/60 bg-card px-4 py-3 md:hidden">
+      <nav className="grid grid-cols-2 gap-1">
+        {[
+          { href: "#/home", label: "Dashboard" },
+          { href: "#/runs", label: "Runs" },
+          { href: "#/launch", label: "Launch" },
+          { href: "#/image", label: "Image Provider" },
+          { href: "#/tts", label: "TTS" },
+          { href: "#/transcriber", label: "Transcriber" },
+          { href: "#/auth", label: "Google Auth" },
+        ].map((l) => (
+          <a
+            key={l.href}
+            href={l.href}
+            className="rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
           >
-            {n.label}
-          </button>
+            {l.label}
+          </a>
         ))}
-        <div className="mt-auto text-xs text-zinc-500 px-2">v0.1.0</div>
-      </aside>
-      <main className="flex-1 overflow-auto scroll-thin">
-        {route.name === "home" && <Home />}
-        {route.name === "runs" && <Runs onOpen={(ns) => go("run", ns)} />}
-        {route.name === "run" && route.ns && <RunDetail ns={route.ns} onBack={() => go("runs")} />}
-        {route.name === "launch" && <Launch onLaunched={(ns) => go("run", ns)} />}
-        {route.name === "image" && <ImageProvider />}
-        {route.name === "tts" && <Tts />}
-        {route.name === "transcriber" && <Transcriber />}
-        {route.name === "auth" && <Auth />}
-      </main>
+      </nav>
     </div>
   );
 }
