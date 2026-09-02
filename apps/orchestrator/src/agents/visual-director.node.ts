@@ -377,12 +377,14 @@ export async function visualDirectorNode(
   const formatLabel = formatLabelFor(videoProfile);
   const canvasGuidance = canvasGuidanceFor(videoProfile);
   const speakingRate = speakingRateWps(videoProfile);
-  const sceneCountRange = videoProfile.sceneDensity.max === null
-    ? `${videoProfile.sceneDensity.min}+`
-    : `${videoProfile.sceneDensity.min}-${videoProfile.sceneDensity.max}`;
+  const sceneCountRange =
+    videoProfile.sceneDensity.max === null
+      ? `${videoProfile.sceneDensity.min}+`
+      : `${videoProfile.sceneDensity.min}-${videoProfile.sceneDensity.max}`;
 
   // Target scene count: aim for middle of density range (long profile has no max)
-  const effectiveMax = videoProfile.sceneDensity.max ?? videoProfile.sceneDensity.min * 2;
+  const effectiveMax =
+    videoProfile.sceneDensity.max ?? videoProfile.sceneDensity.min * 2;
   const targetSceneCount = Math.round(
     (videoProfile.sceneDensity.min + effectiveMax) / 2,
   );

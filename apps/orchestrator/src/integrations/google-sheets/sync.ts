@@ -45,7 +45,9 @@ export async function syncVideoRecord(
   options: SyncVideoRecordOptions,
 ): Promise<SyncVideoRecordResult> {
   const { api, spreadsheetId, sheetName, videoId, record } = options;
-  const sink = getRunLogSink(logger.getCurrentSink()?.runId ?? "") ?? logger.getCurrentSink();
+  const sink =
+    getRunLogSink(logger.getCurrentSink()?.runId ?? "") ??
+    logger.getCurrentSink();
   const startedAt = Date.now();
   const event: Record<string, unknown> = {
     event: "provider_call",

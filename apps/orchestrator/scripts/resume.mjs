@@ -127,7 +127,7 @@ function printStatus(ns, meta, manifest, isSeedRun = false) {
   console.log(`Thread: ${meta?.threadId ?? "unknown"}`);
   console.log(`Topic: ${meta?.topic ?? "unknown"}`);
   console.log(`Pillar: ${meta?.pillar ?? "unknown"}`);
-  console.log(`Source: ${isSeedRun ? "seed" : meta?.runSource ?? "backlog"}`);
+  console.log(`Source: ${isSeedRun ? "seed" : (meta?.runSource ?? "backlog")}`);
   console.log(`Created: ${meta?.createdAt ?? "unknown"}`);
   console.log(`Thread history: ${meta?.threadHistory?.join(", ") ?? "none"}`);
   console.log("\nStage status:");
@@ -408,8 +408,7 @@ async function main() {
   // Determine whether this is a seed run and resolve the seed payload to
   // re-inject. New runs persist run.json.seed (set by seed-run); legacy runs
   // require the user to pass --seed explicitly.
-  const isSeedRun =
-    meta?.runSource === "seed" || Boolean(parsed.seed);
+  const isSeedRun = meta?.runSource === "seed" || Boolean(parsed.seed);
   let resumeSeed = null;
   if (isSeedRun) {
     if (meta?.seed) {

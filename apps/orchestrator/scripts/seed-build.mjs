@@ -39,9 +39,7 @@ export function buildSeed(raw, overrides = {}) {
     if (typeof f.fact !== "string" || !f.fact.trim())
       throw new Error(`seed: research.facts[${i}].fact is required`);
     if (typeof f.confidence !== "string" || !f.confidence.trim())
-      throw new Error(
-        `seed: research.facts[${i}].confidence is required`,
-      );
+      throw new Error(`seed: research.facts[${i}].confidence is required`);
   }
 
   const content = raw.content || {};

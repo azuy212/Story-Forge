@@ -98,13 +98,17 @@ function kenBurnsFilter(
   // Smoothstep interpolation gives the camera gentle acceleration/deceleration.
   const progress = `(3*pow(${t},2)-2*pow(${t},3))`;
 
-  const zoomExpr = `1+(${opts.kenBurnsMaxZoom}-1)*${progress}`;
+  // Guard against caller-supplied maxZoom < 1, which would zoom *out* and
+  // expose the source padding as black bars. Sub-1 zooms are unsupported.
+  const maxZoom = Math.max(1, opts.kenBurnsMaxZoom);
+
+  const zoomExpr = `1+(${maxZoom}-1)*${progress}`;
 
   const panX = pan.x.replaceAll("{progress}", progress);
   const panY = pan.y.replaceAll("{progress}", progress);
 
-  const srcW = Math.ceil(opts.width * opts.kenBurnsMaxZoom);
-  const srcH = Math.ceil(opts.height * opts.kenBurnsMaxZoom);
+  const srcW = Math.ceil(opts.width * maxZoom);
+  const srcH = Math.ceil(opts.height * maxZoom);
   return [
     `scale=${srcW}:${srcH}:force_original_aspect_ratio=increase`,
     "setsar=1",

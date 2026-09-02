@@ -3,7 +3,13 @@
 // relative tree so compiled modules that import a sibling .mjs can resolve
 // it at runtime. Without this, namespace.js (and any other TS that imports
 // ../foo.mjs) throws ERR_MODULE_NOT_FOUND when the launcher runs.
-import { readdir, mkdir, copyFile, readFile, writeFile } from "node:fs/promises";
+import {
+  readdir,
+  mkdir,
+  copyFile,
+  readFile,
+  writeFile,
+} from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 
 const ROOT = process.cwd();

@@ -128,12 +128,12 @@ describe("long video profile: min-only enforcement", () => {
       storyType: "discovery" as const,
       storySummary: "A short story.",
     };
-    expect(
-      schema.safeParse({ ...base, storyBeats: tooFew }).success,
-    ).toBe(false);
-    expect(
-      schema.safeParse({ ...base, storyBeats: tooMany }).success,
-    ).toBe(false);
+    expect(schema.safeParse({ ...base, storyBeats: tooFew }).success).toBe(
+      false,
+    );
+    expect(schema.safeParse({ ...base, storyBeats: tooMany }).success).toBe(
+      false,
+    );
   });
 
   it("beatCountRangeFor returns min=10, max=null for long", () => {
@@ -147,10 +147,9 @@ describe("long video profile: min-only enforcement", () => {
   it("checkNarrationDuration reports no issue for long when words exceed the old short max", () => {
     const profile = longProfile();
     const range = wordRangeFor(profile);
-    const longText = Array.from(
-      { length: range.min + 200 },
-      () => "word",
-    ).join(" ");
+    const longText = Array.from({ length: range.min + 200 }, () => "word").join(
+      " ",
+    );
     const issues = checkNarrationDuration(profile, longText, 600);
     expect(issues).toEqual([]);
   });
@@ -159,7 +158,9 @@ describe("long video profile: min-only enforcement", () => {
     const profile = longProfile();
     const range = wordRangeFor(profile);
     const shortText = "only a few words here now";
-    expect(range.min).toBeGreaterThan(shortText.split(/\s+/).filter(Boolean).length);
+    expect(range.min).toBeGreaterThan(
+      shortText.split(/\s+/).filter(Boolean).length,
+    );
     const issues = checkNarrationDuration(profile, shortText, 300);
     expect(issues.some((i) => i.toLowerCase().includes("word"))).toBe(true);
   });
@@ -200,12 +201,8 @@ describe("long video profile: min-only enforcement", () => {
     expect(
       checkNarrationDuration(profile, longText, minEstimated - 10).length,
     ).toBeGreaterThan(0);
-    expect(
-      checkNarrationDuration(profile, longText, 600).length,
-    ).toBe(0);
-    expect(
-      checkNarrationDuration(profile, longText, 9999).length,
-    ).toBe(0);
+    expect(checkNarrationDuration(profile, longText, 600).length).toBe(0);
+    expect(checkNarrationDuration(profile, longText, 9999).length).toBe(0);
   });
 
   it("checkNarrationDuration short: estimated duration above max is an issue", () => {

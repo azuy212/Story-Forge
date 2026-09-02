@@ -71,7 +71,9 @@ const ScenePlanSchema = z.object({
 function buildScenesSchema(profile?: VideoProfileConfig) {
   const minScenes = profile?.profile === "long" ? 25 : 4;
   const maxScenes = profile?.profile === "long" ? null : 12;
-  let arr = z.array(ScenePlanSchema).min(minScenes, `must have at least ${minScenes} scenes`);
+  let arr = z
+    .array(ScenePlanSchema)
+    .min(minScenes, `must have at least ${minScenes} scenes`);
   if (maxScenes !== null) {
     arr = arr.max(maxScenes, `must have at most ${maxScenes} scenes`);
   }

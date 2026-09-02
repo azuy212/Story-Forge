@@ -42,7 +42,9 @@ const ScriptBeatSchema = z.object({
 function buildScriptBeatsSchema(profile?: VideoProfileConfig) {
   const minBeats = profile?.profile === "long" ? 10 : 6;
   const maxBeats = profile?.profile === "long" ? null : 10;
-  let arr = z.array(ScriptBeatSchema).min(minBeats, `must have at least ${minBeats} story beats`);
+  let arr = z
+    .array(ScriptBeatSchema)
+    .min(minBeats, `must have at least ${minBeats} story beats`);
   if (maxBeats !== null) {
     arr = arr.max(maxBeats, `must have at most ${maxBeats} story beats`);
   }

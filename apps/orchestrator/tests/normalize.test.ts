@@ -153,6 +153,21 @@ describe("normalizeAsset Ken Burns (image)", () => {
   it("exposes a preset count", () => {
     expect(PAN_PRESET_COUNT).toBe(7);
   });
+
+  it("clamps sub-1 maxZoom to 1.0 in both scale and zoompan expression", async () => {
+    await normalizeAsset("input.png", "out.mp4", 4, 0, {
+      ...BASE_OPTS,
+      kenBurnsMaxZoom: 0.5,
+    });
+    const filter = vfFromArgs(lastCallArgs());
+
+    // Sub-1 zooms would zoom *out* and expose the source canvas as black bars.
+    // Clamp to 1.0 keeps framing static and source-scale = output-scale.
+    expect(filter).toContain(
+      `scale=${BASE_OPTS.width}:${BASE_OPTS.height}:force_original_aspect_ratio=increase`,
+    );
+    expect(filter).toContain("z='1+(1-1)*");
+  });
 });
 
 describe("normalizeAsset without Ken Burns (image)", () => {

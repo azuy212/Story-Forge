@@ -367,13 +367,14 @@ async function main() {
   // strict → bypass). Text files always convert regardless of --no-convert,
   // since there's no other way to produce a structured seed.
   const loose = isTextFile || isLooseSeed(raw);
-  const doConvert = parsed.convert === true
-    ? true
-    : parsed.convert === false
-      ? isTextFile
-        ? true
-        : false
-      : loose;
+  const doConvert =
+    parsed.convert === true
+      ? true
+      : parsed.convert === false
+        ? isTextFile
+          ? true
+          : false
+        : loose;
 
   if (doConvert) {
     const mode = isTextFile ? "text/paragraph" : "loose JSON";

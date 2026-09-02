@@ -157,9 +157,10 @@ export async function scriptQANode(
   logger.nodePhase(label, "checking script");
 
   // For long profile, only enforce minimum word count
-  const targetWordRange = videoProfile.profile === "long"
-    ? `at least ${wordRange.min}`
-    : `${wordRange.min}-${wordRange.max}`;
+  const targetWordRange =
+    videoProfile.profile === "long"
+      ? `at least ${wordRange.min}`
+      : `${wordRange.min}-${wordRange.max}`;
 
   const result = await runAgent<ScriptQAOutput>({
     agent: AgentModel.ScriptQA,

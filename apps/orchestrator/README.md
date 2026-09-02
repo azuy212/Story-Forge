@@ -275,10 +275,10 @@ The `seed-run` launcher handles thread creation, run-folder naming, and SSE
 streaming. Two seed forms are supported, auto-detected by extension and shape
 (override with `--convert` / `--no-convert`):
 
-| Mode | Seed file | Behavior |
-| --- | --- | --- |
-| Structured | `.json` with `research.{summary,facts}` + `content.{script,...}` | Validated and fed to the graph. **No LLM convert call.** `pillar` + `topic` are required (in the file or via `--pillar`/`--topic`). |
-| Text / paragraph | `.txt` / `.md`, or `.json` with string `research` / `script` | LLM (using `SEED_CONVERT_PROMPT`) structures it, including `pillar` + `topic` when not supplied. Requires `OPENROUTER_API_KEY`. |
+| Mode             | Seed file                                                        | Behavior                                                                                                                            |
+| ---------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Structured       | `.json` with `research.{summary,facts}` + `content.{script,...}` | Validated and fed to the graph. **No LLM convert call.** `pillar` + `topic` are required (in the file or via `--pillar`/`--topic`). |
+| Text / paragraph | `.txt` / `.md`, or `.json` with string `research` / `script`     | LLM (using `SEED_CONVERT_PROMPT`) structures it, including `pillar` + `topic` when not supplied. Requires `OPENROUTER_API_KEY`.     |
 
 ### Sheet writeback
 
@@ -316,7 +316,12 @@ pnpm seed-run --seed ./my-seed.json --dry-run
   "research": {
     "summary": "One-paragraph brief.",
     "facts": [
-      { "id": "f1", "fact": "...", "confidence": "high", "classification": "study" }
+      {
+        "id": "f1",
+        "fact": "...",
+        "confidence": "high",
+        "classification": "study"
+      }
     ]
   },
   "content": {
