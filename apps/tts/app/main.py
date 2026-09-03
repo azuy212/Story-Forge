@@ -22,6 +22,11 @@ def health():
     return {"status": "running", "service": "chatterbox"}
 
 
+@app.get("/health")
+def health_alias():
+    return {"status": "running", "service": "chatterbox"}
+
+
 @app.post("/generate")
 def generate(request: GenerateRequest):
     try:
