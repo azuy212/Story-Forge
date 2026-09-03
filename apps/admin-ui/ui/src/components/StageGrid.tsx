@@ -3,7 +3,7 @@ import { CheckCircle2, Circle, CircleDashed, Clock, XCircle, HelpCircle } from "
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-const STAGES = [
+export const STAGES = [
   { key: "research", label: "Research" },
   { key: "researchQA", label: "Research QA" },
   { key: "scriptPlan", label: "Script Plan" },
@@ -66,7 +66,13 @@ const META: Record<
   },
 };
 
-export function StageGrid({ stages }: { stages: Record<string, StageStatus> }) {
+export function StageGrid({
+  stages,
+  onSelect,
+}: {
+  stages: Record<string, StageStatus>;
+  onSelect: (stageKey: string) => void;
+}) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
       {STAGES.map((s) => {
@@ -76,12 +82,16 @@ export function StageGrid({ stages }: { stages: Record<string, StageStatus> }) {
         return (
           <Tooltip key={s.key}>
             <TooltipTrigger asChild>
-              <div
+              <button
+                type="button"
+                onClick={() => onSelect(s.key)}
                 className={cn(
-                  "group flex items-center gap-2.5 rounded-md border border-transparent px-2.5 py-2 text-left transition-colors hover:border-border/60 hover:bg-card/60",
+                  "group flex w-full items-center gap-2.5 rounded-md border border-transparent px-2.5 py-2 text-left transition-colors",
+                  "hover:border-border/60 hover:bg-card/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                   "ring-1 ring-inset",
                   meta.ring,
                 )}
+                aria-label={`View ${s.label} artifact`}
               >
                 <Icon className={cn("h-4 w-4 shrink-0", meta.tone)} />
                 <div className="min-w-0 flex-1">
@@ -95,10 +105,10 @@ export function StageGrid({ stages }: { stages: Record<string, StageStatus> }) {
                     {status}
                   </div>
                 </div>
-              </div>
+              </button>
             </TooltipTrigger>
             <TooltipContent side="top">
-              <span className="font-mono">{s.key}</span> · {status}
+              <span className="font-mono">{s.key}</span> · {status} · click to view artifact
             </TooltipContent>
           </Tooltip>
         );

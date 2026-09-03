@@ -7,6 +7,7 @@ import { orchestratorRouter } from "./routers/orchestrator.mjs";
 import { imageProviderRouter } from "./routers/image-provider.mjs";
 import { ttsRouter } from "./routers/tts.mjs";
 import { transcriberRouter } from "./routers/transcriber.mjs";
+import { sheetsRouter } from "./routers/sheets.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const UI_DIST = join(__dirname, "..", "dist", "ui");
@@ -21,6 +22,7 @@ await app.register(orchestratorRouter, { prefix: "/api/orchestrator" });
 await app.register(imageProviderRouter, { prefix: "/api/image-provider" });
 await app.register(ttsRouter, { prefix: "/api/tts" });
 await app.register(transcriberRouter, { prefix: "/api/transcriber" });
+await app.register(sheetsRouter, { prefix: "/api/sheets" });
 
 app.get("/api/health", async () => ({ status: "ok", service: "admin-ui" }));
 

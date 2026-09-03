@@ -1,12 +1,14 @@
 import { useState } from "react";
-import { ArrowRight, FileUp, Play, Rocket, Sparkles } from "lucide-react";
+import { ArrowRight, CalendarClock, FileUp, Layers3, ListOrdered, Play, Rocket, Sparkles, Tag, Zap } from "lucide-react";
 import { api } from "@/lib/api";
+import { useSheet } from "@/hooks/use-sheet";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -27,7 +29,8 @@ export function Launch({ onLaunched }: { onLaunched: (ns: string) => void }) {
         title="Launch"
         description="Trigger the pipeline — pull from the backlog or feed pre-written research via a seed file."
       />
-      <div className="px-4 sm:px-6">
+      <div className="space-y-6 px-4 sm:px-6">
+        <NextInLineStrip />
         <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
           <TabsList>
             <TabsTrigger value="next">
@@ -46,6 +49,89 @@ export function Launch({ onLaunched }: { onLaunched: (ns: string) => void }) {
         </Tabs>
       </div>
     </div>
+  );
+}
+
+function NextInLineStrip() {
+  const sheet = useSheet();
+  const short = sheet.nextInLine("short");
+  const long = sheet.nextInLine("long");
+
+  return (
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <NextInLineCard profile="short" next={short} loading={sheet.loading} />
+      <NextInLineCard profile="long" next={long} loading={sheet.loading} />
+    </div>
+  );
+}
+
+function NextInLineCard({
+  profile,
+  next,
+  loading,
+}: {
+  profile: "short" | "long";
+  next: ReturnType<ReturnType<typeof useSheet>["nextInLine"]>;
+  loading: boolean;
+}) {
+  const Icon = profile === "short" ? Zap : Layers3;
+  const label = profile === "short" ? "Short video" : "Long video";
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Icon className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm">Next in line — {label}</CardTitle>
+          </div>
+          <Badge variant="outline" className="capitalize">
+            {profile}
+          </Badge>
+        </div>
+        <CardDescription>
+          First planned row in the sheet. The launcher picks this one when you press Run Next.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {loading && !next ? (
+          <div className="space-y-2">
+            <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+            <div className="h-3 w-1/2 animate-pulse rounded bg-muted" />
+          </div>
+        ) : !next || !next.rowExists ? (
+          <div className="flex items-center gap-2 rounded-md border border-dashed border-border/60 px-3 py-4 text-sm text-muted-foreground">
+            <ListOrdered className="h-4 w-4" />
+            <span>No planned rows in this sheet.</span>
+          </div>
+        ) : (
+          <>
+            <p className="text-sm font-medium leading-snug text-foreground">{next.topic}</p>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <Tag className="h-3 w-3" />
+                {next.category || "no category"}
+              </span>
+              <span className="inline-flex items-center gap-1 font-mono">
+                <span className="text-muted-foreground/70">id</span>
+                {next.videoId || "—"}
+              </span>
+              {next.scheduledAtLocal ? (
+                <span className="inline-flex items-center gap-1 font-mono">
+                  <CalendarClock className="h-3 w-3" />
+                  {next.scheduledAtLocal}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1">
+                  <CalendarClock className="h-3 w-3" />
+                  no slot yet
+                </span>
+              )}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

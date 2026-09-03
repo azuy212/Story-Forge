@@ -7,6 +7,7 @@ import { Auth } from "./pages/Auth";
 import { ImageProvider } from "./pages/ImageProvider";
 import { Tts } from "./pages/Tts";
 import { Transcriber } from "./pages/Transcriber";
+import { SheetsView } from "./pages/SheetsView";
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -29,6 +30,7 @@ const ROUTE_META: Record<string, { title: string; group: string }> = {
   runs: { title: "Runs", group: "Overview" },
   run: { title: "Run detail", group: "Overview" },
   launch: { title: "Launch", group: "Production" },
+  sheets: { title: "Sheets", group: "Production" },
   image: { title: "Image Provider", group: "Services" },
   tts: { title: "Text to Speech", group: "Services" },
   transcriber: { title: "Transcriber", group: "Services" },
@@ -92,6 +94,7 @@ export function App() {
                 <RunDetail ns={route.ns} onBack={() => go("runs")} />
               )}
               {route.name === "launch" && <Launch onLaunched={(ns) => go("run", ns)} />}
+              {route.name === "sheets" && <SheetsView />}
               {route.name === "image" && <ImageProvider />}
               {route.name === "tts" && <Tts />}
               {route.name === "transcriber" && <Transcriber />}
@@ -143,6 +146,7 @@ function MobileNav({ open }: { open: boolean }) {
           { href: "#/home", label: "Dashboard" },
           { href: "#/runs", label: "Runs" },
           { href: "#/launch", label: "Launch" },
+          { href: "#/sheets", label: "Sheets" },
           { href: "#/image", label: "Image Provider" },
           { href: "#/tts", label: "TTS" },
           { href: "#/transcriber", label: "Transcriber" },
