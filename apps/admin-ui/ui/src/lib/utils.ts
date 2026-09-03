@@ -49,6 +49,12 @@ export function formatMs(ms: number): string {
   return `${ms.toFixed(3)}s`;
 }
 
+export function formatUsd(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(n)) return "—";
+  if (n < 0.01 && n > 0) return "<$0.01";
+  return `$${n.toFixed(2)}`;
+}
+
 export function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
   return `${s.slice(0, Math.max(0, max - 1))}…`;

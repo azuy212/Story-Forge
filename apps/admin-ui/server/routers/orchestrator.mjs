@@ -1,6 +1,15 @@
 import { fileURLToPath } from "node:url";
 import { dirname, join, isAbsolute, basename } from "node:path";
-import { readFileSync, writeFileSync, existsSync, copyFileSync, rmSync, renameSync, statSync, readdirSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  copyFileSync,
+  rmSync,
+  renameSync,
+  statSync,
+  readdirSync,
+} from "node:fs";
 import { createOrAppendRunMeta } from "../../../orchestrator/src/artifacts/run-meta.mjs";
 import {
   listNamespaces,
@@ -11,6 +20,8 @@ import {
   stageStatus,
   deriveRunStatus,
   summarizeRun,
+  summarizeLlmCost,
+  STAGE_ORDER,
   PATHS,
 } from "../lib/runs.mjs";
 import {
@@ -86,9 +97,9 @@ function tailEmitter(ns, send, onClose) {
 export async function orchestratorRouter(app) {
   app.get("/runs", async () => {
     const ns = listNamespaces();
-    return ns.map(summarizeRun).sort((a, b) =>
-      (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
-    );
+    return ns
+      .map(summarizeRun)
+      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
   });
 
   app.get("/runs/:ns", async (req, reply) => {
@@ -100,6 +111,7 @@ export async function orchestratorRouter(app) {
     const logTail = readLogTail(ns, 0, 32 * 1024).lines;
     const status = deriveRunStatus(meta, manifest, logTail);
     const child = get(ns);
+    const llmCost = summarizeLlmCost(ns);
     return {
       ns,
       meta,
@@ -108,6 +120,7 @@ export async function orchestratorRouter(app) {
       status,
       childStatus: child?.status ?? null,
       logSize: logSize(ns),
+      llmCost,
     };
   });
 
@@ -165,8 +178,12 @@ export async function orchestratorRouter(app) {
     const audioRec = readArtifact("audio");
     const audio = audioRec?.data
       ? {
-          combinedUrl: toFileUrl(audioRec.data.combinedAudio?.url ?? audioRec.data.narrationUrl),
-          combinedDurationMs: audioRec.data.combinedAudio?.durationMs ?? audioRec.data.narrationDurationMs,
+          combinedUrl: toFileUrl(
+            audioRec.data.combinedAudio?.url ?? audioRec.data.narrationUrl,
+          ),
+          combinedDurationMs:
+            audioRec.data.combinedAudio?.durationMs ??
+            audioRec.data.narrationDurationMs,
           voice: audioRec.data.voice ?? null,
           scenes: (audioRec.data.scenes ?? []).map((a) => ({
             sceneId: a.sceneId,
@@ -212,6 +229,133 @@ export async function orchestratorRouter(app) {
     return { ns, scenes, thumbnail, audio, subtitles, video, metadata };
   });
 
+  app.get("/runs/:ns/artifacts/:type", async (req, reply) => {
+    const { ns, type } = req.params;
+    if (!readRunMeta(ns))
+      return reply.code(404).send({ error: "run_not_found" });
+    if (!STAGE_ORDER.includes(type))
+      return reply.code(400).send({ error: "invalid_stage" });
+
+    const manifest = readManifest(ns);
+    const entry = manifest?.[type];
+    const versions = (entry?.versions ?? []).map((v) => ({
+      version: v.version,
+      status: v.status ?? "unknown",
+      createdAt: v.createdAt ?? null,
+      artifactId: v.artifactId ?? null,
+    }));
+
+    const dir = join(PATHS.RUNS, ns, "artifacts", type);
+    const readVersion = (n) => {
+      const p = join(dir, `v${n}.json`);
+      if (!existsSync(p)) return null;
+      try {
+        const stat = statSync(p);
+        return {
+          path: p,
+          data: JSON.parse(readFileSync(p, "utf-8")),
+          sizeBytes: stat.size,
+        };
+      } catch {
+        return null;
+      }
+    };
+
+    const pickLatest = () => {
+      if (!entry?.latest) return null;
+      const n = Number(String(entry.latest).replace("v", ""));
+      if (!Number.isFinite(n)) return null;
+      return (
+        readVersion(n) ??
+        versions
+          .map((v) => v.version)
+          .sort((a, b) => b - a)
+          .map((n) => readVersion(n))
+          .find((x) => x !== null) ??
+        null
+      );
+    };
+
+    const requestedVersion =
+      req.query.version != null ? Number(req.query.version) : null;
+    const picked =
+      requestedVersion != null && Number.isFinite(requestedVersion)
+        ? readVersion(requestedVersion)
+        : pickLatest();
+    const selectedVersion =
+      requestedVersion != null && Number.isFinite(requestedVersion)
+        ? requestedVersion
+        : picked
+          ? Number(String(entry?.latest ?? "").replace("v", "")) || null
+          : null;
+    return {
+      ns,
+      type,
+      exists: picked !== null,
+      version: selectedVersion,
+      versions,
+      artifact: picked?.data ?? null,
+      sizeBytes: picked?.sizeBytes ?? null,
+    };
+  });
+
+  app.delete("/runs/:ns/artifacts/:type", async (req, reply) => {
+    const { ns, type } = req.params;
+    if (!readRunMeta(ns))
+      return reply.code(404).send({ error: "run_not_found" });
+    if (!STAGE_ORDER.includes(type))
+      return reply.code(400).send({ error: "invalid_stage" });
+    if (get(ns)) return reply.code(409).send({ error: "run_active" });
+
+    const dir = join(PATHS.RUNS, ns, "artifacts", type);
+    let deleted = 0;
+    if (existsSync(dir)) {
+      const files = readdirSync(dir).filter((f) => /^v\d+\.json$/.test(f));
+      deleted = files.length;
+      rmSync(dir, { recursive: true, force: true });
+    }
+
+    const manifestPath = join(PATHS.RUNS, ns, "manifest.json");
+    if (existsSync(manifestPath)) {
+      try {
+        const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+        if (manifest && typeof manifest === "object" && type in manifest) {
+          delete manifest[type];
+          writeFileSync(
+            manifestPath,
+            JSON.stringify(manifest, null, 2),
+            "utf-8",
+          );
+        }
+      } catch {
+        // manifest corrupted; filesystem delete is the source of truth
+      }
+    }
+
+    const execPath = join(PATHS.RUNS, ns, "state", "execution.json");
+    if (existsSync(execPath)) {
+      try {
+        const refs = JSON.parse(readFileSync(execPath, "utf-8"));
+        if (refs && typeof refs === "object") {
+          let changed = false;
+          for (const k of Object.keys(refs)) {
+            if (k.startsWith(`${type}@`)) {
+              delete refs[k];
+              changed = true;
+            }
+          }
+          if (changed) {
+            writeFileSync(execPath, JSON.stringify(refs, null, 2), "utf-8");
+          }
+        }
+      } catch {
+        // skip
+      }
+    }
+
+    return { ok: true, ns, type, deleted };
+  });
+
   app.get("/runs/:ns/stream", async (req, reply) => {
     const { ns } = req.params;
     sseHeaders(reply);
@@ -243,7 +387,12 @@ export async function orchestratorRouter(app) {
     const before = listNamespaces();
     const controller = makeController();
     register(`run-next-${Date.now()}`, controller);
-    spawnScript("run-next.mjs", [`--profile=${profile}`], `run-next-${Date.now()}`, () => {});
+    spawnScript(
+      "run-next.mjs",
+      [`--profile=${profile}`],
+      `run-next-${Date.now()}`,
+      () => {},
+    );
     const ns = await watchForNewNamespace(before, 5000);
     if (!ns) {
       return { none: true, reason: "no-pending-row-or-no-slot" };
@@ -255,9 +404,12 @@ export async function orchestratorRouter(app) {
 
   app.post("/launch/seed", async (req, reply) => {
     const body = req.body ?? {};
-    if (!body.seedPath) return reply.code(400).send({ error: "seed_path_required" });
+    if (!body.seedPath)
+      return reply.code(400).send({ error: "seed_path_required" });
     if (!existsSync(body.seedPath)) {
-      return reply.code(400).send({ error: "seed_file_not_found", path: body.seedPath });
+      return reply
+        .code(400)
+        .send({ error: "seed_file_not_found", path: body.seedPath });
     }
     const m = await import(join(SCRIPT_PATH, "seed-build.mjs"));
     const { buildSeed } = m;
@@ -270,7 +422,9 @@ export async function orchestratorRouter(app) {
         profile: body.profile,
       });
     } catch (e) {
-      return reply.code(400).send({ error: "seed_invalid", message: e.message });
+      return reply
+        .code(400)
+        .send({ error: "seed_invalid", message: e.message });
     }
     const ns = `seed-${Date.now()}-${built.topic
       .toLowerCase()
@@ -329,7 +483,8 @@ export async function orchestratorRouter(app) {
     const { ns } = req.params;
     const meta = readRunMeta(ns);
     if (!meta) return reply.code(404).send({ error: "run_not_found" });
-    const { pillar, topic, videoProfile, projectId, youtubePublishAt } = req.body ?? {};
+    const { pillar, topic, videoProfile, projectId, youtubePublishAt } =
+      req.body ?? {};
     const path = join(PATHS.RUNS, ns, "run.json");
     const next = {
       ...meta,
@@ -346,7 +501,8 @@ export async function orchestratorRouter(app) {
   app.delete("/runs/:ns", async (req, reply) => {
     const { ns } = req.params;
     const dir = join(PATHS.RUNS, ns);
-    if (!existsSync(dir)) return reply.code(404).send({ error: "run_not_found" });
+    if (!existsSync(dir))
+      return reply.code(404).send({ error: "run_not_found" });
     rmSync(dir, { recursive: true, force: true });
     return { ok: true };
   });
@@ -358,9 +514,13 @@ export async function orchestratorRouter(app) {
     const safe = rest.replace(/\.\.+/g, "");
     const full = join(PATHS.RUNS, ns, safe);
     const root = join(PATHS.RUNS, ns);
-    if (!full.startsWith(root)) return reply.code(400).send({ error: "bad_path" });
+    if (!full.startsWith(root))
+      return reply.code(400).send({ error: "bad_path" });
     if (!existsSync(full)) return reply.code(404).send({ error: "not_found" });
-    return reply.sendFile(safe, root.endsWith(full) ? root : join(PATHS.RUNS, ns));
+    return reply.sendFile(
+      safe,
+      root.endsWith(full) ? root : join(PATHS.RUNS, ns),
+    );
   });
 
   app.get("/file", async (req, reply) => {
@@ -391,7 +551,9 @@ export async function orchestratorRouter(app) {
       buf += chunk.toString("utf-8");
       const m = buf.match(/Refresh token:\s*\n+([A-Za-z0-9_\-]+)/);
       if (m) captured = m[1];
-      const urlM = buf.match(/(https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth[^\s]+)/);
+      const urlM = buf.match(
+        /(https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth[^\s]+)/,
+      );
       if (urlM && !reply.sent) {
         reply.sent = true;
         reply.send({ id, authUrl: urlM[1] });
@@ -411,12 +573,16 @@ export async function orchestratorRouter(app) {
     const { token } = req.body ?? {};
     if (!token) return reply.code(400).send({ error: "token_required" });
     const envPath = PATHS.ORCH_ENV;
-    if (!existsSync(envPath)) return reply.code(404).send({ error: "env_not_found" });
+    if (!existsSync(envPath))
+      return reply.code(404).send({ error: "env_not_found" });
     const backup = `${envPath}.bak`;
     copyFileSync(envPath, backup);
     let text = readFileSync(envPath, "utf-8");
     if (/^YOUTUBE_REFRESH_TOKEN=.*$/m.test(text)) {
-      text = text.replace(/^YOUTUBE_REFRESH_TOKEN=.*$/m, `YOUTUBE_REFRESH_TOKEN=${token}`);
+      text = text.replace(
+        /^YOUTUBE_REFRESH_TOKEN=.*$/m,
+        `YOUTUBE_REFRESH_TOKEN=${token}`,
+      );
     } else {
       text = text.trimEnd() + `\nYOUTUBE_REFRESH_TOKEN=${token}\n`;
     }
@@ -427,8 +593,13 @@ export async function orchestratorRouter(app) {
   app.get("/health", async () => {
     try {
       const r = await fetch(
-        (process.env.LANGGRAPH_URL ?? "http://localhost:2024") + "/assistants/search",
-        { method: "POST", headers: { "content-type": "application/json" }, body: "{}" },
+        (process.env.LANGGRAPH_URL ?? "http://localhost:2024") +
+          "/assistants/search",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: "{}",
+        },
       );
       return { langgraph: r.ok ? "ok" : "degraded" };
     } catch (e) {

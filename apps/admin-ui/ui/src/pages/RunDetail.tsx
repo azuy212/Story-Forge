@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
+  Coins,
   Edit,
   FileSearch,
   FlaskConical,
@@ -15,8 +16,15 @@ import {
   Trash2,
   Workflow,
 } from "lucide-react";
-import { api, type LogEvent, type RunDetail as RunDetailT, type RunStatus } from "@/lib/api";
-import { StageGrid } from "@/components/StageGrid";
+import {
+  api,
+  type LogEvent,
+  type LlmCostSummary,
+  type RunDetail as RunDetailT,
+  type RunStatus,
+} from "@/lib/api";
+import { StageGrid, STAGES } from "@/components/StageGrid";
+import { StageArtifactDialog } from "@/components/StageArtifactDialog";
 import { LogStream } from "@/components/LogStream";
 import { ProgressBar, type NodeStatus } from "@/components/ProgressBar";
 import { AssetsGallery } from "@/components/AssetsGallery";
@@ -63,17 +71,20 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/toast";
-import { cn, formatDateTime, truncate } from "@/lib/utils";
+import { cn, formatDateTime, formatUsd, truncate } from "@/lib/utils";
 
 type Props = { ns: string; onBack: () => void };
 
 export function RunDetail({ ns, onBack }: Props) {
   const [detail, setDetail] = useState<RunDetailT | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<"cancel" | "abort" | "delete" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<
+    "cancel" | "abort" | "delete" | "deleteArtifact" | null
+  >(null);
   const [editOpen, setEditOpen] = useState(false);
   const [resumeOpen, setResumeOpen] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
+  const [artifactStage, setArtifactStage] = useState<string | null>(null);
   const statusRef = useRef<RunStatus | null>(null);
   useEffect(() => {
     statusRef.current = detail?.status ?? null;
@@ -149,7 +160,7 @@ export function RunDetail({ ns, onBack }: Props) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={meta.topic as string ?? "Run detail"}
+        title={(meta.topic as string) ?? "Run detail"}
         description={
           <span className="flex flex-wrap items-center gap-1.5">
             <span className="font-mono text-xs">{ns}</span>
@@ -183,16 +194,19 @@ export function RunDetail({ ns, onBack }: Props) {
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" disabled={actionBusy} aria-label="More actions">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  disabled={actionBusy}
+                  aria-label="More actions"
+                >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>Run actions</DropdownMenuLabel>
                 <DropdownMenuItem
-                  onClick={() =>
-                    withAction(() => api.resumeRun(ns), "Resumed")
-                  }
+                  onClick={() => withAction(() => api.resumeRun(ns), "Resumed")}
                 >
                   <Play className="h-4 w-4" /> Resume
                 </DropdownMenuItem>
@@ -201,7 +215,10 @@ export function RunDetail({ ns, onBack }: Props) {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() =>
-                    withAction(() => api.resumeRun(ns, { dryRun: true }), "Dry-run complete")
+                    withAction(
+                      () => api.resumeRun(ns, { dryRun: true }),
+                      "Dry-run complete",
+                    )
                   }
                 >
                   <FlaskConical className="h-4 w-4" /> Dry-run resume
@@ -236,12 +253,20 @@ export function RunDetail({ ns, onBack }: Props) {
       />
 
       <div className="space-y-6 px-4 pb-10 sm:px-6">
-        <Section title="Pipeline progress" icon={Workflow} description="Producer node status from live SSE events.">
+        <Section
+          title="Pipeline progress"
+          icon={Workflow}
+          description="Producer node status from live SSE events."
+        >
           <PipelineProgress ns={ns} />
         </Section>
 
-        <Section title="Stage status" icon={CheckCircle2} description="Per-stage artifact availability.">
-          <StageGrid stages={detail.stages} />
+        <Section
+          title="Stage status"
+          icon={CheckCircle2}
+          description="Per-stage artifact availability."
+        >
+          <StageGrid stages={detail.stages} onSelect={setArtifactStage} />
         </Section>
 
         <div className="grid gap-4 lg:grid-cols-2">
@@ -253,17 +278,37 @@ export function RunDetail({ ns, onBack }: Props) {
               </div>
             </CardHeader>
             <CardContent>
-              <MetaRow label="Topic" value={(meta.topic as string) ?? null} copyable />
+              <MetaRow
+                label="Topic"
+                value={(meta.topic as string) ?? null}
+                copyable
+              />
               <MetaRow label="Pillar" value={(meta.pillar as string) ?? null} />
-              <MetaRow label="Profile" value={(meta.videoProfile as string) ?? null} />
-              <MetaRow label="Source" value={(meta.runSource as string) ?? "backlog"} />
-              <MetaRow label="Project ID" value={(meta.projectId as string) ?? null} mono />
+              <MetaRow
+                label="Profile"
+                value={(meta.videoProfile as string) ?? null}
+              />
+              <MetaRow
+                label="Source"
+                value={(meta.runSource as string) ?? "backlog"}
+              />
+              <MetaRow
+                label="Project ID"
+                value={(meta.projectId as string) ?? null}
+                mono
+              />
               <MetaRow
                 label="Publish at"
                 value={formatDateTime(meta.youtubePublishAt as string | null)}
               />
-              <MetaRow label="Created" value={formatDateTime(meta.createdAt as string | null)} />
-              <MetaRow label="Aborted" value={formatDateTime(meta.abortedAt as string | null)} />
+              <MetaRow
+                label="Created"
+                value={formatDateTime(meta.createdAt as string | null)}
+              />
+              <MetaRow
+                label="Aborted"
+                value={formatDateTime(meta.abortedAt as string | null)}
+              />
             </CardContent>
           </Card>
 
@@ -279,7 +324,9 @@ export function RunDetail({ ns, onBack }: Props) {
             </CardHeader>
             <CardContent>
               {threadHistory.length === 0 ? (
-                <div className="text-sm text-muted-foreground/60">No thread history yet.</div>
+                <div className="text-sm text-muted-foreground/60">
+                  No thread history yet.
+                </div>
               ) : (
                 <ol className="space-y-1 font-mono text-xs text-foreground/80">
                   {threadHistory.map((t, i) => (
@@ -297,6 +344,14 @@ export function RunDetail({ ns, onBack }: Props) {
         </div>
 
         <Section
+          title="LLM cost"
+          icon={Coins}
+          description="Token spend across every agent that called the model. Per-stage breakdown of completed LLM invocations."
+        >
+          <LlmCostPanel llmCost={detail.llmCost} />
+        </Section>
+
+        <Section
           title="Generated assets"
           icon={FileSearch}
           description="Video, audio, subtitles, scene images, thumbnail, and metadata."
@@ -304,7 +359,11 @@ export function RunDetail({ ns, onBack }: Props) {
           <AssetsPanel ns={ns} />
         </Section>
 
-        <Section title="Live log" icon={Workflow} description="Streaming SSE console for this run.">
+        <Section
+          title="Live log"
+          icon={Workflow}
+          description="Streaming SSE console for this run."
+        >
           <LogPanel ns={ns} />
         </Section>
       </div>
@@ -326,6 +385,25 @@ export function RunDetail({ ns, onBack }: Props) {
         onResumed={() => toast.success("Resume queued")}
       />
 
+      <StageArtifactDialog
+        open={artifactStage !== null}
+        onOpenChange={(o) => !o && setArtifactStage(null)}
+        ns={ns}
+        stageKey={artifactStage}
+        stageLabel={
+          STAGES.find((s) => s.key === artifactStage)?.label ??
+          artifactStage ??
+          ""
+        }
+        deleteDisabled={detail.status === "running"}
+        deleteHint={
+          detail.status === "running"
+            ? "Cannot delete while the run is active"
+            : undefined
+        }
+        onRequestDelete={() => setConfirmAction("deleteArtifact")}
+      />
+
       <AlertDialog
         open={confirmAction !== null}
         onOpenChange={(o) => !o && setConfirmAction(null)}
@@ -334,12 +412,16 @@ export function RunDetail({ ns, onBack }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>
               {confirmAction === "delete" && "Delete run"}
+              {confirmAction === "deleteArtifact" &&
+                `Delete ${STAGES.find((s) => s.key === artifactStage)?.label ?? artifactStage ?? "stage"} artifact`}
               {confirmAction === "abort" && "Abort run"}
               {confirmAction === "cancel" && "Cancel running child"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirmAction === "delete" &&
                 `This will permanently remove ${ns} and all generated assets. This action cannot be undone.`}
+              {confirmAction === "deleteArtifact" &&
+                `Removes all stored versions for this stage and clears the manifest entry. The next resume will recompute this stage from scratch. This action cannot be undone.`}
               {confirmAction === "abort" &&
                 `Stops the child process (if running) and writes abortedAt to run.json for ${ns}.`}
               {confirmAction === "cancel" &&
@@ -351,7 +433,20 @@ export function RunDetail({ ns, onBack }: Props) {
             <AlertDialogAction
               onClick={() => {
                 if (confirmAction === "delete") {
-                  withAction(() => api.deleteRun(ns).then(onBack), "Run deleted");
+                  withAction(
+                    () => api.deleteRun(ns).then(onBack),
+                    "Run deleted",
+                  );
+                } else if (
+                  confirmAction === "deleteArtifact" &&
+                  artifactStage
+                ) {
+                  const stage = artifactStage;
+                  withAction(async () => {
+                    const r = await api.deleteStageArtifact(ns, stage);
+                    setArtifactStage(null);
+                    return r;
+                  }, "Stage artifact deleted");
                 } else if (confirmAction === "abort") {
                   withAction(() => api.abortRun(ns), "Run aborted");
                 } else if (confirmAction === "cancel") {
@@ -360,12 +455,15 @@ export function RunDetail({ ns, onBack }: Props) {
                 setConfirmAction(null);
               }}
               className={cn(
-                confirmAction === "delete" || confirmAction === "abort"
+                confirmAction === "delete" ||
+                  confirmAction === "deleteArtifact" ||
+                  confirmAction === "abort"
                   ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   : "",
               )}
             >
               {confirmAction === "delete" && "Delete"}
+              {confirmAction === "deleteArtifact" && "Delete stage"}
               {confirmAction === "abort" && "Abort"}
               {confirmAction === "cancel" && "Cancel child"}
             </AlertDialogAction>
@@ -418,7 +516,11 @@ function Section({
             {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
             {title}
           </h2>
-          {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
+          {description && (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {description}
+            </p>
+          )}
         </div>
       </div>
       {children}
@@ -441,7 +543,9 @@ function PipelineProgress({ ns }: { ns: string }) {
 
   useEffect(() => {
     let alive = true;
-    const es = new EventSource(`/api/orchestrator/runs/${encodeURIComponent(ns)}/stream`);
+    const es = new EventSource(
+      `/api/orchestrator/runs/${encodeURIComponent(ns)}/stream`,
+    );
     const onMsg = (e: MessageEvent) => {
       try {
         const data = JSON.parse(e.data) as LogEvent;
@@ -491,11 +595,18 @@ function LogPanel({ ns }: { ns: string }) {
       alive = false;
     };
   }, [ns]);
-  return <LogStream initial={initial} streamUrl={`/api/orchestrator/runs/${encodeURIComponent(ns)}/stream`} />;
+  return (
+    <LogStream
+      initial={initial}
+      streamUrl={`/api/orchestrator/runs/${encodeURIComponent(ns)}/stream`}
+    />
+  );
 }
 
 function AssetsPanel({ ns }: { ns: string }) {
-  const [assets, setAssets] = useState<Awaited<ReturnType<typeof api.getAssets>> | null>(null);
+  const [assets, setAssets] = useState<Awaited<
+    ReturnType<typeof api.getAssets>
+  > | null>(null);
   useEffect(() => {
     let alive = true;
     const tick = () => {
@@ -512,6 +623,205 @@ function AssetsPanel({ ns }: { ns: string }) {
     };
   }, [ns]);
   return <AssetsGallery assets={assets} />;
+}
+
+function LlmCostPanel({ llmCost }: { llmCost: LlmCostSummary }) {
+  const total = llmCost.totalCostUsd;
+  const stages = useMemo(() => {
+    return Object.entries(llmCost.perStage)
+      .map(([node, v]) => ({ node, ...v }))
+      .sort((a, b) => {
+        // Missing-cost entries sink to the end; otherwise descending by cost.
+        if (a.costUsd == null && b.costUsd == null)
+          return a.node.localeCompare(b.node);
+        if (a.costUsd == null) return 1;
+        if (b.costUsd == null) return -1;
+        return b.costUsd - a.costUsd;
+      });
+  }, [llmCost.perStage]);
+
+  const models = useMemo(() => {
+    return Object.entries(llmCost.perModel)
+      .map(([model, v]) => ({ model, ...v }))
+      .sort((a, b) => {
+        if (a.costUsd == null && b.costUsd == null)
+          return a.model.localeCompare(b.model);
+        if (a.costUsd == null) return 1;
+        if (b.costUsd == null) return -1;
+        return b.costUsd - a.costUsd;
+      });
+  }, [llmCost.perModel]);
+
+  const hasAny =
+    llmCost.requestCount > 0 || stages.length > 0 || models.length > 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <CostMetric
+          label="Total cost"
+          value={formatUsd(total)}
+          tone={total == null ? "muted" : "primary"}
+        />
+        <CostMetric
+          label="LLM calls"
+          value={llmCost.requestCount.toLocaleString()}
+          tone="muted"
+        />
+        <CostMetric
+          label="Stages reporting cost"
+          value={stages.filter((s) => s.costUsd != null).length.toString()}
+          tone="muted"
+          hint={
+            stages.length > 0 ? `of ${stages.length} total stages` : undefined
+          }
+        />
+      </div>
+
+      {!hasAny ? (
+        <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground/70">
+          No LLM usage recorded yet for this run.
+        </div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <BreakdownCard
+            title="By stage"
+            emptyMessage="No stage usage yet."
+            rows={stages.map((s) => ({
+              key: s.node,
+              label: s.node,
+              requests: s.requests,
+              costUsd: s.costUsd,
+              fraction:
+                total != null && s.costUsd != null ? s.costUsd / total : null,
+            }))}
+            totalCostUsd={total}
+          />
+          <BreakdownCard
+            title="By model"
+            emptyMessage="No model usage yet."
+            rows={models.map((m) => ({
+              key: m.model,
+              label: m.model,
+              requests: m.requests,
+              costUsd: m.costUsd,
+              fraction:
+                total != null && m.costUsd != null ? m.costUsd / total : null,
+            }))}
+            totalCostUsd={total}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CostMetric({
+  label,
+  value,
+  tone,
+  hint,
+}: {
+  label: string;
+  value: string;
+  tone: "primary" | "muted";
+  hint?: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-3 p-4">
+        <div
+          className={cn(
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-md",
+            tone === "primary"
+              ? "bg-primary/10 text-primary"
+              : "bg-muted text-muted-foreground",
+          )}
+        >
+          <Coins className="h-3.5 w-3.5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            {label}
+          </p>
+          <p className="truncate font-mono text-base font-semibold">{value}</p>
+          {hint && (
+            <p className="text-[11px] text-muted-foreground/70">{hint}</p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BreakdownCard({
+  title,
+  emptyMessage,
+  rows,
+  totalCostUsd,
+}: {
+  title: string;
+  emptyMessage: string;
+  rows: Array<{
+    key: string;
+    label: string;
+    requests: number;
+    costUsd: number | null;
+    fraction: number | null;
+  }>;
+  totalCostUsd: number | null;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <CardTitle>{title}</CardTitle>
+          <Badge variant="muted" className="font-mono text-[10px]">
+            {rows.length}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {rows.length === 0 ? (
+          <div className="text-sm text-muted-foreground/60">{emptyMessage}</div>
+        ) : (
+          <ul className="space-y-2">
+            {rows.map((row) => (
+              <li key={row.key} className="space-y-1">
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate font-mono" title={row.label}>
+                    {row.label}
+                  </span>
+                  <span className="flex items-center gap-2 tabular-nums">
+                    <span className="text-muted-foreground/70">
+                      {row.requests} call{row.requests === 1 ? "" : "s"}
+                    </span>
+                    <span className="font-medium">
+                      {formatUsd(row.costUsd)}
+                    </span>
+                  </span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  {row.fraction != null &&
+                  totalCostUsd != null &&
+                  totalCostUsd > 0 ? (
+                    <div
+                      className="h-full bg-primary/70"
+                      style={{
+                        width: `${Math.min(100, Math.max(0, row.fraction * 100))}%`,
+                      }}
+                    />
+                  ) : (
+                    <div className="h-full w-full bg-muted-foreground/15" />
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 function EditDialog({
@@ -573,21 +883,26 @@ function EditDialog({
         <DialogHeader>
           <DialogTitle>Edit run metadata</DialogTitle>
           <DialogDescription>
-            Update pillar, topic, video profile, project ID, or scheduled publish time.
+            Update pillar, topic, video profile, project ID, or scheduled
+            publish time.
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Pillar">
             <Input
               value={form.pillar}
-              onChange={(e) => setForm((s) => ({ ...s, pillar: e.target.value }))}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, pillar: e.target.value }))
+              }
               placeholder="Psychology"
             />
           </Field>
           <Field label="Topic">
             <Input
               value={form.topic}
-              onChange={(e) => setForm((s) => ({ ...s, topic: e.target.value }))}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, topic: e.target.value }))
+              }
               placeholder="Why your brain…"
             />
           </Field>
@@ -608,14 +923,18 @@ function EditDialog({
           <Field label="Project ID">
             <Input
               value={form.projectId}
-              onChange={(e) => setForm((s) => ({ ...s, projectId: e.target.value }))}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, projectId: e.target.value }))
+              }
               placeholder="row id"
             />
           </Field>
           <Field label="Publish at (ISO 8601)" className="sm:col-span-2">
             <Input
               value={form.youtubePublishAt}
-              onChange={(e) => setForm((s) => ({ ...s, youtubePublishAt: e.target.value }))}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, youtubePublishAt: e.target.value }))
+              }
               placeholder="2025-01-01T00:00:00Z"
               className="font-mono"
             />
@@ -679,26 +998,34 @@ function ResumeDialog({
         <DialogHeader>
           <DialogTitle>Resume with overrides</DialogTitle>
           <DialogDescription>
-            Override pillar, topic, profile, or pass a seed file. Empty fields are ignored.
+            Override pillar, topic, profile, or pass a seed file. Empty fields
+            are ignored.
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Pillar">
             <Input
               value={form.pillar}
-              onChange={(e) => setForm((s) => ({ ...s, pillar: e.target.value }))}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, pillar: e.target.value }))
+              }
               placeholder="Psychology"
             />
           </Field>
           <Field label="Topic">
             <Input
               value={form.topic}
-              onChange={(e) => setForm((s) => ({ ...s, topic: e.target.value }))}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, topic: e.target.value }))
+              }
               placeholder="Why your brain…"
             />
           </Field>
           <Field label="Profile">
-            <Select value={form.profile} onValueChange={(v) => setForm((s) => ({ ...s, profile: v }))}>
+            <Select
+              value={form.profile}
+              onValueChange={(v) => setForm((s) => ({ ...s, profile: v }))}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -722,10 +1049,15 @@ function ResumeDialog({
             type="checkbox"
             id="dry-run"
             checked={form.dryRun}
-            onChange={(e) => setForm((s) => ({ ...s, dryRun: e.target.checked }))}
+            onChange={(e) =>
+              setForm((s) => ({ ...s, dryRun: e.target.checked }))
+            }
             className="h-4 w-4 rounded border-input bg-background accent-primary"
           />
-          <Label htmlFor="dry-run" className="cursor-pointer normal-case tracking-normal">
+          <Label
+            htmlFor="dry-run"
+            className="cursor-pointer normal-case tracking-normal"
+          >
             Dry-run only
           </Label>
         </div>

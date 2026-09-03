@@ -49,12 +49,26 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SearchInput } from "@/components/shared/search-input";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
-import { formatRelativeTime, truncate } from "@/lib/utils";
+import { cn, formatRelativeTime, formatUsd, truncate } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
 
-const STATUSES: RunStatus[] = ["new", "running", "incomplete", "failed", "published", "aborted"];
+const STATUSES: RunStatus[] = [
+  "new",
+  "running",
+  "incomplete",
+  "failed",
+  "published",
+  "aborted",
+];
 
-type SortKey = "ns" | "topic" | "status" | "createdAt" | "videoProfile" | "runSource";
+type SortKey =
+  | "ns"
+  | "topic"
+  | "status"
+  | "createdAt"
+  | "videoProfile"
+  | "runSource"
+  | "llmCostUsd";
 type SortDir = "asc" | "desc";
 
 export function Runs({ onOpen }: { onOpen: (ns: string) => void }) {
@@ -95,26 +109,49 @@ export function Runs({ onOpen }: { onOpen: (ns: string) => void }) {
     const q = search.trim().toLowerCase();
     const list = runs.filter((r) => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
-      if (profileFilter !== "all" && (r.videoProfile ?? "short") !== profileFilter) return false;
+      if (
+        profileFilter !== "all" &&
+        (r.videoProfile ?? "short") !== profileFilter
+      )
+        return false;
       if (sourceFilter !== "all" && r.runSource !== sourceFilter) return false;
       if (q) {
-        const hay = `${r.ns} ${r.topic ?? ""} ${r.pillar ?? ""} ${r.projectId ?? ""}`.toLowerCase();
+        const hay =
+          `${r.ns} ${r.topic ?? ""} ${r.pillar ?? ""} ${r.projectId ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
     const dir = sortDir === "asc" ? 1 : -1;
     return [...list].sort((a, b) => {
-      const av = (a[sortKey] ?? "") as string;
-      const bv = (b[sortKey] ?? "") as string;
       if (sortKey === "createdAt") {
         const at = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const bt = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return (at - bt) * dir;
       }
+      if (sortKey === "llmCostUsd") {
+        // Push runs that have never reported cost to the end regardless of
+        // direction so a high-cost sort doesn't pretend unknown is "0".
+        const av = a.llmCostUsd;
+        const bv = b.llmCostUsd;
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        return (av - bv) * dir;
+      }
+      const av = (a[sortKey] ?? "") as string;
+      const bv = (b[sortKey] ?? "") as string;
       return av.localeCompare(bv) * dir;
     });
-  }, [runs, statusFilter, profileFilter, sourceFilter, search, sortKey, sortDir]);
+  }, [
+    runs,
+    statusFilter,
+    profileFilter,
+    sourceFilter,
+    search,
+    sortKey,
+    sortDir,
+  ]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -143,7 +180,11 @@ export function Runs({ onOpen }: { onOpen: (ns: string) => void }) {
         title="Runs"
         description={`${runs.length} run${runs.length === 1 ? "" : "s"} on disk`}
         actions={
-          <Button variant="outline" size="sm" onClick={() => setRefreshTick((n) => n + 1)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setRefreshTick((n) => n + 1)}
+          >
             <RefreshCw className="h-3.5 w-3.5" /> Refresh
           </Button>
         }
@@ -157,7 +198,10 @@ export function Runs({ onOpen }: { onOpen: (ns: string) => void }) {
             placeholder="Search ns, topic, pillar, project id…"
             className="min-w-60 flex-1"
           />
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as RunStatus | "all")}>
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => setStatusFilter(v as RunStatus | "all")}
+          >
             <SelectTrigger className="w-40">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
@@ -250,6 +294,13 @@ export function Runs({ onOpen }: { onOpen: (ns: string) => void }) {
                     onClick={() => toggleSort("status")}
                   />
                   <SortableHead
+                    label="LLM cost"
+                    active={sortKey === "llmCostUsd"}
+                    dir={sortDir}
+                    onClick={() => toggleSort("llmCostUsd")}
+                    align="right"
+                  />
+                  <SortableHead
                     label="Created"
                     active={sortKey === "createdAt"}
                     dir={sortDir}
@@ -272,7 +323,9 @@ export function Runs({ onOpen }: { onOpen: (ns: string) => void }) {
                     </TableCell>
                     <TableCell className="max-w-xs">
                       <span className="block truncate" title={r.topic ?? ""}>
-                        {r.topic ?? <span className="text-muted-foreground/60">—</span>}
+                        {r.topic ?? (
+                          <span className="text-muted-foreground/60">—</span>
+                        )}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -292,6 +345,12 @@ export function Runs({ onOpen }: { onOpen: (ns: string) => void }) {
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={r.status} />
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      <CostCell
+                        costUsd={r.llmCostUsd}
+                        requests={r.llmRequestCount}
+                      />
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {r.createdAt ? formatRelativeTime(r.createdAt) : "—"}
@@ -331,12 +390,16 @@ export function Runs({ onOpen }: { onOpen: (ns: string) => void }) {
         )}
       </div>
 
-      <AlertDialog open={confirmDelete !== null} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+      <AlertDialog
+        open={confirmDelete !== null}
+        onOpenChange={(o) => !o && setConfirmDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete run?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove <span className="font-mono text-foreground">{confirmDelete}</span>{" "}
+              This will permanently remove{" "}
+              <span className="font-mono text-foreground">{confirmDelete}</span>{" "}
               and all its assets. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -360,18 +423,23 @@ function SortableHead({
   active,
   dir,
   onClick,
+  align = "left",
 }: {
   label: string;
   active: boolean;
   dir: SortDir;
   onClick: () => void;
+  align?: "left" | "right";
 }) {
   return (
-    <TableHead>
+    <TableHead className={align === "right" ? "text-right" : undefined}>
       <button
         type="button"
         onClick={onClick}
-        className="inline-flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+        className={cn(
+          "inline-flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground",
+          align === "right" && "flex-row-reverse",
+        )}
       >
         {label}
         {active ? (
@@ -385,5 +453,34 @@ function SortableHead({
         )}
       </button>
     </TableHead>
+  );
+}
+
+function CostCell({
+  costUsd,
+  requests,
+}: {
+  costUsd: number | null;
+  requests: number;
+}) {
+  if (costUsd == null) {
+    return (
+      <span
+        className="text-muted-foreground/60"
+        title={
+          requests > 0 ? "Provider did not report cost" : "No LLM calls yet"
+        }
+      >
+        —
+      </span>
+    );
+  }
+  return (
+    <span
+      title={`${requests} LLM call${requests === 1 ? "" : "s"}`}
+      className="tabular-nums"
+    >
+      {formatUsd(costUsd)}
+    </span>
   );
 }
