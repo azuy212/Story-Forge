@@ -136,8 +136,11 @@ export async function orchestratorRouter(app) {
     const meta = readRunMeta(ns);
     if (!meta) return reply.code(404).send({ error: "run_not_found" });
 
+    const manifest = readManifest(ns);
     const readArtifact = (type) => {
-      const p = join(PATHS.RUNS, ns, "artifacts", type, "v1.json");
+      const latest = manifest?.[type]?.latest;
+      const filename = latest ? `${latest}.json` : "v1.json";
+      const p = join(PATHS.RUNS, ns, "artifacts", type, filename);
       if (!existsSync(p)) return null;
       try {
         return JSON.parse(readFileSync(p, "utf-8"));
