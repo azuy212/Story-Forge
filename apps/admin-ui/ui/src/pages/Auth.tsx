@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, ExternalLink, KeyRound, Loader2, Save, ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api";
 import { PageHeader } from "@/components/shared/page-header";
@@ -17,12 +17,56 @@ export function Auth() {
   const [authUrl, setAuthUrl] = useState<string | null>(null);
   const [token, setToken] = useState("");
   const [saved, setSaved] = useState<string | null>(null);
+  const flowId = useRef<string | null>(null);
+
+  // Once the authUrl is shown, poll the server until the script has produced
+  // a refresh token (or exited). Auto-fills the input so the user doesn't
+  // have to copy from a terminal.
+  useEffect(() => {
+    if (state !== "awaiting-auth") return;
+    const id = flowId.current;
+    if (!id) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const s = await api.oauthStatus(id);
+        if (cancelled) return;
+        if (s.refreshToken && !token) {
+          setToken(s.refreshToken);
+          setState("ready-to-save");
+          toast.success("Refresh token received");
+        }
+        if (s.status === "failed" && !s.refreshToken) {
+          toast.error(
+            "OAuth script exited without a refresh token",
+            `code=${s.code ?? "?"}`,
+          );
+          setState("idle");
+          return;
+        }
+        if (s.status === "complete" && !s.refreshToken) {
+          // Script ended cleanly but no token — leave UI in awaiting-auth
+          // so the user can still paste manually if they got it elsewhere.
+          return;
+        }
+        if (!s.refreshToken) setTimeout(tick, 1000);
+      } catch {
+        if (!cancelled) setTimeout(tick, 1500);
+      }
+    };
+    setTimeout(tick, 1000);
+    return () => {
+      cancelled = true;
+    };
+  }, [state, token]);
 
   async function start() {
     setState("starting");
     setSaved(null);
+    setToken("");
     try {
       const r = await api.oauthStart();
+      flowId.current = r.id;
       setAuthUrl(r.authUrl);
       setState("awaiting-auth");
     } catch (e) {

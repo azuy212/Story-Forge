@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { dirname, join, isAbsolute, basename } from "node:path";
+import { spawn } from "node:child_process";
 import {
   readFileSync,
   writeFileSync,
@@ -39,6 +40,11 @@ import { sseHeaders, sseSend, sseComment, heartbeat } from "../lib/sse.mjs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPT_PATH = join(PATHS.ORCHESTRATOR, "scripts");
 
+// Per-OAuth-flow state, keyed by the same `oauth-<timestamp>` id returned
+// from /auth/youtube/start. Used by the UI to fetch the refresh token after
+// Google redirects back to the local callback server.
+const oauthState = new Map();
+
 function spawnScript(script, args, ns, onEvent) {
   const child = spawnTracked({
     ns,
@@ -46,6 +52,38 @@ function spawnScript(script, args, ns, onEvent) {
     args: [join(SCRIPT_PATH, script), ...args],
     cwd: PATHS.ORCHESTRATOR,
     onEvent,
+  });
+  return child;
+}
+
+function spawnScriptRaw(script, args, ns, controller) {
+  const child = spawn(
+    process.execPath,
+    [join(SCRIPT_PATH, script), ...args],
+    {
+      cwd: PATHS.ORCHESTRATOR,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: process.env,
+    },
+  );
+  attachChild(ns, child);
+  if (controller) {
+    controller.signal.addEventListener("abort", () => {
+      try {
+        child.kill("SIGTERM");
+      } catch {
+        // already exited
+      }
+    });
+  }
+  child.on("exit", (code, signal) => {
+    finish(
+      ns,
+      signal === "SIGTERM" ? "cancelled" : code === 0 ? "complete" : "failed",
+    );
+  });
+  child.on("error", (err) => {
+    finish(ns, "failed", err.message);
   });
   return child;
 }
@@ -544,32 +582,67 @@ export async function orchestratorRouter(app) {
 
   app.post("/auth/youtube/start", async (req, reply) => {
     const id = `oauth-${Date.now()}`;
-    register(id, makeController());
-    const child = spawnScript("oauth-youtube.mjs", [], id, (ev) => {
-      if (ev.event === "stderr") console.log(`[oauth] ${ev.data}`);
-    });
+    const controller = makeController();
+    register(id, controller);
+    const child = spawnScriptRaw("oauth-youtube.mjs", [], id, controller);
     let buf = "";
-    let captured = null;
+    let sent = false;
+    const sendOnce = (payload) => {
+      if (sent) return;
+      sent = true;
+      reply.send(payload);
+    };
+    const logOAuth = (line) => {
+      const out = `[oauth] ${line}`;
+      process.stdout.write(out + "\n");
+      app.log.info(out);
+    };
     child.stdout.on("data", (chunk) => {
-      buf += chunk.toString("utf-8");
-      const m = buf.match(/Refresh token:\s*\n+([A-Za-z0-9_\-]+)/);
-      if (m) captured = m[1];
+      const text = chunk.toString("utf-8");
+      buf += text;
+      // Echo every child stdout line so the refresh token is visible
+      // in the dev server terminal + Pino logs (not just in the pipe).
+      for (const line of text.split("\n")) {
+        if (line.length > 0) logOAuth(line);
+      }
       const urlM = buf.match(
         /(https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth[^\s]+)/,
       );
-      if (urlM && !reply.sent) {
-        reply.sent = true;
-        reply.send({ id, authUrl: urlM[1] });
+      if (urlM) {
+        oauthState.set(id, { ...(oauthState.get(id) ?? {}), authUrl: urlM[1] });
+        sendOnce({ id, authUrl: urlM[1] });
+      }
+      const tokenM = buf.match(/Refresh token:\s*\n+([\w\-/]+)/);
+      if (tokenM) {
+        oauthState.set(id, {
+          ...(oauthState.get(id) ?? {}),
+          refreshToken: tokenM[1],
+        });
       }
     });
+    child.stderr.on("data", (c) => logOAuth(c.toString("utf-8").trimEnd()));
     child.on("exit", (code) => {
-      if (captured) {
-        finish(id, code === 0 ? "complete" : "failed");
-        return;
+      const cur = oauthState.get(id) ?? {};
+      oauthState.set(id, {
+        ...cur,
+        status: code === 0 ? "complete" : "failed",
+        code,
+      });
+      if (!sent) {
+        sendOnce({
+          error: "oauth_url_not_received",
+          code,
+        });
       }
-      finish(id, code === 0 ? "complete" : "failed");
     });
     return reply;
+  });
+
+  app.get("/auth/youtube/status/:id", async (req, reply) => {
+    const { id } = req.params;
+    const cur = oauthState.get(id);
+    if (!cur) return reply.code(404).send({ error: "not_found" });
+    return cur;
   });
 
   app.post("/auth/youtube/save", async (req, reply) => {

@@ -10,7 +10,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc && node scripts/copy-mjs.mjs",
-    "dev": "npx @langchain/langgraph-cli dev --server-log-level warn",
+    "dev": "npx @langchain/langgraph-cli dev --no-browser --server-log-level warn",
     "clean": "rm -rf dist",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns=\\.test\\.ts$ --testPathIgnorePatterns=\\.int\\.test\\.ts$",
     "test:int": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns=\\.int\\.test\\.ts$",

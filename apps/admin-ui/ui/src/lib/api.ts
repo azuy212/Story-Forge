@@ -151,10 +151,14 @@ export type DeleteStageResult = {
 export type Health = Record<string, string>;
 
 async function jsonFetch<T>(input: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(input, {
-    ...init,
-    headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
-  });
+  const hasBody = init?.body != null;
+  const headers: Record<string, string> = {
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+  if (hasBody && !("content-type" in headers) && !("Content-Type" in headers)) {
+    headers["content-type"] = "application/json";
+  }
+  const r = await fetch(input, { ...init, headers });
   if (!r.ok) {
     const text = await r.text();
     throw new Error(`${r.status} ${r.statusText}: ${text}`);
@@ -230,6 +234,13 @@ export const api = {
         method: "POST",
       },
     ),
+  oauthStatus: (id: string) =>
+    jsonFetch<{
+      authUrl?: string;
+      refreshToken?: string;
+      status?: "complete" | "failed";
+      code?: number | null;
+    }>(`/api/orchestrator/auth/youtube/status/${encodeURIComponent(id)}`),
   oauthSave: (token: string) =>
     jsonFetch<{ ok: boolean; backup: string }>(
       "/api/orchestrator/auth/youtube/save",
