@@ -24,6 +24,14 @@ export const config = {
     read(`MODEL_${agentName.toUpperCase()}`),
   modelForRole: (roleName: string): string | undefined =>
     read(`MODEL_${roleName}`),
+  llmFirstTokenTimeoutMs: (): number => {
+    const value = Number(read("LLM_FIRST_TOKEN_TIMEOUT_MS") ?? "90000");
+    return Number.isFinite(value) && value > 0 ? value : 90000;
+  },
+  llmStreamInactivityTimeoutMs: (): number => {
+    const value = Number(read("LLM_STREAM_INACTIVITY_TIMEOUT_MS") ?? "120000");
+    return Number.isFinite(value) && value > 0 ? value : 120000;
+  },
   isDebug: (): boolean => read("LOG_LEVEL") === "debug",
   logFormat: (): "pretty" | "json" => {
     const value = read("LOG_FORMAT");

@@ -62,7 +62,6 @@ export type GenerateOptions = {
   temperature?: number;
   maxTokens?: number;
   responseFormat?: { type: "json_object" } | { type: "text" };
-  timeoutMs?: number;
 };
 
 export interface CreateModelOptions {
@@ -74,13 +73,114 @@ export interface CreateModelOptions {
   invocationId?: string;
   attempt?: number;
   fromCache?: boolean;
+  /** Test seam: inject an OpenAI client instead of the shared singleton. */
+  client?: OpenAI;
+}
+
+export type StreamedLlmResponse = {
+  text: string;
+  id?: string;
+  model?: string;
+  usage?: unknown;
+};
+
+export type LlmStreamTimeoutOptions = {
+  firstTokenTimeoutMs: number;
+  streamInactivityTimeoutMs: number;
+};
+
+type TimeoutPhase = "firstToken" | "inactivity";
+
+function timeoutMessage(
+  phase: TimeoutPhase,
+  timeouts: LlmStreamTimeoutOptions,
+): string {
+  if (phase === "firstToken") {
+    return `Model request timed out waiting for first token after ${timeouts.firstTokenTimeoutMs}ms`;
+  }
+  return `Model stream stalled after ${timeouts.streamInactivityTimeoutMs}ms without stream data`;
+}
+
+/**
+ * Consume a streamed chat-completions response with two-phase timeout handling:
+ * a first-token timer that aborts if no chunk arrives, and an inactivity timer
+ * that resets on every chunk so a live stream can run as long as needed. No
+ * absolute cap is imposed on total generation length.
+ */
+export async function generateWithStreamTimeouts(
+  createStream: (
+    signal: AbortSignal,
+  ) => Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>>,
+  timeouts: LlmStreamTimeoutOptions,
+): Promise<StreamedLlmResponse> {
+  const controller = new AbortController();
+  let timedOut = false;
+  let timeoutPhase: TimeoutPhase = "firstToken";
+  let firstTokenTimer: NodeJS.Timeout | undefined;
+  let inactivityTimer: NodeJS.Timeout | undefined;
+
+  const clearTimers = (): void => {
+    if (firstTokenTimer !== undefined) clearTimeout(firstTokenTimer);
+    if (inactivityTimer !== undefined) clearTimeout(inactivityTimer);
+    firstTokenTimer = inactivityTimer = undefined;
+  };
+
+  const abortOnTimeout = (phase: TimeoutPhase): void => {
+    timedOut = true;
+    timeoutPhase = phase;
+    controller.abort();
+  };
+
+  try {
+    firstTokenTimer = setTimeout(
+      () => abortOnTimeout("firstToken"),
+      timeouts.firstTokenTimeoutMs,
+    );
+
+    const stream = await createStream(controller.signal);
+
+    let text = "";
+    let id: string | undefined;
+    let streamModel: string | undefined;
+    let usage: unknown;
+
+    for await (const chunk of stream) {
+      if (firstTokenTimer !== undefined) {
+        clearTimeout(firstTokenTimer);
+        firstTokenTimer = undefined;
+      }
+      if (inactivityTimer !== undefined) clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(
+        () => abortOnTimeout("inactivity"),
+        timeouts.streamInactivityTimeoutMs,
+      );
+
+      id ??= chunk.id;
+      streamModel ??= chunk.model;
+      const delta = chunk.choices?.[0]?.delta?.content;
+      if (typeof delta === "string") text += delta;
+      if (chunk.usage) usage = chunk.usage;
+    }
+
+    return { text, id, model: streamModel, usage };
+  } catch (err) {
+    if (timedOut) {
+      const timeoutError = new Error(timeoutMessage(timeoutPhase, timeouts));
+      timeoutError.name = "TimeoutError";
+      (timeoutError as Error & { cause?: unknown }).cause = err;
+      throw timeoutError;
+    }
+    throw err;
+  } finally {
+    clearTimers();
+  }
 }
 
 export function createModel(
   agent: AgentModel,
   options: CreateModelOptions = {},
 ) {
-  const client = getClient();
+  const client = options.client ?? getClient();
   const model = resolveModel(agent);
   const sink = options.runLogSink ?? null;
   const includeMessages = config.runLogIncludeMessages();
@@ -97,21 +197,18 @@ export function createModel(
       messages: OpenAI.Chat.ChatCompletionMessageParam[],
       generateOptions?: GenerateOptions,
     ): Promise<LLMResult<string>> {
-      const timeoutMs = generateOptions?.timeoutMs ?? 600_000; // Default to 10 minutes
-      const controller = new AbortController();
-      let timedOut = false;
-      const timer = setTimeout(() => {
-        timedOut = true;
-        controller.abort();
-      }, timeoutMs);
+      const firstTokenTimeoutMs = config.llmFirstTokenTimeoutMs();
+      const streamInactivityTimeoutMs = config.llmStreamInactivityTimeoutMs();
 
       const startedAt = Date.now();
-      const requestBody = {
+      const requestBody: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
         model,
         messages,
         temperature: generateOptions?.temperature ?? 0.7,
         max_tokens: generateOptions?.maxTokens,
         response_format: generateOptions?.responseFormat,
+        stream: true,
+        stream_options: { include_usage: true },
       };
       const requestBodyBytes = Buffer.byteLength(
         JSON.stringify(requestBody),
@@ -125,23 +222,25 @@ export function createModel(
       let errorPayload: Record<string, unknown> | undefined;
 
       try {
-        const response = await client.chat.completions.create(
+        const {
+          text,
+          id,
+          model: responseModel,
+          usage,
+        } = await generateWithStreamTimeouts(
+          (signal) => client.chat.completions.create(requestBody, { signal }),
           {
-            model,
-            messages,
-            temperature: generateOptions?.temperature ?? 0.7,
-            max_tokens: generateOptions?.maxTokens,
-            response_format: generateOptions?.responseFormat,
+            firstTokenTimeoutMs,
+            streamInactivityTimeoutMs,
           },
-          { signal: controller.signal },
         );
         responseStatus = 200;
-        responseId = response.id;
-        responseText = response.choices?.[0]?.message?.content ?? "";
+        responseId = id;
+        responseText = text;
         responseBytes = Buffer.byteLength(responseText, "utf-8");
-        normalizedUsage = normalizeUsage(response.usage, {
-          model: response.model ?? model,
-          requestId: response.id,
+        normalizedUsage = normalizeUsage(usage, {
+          model: responseModel ?? model,
+          requestId: id,
         });
         return {
           output: responseText,
@@ -152,24 +251,20 @@ export function createModel(
           typeof err === "object" && err !== null && "status" in err
             ? (err as { status?: unknown }).status
             : undefined;
+        const isTimeout =
+          typeof err === "object" &&
+          err !== null &&
+          "name" in err &&
+          (err as { name?: unknown }).name === "TimeoutError";
         responseStatus = typeof status === "number" ? status : undefined;
         errorPayload = {
           name: (err as Error)?.name,
           message: (err as Error)?.message ?? String(err),
           status,
-          timedOut,
+          timedOut: isTimeout,
         };
-        if (timedOut) {
-          const timeoutError = new Error(
-            `Model request timed out after ${timeoutMs}ms`,
-          );
-          timeoutError.name = "TimeoutError";
-          (timeoutError as Error & { cause?: unknown }).cause = err;
-          throw timeoutError;
-        }
         throw err;
       } finally {
-        clearTimeout(timer);
         appendRunLogEvent(sink, {
           event: "llm_call",
           agent,
