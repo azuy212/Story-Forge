@@ -123,6 +123,12 @@ export const config = {
     const wpm = Number(value);
     return Number.isFinite(wpm) && wpm > 0 ? wpm : undefined;
   },
+  // --- Narration generation mode ---
+  narrationGenerationMode: (): "complete" | "scene" => {
+    const value = read("NARRATION_GENERATION_MODE");
+    if (value === "scene" || value === "complete") return value;
+    return config.ttsProviderType() === "openrouter" ? "complete" : "scene";
+  },
   // --- OpenRouter TTS provider ---
   ttsProviderType: (): "chatterbox" | "openrouter" => {
     const value = read("TTS_PROVIDER");

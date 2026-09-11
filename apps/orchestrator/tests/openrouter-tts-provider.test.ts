@@ -244,6 +244,28 @@ describe("OpenRouterTTSProvider", () => {
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.voice).toBe("other-voice");
   });
+
+  it("never forwards the pipeline default voice 'narrator'", async () => {
+    delete process.env.OPENROUTER_TTS_VOICE;
+    fetchSpy.mockResolvedValueOnce(makeAudioResponse(MP3_BYTES));
+
+    await provider.synthesize({ text: "Hi", voice: "narrator" });
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect("voice" in body).toBe(false);
+  });
+
+  it("uses the configured voice when the caller passes the generic 'narrator' default", async () => {
+    process.env.OPENROUTER_TTS_VOICE = VOICE;
+    fetchSpy.mockResolvedValueOnce(makeAudioResponse(MP3_BYTES));
+
+    await provider.synthesize({ text: "Hi", voice: "narrator" });
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.voice).toBe(VOICE);
+  });
 });
 
 describe("OpenRouterTTSProvider HTTP errors", () => {

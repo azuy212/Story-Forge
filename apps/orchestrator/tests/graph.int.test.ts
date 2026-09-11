@@ -484,6 +484,9 @@ beforeEach(() => {
   // asset-generator normalizes video → image when this flag is unset, which
   // is the safe default for production but breaks the happy-path assertions.
   process.env.ENABLE_VIDEO_ASSETS = "true";
+  // The TTS/concatenator mocks below model scene-mode narration (one TTS call
+  // per scene, each 7000ms). Opt into scene mode explicitly.
+  process.env.NARRATION_GENERATION_MODE = "scene";
   mockGenerate.mockReset();
 });
 

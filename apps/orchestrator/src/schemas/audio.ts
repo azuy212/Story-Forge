@@ -7,7 +7,9 @@ export const SceneAudioSchema = z.object({
   durationMs: z.number().positive(),
   // Local filesystem path consumed by FFmpeg concat/composer. Remote URLs are
   // rejected by concatAudio; TTS providers must persist audio to disk.
-  url: z.string().min(1),
+  // Optional in complete narration mode where a single audio file covers all
+  // scenes and per-scene audio URLs are not available.
+  url: z.string().min(1).optional(),
 });
 
 export const CombinedAudioSchema = z.object({

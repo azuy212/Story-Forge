@@ -10,6 +10,7 @@ import { narrationGeneratorNode } from "../src/agents/narration-generator.node.j
 import type { ProjectState, Scene } from "../src/types/index.js";
 import type { TTSProvider } from "../src/providers/tts-provider.js";
 import { StubTTSProvider } from "../src/providers/stub-tts-provider.js";
+import { config } from "../src/utils/config.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -63,6 +64,7 @@ function runNode(
 }
 
 beforeEach(() => {
+  process.env.NARRATION_GENERATION_MODE = "scene";
   mockSynthesize.mockReset();
   mockConcat.mockReset();
   mockConcat.mockImplementation(
@@ -90,6 +92,7 @@ async function newStore(): Promise<void> {
 
 afterEach(async () => {
   delete process.env.ARTIFACT_STORE_DIR;
+  delete process.env.NARRATION_GENERATION_MODE;
   if (storeDir) await rm(storeDir, { recursive: true, force: true });
 });
 
@@ -318,5 +321,224 @@ describe("narrationGeneratorNode", () => {
     expect(second.audio.combinedAudio?.sourceSceneArtifactIds).toEqual(
       first.audio.combinedAudio?.sourceSceneArtifactIds,
     );
+  });
+});
+
+describe("narrationGenerationMode config", () => {
+  const originalMode = process.env.NARRATION_GENERATION_MODE;
+  const originalProvider = process.env.TTS_PROVIDER;
+
+  afterEach(() => {
+    if (originalMode === undefined) {
+      delete process.env.NARRATION_GENERATION_MODE;
+    } else {
+      process.env.NARRATION_GENERATION_MODE = originalMode;
+    }
+    if (originalProvider === undefined) {
+      delete process.env.TTS_PROVIDER;
+    } else {
+      process.env.TTS_PROVIDER = originalProvider;
+    }
+  });
+
+  it("defaults to scene when TTS_PROVIDER is chatterbox", () => {
+    delete process.env.NARRATION_GENERATION_MODE;
+    process.env.TTS_PROVIDER = "chatterbox";
+    expect(config.narrationGenerationMode()).toBe("scene");
+  });
+
+  it("defaults to complete when TTS_PROVIDER is openrouter", () => {
+    delete process.env.NARRATION_GENERATION_MODE;
+    process.env.TTS_PROVIDER = "openrouter";
+    expect(config.narrationGenerationMode()).toBe("complete");
+  });
+
+  it("defaults to scene when both NARRATION_GENERATION_MODE and TTS_PROVIDER are unset", () => {
+    delete process.env.NARRATION_GENERATION_MODE;
+    delete process.env.TTS_PROVIDER;
+    expect(config.narrationGenerationMode()).toBe("scene");
+  });
+
+  it("returns scene for NARRATION_GENERATION_MODE=scene", () => {
+    process.env.NARRATION_GENERATION_MODE = "scene";
+    expect(config.narrationGenerationMode()).toBe("scene");
+  });
+
+  it("returns complete for NARRATION_GENERATION_MODE=complete", () => {
+    process.env.NARRATION_GENERATION_MODE = "complete";
+    expect(config.narrationGenerationMode()).toBe("complete");
+  });
+
+  it("falls through to provider default for invalid values", () => {
+    process.env.NARRATION_GENERATION_MODE = "invalid";
+    process.env.TTS_PROVIDER = "openrouter";
+    expect(config.narrationGenerationMode()).toBe("complete");
+  });
+});
+
+describe("narrationGeneratorNode complete mode", () => {
+  const original = process.env.NARRATION_GENERATION_MODE;
+
+  beforeEach(() => {
+    process.env.NARRATION_GENERATION_MODE = "complete";
+    mockSynthesize.mockReset();
+    mockConcat.mockReset();
+    mockSynthesize.mockImplementation(async (opts: { text: string }) => ({
+      audioUrl: `complete-${opts.text.length}.wav`,
+      durationMs: opts.text.length * 10,
+    }));
+  });
+
+  afterEach(() => {
+    if (original === undefined) {
+      delete process.env.NARRATION_GENERATION_MODE;
+    } else {
+      process.env.NARRATION_GENERATION_MODE = original;
+    }
+  });
+
+  function runComplete(
+    scenes: Scene[],
+    contentNarration: string,
+    provider: TTSProvider = mockTTSProvider,
+  ) {
+    return narrationGeneratorNode(
+      {
+        project: { pillar: "Geography", topic: "Test" },
+        content: { narration: contentNarration },
+        production: { scenes },
+        execution: { version: "0.1.0" },
+      } as ProjectState,
+      {
+        configurable: {
+          ttsProvider: provider,
+          audioConcatenator: mockConcat,
+        },
+      } as any,
+    );
+  }
+
+  it("makes exactly one TTS call with the full narration text", async () => {
+    const result = await runComplete(
+      [
+        makeScene(1, "Scene one narration."),
+        makeScene(2, "Scene two narration."),
+      ],
+      "Full narration combining all scenes.",
+    );
+
+    expect(mockSynthesize).toHaveBeenCalledTimes(1);
+    expect(mockSynthesize.mock.calls[0][0].text).toBe(
+      "Full narration combining all scenes.",
+    );
+    expect(mockConcat).not.toHaveBeenCalled();
+    expect(result.audio.version).toBe(2);
+    expect(result.audio.scenes).toHaveLength(2);
+    expect(result.audio.combinedAudio?.sourceSceneArtifactIds).toHaveLength(2);
+  });
+
+  it("estimates scene durations proportionally to word count", async () => {
+    const sceneOne = "one two three four five six seven eight nine ten";
+    const sceneTwo =
+      "one two three four five six seven eight nine ten eleven twelve " +
+      "thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty";
+    mockSynthesize.mockImplementation(async () => ({
+      audioUrl: "complete.wav",
+      durationMs: 3000,
+    }));
+
+    const result = await runComplete(
+      [makeScene(1, sceneOne), makeScene(2, sceneTwo)],
+      `${sceneOne} ${sceneTwo}`,
+    );
+
+    const scenes = result.audio.scenes;
+    // Scene 1 has 10 words of 30 total → 1000ms; Scene 2 has 20 → 2000ms.
+    expect(scenes?.[0].durationMs).toBe(1000);
+    expect(scenes?.[1].durationMs).toBe(2000);
+    expect(scenes?.[0].durationMs! + scenes?.[1].durationMs!).toBe(3000);
+  });
+
+  it("provides narrationUrl and combined audio from the single synthesis", async () => {
+    const result = await runComplete(
+      [makeScene(1, "Hello world.")],
+      "Hello world.",
+    );
+
+    expect(result.audio.narrationUrl).toBe("complete-12.wav");
+    expect(result.audio.narrationDurationMs).toBe(120);
+    expect(result.audio.combinedAudio?.url).toBe("complete-12.wav");
+    expect(result.audio.combinedAudio?.durationMs).toBe(120);
+  });
+
+  it("does not set per-scene audio URLs in complete mode", async () => {
+    const result = await runComplete(
+      [makeScene(1, "Hello world.")],
+      "Hello world.",
+    );
+
+    expect(result.audio.scenes?.[0].url).toBeUndefined();
+    expect(result.audio.scenes?.[0].artifactId).toBeDefined();
+    expect(result.audio.combinedAudio?.artifactId).toBeDefined();
+  });
+
+  it("fails when content.narration is missing without calling TTS", async () => {
+    const result = await narrationGeneratorNode(
+      {
+        project: { pillar: "Geography", topic: "Test" },
+        content: {},
+        production: { scenes: [makeScene(1, "Scene one.")] },
+        execution: { version: "0.1.0" },
+      } as ProjectState,
+      {
+        configurable: {
+          ttsProvider: mockTTSProvider,
+          audioConcatenator: mockConcat,
+        },
+      } as any,
+    );
+
+    expect(result.diagnostics.errors?.[0]).toContain("content.narration");
+    expect(mockSynthesize).not.toHaveBeenCalled();
+  });
+
+  it("reports provider failures in complete mode", async () => {
+    mockSynthesize.mockRejectedValue(new Error("service unavailable"));
+    const result = await runComplete(
+      [makeScene(1, "Hello world.")],
+      "Hello world.",
+    );
+
+    expect(result.diagnostics.errors?.[0]).toContain("TTS synthesis failed");
+    expect(result.audio.combinedAudio).toBeUndefined();
+  });
+
+  it("preserves scene order by scene ID", async () => {
+    const result = await runComplete(
+      [
+        makeScene(3, "Third scene."),
+        makeScene(1, "First scene."),
+        makeScene(2, "Second scene."),
+      ],
+      "First scene. Second scene. Third scene.",
+    );
+
+    expect(result.audio.scenes?.map((scene) => scene.sceneId)).toEqual([
+      1, 2, 3,
+    ]);
+  });
+
+  it("supports stub provider with a single synthesis", async () => {
+    const result = await runComplete(
+      [makeScene(1, "Stub scene.")],
+      "Stub complete narration.",
+      new StubTTSProvider(),
+    );
+
+    expect(result.audio.narrationUrl).toBe(
+      "https://placeholder.local/narration.wav",
+    );
+    expect(result.audio.narrationDurationMs).toBeGreaterThan(0);
+    expect(result.audio.version).toBe(2);
   });
 });

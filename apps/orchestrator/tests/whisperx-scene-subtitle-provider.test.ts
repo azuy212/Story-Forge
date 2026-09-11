@@ -130,4 +130,93 @@ describe("WhisperXSceneSubtitleProvider", () => {
       ),
     ).rejects.toThrow(/no word timestamps/);
   });
+
+  it("aligns the combined audio once when per-scene URLs are absent (complete mode)", async () => {
+    const completeAudio: SceneAudio[] = [
+      { sceneId: 1, narration: "First scene has words.", durationMs: 2000 },
+      { sceneId: 2, narration: "Second scene has words.", durationMs: 3000 },
+    ];
+    mockAlign.mockResolvedValue({
+      wordTimestamps: [
+        { word: "First", start: 0.0, end: 0.4 },
+        { word: "scene", start: 0.4, end: 0.8 },
+        { word: "has", start: 0.8, end: 1.1 },
+        { word: "words.", start: 1.1, end: 1.8 },
+        { word: "Second", start: 1.9, end: 2.3 },
+        { word: "scene", start: 2.3, end: 2.7 },
+        { word: "has", start: 2.7, end: 3.0 },
+        { word: "words.", start: 3.0, end: 3.6 },
+      ],
+    });
+
+    const result = await provider.generateSceneSubtitles(
+      SCENES,
+      completeAudio,
+      undefined,
+      {
+        combinedAudioUrl: "narration.wav",
+        fullNarration: "First scene has words. Second scene has words.",
+      },
+    );
+
+    expect(mockAlign).toHaveBeenCalledTimes(1);
+    expect(mockAlign).toHaveBeenNthCalledWith(
+      1,
+      "narration.wav",
+      "First scene has words. Second scene has words.",
+      expect.objectContaining({ sceneId: 2 }),
+    );
+    // Global timestamps come straight from the combined alignment — no
+    // per-scene offsetting.
+    expect(result.wordTimestamps).toEqual([
+      { word: "First", start: 0.0, end: 0.4 },
+      { word: "scene", start: 0.4, end: 0.8 },
+      { word: "has", start: 0.8, end: 1.1 },
+      { word: "words.", start: 1.1, end: 1.8 },
+      { word: "Second", start: 1.9, end: 2.3 },
+      { word: "scene", start: 2.3, end: 2.7 },
+      { word: "has", start: 2.7, end: 3.0 },
+      { word: "words.", start: 3.0, end: 3.6 },
+    ]);
+    expect(result.srt).toContain("00:00:01,900");
+    expect(result.ass).toContain("[Script Info]");
+  });
+
+  it("builds the full narration from scene text when complete mode supplies no transcript", async () => {
+    const completeAudio: SceneAudio[] = [
+      { sceneId: 1, narration: "One two.", durationMs: 1500 },
+      { sceneId: 2, narration: "Three four.", durationMs: 1500 },
+    ];
+    mockAlign.mockResolvedValue({
+      wordTimestamps: [
+        { word: "One", start: 0.0, end: 0.3 },
+        { word: "two.", start: 0.3, end: 0.7 },
+        { word: "Three", start: 0.8, end: 1.1 },
+        { word: "four.", start: 1.1, end: 1.5 },
+      ],
+    });
+
+    await provider.generateSceneSubtitles(SCENES, completeAudio, undefined, {
+      combinedAudioUrl: "narration.wav",
+    });
+
+    expect(mockAlign).toHaveBeenCalledWith(
+      "narration.wav",
+      "One two. Three four.",
+      expect.objectContaining({}),
+    );
+  });
+
+  it("still requires per-scene URLs when no combined audio option is supplied", async () => {
+    const stubAudio = [
+      { sceneId: 1, narration: "First scene.", durationMs: 2000 },
+    ];
+
+    await expect(
+      provider.generateSceneSubtitles(
+        [{ sceneId: 1, narration: "First scene." }] as Scene[],
+        stubAudio,
+      ),
+    ).rejects.toThrow(/Missing audio URL for scene 1/);
+  });
 });

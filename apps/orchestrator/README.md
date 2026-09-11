@@ -181,10 +181,20 @@ those files with FFmpeg without inserting silence or changing playback speed.
 SubtitleGenerator creates cues from the same scene narration and measured scene
 audio durations. Cues never cross scene boundaries.
 
+**Complete-narration mode** (`NARRATION_GENERATION_MODE=complete`, the OpenRouter
+TTS default) synthesizes the whole narration in a single audio file; per-scene
+durations are word-count-proportional estimates with no per-scene audio files.
+
 > Note: subtitle timing is scene-bounded **proportional caption timing** — words
 > are distributed uniformly across the measured scene duration. It is
 > deterministic and needs no alignment service, but it is not waveform word
 > alignment.
+
+> Note: in real-provider mode (`USE_REAL_PROVIDERS=true`) the WhisperX scene
+> subtitle provider aligns actual audio instead: it aligns each scene's audio in
+> scene mode, or the single combined narration audio in complete mode, and
+> builds cues from the returned word timestamps. Only a WhisperX failure falls
+> back to the deterministic timing above.
 
 > Note: scene-audio cache identity includes the TTS provider's
 > `cacheFingerprint()`. Chatterbox's fingerprint is a **deployment contract**:
@@ -213,7 +223,10 @@ output file atomically via temp-file + rename), retries transient failures
 (429, 5xx, network/timeouts) with exponential backoff, and aborts on timeout.
 Non-2xx JSON errors (`error.message`) are surfaced for diagnosis. The audio is
 re-encoded to WAV via FFmpeg so downstream concat/alignment only ever sees the
-same format Chatterbox produces.
+same format Chatterbox produces. The pipeline's generic voice default
+(`"narrator"`) is never forwarded — only a configured `OPENROUTER_TTS_VOICE` or
+an explicitly passed non-default voice is sent, since Fish Audio rejects
+generic voice names with HTTP 400.
 
 Voice and response format are provider/model-specific configuration, not part
 of the generic TTS contract:

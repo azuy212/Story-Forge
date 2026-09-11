@@ -24,6 +24,14 @@ const TTS_WRITE_ERROR_CODE = "TTS_WRITE_ERROR";
 const MIN_ATEMPO = 0.85;
 const MAX_ATEMPO = 1.15;
 
+// The pipeline's generic TTS interface lets agents pass a curated voice name
+// (the Chatterbox default is "narrator"). OpenRouter TTS models instead take a
+// provider-specific voice id and reject generic names with HTTP 400, so a
+// generic default must never be forwarded. Configured/supplied voices that
+// aren't the generic default are still passed through; otherwise the model's
+// own default voice is used (the OpenRouter docs treat voice as optional).
+const DEFAULT_PIPELINE_VOICE = "narrator";
+
 const RETRY_BASE_MS = 1_000;
 const RETRY_MAX_MS = 8_000;
 const MAX_RETRIES = 3;
@@ -59,7 +67,7 @@ export class OpenRouterTTSProvider implements TTSProvider {
     const sink = opts.runLogSink ?? null;
     const startedAt = Date.now();
     const model = config.openRouterTTSModel();
-    const voice = opts.voice || config.openRouterTTSVoice();
+    const voice = resolveVoice(opts.voice);
     const responseFormat = config.openRouterTTSResponseFormat();
 
     const requestBody: Record<string, unknown> = {
@@ -331,6 +339,11 @@ async function buildHttpError(response: Response): Promise<PipelineError> {
   );
   (error as PipelineError & { status?: number }).status = response.status;
   return error;
+}
+
+function resolveVoice(optsVoice: string | undefined): string | undefined {
+  if (optsVoice && optsVoice !== DEFAULT_PIPELINE_VOICE) return optsVoice;
+  return config.openRouterTTSVoice();
 }
 
 function isTransientTtsError(err: unknown): boolean {

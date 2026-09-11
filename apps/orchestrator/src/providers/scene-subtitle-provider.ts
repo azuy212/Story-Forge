@@ -14,6 +14,11 @@ const PUNCTUATION_RE = /[.,!?;:…]$/;
 export interface SceneSubtitleOptions {
   runLogSink?: RunLogSink | null;
   runId?: string;
+  // Complete narration mode synthesizes a single combined audio file, so
+  // per-scene audio URLs are absent. Aligning those scenes requires the
+  // combined audio + the full narration transcript instead of per-scene files.
+  combinedAudioUrl?: string;
+  fullNarration?: string;
 }
 
 export interface SceneSubtitleProvider {

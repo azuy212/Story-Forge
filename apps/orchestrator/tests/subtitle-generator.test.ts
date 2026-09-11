@@ -242,6 +242,44 @@ describe("subtitleGeneratorNode", () => {
     expect(result.subtitles.srt).toContain("Scene");
   });
 
+  it("forwards the combined audio URL and full narration for complete-mode alignment", async () => {
+    mockGenerateSceneSubtitles.mockResolvedValue({
+      srt: "1\n00:00:00,000 --> 00:00:01,000\nScene",
+      ass: "Scene",
+      wordTimestamps: [{ word: "Scene", start: 0, end: 1 }],
+    });
+    const completeAudio = {
+      version: 2 as const,
+      scenes: [
+        { sceneId: 1, narration: SCENES[0].narration!, durationMs: 2000 },
+        { sceneId: 2, narration: SCENES[1].narration!, durationMs: 3000 },
+      ],
+      combinedAudio: {
+        artifactId: "combined",
+        durationMs: 5000,
+        url: "narration.wav",
+        sourceSceneArtifactIds: [],
+      },
+      narrationUrl: "narration.wav",
+      narrationDurationMs: 5000,
+    };
+
+    await runNode(
+      { audio: completeAudio as any },
+      { sceneSubtitleProvider: mockSceneProvider },
+    );
+
+    expect(mockGenerateSceneSubtitles).toHaveBeenCalledWith(
+      SCENES,
+      completeAudio.scenes,
+      DEFAULT_VIDEO_PROFILE,
+      expect.objectContaining({
+        combinedAudioUrl: "narration.wav",
+        fullNarration: "First scene has words. Second scene has words.",
+      }),
+    );
+  });
+
   it("does not generate subtitles when scene count is incomplete", async () => {
     const result = await runNode({
       audio: { ...DEFAULT_AUDIO, scenes: AUDIO_SCENES.slice(0, 1) },

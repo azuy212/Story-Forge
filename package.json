@@ -6,6 +6,7 @@
   "scripts": {
     "setup:all": "pnpm install && bash scripts/setup-python.sh",
     "dev": "concurrently --kill-others-on-fail --names orchestrator,image-provider,tts,transcriber,admin-ui --prefix-colors blue,green,magenta,yellow,cyan \"pnpm dev:orchestrator\" \"pnpm dev:image-provider\" \"pnpm dev:tts\" \"pnpm dev:transcriber\" \"pnpm dev:admin\"",
+    "dev:no-tts": "concurrently --kill-others-on-fail --names orchestrator,image-provider,transcriber,admin-ui --prefix-colors blue,green,yellow,cyan \"pnpm dev:orchestrator\" \"pnpm dev:image-provider\" \"pnpm dev:transcriber\" \"pnpm dev:admin\"",
     "dev:orchestrator": "pnpm --filter youtube-shorts-orchestrator dev",
     "dev:image-provider": "pnpm --filter gemini-image-automation serve",
     "dev:tts": "cd apps/tts && venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8010",

@@ -27,7 +27,7 @@ import { getArtifactNamespace, withTopic } from "../artifacts/context.js";
 import { hashObject } from "../artifacts/hash.js";
 import { padSceneId } from "../utils/scene-id.js";
 import { AUDIO_DURATION_TOLERANCE_MS } from "../utils/constants.js";
-import { config } from "../utils/config.js";
+import { config as pipelineConfig } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
 import {
@@ -35,8 +35,8 @@ import {
   getRunLogSinkFromConfig,
 } from "../utils/run-log.js";
 
-const DEFAULT_PROVIDER = config.useRealProviders()
-  ? config.ttsProviderType() === "openrouter"
+const DEFAULT_PROVIDER = pipelineConfig.useRealProviders()
+  ? pipelineConfig.ttsProviderType() === "openrouter"
     ? new OpenRouterTTSProvider()
     : new ChatterboxTTSProvider()
   : new StubTTSProvider();
@@ -90,6 +90,25 @@ function sceneAudioData(
   };
 }
 
+function validateScenes(scenes: Scene[]): { scenes: Scene[]; error?: string } {
+  const ordered = [...scenes].sort((a, b) => a.sceneId - b.sceneId);
+  const seen = new Set<number>();
+  const duplicates = ordered.filter((scene) => {
+    if (seen.has(scene.sceneId)) return true;
+    seen.add(scene.sceneId);
+    return false;
+  });
+
+  if (duplicates.length > 0) {
+    return {
+      scenes: ordered,
+      error: `${AgentModel.NarrationGenerator}: Duplicate scene IDs (${duplicates.map((scene) => scene.sceneId).join(", ")})`,
+    };
+  }
+
+  return { scenes: ordered };
+}
+
 function validScenes(scenes: Scene[]): { scenes: Scene[]; error?: string } {
   const ordered = [...scenes].sort((a, b) => a.sceneId - b.sceneId);
   const seen = new Set<number>();
@@ -118,10 +137,12 @@ export async function narrationGeneratorNode(
   execution: Partial<Execution>;
 }> {
   const startedAt = Date.now();
-  const input = validScenes(state.production?.scenes ?? []);
+  const narrationMode = pipelineConfig.narrationGenerationMode();
   const label = nodeLabel(AgentModel.NarrationGenerator);
   logger.nodeStart(label);
-  if (input.scenes.length === 0) {
+
+  const initial = validateScenes(state.production?.scenes ?? []);
+  if (initial.scenes.length === 0) {
     logger.nodeFailed(label, "No production scenes found");
     return {
       audio: {},
@@ -133,6 +154,29 @@ export async function narrationGeneratorNode(
       execution: { currentNode: AgentModel.NarrationGenerator },
     };
   }
+  if (initial.error) {
+    logger.nodeFailed(label, initial.error);
+    return {
+      audio: {},
+      diagnostics: { errors: [initial.error] },
+      execution: { currentNode: AgentModel.NarrationGenerator },
+    };
+  }
+
+  // Complete mode synthesizes the entire narration (state.content.narration) in
+  // a single TTS request so the output has continuous, cohesive prosody. Scene
+  // durations are estimated proportionally (word-count share of total audio).
+  if (narrationMode === "complete") {
+    return runCompleteNarration(
+      state,
+      initial.scenes,
+      config,
+      label,
+      startedAt,
+    );
+  }
+
+  const input = validScenes(initial.scenes);
   if (input.error) {
     logger.nodeFailed(label, input.error);
     return {
@@ -166,6 +210,7 @@ export async function narrationGeneratorNode(
         node: AgentModel.NarrationGenerator,
         sceneId: scene.sceneId,
         kind: "start",
+        narrationMode,
         runId,
         voice,
         textLength: options.text.length,
@@ -225,6 +270,7 @@ export async function narrationGeneratorNode(
           errorReason: result.error,
           durationMs: Date.now() - startedAt,
           cacheHit: result.fromCache,
+          narrationMode,
           runId,
         });
         return { scene, result };
@@ -242,6 +288,7 @@ export async function narrationGeneratorNode(
         cacheHit: result.fromCache,
         durationMsAudio: result.data.durationMs,
         url: result.data.url,
+        narrationMode,
         runId,
       });
       return {
@@ -295,7 +342,7 @@ export async function narrationGeneratorNode(
 
   const sceneInputs: AudioConcatInput[] = successfulScenes.map((scene) => ({
     sceneId: scene.sceneId,
-    filePath: scene.url,
+    filePath: scene.url!,
     durationMs: scene.durationMs,
   }));
   const sourceSceneArtifactIds = successfulScenes.map(
@@ -393,6 +440,230 @@ export async function narrationGeneratorNode(
       narrationUrl: combined.data.combinedAudio!.url,
       narrationDurationMs: combined.data.combinedAudio!.durationMs,
     },
+    diagnostics: {},
+    execution: { currentNode: AgentModel.NarrationGenerator },
+  };
+}
+
+/**
+ * Splits the actual total narration audio duration across scenes in
+ * proportion to each scene's narration word count. This is an ESTIMATE used
+ * to drive scene boundaries in complete mode: punctuation, pacing, and
+ * emphasis mean identical word counts do not guarantee identical durations.
+ * Scenes without narration text get an equal share.
+ */
+function estimateSceneDurationsMs(
+  scenes: Scene[],
+  totalDurationMs: number,
+): number[] {
+  const wordCounts = scenes.map(
+    (scene) =>
+      (scene.narration ?? "").trim().split(/\s+/).filter(Boolean).length,
+  );
+  const totalWords = wordCounts.reduce((sum, count) => sum + count, 0);
+
+  if (totalWords === 0) {
+    return scenes.map(() =>
+      Math.round(totalDurationMs / Math.max(1, scenes.length)),
+    );
+  }
+
+  return wordCounts.map((count) =>
+    Math.round((count / totalWords) * totalDurationMs),
+  );
+}
+
+function completeNarrationCombinedKey(
+  fullNarration: string,
+  options: SynthesizeOptions,
+  provider: TTSProvider,
+  scenes: Scene[],
+): Record<string, unknown> {
+  return {
+    kind: "combined",
+    narrationMode: "complete",
+    narration: fullNarration,
+    ttsFingerprint: canonicalTTSFingerprint(options, provider),
+    cacheVersion: AUDIO_CACHE_VERSION,
+    scenes: scenes.map((scene) => ({
+      sceneId: scene.sceneId,
+      narration: (scene.narration ?? "").trim(),
+    })),
+  };
+}
+
+function completeNarrationSceneIdentity(
+  scene: Scene,
+  options: SynthesizeOptions,
+  provider: TTSProvider,
+): string {
+  return `scene-${padSceneId(scene.sceneId)}-${hashObject({
+    sceneId: scene.sceneId,
+    narration: (scene.narration ?? "").trim(),
+    tts: canonicalTTSFingerprint(options, provider),
+    cacheVersion: AUDIO_CACHE_VERSION,
+  }).slice(0, 16)}`;
+}
+
+async function runCompleteNarration(
+  state: ProjectState,
+  scenes: Scene[],
+  config: RunnableConfig,
+  label: string,
+  startedAt: number,
+): Promise<{
+  audio: Partial<Audio>;
+  diagnostics: Partial<Diagnostics>;
+  execution: Partial<Execution>;
+}> {
+  const fullNarration = state.content?.narration?.trim();
+  const voice = state.branding?.voice ?? DEFAULT_VOICE;
+  const provider = getTTSProvider(config);
+  const runId = getArtifactNamespace(config, state);
+  const runLogSink = getRunLogSinkFromConfig(config);
+
+  if (!fullNarration) {
+    const error = `${AgentModel.NarrationGenerator}: complete narration mode requires content.narration`;
+    logger.nodeFailed(label, error);
+    return {
+      audio: {},
+      diagnostics: { errors: [error] },
+      execution: { currentNode: AgentModel.NarrationGenerator },
+    };
+  }
+
+  logger.nodePhase(label, "generating complete voice audio");
+
+  appendRunLogEvent(runLogSink, {
+    event: "scene_event",
+    node: AgentModel.NarrationGenerator,
+    sceneId: scenes.length,
+    kind: "start",
+    narrationMode: "complete",
+    runId,
+    voice,
+    textLength: fullNarration.length,
+  });
+
+  const options: SynthesizeOptions = {
+    text: fullNarration,
+    voice,
+    filename: "narration.wav",
+    runId,
+    videoProfile: state.videoProfile?.profile,
+    runLogSink,
+  };
+  const combinedKey = completeNarrationCombinedKey(
+    fullNarration,
+    options,
+    provider,
+    scenes,
+  );
+
+  const combined = await cacheNodeResult<Audio>(
+    {
+      type: "audio",
+      node: AgentModel.NarrationGenerator,
+      producerVersion: String(AUDIO_CACHE_VERSION),
+      lookupAllVersions: true,
+      key: combinedKey,
+    },
+    async () => {
+      try {
+        const ttsResult = await provider.synthesize(options);
+        if (
+          !Number.isFinite(ttsResult.durationMs) ||
+          ttsResult.durationMs <= 0
+        ) {
+          return {
+            data: null,
+            error: "TTS returned invalid duration for complete narration",
+          };
+        }
+
+        const estimatedDurationsMs = estimateSceneDurationsMs(
+          scenes,
+          ttsResult.durationMs,
+        );
+        const audioScenes: SceneAudio[] = scenes.map((scene, index) => ({
+          sceneId: scene.sceneId,
+          artifactId: completeNarrationSceneIdentity(scene, options, provider),
+          narration: (scene.narration ?? "").trim(),
+          durationMs: estimatedDurationsMs[index],
+          // No per-scene audio URL: the single synthesized narration is the
+          // combined artifact. WhisperX scene alignment therefore relies on
+          // fallback to deterministic scene-bounded timing.
+        }));
+
+        return {
+          data: {
+            version: 2,
+            scenes: audioScenes,
+            combinedAudio: {
+              artifactId: logicalAudioArtifactId("combined", combinedKey),
+              durationMs: ttsResult.durationMs,
+              url: ttsResult.audioUrl,
+              sourceSceneArtifactIds: audioScenes.map(
+                (scene) => scene.artifactId!,
+              ),
+            },
+            narrationUrl: ttsResult.audioUrl,
+            narrationDurationMs: ttsResult.durationMs,
+            voice,
+            generatedAt: new Date().toISOString(),
+          },
+        };
+      } catch (err) {
+        return {
+          data: null,
+          error: `${AgentModel.NarrationGenerator}: Complete narration TTS synthesis failed: ${(err as Error)?.message ?? String(err)}`,
+        };
+      }
+    },
+    withTopic(config, state),
+  );
+
+  if (combined.error || !combined.data) {
+    appendRunLogEvent(runLogSink, {
+      event: "scene_event",
+      node: AgentModel.NarrationGenerator,
+      sceneId: scenes.length,
+      kind: "end",
+      outcome: "failed",
+      narrationMode: "complete",
+      errorReason: combined.error,
+      durationMs: Date.now() - startedAt,
+      runId,
+    });
+    logger.nodeFailed(label, combined.error ?? "Complete narration is missing");
+    return {
+      audio: {},
+      diagnostics: {
+        errors: [
+          combined.error ??
+            `${AgentModel.NarrationGenerator}: Complete narration is missing`,
+        ],
+      },
+      execution: { currentNode: AgentModel.NarrationGenerator },
+    };
+  }
+
+  appendRunLogEvent(runLogSink, {
+    event: "scene_event",
+    node: AgentModel.NarrationGenerator,
+    sceneId: scenes.length,
+    kind: "end",
+    outcome: "resolved",
+    narrationMode: "complete",
+    durationMs: Date.now() - startedAt,
+    cacheHit: combined.fromCache,
+    durationMsAudio: combined.data.narrationDurationMs,
+    runId,
+  });
+  logger.nodeDone(label, Date.now() - startedAt);
+
+  return {
+    audio: combined.data,
     diagnostics: {},
     execution: { currentNode: AgentModel.NarrationGenerator },
   };

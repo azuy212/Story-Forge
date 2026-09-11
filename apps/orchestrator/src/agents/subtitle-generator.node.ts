@@ -26,7 +26,7 @@ import {
   type RunLogSink,
 } from "../utils/run-log.js";
 
-const SUBTITLE_ALIGNMENT_VERSION = 5;
+const SUBTITLE_ALIGNMENT_VERSION = 6;
 
 const DEFAULT_PROVIDER = new DeterministicSceneSubtitleProvider();
 const REAL_PROVIDER = new WhisperXSceneSubtitleProvider(
@@ -233,7 +233,14 @@ export async function subtitleGeneratorNode(
           scenes as Scene[],
           audioScenes as SceneAudio[],
           videoProfile,
-          { runLogSink, runId },
+          {
+            runLogSink,
+            runId,
+            // Complete narration mode has no per-scene audio URLs; the scene
+            // provider needs the combined audio + full transcript to align.
+            combinedAudioUrl: combinedAudio?.url,
+            fullNarration: narration,
+          },
         );
         return {
           data: {

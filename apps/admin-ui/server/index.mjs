@@ -14,7 +14,7 @@ const UI_DIST = join(__dirname, "..", "dist", "ui");
 
 const PORT = Number(process.env.ADMIN_UI_PORT ?? 2025);
 
-const app = Fastify({ logger: { level: "info" } });
+const app = Fastify({ logger: { level: "warn" } });
 
 await app.register(cors, { origin: true, credentials: true });
 
