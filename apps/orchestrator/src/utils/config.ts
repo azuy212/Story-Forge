@@ -123,6 +123,21 @@ export const config = {
     const wpm = Number(value);
     return Number.isFinite(wpm) && wpm > 0 ? wpm : undefined;
   },
+  // --- OpenRouter TTS provider ---
+  ttsProviderType: (): "chatterbox" | "openrouter" => {
+    const value = read("TTS_PROVIDER");
+    return value === "openrouter" ? "openrouter" : "chatterbox";
+  },
+  openRouterTTSModel: (): string =>
+    read("OPENROUTER_TTS_MODEL") ?? "fish-audio/s2.1-pro-free",
+  openRouterTTSVoice: (): string | undefined =>
+    read("OPENROUTER_TTS_VOICE") || undefined,
+  openRouterTTSResponseFormat: (): string =>
+    read("OPENROUTER_TTS_RESPONSE_FORMAT") ?? "mp3",
+  openRouterTTSTimeoutMs: (): number => {
+    const value = Number(read("OPENROUTER_TTS_TIMEOUT_MS") ?? "300000");
+    return Number.isFinite(value) && value > 0 ? value : 300_000;
+  },
   // --- YouTube publishing ---
   // Real uploads require a dedicated opt-in; USE_REAL_PROVIDERS alone must not
   // start publishing to the internet while the pipeline is being validated.

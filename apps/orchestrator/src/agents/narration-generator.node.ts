@@ -15,6 +15,7 @@ import type {
 } from "../providers/tts-provider.js";
 import { StubTTSProvider } from "../providers/stub-tts-provider.js";
 import { ChatterboxTTSProvider } from "../providers/chatterbox-tts-provider.js";
+import { OpenRouterTTSProvider } from "../providers/openrouter-tts-provider.js";
 import { canonicalTTSFingerprint } from "../providers/tts-fingerprint.js";
 import {
   concatAudio,
@@ -35,7 +36,9 @@ import {
 } from "../utils/run-log.js";
 
 const DEFAULT_PROVIDER = config.useRealProviders()
-  ? new ChatterboxTTSProvider()
+  ? config.ttsProviderType() === "openrouter"
+    ? new OpenRouterTTSProvider()
+    : new ChatterboxTTSProvider()
   : new StubTTSProvider();
 const DEFAULT_VOICE = "narrator";
 const AUDIO_CACHE_VERSION = 3;

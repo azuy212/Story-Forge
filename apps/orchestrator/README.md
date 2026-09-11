@@ -191,6 +191,44 @@ audio durations. Cues never cross scene boundaries.
 > bump `CHATTERBOX_CACHE_VERSION` in `chatterbox-tts-provider.ts` whenever the
 > server-side model/voice pipeline changes, or cached scene audio can go stale.
 
+### TTS Providers
+
+Narration audio is produced by a `TTSProvider` selected via environment config
+(see [Environment](#environment) below). The generic interface is
+`src/providers/tts-provider.ts` (`synthesize({ text, voice?, filename?, ... })`
+→ `{ audioUrl, durationMs }`); it contains no provider-specific concepts.
+Providers persist audio to disk (FFmpeg concat requires local files).
+
+| Provider                | `TTS_PROVIDER`         | Backend                                          | Output    |
+| ----------------------- | ---------------------- | ------------------------------------------------ | --------- |
+| `ChatterboxTTSProvider` | `chatterbox` (default) | Local service on `TTS_URL` (port 8010)           | WAV       |
+| `OpenRouterTTSProvider` | `openrouter`           | `POST https://openrouter.ai/api/v1/audio/speech` | MP3 → WAV |
+
+`OpenRouterTTSProvider` treats OpenRouter as the TTS gateway: the configured
+`OPENROUTER_TTS_MODEL` names the actual TTS model (currently the Fish Audio
+model `fish-audio/s2.1-pro-free`; the provider does not know or care that the
+model is Fish Audio). It POSTs `{ model, input, voice?, response_format? }`,
+requires no JSON on the responsive OK body (raw audio bytes are written to the
+output file atomically via temp-file + rename), retries transient failures
+(429, 5xx, network/timeouts) with exponential backoff, and aborts on timeout.
+Non-2xx JSON errors (`error.message`) are surfaced for diagnosis. The audio is
+re-encoded to WAV via FFmpeg so downstream concat/alignment only ever sees the
+same format Chatterbox produces.
+
+Voice and response format are provider/model-specific configuration, not part
+of the generic TTS contract:
+
+```env
+TTS_PROVIDER=openrouter
+OPENROUTER_TTS_MODEL=fish-audio/s2.1-pro-free
+OPENROUTER_TTS_VOICE=536d3a5e000945adb7038665781a4aca
+OPENROUTER_TTS_RESPONSE_FORMAT=mp3
+```
+
+Adding another OpenRouter TTS model (e.g. `fish-audio/s2.1-pro` or any model
+behind OpenRouter's `/api/v1/audio/speech`) requires only a config change —
+no provider code change.
+
 ```text
 VisualDirector / AssetGenerator
    ↓ production.scenes[].narration
@@ -543,6 +581,9 @@ src/
     stub-asset-provider.ts           — stub for tests
     tts-provider.ts                  — TTS provider interface
     stub-tts-provider.ts             — stub for tests
+    chatterbox-tts-provider.ts       — Chatterbox TTS (local service on TTS_URL)
+    openrouter-tts-provider.ts       — OpenRouter /api/v1/audio/speech TTS
+    tts-fingerprint.ts               — canonical TTS cache identity
     publisher-provider.ts            — PublisherProvider interface
     stub-publisher-provider.ts       — stub for tests
   utils/
@@ -590,6 +631,7 @@ tests/
   fs-artifact-store.test.ts
   normalize.test.ts
   chatterbox-tts-provider.test.ts
+  openrouter-tts-provider.test.ts
   image-provider-asset-provider.test.ts
 ```
 

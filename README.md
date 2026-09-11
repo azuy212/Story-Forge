@@ -269,7 +269,12 @@ Important variables in `apps/orchestrator/.env.example`:
 | `MODEL_<AGENT>` | Per-agent model override |
 | `USE_REAL_PROVIDERS` | Selects real provider clients when `true` |
 | `IMAGE_PROVIDER_URL` | Image provider base URL; default `http://localhost:8020` |
-| `TTS_URL` | TTS base URL; default `http://localhost:8010` |
+| `TTS_URL` | Chatterbox TTS base URL; default `http://localhost:8010` |
+| `TTS_PROVIDER` | Narration backend: `chatterbox` (default) or `openrouter` |
+| `OPENROUTER_TTS_MODEL` | OpenRouter TTS model name; default `fish-audio/s2.1-pro-free` |
+| `OPENROUTER_TTS_VOICE` | Provider/model-specific voice id; optional, passed through when configured |
+| `OPENROUTER_TTS_RESPONSE_FORMAT` | OpenRouter TTS output format; default `mp3` |
+| `OPENROUTER_TTS_TIMEOUT_MS` | OpenRouter TTS request timeout; default `300000` |
 | `TRANSCRIBER_URL` | Transcriber base URL; default `http://localhost:8030` |
 | `ENABLE_QA` and stage-specific QA flags | Enable graph quality gates |
 | `ENABLE_VIDEO_ASSETS` | Enables video asset generation when supported |
@@ -397,6 +402,11 @@ if one service exits. Stop the environment with `Ctrl-C`.
 ### TTS
 
 FastAPI application: `apps/tts/app/main.py`.
+
+The orchestrator can also synthesize narration through **OpenRouter** instead of
+the local Chatterbox service by setting `TTS_PROVIDER=openrouter` plus
+`OPENROUTER_API_KEY` and `OPENROUTER_TTS_MODEL` (see the Orchestrator variables
+table above).
 
 | Method | Path | Purpose |
 | --- | --- | --- |
