@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import "dotenv/config";
 import { orchestratorRouter } from "./routers/orchestrator.mjs";
 import { imageProviderRouter } from "./routers/image-provider.mjs";
 import { ttsRouter } from "./routers/tts.mjs";
@@ -14,17 +15,23 @@ const UI_DIST = join(__dirname, "..", "dist", "ui");
 
 const PORT = Number(process.env.ADMIN_UI_PORT ?? 2025);
 
+const ttsProvider = process.env.TTS_PROVIDER ?? "chatterbox";
+const ttsEnabled = ttsProvider === "chatterbox";
+
 const app = Fastify({ logger: { level: "warn" } });
 
 await app.register(cors, { origin: true, credentials: true });
 
 await app.register(orchestratorRouter, { prefix: "/api/orchestrator" });
 await app.register(imageProviderRouter, { prefix: "/api/image-provider" });
-await app.register(ttsRouter, { prefix: "/api/tts" });
+if (ttsEnabled) {
+  await app.register(ttsRouter, { prefix: "/api/tts" });
+}
 await app.register(transcriberRouter, { prefix: "/api/transcriber" });
 await app.register(sheetsRouter, { prefix: "/api/sheets" });
 
 app.get("/api/health", async () => ({ status: "ok", service: "admin-ui" }));
+app.get("/api/config", async () => ({ ttsProvider, ttsEnabled }));
 
 if (existsSync(UI_DIST)) {
   try {

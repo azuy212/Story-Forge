@@ -12,6 +12,7 @@ import { AppSidebar } from "@/components/shared/app-sidebar";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toast";
+import { ConfigProvider, useConfig } from "@/lib/config-context";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -38,8 +39,17 @@ const ROUTE_META: Record<string, { title: string; group: string }> = {
 };
 
 export function App() {
+  return (
+    <ConfigProvider>
+      <AppInner />
+    </ConfigProvider>
+  );
+}
+
+function AppInner() {
   const [route, setRoute] = useState<Route>(parseHash);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { ttsEnabled } = useConfig();
 
   useEffect(() => {
     const onHash = () => {
@@ -86,7 +96,7 @@ export function App() {
           </header>
 
           <main className="flex-1 overflow-x-hidden">
-            <MobileNav open={mobileNavOpen} />
+            <MobileNav open={mobileNavOpen} ttsEnabled={ttsEnabled} />
             <div className={cn("mx-auto w-full", "max-w-7xl")}>
               {route.name === "home" && <Home />}
               {route.name === "runs" && <Runs onOpen={(ns) => go("run", ns)} />}
@@ -137,7 +147,7 @@ function Breadcrumbs({
   );
 }
 
-function MobileNav({ open }: { open: boolean }) {
+function MobileNav({ open, ttsEnabled }: { open: boolean; ttsEnabled: boolean }) {
   if (!open) return null;
   return (
     <div className="border-b border-border/60 bg-card px-4 py-3 md:hidden">
@@ -148,7 +158,7 @@ function MobileNav({ open }: { open: boolean }) {
           { href: "#/launch", label: "Launch" },
           { href: "#/sheets", label: "Sheets" },
           { href: "#/image", label: "Image Provider" },
-          { href: "#/tts", label: "TTS" },
+          ...(ttsEnabled ? [{ href: "#/tts", label: "TTS" }] : []),
           { href: "#/transcriber", label: "Transcriber" },
           { href: "#/auth", label: "Google Auth" },
         ].map((l) => (

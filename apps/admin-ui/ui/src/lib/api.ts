@@ -150,6 +150,11 @@ export type DeleteStageResult = {
 
 export type Health = Record<string, string>;
 
+export type AppConfig = {
+  ttsProvider: string;
+  ttsEnabled: boolean;
+};
+
 async function jsonFetch<T>(input: string, init?: RequestInit): Promise<T> {
   const hasBody = init?.body != null;
   const headers: Record<string, string> = {
@@ -167,6 +172,7 @@ async function jsonFetch<T>(input: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  config: () => jsonFetch<AppConfig>("/api/config"),
   health: () => jsonFetch<Health>("/api/orchestrator/health"),
   listRuns: () => jsonFetch<RunSummary[]>("/api/orchestrator/runs"),
   getRun: (ns: string) =>

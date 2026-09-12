@@ -18,6 +18,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { formatRelativeTime } from "@/lib/utils";
+import { useConfig } from "@/lib/config-context";
 
 type ServiceHealth = { name: string; status: "ok" | "down" | "unknown"; hint?: string };
 
@@ -29,6 +30,7 @@ const SERVICE_ICONS: Record<string, React.ComponentType<{ className?: string }>>
 };
 
 export function Home() {
+  const { ttsEnabled } = useConfig();
   const [services, setServices] = useState<ServiceHealth[]>([]);
   const [recentRuns, setRecentRuns] = useState<RunSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,17 +41,18 @@ export function Home() {
       const orch = (await api.health().then((h) => h.langgraph).catch(() => "down")) as
         | "ok"
         | "down";
-      const [img, tts, txr] = await Promise.all([
-        api.imageProvider.health(),
-        api.tts.health(),
-        api.transcriber.health(),
-      ]);
+      const probes: Promise<ServiceHealth>[] = [
+        api.imageProvider.health().then((s) => ({ name: "Image Provider", status: s })),
+        api.transcriber.health().then((s) => ({ name: "Transcriber", status: s })),
+      ];
+      if (ttsEnabled) {
+        probes.push(api.tts.health().then((s) => ({ name: "TTS", status: s })));
+      }
+      const extra = await Promise.all(probes);
       if (!alive) return;
       setServices([
         { name: "Orchestrator (langgraph)", status: orch },
-        { name: "Image Provider", status: img },
-        { name: "TTS", status: tts },
-        { name: "Transcriber", status: txr },
+        ...extra,
       ]);
     };
     const loadRuns = async () => {
@@ -72,7 +75,7 @@ export function Home() {
       alive = false;
       clearInterval(t);
     };
-  }, []);
+  }, [ttsEnabled]);
 
   const allOk = services.length > 0 && services.every((s) => s.status === "ok");
   const anyDown = services.some((s) => s.status === "down");
@@ -106,7 +109,7 @@ export function Home() {
 
       <div className="space-y-6 px-4 pb-8 sm:px-6">
         <section>
-          <SectionHeader title="Service health" description="Live ping of the four core services." />
+          <SectionHeader title="Service health" description="Live ping of the core services." />
           {services.length === 0 ? (
             <Skeleton className="h-24 w-full" />
           ) : (
@@ -214,7 +217,9 @@ export function Home() {
               <QuickAction href="#/launch" icon={PlayCircle} title="Launch next" desc="Pick first pending row from backlog" />
               <QuickAction href="#/runs" icon={ListChecks} title="Browse runs" desc="Filter, sort, search run history" />
               <QuickAction href="#/image" icon={ImageIcon} title="Image Provider" desc="Generate scene images or videos" />
-              <QuickAction href="#/tts" icon={Mic2} title="TTS" desc="Synthesize narration" />
+              {ttsEnabled && (
+                <QuickAction href="#/tts" icon={Mic2} title="TTS" desc="Synthesize narration" />
+              )}
               <QuickAction href="#/transcriber" icon={Waves} title="Transcriber" desc="Force-align audio to text" />
               <QuickAction href="#/auth" icon={KeyRound} title="Google Auth" desc="Set up OAuth refresh token" />
             </div>

@@ -27,6 +27,7 @@ ensure_env_file "apps/orchestrator"
 ensure_env_file "apps/tts"
 ensure_env_file "apps/image-provider"
 ensure_env_file "apps/transcriber"
+ensure_env_file "apps/admin-ui"
 
 setup_service "apps/tts" requirements.txt
 "$ROOT_DIR/apps/tts/venv/bin/python" -m pip install -r "$ROOT_DIR/apps/tts/dev-requirements.txt"

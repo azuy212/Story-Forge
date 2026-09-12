@@ -16,6 +16,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
+import { useConfig } from "@/lib/config-context";
 
 export type NavItem = {
   key: string;
@@ -46,6 +47,8 @@ export function AppSidebar() {
     return window.localStorage.getItem(STORAGE_KEY) === "1";
   });
   const [currentRoute, setCurrentRoute] = useState<string>("home");
+  const { ttsEnabled } = useConfig();
+  const navItems = NAV_ITEMS.filter((i) => i.key !== "tts" || ttsEnabled);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -101,7 +104,7 @@ export function AppSidebar() {
                 </div>
               )}
               <ul className="space-y-0.5 px-2">
-                {NAV_ITEMS.filter((i) => i.group === group).map((item) => (
+                {navItems.filter((i) => i.group === group).map((item) => (
                   <li key={item.key}>
                     <SidebarLink
                       item={item}

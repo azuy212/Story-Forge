@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Download, Loader2, Mic2, Play, Sparkles } from "lucide-react";
+import { Download, Loader2, Mic2, MicOff, Play, Sparkles } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,12 +16,14 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { toast } from "@/components/ui/toast";
 import { truncate } from "@/lib/utils";
+import { useConfig } from "@/lib/config-context";
 
 type Voice = { name: string; size: number };
 type Health = "ok" | "down" | "unknown";
 type HistoryItem = { url: string; text: string; voice: string };
 
 export function Tts() {
+  const { ttsEnabled } = useConfig();
   const [health, setHealth] = useState<Health>("unknown");
   const [voices, setVoices] = useState<Voice[]>([]);
   const [text, setText] = useState("");
@@ -30,6 +32,7 @@ export function Tts() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
   useEffect(() => {
+    if (!ttsEnabled) return;
     const tick = async () => {
       try {
         const r = await fetch("/api/tts/");
@@ -51,7 +54,22 @@ export function Tts() {
     tick();
     const t = setInterval(tick, 5000);
     return () => clearInterval(t);
-  }, [voice]);
+  }, [voice, ttsEnabled]);
+
+  if (!ttsEnabled) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Text to Speech" description="Synthesize narration with the configured TTS provider." />
+        <div className="space-y-6 px-4 pb-10 sm:px-6">
+          <EmptyState
+            icon={<MicOff className="h-6 w-6" />}
+            title="TTS service not configured"
+            description="The TTS provider is not ChatterBox, so the local TTS service is disabled. Narration is synthesized through the configured remote provider instead."
+          />
+        </div>
+      </div>
+    );
+  }
 
   async function onGenerate() {
     if (!text.trim()) {
