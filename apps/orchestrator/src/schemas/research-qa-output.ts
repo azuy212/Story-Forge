@@ -21,6 +21,10 @@ export const ResearchQAOutputSchema = z.object({
   feedback: z.string().optional(),
   issues: z.array(z.string()).optional(),
   factsToRegenerate: z.number().int().min(0).optional(),
+  // Explicit fact IDs that must be regenerated (the "revise" + "remove"
+  // verdicts). Lets the collector target replacements precisely instead of
+  // guessing which facts the reviewer flagged.
+  factsToRegenerateIds: z.array(z.string()).optional(),
   factVerdicts: z.array(FactVerdictSchema),
   // Set by the node (not the LLM) when a verdict repeats the previous round's
   // feedback, so the router accepts/fails instead of regenerating again.

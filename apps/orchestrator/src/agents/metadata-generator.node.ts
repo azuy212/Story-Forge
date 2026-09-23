@@ -51,6 +51,11 @@ export async function metadataGeneratorNode(
   const title = state.content?.title;
   const hook = state.content?.hook;
   const channel = state.branding?.channel ?? "";
+  const audienceTrigger = state.storyPlan?.audienceTrigger?.type ?? "";
+  const audienceTriggerStatement =
+    state.storyPlan?.audienceTrigger?.statement ?? "";
+  const audienceTriggerFactIds =
+    state.storyPlan?.audienceTrigger?.factIds?.join(", ") ?? "";
 
   if (!script || !title || !hook) {
     return {
@@ -72,7 +77,16 @@ export async function metadataGeneratorNode(
     agent: AgentModel.MetadataGenerator,
     promptPath: PromptPaths.MetadataGenerator,
     schema: MetadataOutputSchema,
-    variables: { script, title, hook, channel, formatLabel },
+    variables: {
+      script,
+      title,
+      hook,
+      channel,
+      formatLabel,
+      audienceTrigger,
+      audienceTriggerStatement,
+      audienceTriggerFactIds,
+    },
     inject,
     configurable: withTopic(config, state).configurable,
     generateOptions: {

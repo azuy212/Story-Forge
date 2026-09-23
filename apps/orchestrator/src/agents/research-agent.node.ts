@@ -50,8 +50,11 @@ export async function researchAgentNode(
   const qaFeedback = needsRevision
     ? [
         ...(qa.feedback ? [`Feedback: ${qa.feedback}`] : []),
-        ...(qa.factsToRegenerate
-          ? [`Replacements needed: ${qa.factsToRegenerate}`]
+        ...(qa.factsToRegenerateIds?.length
+          ? [
+              `Replacements needed: ${qa.factsToRegenerateIds.length}`,
+              `Regenerate exactly these fact IDs (fix or replace only these; replacement facts MUST reuse the same IDs; keep all other facts and their IDs unchanged): ${qa.factsToRegenerateIds.join(", ")}`,
+            ]
           : []),
         ...(qa.issues?.length
           ? [`Issues:\n${qa.issues.map((i) => `- ${i}`).join("\n")}`]

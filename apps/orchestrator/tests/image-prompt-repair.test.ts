@@ -39,6 +39,7 @@ const REPAIRABLE_SCENE: Scene = {
         "There are a lot of people I can help with, but I can't depict some public figures.",
     },
   ],
+  assetMode: "generated" as const,
 };
 
 const REPAIR_OUTPUT = {
@@ -111,6 +112,7 @@ describe("imagePromptRepairNode", () => {
       generationPrompt: "A map.",
       assetUrl: "https://existing.local/map.png",
       generationStatus: "complete",
+      assetMode: "generated" as const,
     };
     const result = await runNode([complete, REPAIRABLE_SCENE]);
 
@@ -201,6 +203,7 @@ describe("imagePromptRepairNode", () => {
       sceneId: 6,
       generationPrompt: "A map.",
       generationStatus: "pending",
+      assetMode: "generated" as const,
     };
     const result = await runNode([pending]);
 

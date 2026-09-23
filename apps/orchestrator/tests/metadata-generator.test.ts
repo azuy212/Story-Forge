@@ -59,7 +59,7 @@ describe("metadataGeneratorNode", () => {
       title: "The Country That Doesn't Exist",
       description: "Discover this hidden geography fact.",
       tags: ["geography", "maps", "hidden places"],
-      hashtags: ["geographyfacts", "hiddenhistory"],
+      hashtags: ["geographyfacts", "hiddenhistory", "maps"],
       category: "Education",
       pinnedComment: "Which place surprised you the most?",
     };
@@ -130,7 +130,7 @@ describe("metadataGeneratorNode", () => {
         title: "",
         description: "",
         tags: "not-array",
-        hashtags: [],
+        hashtags: ["a", "b", "c"],
         category: "",
         pinnedComment: "",
       }),
@@ -148,7 +148,7 @@ describe("metadataGeneratorNode", () => {
       title: "T",
       description: "D",
       tags: [],
-      hashtags: [],
+      hashtags: ["a", "b", "c"],
       category: "Education",
       pinnedComment: "C",
     };

@@ -21,6 +21,10 @@ export const PromptQAOutputSchema = z.object({
   ]),
   globalFeedback: z.string().optional(),
   issues: z.array(z.string()).optional(),
+  // Model-forced root-cause classification. Informational: the graph router
+  // still routes deterministically, but the producer uses this to target its
+  // revision (regenerate prompts vs re-plan the visual plan).
+  revisionTarget: z.enum(["prompts", "visual_plan", "both", "none"]).optional(),
   sceneResults: z
     .array(SceneResultSchema)
     .min(1, "must have at least one scene result"),

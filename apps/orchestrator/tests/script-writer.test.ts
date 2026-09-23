@@ -15,7 +15,6 @@ const MOCK_PROMPT = [
   "Story Summary: {{storySummary}}",
   "Story Beats: {{storyBeats}}",
   "Channel: {{channel}}",
-  "Call to Action: {{cta}}",
   "QA Feedback: {{qaFeedback}}",
   "Previous Script: {{previousScript}}",
 ].join("\n");
@@ -190,13 +189,22 @@ function buildResponse(overrides?: {
         content: {
           script:
             "[What if a country officially wasn't real?] The nation has no borders...",
-          narration:
-            "What if a country officially wasn't real? The nation has no borders...",
-          callToAction: "Follow @UniverseDecoded for more.",
+          beats: [
+            {
+              beatId: 1,
+              narration: "What if a country officially wasn't real?",
+            },
+            { beatId: 2, narration: "The nation has no borders." },
+            { beatId: 3, narration: "It has no permanent population." },
+            { beatId: 4, narration: "Its ecosystem is found nowhere else." },
+            { beatId: 5, narration: "Access requires special permission." },
+            { beatId: 6, narration: "But it appears on very few maps." },
+          ],
+          retention: { pivotSentence: "The nation has no borders." },
           estimatedDurationSeconds: 42,
           ending: {
             type: "open_question",
-            narration: "The nation has no borders...",
+            narration: "But it appears on very few maps...",
             visualDirection: "Hold on the empty map.",
           },
         },
@@ -229,6 +237,17 @@ describe("scriptWriterNode", () => {
     expect(result.content?.callToAction).toBe("Subscribe");
     expect(result.content?.ending?.type).toBe("open_question");
     expect(result.content?.estimatedDurationSeconds).toBe(42);
+    // Narration is assembled in code from the trimmed beat narrations, in
+    // order — the writer never emits a flat narration blob.
+    expect(result.content?.beats).toHaveLength(6);
+    expect(result.content?.narration).toBe(
+      "What if a country officially wasn't real? The nation has no borders. " +
+        "It has no permanent population. Its ecosystem is found nowhere else. " +
+        "Access requires special permission. But it appears on very few maps.",
+    );
+    expect(result.content?.retention).toEqual({
+      pivotSentence: "The nation has no borders.",
+    });
     expect(result.execution?.currentNode).toBe("ScriptWriter");
     expect(result.diagnostics?.telemetry?.ScriptWriter).toBeDefined();
     expect(result.diagnostics?.telemetry?.ScriptWriter.retries).toBe(0);
@@ -260,7 +279,8 @@ describe("scriptWriterNode", () => {
     expect(userMsg!.content).toContain("Hook with central question");
     expect(userMsg!.content).toContain("Beat 1");
     expect(userMsg!.content).toContain("GeoFacts");
-    expect(userMsg!.content).toContain("Subscribe");
+    // CTA is configuration-owned and never passed to the model.
+    expect(userMsg!.content).not.toContain("Call to Action");
   });
 
   it("passes language revision feedback while preserving research inputs", async () => {
@@ -352,6 +372,41 @@ describe("scriptWriterNode", () => {
 
     const options = mockGenerate.mock.calls[0][1] as Record<string, unknown>;
     expect((options?.responseFormat as any)?.type).toBe("json_object");
+  });
+
+  it("hard-fails when writer beats do not match planner beat count", async () => {
+    // 5 beats vs 6 in the planner → structural mismatch
+    const badJson = JSON.stringify({
+      content: {
+        script: "ok",
+        beats: [
+          { beatId: 1, narration: "beat 1" },
+          { beatId: 2, narration: "beat 2" },
+          { beatId: 3, narration: "beat 3" },
+          { beatId: 4, narration: "beat 4" },
+          { beatId: 5, narration: "beat 5" },
+        ],
+        retention: { pivotSentence: "beat 2" },
+        estimatedDurationSeconds: 30,
+      },
+    });
+    mockGenerate
+      .mockResolvedValueOnce(buildResponse({ content: badJson }))
+      .mockResolvedValueOnce(buildResponse());
+
+    const { promise } = runNode();
+    const result = await promise;
+
+    // The node clears generated fields and writes an error; it does NOT retry
+    // because validateBeatMapping is a hard structural check, not a schema
+    // validation that triggers retry logic.
+    expect(result.content?.script).toBe("");
+    expect(result.content?.narration).toBe("");
+    expect(result.content?.beats).toEqual([]);
+    expect(result.diagnostics?.errors).toBeDefined();
+    expect(result.diagnostics?.errors![0]).toContain(
+      "narration must have exactly one beat per story-plan beat",
+    );
   });
 
   it("retries once after invalid JSON, succeeds on second attempt", async () => {

@@ -28,6 +28,7 @@ const BASE_SCENES = [
     visualDescription: "Satellite view",
     sceneType: "landscape",
     emphasis: "medium" as const,
+    assetMode: "generated" as const,
   },
   {
     sceneId: 2,
@@ -38,6 +39,7 @@ const BASE_SCENES = [
     visualDescription: "Map fading",
     sceneType: "map",
     emphasis: "high" as const,
+    assetMode: "generated" as const,
   },
 ];
 

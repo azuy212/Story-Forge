@@ -40,6 +40,7 @@ const STORY_BEATS = [
     keyMessage: "This place defies normal geography.",
     referencedFacts: ["fact-001"],
     priority: "high",
+    targetWords: 20,
     estimatedDurationSeconds: 4,
   },
   {
@@ -50,6 +51,7 @@ const STORY_BEATS = [
     keyMessage: "The nearest land is over 2,000 km away.",
     referencedFacts: ["fact-001", "fact-002"],
     priority: "high",
+    targetWords: 20,
     estimatedDurationSeconds: 6,
   },
   {
@@ -60,6 +62,7 @@ const STORY_BEATS = [
     keyMessage: "One of the most isolated places on the planet.",
     referencedFacts: ["fact-002"],
     priority: "medium",
+    targetWords: 20,
     estimatedDurationSeconds: 8,
   },
   {
@@ -70,6 +73,7 @@ const STORY_BEATS = [
     keyMessage: "It has no permanent population.",
     referencedFacts: ["fact-003"],
     priority: "medium",
+    targetWords: 20,
     estimatedDurationSeconds: 8,
   },
   {
@@ -80,6 +84,7 @@ const STORY_BEATS = [
     keyMessage: "Its ecosystem is found nowhere else.",
     referencedFacts: ["fact-005"],
     priority: "medium",
+    targetWords: 20,
     estimatedDurationSeconds: 8,
   },
   {
@@ -91,6 +96,7 @@ const STORY_BEATS = [
     keyMessage: "Access requires special permission.",
     referencedFacts: ["fact-007"],
     priority: "high",
+    targetWords: 20,
     estimatedDurationSeconds: 8,
   },
 ];
@@ -143,8 +149,12 @@ function makeBeats(
   keyMessage: string;
   referencedFacts: string[];
   priority: "high";
+  targetWords: number;
   estimatedDurationSeconds: number;
 }[] {
+  // Sum of targetWords across beats must land inside the short-profile
+  // narration word range [109,133] at the pinned 160 wpm.
+  const perBeat = Math.max(10, Math.round(120 / count));
   return Array.from({ length: count }, (_, i) => ({
     beatId: i + 1,
     purpose: "Hook",
@@ -153,6 +163,7 @@ function makeBeats(
     keyMessage: "K.",
     referencedFacts: [`fact-${String(i + 1).padStart(3, "0")}`],
     priority: "high" as const,
+    targetWords: perBeat,
     estimatedDurationSeconds: durationPerBeat,
   }));
 }
@@ -178,6 +189,8 @@ function makeScenes(narration: string[], durations: number[]) {
     sceneGoal: "Hook",
     visualDescription: "Aerial view of remote island",
     sceneType: "landscape" as const,
+    assetMode: "generated" as const,
+    sceneRole: "narrative" as const,
     cameraShot: "aerial" as const,
     cameraMotion: "drone-flyover" as const,
     transition: "cut" as const,
@@ -273,6 +286,13 @@ function queueHappyPathMocks(
         },
         storyType: "mystery",
         storySummary: "Mystery Island story.",
+        audienceTrigger: {
+          type: "curiosity",
+          statement: "A country that officially doesn't exist.",
+          factIds: ["fact-001"],
+        },
+        endingType: "open_question",
+        retention: { pivotBeatId: 3 },
         storyBeats: BEATS,
       }),
       usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
@@ -284,9 +304,46 @@ function queueHappyPathMocks(
     output: JSON.stringify({
       content: {
         script: `Script body v${i + 1}.`,
-        narration: NARRATIONS.join(" "),
-        callToAction: "Subscribe!",
+        beats: [
+          {
+            beatId: 1,
+            narration:
+              "What if a country officially was not real? This land appears on every map. Yet it has no borders.",
+          },
+          {
+            beatId: 2,
+            narration:
+              "The nation has no formal territory. It has no legal standing in the international community.",
+          },
+          {
+            beatId: 3,
+            narration:
+              "It is one of the most isolated places on Earth. Open ocean surrounds it for thousands of miles.",
+          },
+          {
+            beatId: 4,
+            narration:
+              "No one lives here permanently. The few visitors who come each year need special approval to come ashore.",
+          },
+          {
+            beatId: 5,
+            narration:
+              "Its ecosystem is unique. It has plant and animal species found nowhere else in the world.",
+          },
+          {
+            beatId: 6,
+            narration:
+              "Access requires special permission. Even then, the journey across the open sea takes several days.",
+          },
+        ],
+        retention: { pivotSentence: "Yet it has no borders." },
         estimatedDurationSeconds: 50,
+        ending: {
+          type: "open_question",
+          narration:
+            "Access requires special permission. Even then, the journey across the open sea takes several days.",
+          visualDirection: "Hold on empty horizon.",
+        },
       },
     }),
     usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
@@ -314,12 +371,12 @@ function queueHappyPathMocks(
     // 6. MetadataGenerator (parallel branch after VisualDirector)
     .mockResolvedValueOnce({
       output: JSON.stringify({
-        title: "Mystery Island Video",
-        description: "Explore the mystery.",
+        title: "T",
+        description: "D",
         tags: ["geography"],
-        hashtags: ["#mystery"],
+        hashtags: ["t", "test", "video"],
         category: "Education",
-        pinnedComment: "What do you think?",
+        pinnedComment: "C",
       }),
       usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
     })
@@ -480,6 +537,7 @@ beforeEach(() => {
   delete process.env.TARGET_DURATION_SEC;
   delete process.env.DURATION_TOLERANCE_SEC;
   delete process.env.WORDS_PER_MINUTE;
+  delete process.env.NARRATION_TARGET_WPM;
   // Tests that assert `assetType: "video"` exercise the full video path; the
   // asset-generator normalizes video → image when this flag is unset, which
   // is the safe default for production but breaks the happy-path assertions.
@@ -523,6 +581,13 @@ describe("Graph", () => {
           storyType: "mystery",
           storySummary:
             "A remote island that is one of the most isolated places on Earth.",
+          audienceTrigger: {
+            type: "curiosity",
+            statement: "A country that officially isn't real.",
+            factIds: ["fact-001"],
+          },
+          endingType: "open_question",
+          retention: { pivotBeatId: 3 },
           storyBeats: STORY_BEATS,
         }),
 
@@ -532,12 +597,48 @@ describe("Graph", () => {
         output: JSON.stringify({
           content: {
             script: "Script text.",
-            narration: SCENE_NARRATIONS.join(" "),
-            callToAction: "Follow @UniverseDecoded for more.",
+            beats: [
+              {
+                beatId: 1,
+                narration:
+                  "What if a country officially was not real? This land appears on every map. Yet it has no borders.",
+              },
+              {
+                beatId: 2,
+                narration:
+                  "The nation has no formal territory. It has no legal standing in the international community.",
+              },
+              {
+                beatId: 3,
+                narration:
+                  "It is one of the most isolated places on Earth. Open ocean surrounds it for thousands of miles.",
+              },
+              {
+                beatId: 4,
+                narration:
+                  "No one lives here permanently. The few visitors who come each year need special approval to come ashore.",
+              },
+              {
+                beatId: 5,
+                narration:
+                  "Its ecosystem is unique. It has plant and animal species found nowhere else in the world.",
+              },
+              {
+                beatId: 6,
+                narration:
+                  "Access requires special permission. Even then, the journey across the open sea takes several days.",
+              },
+            ],
+            retention: { pivotSentence: "Yet it has no borders." },
             estimatedDurationSeconds: 42,
+            ending: {
+              type: "open_question",
+              narration:
+                "Access requires special permission. Even then, the journey across the open sea takes several days.",
+              visualDirection: "Hold on empty horizon.",
+            },
           },
         }),
-
         usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
       })
       .mockResolvedValueOnce({
@@ -560,7 +661,7 @@ describe("Graph", () => {
           title: "Test Title",
           description: "Test description.",
           tags: ["geography"],
-          hashtags: ["geo"],
+          hashtags: ["geo", "test", "video"],
           category: "Education",
           pinnedComment: "Comment?",
         }),
@@ -887,6 +988,13 @@ describe("Graph", () => {
           content: { title: "Title", hook: "Hook?" },
           storyType: "mystery",
           storySummary: "Summary.",
+          audienceTrigger: {
+            type: "curiosity",
+            statement: "A country that doesn't exist.",
+            factIds: ["fact-001"],
+          },
+          endingType: "open_question",
+          retention: { pivotBeatId: 1 },
           storyBeats: makeBeats(6),
         }),
 
@@ -899,6 +1007,13 @@ describe("Graph", () => {
             narration: SCENE_NARRATIONS.join(" "),
             callToAction: "Subscribe.",
             estimatedDurationSeconds: 48,
+            retention: {
+              hookSentence: "Hook?",
+              pivotSentence: "Yet it has no borders.",
+              endingSentence:
+                "Even then, the journey across the open sea takes several days.",
+              pivotWordPosition: 13,
+            },
           },
         }),
 
@@ -1023,6 +1138,13 @@ describe("Graph", () => {
           content: { title: "Title", hook: "Hook?" },
           storyType: "mystery",
           storySummary: "Summary.",
+          audienceTrigger: {
+            type: "curiosity",
+            statement: "A country that doesn't exist.",
+            factIds: ["fact-001"],
+          },
+          endingType: "open_question",
+          retention: { pivotBeatId: 1 },
           storyBeats: makeBeats(6),
         }),
 
@@ -1035,6 +1157,13 @@ describe("Graph", () => {
             narration: SCENE_NARRATIONS.join(" "),
             callToAction: "Subscribe.",
             estimatedDurationSeconds: 48,
+            retention: {
+              hookSentence: "Hook?",
+              pivotSentence: "Yet it has no borders.",
+              endingSentence:
+                "Even then, the journey across the open sea takes several days.",
+              pivotWordPosition: 13,
+            },
           },
         }),
 
@@ -1234,6 +1363,13 @@ describe("Graph", () => {
           },
           storyType: "mystery",
           storySummary: "Mystery Island story.",
+          audienceTrigger: {
+            type: "curiosity",
+            statement: "A country that wasn't real.",
+            factIds: ["fact-001"],
+          },
+          endingType: "open_question",
+          retention: { pivotBeatId: 3 },
           storyBeats: BEATS_ADJUSTED,
         }),
 
@@ -1247,6 +1383,13 @@ describe("Graph", () => {
             narration: NARRATIONS.join(" "),
             callToAction: "Subscribe!",
             estimatedDurationSeconds: 50,
+            retention: {
+              hookSentence: "What if a country wasn't real?",
+              pivotSentence: "Yet it has no borders.",
+              endingSentence:
+                "Even then, the journey across the open sea takes several days.",
+              pivotWordPosition: 13,
+            },
           },
         }),
 
@@ -1489,6 +1632,13 @@ describe("Graph", () => {
           },
           storyType: "mystery",
           storySummary: "Mystery Island story.",
+          audienceTrigger: {
+            type: "curiosity",
+            statement: "A country that wasn't real.",
+            factIds: ["fact-001"],
+          },
+          endingType: "open_question",
+          retention: { pivotBeatId: 3 },
           storyBeats: BEATS,
         }),
 
@@ -1502,6 +1652,13 @@ describe("Graph", () => {
             narration: NARRATIONS.join(" "),
             callToAction: "Subscribe!",
             estimatedDurationSeconds: 8,
+            retention: {
+              hookSentence: "What if a country wasn't real?",
+              pivotSentence: "Yet it has no borders.",
+              endingSentence:
+                "Even then, the journey across the open sea takes several days.",
+              pivotWordPosition: 13,
+            },
           },
         }),
 
@@ -1674,6 +1831,13 @@ describe("Graph", () => {
           },
           storyType: "mystery",
           storySummary: "Mystery Island story.",
+          audienceTrigger: {
+            type: "curiosity",
+            statement: "A country that wasn't real.",
+            factIds: ["fact-001"],
+          },
+          endingType: "open_question",
+          retention: { pivotBeatId: 3 },
           storyBeats: BEATS,
         }),
 
@@ -1687,6 +1851,13 @@ describe("Graph", () => {
             narration: NARRATIONS.join(" "),
             callToAction: "Subscribe!",
             estimatedDurationSeconds: 8,
+            retention: {
+              hookSentence: "What if a country wasn't real?",
+              pivotSentence: "Yet it has no borders.",
+              endingSentence:
+                "Even then, the journey across the open sea takes several days.",
+              pivotWordPosition: 13,
+            },
           },
         }),
 
@@ -1962,6 +2133,13 @@ describe("Graph", () => {
           },
           storyType: "mystery",
           storySummary: "Mystery Island story.",
+          audienceTrigger: {
+            type: "curiosity",
+            statement: "A country that wasn't real.",
+            factIds: ["fact-001"],
+          },
+          endingType: "open_question",
+          retention: { pivotBeatId: 3 },
           storyBeats: BEATS,
         }),
 
@@ -1975,6 +2153,13 @@ describe("Graph", () => {
             narration: NARRATIONS.join(" "),
             callToAction: "Subscribe!",
             estimatedDurationSeconds: 50,
+            retention: {
+              hookSentence: "What if a country wasn't real?",
+              pivotSentence: "Yet it has no borders.",
+              endingSentence:
+                "Even then, the journey across the open sea takes several days.",
+              pivotWordPosition: 13,
+            },
           },
         }),
 
@@ -2190,6 +2375,13 @@ describe("Graph", () => {
           },
           storyType: "mystery",
           storySummary: "Mystery Island story.",
+          audienceTrigger: {
+            type: "curiosity",
+            statement: "A country that wasn't real.",
+            factIds: ["fact-001"],
+          },
+          endingType: "open_question",
+          retention: { pivotBeatId: 3 },
           storyBeats: BEATS,
         }),
         usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
@@ -2198,10 +2390,47 @@ describe("Graph", () => {
       .mockResolvedValueOnce({
         output: JSON.stringify({
           content: {
-            script: "Script body.",
-            narration: NARRATIONS.join(" "),
-            callToAction: "Subscribe!",
-            estimatedDurationSeconds: 50,
+            script: "Script.",
+            beats: [
+              {
+                beatId: 1,
+                narration:
+                  "What if a country officially was not real? This land appears on every map. Yet it has no borders.",
+              },
+              {
+                beatId: 2,
+                narration:
+                  "The nation has no formal territory. It has no legal standing in the international community.",
+              },
+              {
+                beatId: 3,
+                narration:
+                  "It is one of the most isolated places on Earth. Open ocean surrounds it for thousands of miles.",
+              },
+              {
+                beatId: 4,
+                narration:
+                  "No one lives here permanently. The few visitors who come each year need special approval to come ashore.",
+              },
+              {
+                beatId: 5,
+                narration:
+                  "Its ecosystem is unique. It has plant and animal species found nowhere else in the world.",
+              },
+              {
+                beatId: 6,
+                narration:
+                  "Access requires special permission. Even then, the journey across the open sea takes several days.",
+              },
+            ],
+            retention: { pivotSentence: "Yet it has no borders." },
+            estimatedDurationSeconds: 48,
+            ending: {
+              type: "open_question",
+              narration:
+                "Access requires special permission. Even then, the journey across the open sea takes several days.",
+              visualDirection: "Hold on empty horizon.",
+            },
           },
         }),
         usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
@@ -2225,7 +2454,7 @@ describe("Graph", () => {
           title: "Mystery Island Video",
           description: "Explore the mystery.",
           tags: ["geography"],
-          hashtags: ["#mystery"],
+          hashtags: ["#mystery", "#island", "#geography"],
           category: "Education",
           pinnedComment: "What do you think?",
         }),

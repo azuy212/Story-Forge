@@ -1,6 +1,6 @@
 import {
   resolveVideoProfile,
-  speakingRateWps,
+  speakingRateWordsPerSecond,
   checkNarrationDuration,
 } from "../utils/video-profile.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
@@ -268,7 +268,7 @@ export async function validatePackage(
       .filter(Boolean).length;
     if (words > 0) {
       const wps = (words / narrationMs) * 1000;
-      const targetWps = speakingRateWps(videoProfile);
+      const targetWps = speakingRateWordsPerSecond(videoProfile);
       const paceTolerance = 0.2; // ±0.2 wps around target
       if (wps < targetWps - paceTolerance || wps > targetWps + paceTolerance) {
         warnings.push(

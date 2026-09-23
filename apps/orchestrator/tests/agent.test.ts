@@ -78,8 +78,11 @@ function storyBeats() {
     viewerQuestion: `Question ${i + 1}?`,
     curiosityQuestion: `Next question ${i + 1}?`,
     keyMessage: `Message ${i + 1}.`,
-    referencedFacts: [`fact-00${i + 1}`],
+    referencedFacts: [`fact-00${(i % 3) + 1}`],
     priority: "high",
+    // Sums to 120, inside the short-profile narration word range [109,133]
+    // at the pinned 160 wpm (see beforeEach env cleanup).
+    targetWords: 20,
     estimatedDurationSeconds: i === 5 ? 10 : 8,
   }));
 }
@@ -102,6 +105,13 @@ function buildResponse(overrides?: {
         storyType: "mystery",
         storySummary:
           "A remote island that is one of the most isolated places on Earth.",
+        audienceTrigger: {
+          type: "curiosity",
+          statement: "A country that officially isn't real.",
+          factIds: ["fact-001"],
+        },
+        endingType: "open_question",
+        retention: { pivotBeatId: 3 },
         storyBeats: storyBeats(),
       }),
     usage: {
@@ -112,7 +122,31 @@ function buildResponse(overrides?: {
   };
 }
 
+function storyPlanPayload(
+  beats = storyBeats(),
+  overrides: Record<string, unknown> = {},
+): string {
+  return JSON.stringify({
+    content: { title: "T", hook: "H?" },
+    storyType: "mystery",
+    storySummary: "S.",
+    audienceTrigger: {
+      type: "curiosity",
+      statement: "A country that officially isn't real.",
+      factIds: ["fact-001"],
+    },
+    endingType: "open_question",
+    retention: { pivotBeatId: 3 },
+    storyBeats: beats,
+    ...overrides,
+  });
+}
+
 beforeEach(() => {
+  // Pin the speaking rate so the planner schema's targetWords-sum gate is
+  // deterministic regardless of what the local .env sets.
+  delete process.env.WORDS_PER_MINUTE;
+  delete process.env.NARRATION_TARGET_WPM;
   mockGenerate.mockReset();
 });
 
@@ -216,12 +250,7 @@ describe("scriptPlannerNode", () => {
     );
     mockGenerate.mockResolvedValue(
       buildResponse({
-        content: JSON.stringify({
-          content: { title: "T", hook: "H?" },
-          storyType: "mystery",
-          storySummary: "S.",
-          storyBeats: beats,
-        }),
+        content: storyPlanPayload(beats),
       }),
     );
 
@@ -236,26 +265,26 @@ describe("scriptPlannerNode", () => {
     expect(result.diagnostics?.telemetry?.ScriptPlanner.retries).toBe(3);
   });
 
-  it("warns when a beat references an unknown fact", async () => {
+  it("fails the plan when a beat references an unknown fact", async () => {
     const beats = storyBeats().map((b, i) =>
       i === 0 ? { ...b, referencedFacts: ["fact-999"] } : b,
     );
     mockGenerate.mockResolvedValue(
       buildResponse({
-        content: JSON.stringify({
-          content: { title: "T", hook: "H?" },
-          storyType: "mystery",
-          storySummary: "S.",
-          storyBeats: beats,
-        }),
+        content: storyPlanPayload(beats),
       }),
     );
 
     const { promise } = runNode();
     const result = await promise;
 
+    // Invalid fact references are a hard structural failure: the writer would
+    // otherwise inherit an untraceable claim. The plan is cleared and the run
+    // fails closed at the next guard.
+    expect(result.storyPlan?.storyBeats).toEqual([]);
+    expect(result.diagnostics?.errors).toBeDefined();
     expect(
-      result.diagnostics?.warnings!.some((w) => w.includes("fact-999")),
+      result.diagnostics?.errors!.some((e) => e.includes("fact-999")),
     ).toBe(true);
   });
 
@@ -269,12 +298,7 @@ describe("scriptPlannerNode", () => {
     }));
     mockGenerate.mockResolvedValue(
       buildResponse({
-        content: JSON.stringify({
-          content: { title: "T", hook: "H?" },
-          storyType: "mystery",
-          storySummary: "S.",
-          storyBeats: beats,
-        }),
+        content: storyPlanPayload(beats),
       }),
     );
 
@@ -296,12 +320,7 @@ describe("scriptPlannerNode", () => {
     }));
     mockGenerate.mockResolvedValue(
       buildResponse({
-        content: JSON.stringify({
-          content: { title: "T", hook: "H?" },
-          storyType: "mystery",
-          storySummary: "S.",
-          storyBeats: beats,
-        }),
+        content: storyPlanPayload(beats),
       }),
     );
 

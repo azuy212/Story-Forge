@@ -72,9 +72,15 @@ function isStaleLock(lockDir) {
     if (owner.pid && !pidAlive(owner.pid)) return true;
     if (Date.now() - owner.createdAt > LOCK_STALE_MS) return true;
     return false;
-  } catch {
-    const stat = statSync(lockDir);
-    return Date.now() - stat.mtimeMs > LOCK_STALE_MS;
+  } catch (err) {
+    if (err.code === "ENOENT") return false;
+    try {
+      const stat = statSync(lockDir);
+      return Date.now() - stat.mtimeMs > LOCK_STALE_MS;
+    } catch {
+      // Lock released between mkdir and stat; retry acquisition.
+      return false;
+    }
   }
 }
 

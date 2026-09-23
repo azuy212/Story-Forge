@@ -970,6 +970,7 @@ function ResumeDialog({
     profile: "short",
     seed: "",
     dryRun: false,
+    resetQaRetries: false,
   });
   const [busy, setBusy] = useState(false);
 
@@ -982,6 +983,7 @@ function ResumeDialog({
       if (form.profile) body.profile = form.profile;
       if (form.seed) body.seed = form.seed;
       if (form.dryRun) body.dryRun = true;
+      if (form.resetQaRetries) body.resetQaRetries = true;
       await api.resumeRun(ns, body);
       onOpenChange(false);
       onResumed();
@@ -999,7 +1001,8 @@ function ResumeDialog({
           <DialogTitle>Resume with overrides</DialogTitle>
           <DialogDescription>
             Override pillar, topic, profile, or pass a seed file. Empty fields
-            are ignored.
+            are ignored. Reset QA retries clears the last QC step's cached
+            artifacts so it re-runs with a fresh retry budget.
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1044,22 +1047,41 @@ function ResumeDialog({
             />
           </Field>
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="dry-run"
-            checked={form.dryRun}
-            onChange={(e) =>
-              setForm((s) => ({ ...s, dryRun: e.target.checked }))
-            }
-            className="h-4 w-4 rounded border-input bg-background accent-primary"
-          />
-          <Label
-            htmlFor="dry-run"
-            className="cursor-pointer normal-case tracking-normal"
-          >
-            Dry-run only
-          </Label>
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="dry-run"
+              checked={form.dryRun}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, dryRun: e.target.checked }))
+              }
+              className="h-4 w-4 rounded border-input bg-background accent-primary"
+            />
+            <Label
+              htmlFor="dry-run"
+              className="cursor-pointer normal-case tracking-normal"
+            >
+              Dry-run only
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="reset-qa-retries"
+              checked={form.resetQaRetries}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, resetQaRetries: e.target.checked }))
+              }
+              className="h-4 w-4 rounded border-input bg-background accent-primary"
+            />
+            <Label
+              htmlFor="reset-qa-retries"
+              className="cursor-pointer normal-case tracking-normal"
+            >
+              Reset QA retries for last step
+            </Label>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

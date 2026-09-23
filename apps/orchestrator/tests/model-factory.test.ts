@@ -263,6 +263,12 @@ describe("generateWithStreamTimeouts", () => {
 });
 
 describe("createModel streaming request", () => {
+  beforeEach(() => {
+    // Pin the ScriptWriter model so the resolution assertion does not depend
+    // on .env (which may override the per-agent model locally).
+    process.env.MODEL_SCRIPTWRITER = "z-ai/glm-5.3-flash";
+  });
+
   it("sends a streaming request and accumulates/normalizes the response", async () => {
     const usage = { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 };
     const create = jest.fn(async () => ({

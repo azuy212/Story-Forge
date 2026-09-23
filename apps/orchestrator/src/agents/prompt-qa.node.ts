@@ -76,6 +76,11 @@ export async function promptQANode(
   const visualPlan = state.production?.visualPlan ?? [];
   const videoProfile: VideoProfileConfig =
     state.videoProfile ?? resolveVideoProfile({});
+  const audienceTrigger = state.storyPlan?.audienceTrigger?.type ?? "";
+  const audienceTriggerStatement =
+    state.storyPlan?.audienceTrigger?.statement ?? "";
+  const audienceTriggerFactIds =
+    state.storyPlan?.audienceTrigger?.factIds?.join(", ") ?? "";
   const inject = (config.configurable ?? {}) as AgentInject;
 
   const retryCount = (state.execution?.retryCount?.PromptQA ?? 0) + 1;
@@ -120,6 +125,9 @@ export async function promptQANode(
     variables: {
       scenes: formatScenes(scenes),
       visualPlan: formatVisualPlan(scenes, visualPlan),
+      audienceTrigger,
+      audienceTriggerStatement,
+      audienceTriggerFactIds,
       formatGuidance: canvasGuidance.formatGuidance,
     },
     inject,

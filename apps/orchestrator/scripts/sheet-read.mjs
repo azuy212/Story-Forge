@@ -13,7 +13,10 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import googleapis from "googleapis";
 import { Command } from "commander";
-import { COLUMN, formatLocalTimestamp } from "../src/integrations/google-sheets/sheets-format.mjs";
+import {
+  COLUMN,
+  formatLocalTimestamp,
+} from "../src/integrations/google-sheets/sheets-format.mjs";
 
 const { google } = googleapis;
 
@@ -71,7 +74,10 @@ async function readProfile(client, profile) {
     range: `'${sheetName}'!A:Q`,
   });
   const rows = res.data?.values ?? [];
-  const records = rows.slice(1).map(toRecord).filter((r) => r.videoId || r.topic);
+  const records = rows
+    .slice(1)
+    .map(toRecord)
+    .filter((r) => r.videoId || r.topic);
   return { sheetName, records };
 }
 

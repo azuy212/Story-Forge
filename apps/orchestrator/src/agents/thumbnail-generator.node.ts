@@ -181,6 +181,11 @@ export async function thumbnailGeneratorNode(
   const channel = state.branding?.channel ?? "";
   const style = state.branding?.style ?? "";
   const colorPalette = state.branding?.colorPalette ?? "";
+  const audienceTrigger = state.storyPlan?.audienceTrigger?.type ?? "";
+  const audienceTriggerStatement =
+    state.storyPlan?.audienceTrigger?.statement ?? "";
+  const audienceTriggerFactIds =
+    state.storyPlan?.audienceTrigger?.factIds?.join(", ") ?? "";
   const canvasGuidance = canvasGuidanceFor(videoProfile);
 
   const label = nodeLabel(AgentModel.ThumbnailGenerator);
@@ -211,6 +216,9 @@ export async function thumbnailGeneratorNode(
       channel,
       style,
       colorPalette,
+      audienceTrigger,
+      audienceTriggerStatement,
+      audienceTriggerFactIds,
       formatLabel: canvasGuidance.formatLabel,
       aspectGuidance: canvasGuidance.aspectGuidance,
       aspectLabel: canvasGuidance.aspectLabel,

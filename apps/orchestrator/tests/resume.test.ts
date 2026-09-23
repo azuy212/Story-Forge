@@ -36,8 +36,15 @@ describe("parseArgs", () => {
       profile: null,
       seed: null,
       dryRun: true,
+      resetQaRetries: false,
       help: false,
     });
+  });
+
+  it("parses --reset-qa-retries", () => {
+    const parsed = parseArgs(["ns", "--reset-qa-retries"]);
+    expect(parsed.resetQaRetries).toBe(true);
+    expect(parsed.dryRun).toBe(false);
   });
 
   it("sets help for --help or -h anywhere in the args", () => {

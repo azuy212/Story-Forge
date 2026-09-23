@@ -73,6 +73,11 @@ export async function releaseReviewNode(
       narration: state.content?.narration ?? "",
       thumbnailText: state.thumbnail?.thumbnailText ?? "",
       metadata: serializeMetadata(state.metadataOutput),
+      audienceTrigger: state.storyPlan?.audienceTrigger?.type ?? "",
+      audienceTriggerStatement:
+        state.storyPlan?.audienceTrigger?.statement ?? "",
+      audienceTriggerFactIds:
+        state.storyPlan?.audienceTrigger?.factIds?.join(", ") ?? "",
       formatLabel: formatLabelFor(videoProfile),
       targetDurationSeconds: String(videoProfile.targetDurationSec),
     },

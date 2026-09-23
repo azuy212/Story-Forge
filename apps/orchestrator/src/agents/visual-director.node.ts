@@ -2,7 +2,7 @@ import {
   resolveVideoProfile,
   formatLabelFor,
   canvasGuidanceFor,
-  speakingRateWps,
+  speakingRateWordsPerSecond,
 } from "../utils/video-profile.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type {
@@ -23,6 +23,11 @@ import type {
 } from "../schemas/visual-director-output.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
+import {
+  endsWithTokens,
+  tokenizeText,
+  wordCount,
+} from "../utils/narration-contract.js";
 
 function formatFacts(
   facts: {
@@ -38,30 +43,6 @@ function formatFacts(
       return `- ${f.id}${cls} (${f.confidence}): ${f.fact}`;
     })
     .join("\n");
-}
-
-function normalizeWhitespace(s: string): string {
-  return s.replace(/\s+/g, " ").trim();
-}
-
-function tokenize(s: string): string[] {
-  return normalizeWhitespace(s)
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .split(/\s+/)
-    .filter(Boolean);
-}
-
-function endsWithTokens(source: string, suffix: string): boolean {
-  const sourceTokens = tokenize(source);
-  const suffixTokens = tokenize(suffix);
-  if (suffixTokens.length === 0 || suffixTokens.length > sourceTokens.length) {
-    return false;
-  }
-  return suffixTokens.every(
-    (word, index) =>
-      sourceTokens[sourceTokens.length - suffixTokens.length + index] === word,
-  );
 }
 
 /**
@@ -148,7 +129,7 @@ function computeTiming(
   durationSeconds: number;
   narration: string;
 }[] {
-  const wordCounts = segments.map((n) => tokenize(n).length);
+  const wordCounts = segments.map((n) => wordCount(n));
   const totalWords = wordCounts.reduce((a, b) => a + b, 0) || 1;
 
   const durations = wordCounts.map((w) => (w / totalWords) * totalSeconds);
@@ -204,8 +185,10 @@ function normalizeOutput(
     };
   });
 
-  const originalTokens = tokenize(narration);
-  const concatTokens = tokenize(reindexed.map((s) => s.narration).join(" "));
+  const originalTokens = tokenizeText(narration);
+  const concatTokens = tokenizeText(
+    reindexed.map((s) => s.narration).join(" "),
+  );
   const forward = subsequenceCoverage(originalTokens, concatTokens);
   const backward = subsequenceCoverage(concatTokens, originalTokens);
 
@@ -213,7 +196,7 @@ function normalizeOutput(
   if (forward < COVERAGE_ACCEPT || backward < COVERAGE_ACCEPT) {
     // The LLM paraphrased, dropped, or padded narration. Repair deterministically:
     // re-split the original narration proportionally to the LLM's segment sizes.
-    const proportions = reindexed.map((s) => tokenize(s.narration).length);
+    const proportions = reindexed.map((s) => wordCount(s.narration));
     const repaired = splitNarrationProportional(narration, proportions);
     scenes = reindexed.map((s, i) => ({ ...s, narration: repaired[i] }));
     warnings.push(
@@ -279,6 +262,7 @@ function serializePreviousVisualPlan(
         sceneId: s.sceneId,
         sceneType: s.sceneType,
         assetMode: s.assetMode ?? "generated",
+        sceneRole: s.sceneRole,
         visualDescription: s.visualDescription,
         narration: s.narration,
         renderStyle: plan?.renderStyle,
@@ -301,7 +285,7 @@ export async function visualDirectorNode(
     scenes: Scene[];
     visualPlan?: VisualPlanEntry[];
     directorReview?: {
-      status: "approved" | "minor_revision";
+      status: "approved" | "minor_revision" | "major_revision";
       feedback: string;
     };
   };
@@ -376,7 +360,7 @@ export async function visualDirectorNode(
   const targetDurationSec = videoProfile.targetDurationSec;
   const formatLabel = formatLabelFor(videoProfile);
   const canvasGuidance = canvasGuidanceFor(videoProfile);
-  const speakingRate = speakingRateWps(videoProfile);
+  const speakingRate = speakingRateWordsPerSecond(videoProfile);
   const sceneCountRange =
     videoProfile.sceneDensity.max === null
       ? `${videoProfile.sceneDensity.min}+`
@@ -388,6 +372,10 @@ export async function visualDirectorNode(
   const targetSceneCount = Math.round(
     (videoProfile.sceneDensity.min + effectiveMax) / 2,
   );
+
+  // Hard narration budget for a single scene (~6 seconds of speech). The
+  // ~75 words / 6s figure in older prompts was internally inconsistent.
+  const maxSceneWords = Math.floor(speakingRate * 6);
 
   const label = nodeLabel(AgentModel.VisualDirector);
   logger.nodeStart(label);
@@ -412,9 +400,15 @@ export async function visualDirectorNode(
       canvasGuidance: canvasGuidance.canvasGuidance,
       aspectGuidance: canvasGuidance.aspectGuidance,
       targetDurationSeconds: String(targetDurationSec),
-      speakingRateWps: String(speakingRate),
+      speakingRateWordsPerSecond: String(speakingRate),
+      maxSceneWords: String(maxSceneWords),
       sceneCountRange,
       targetSceneCount: String(targetSceneCount),
+      audienceTrigger: state.storyPlan?.audienceTrigger?.type ?? "",
+      audienceTriggerStatement:
+        state.storyPlan?.audienceTrigger?.statement ?? "",
+      audienceTriggerFactIds:
+        state.storyPlan?.audienceTrigger?.factIds?.join(", ") ?? "",
     },
     inject,
     configurable: withTopic(config, state).configurable,
@@ -491,6 +485,39 @@ export async function visualDirectorNode(
     };
   }
 
+  // Narrative scenes must stay grounded in approved research. Normalization
+  // only drops hallucinated IDs (never adds), so a narrative scene that ends
+  // up with zero references is a structural failure — its narration cannot be
+  // traced to a fact. B-roll scenes may legitimately have no references.
+  const ungroundedNarrative = normalized.filter(
+    (s) => s.sceneRole === "narrative" && (s.references ?? []).length === 0,
+  );
+  if (ungroundedNarrative.length > 0) {
+    const feedback = `Narrative scene(s) [${ungroundedNarrative
+      .map((s) => s.sceneId)
+      .join(
+        ", ",
+      )}] must reference at least one approved fact; B-roll scenes are the only ones allowed to have no references.`;
+    return {
+      production: {
+        scenes: [],
+        directorReview: { status: "major_revision", feedback },
+      },
+      diagnostics: {
+        errors: [`${AgentModel.VisualDirector}: ${feedback}`],
+        warnings,
+        telemetry: { [AgentModel.VisualDirector]: result.telemetry },
+      },
+      execution: {
+        currentNode: AgentModel.VisualDirector,
+        retryCount: {
+          ...state.execution?.retryCount,
+          VisualDirector: retryCount,
+        },
+      },
+    };
+  }
+
   const timed = computeTiming(
     normalized.map((s) => s.narration),
     targetDurationSec,
@@ -541,6 +568,8 @@ export async function visualDirectorNode(
     emotionalBeat: s.emotionalBeat,
     assetType: s.assetType ?? "image",
     assetMode: s.assetMode,
+    sceneRole: s.sceneRole,
+    visualAnchor: s.visualAnchor,
     entities: s.entities,
     references: s.references,
   }));

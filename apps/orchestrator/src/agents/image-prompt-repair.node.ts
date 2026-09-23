@@ -123,6 +123,23 @@ export async function imagePromptRepairNode(
       continue;
     }
 
+    if (!scene.assetMode) {
+      logger.warn(
+        "ImagePromptRepair: scene flagged for repair without an assetMode",
+        {
+          sceneId: targetId,
+        },
+      );
+      // Fail closed: a scene must not be silently assumed "generated" during
+      // repair.
+      repaired[index] = {
+        ...current,
+        generationStatus: "failed",
+        failureType: "invalid_repair_state",
+      };
+      continue;
+    }
+
     const result = await runAgent<ImagePromptRepairOutput>({
       agent: AgentModel.ImagePromptRepair,
       promptPath: PromptPaths.ImagePromptRepair,
@@ -130,7 +147,7 @@ export async function imagePromptRepairNode(
       variables: {
         sceneId: String(targetId),
         sceneType: scene.sceneType ?? "",
-        assetMode: scene.assetMode ?? "generated",
+        assetMode: scene.assetMode,
         visualDescription: scene.visualDescription ?? "",
         narration: scene.narration ?? "",
         entities: JSON.stringify(scene.entities ?? []),

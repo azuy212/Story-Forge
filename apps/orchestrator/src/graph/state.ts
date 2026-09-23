@@ -128,6 +128,9 @@ export const StateAnnotation = Annotation.Root({
       storyType: "mystery",
       storySummary: "",
       storyBeats: [],
+      audienceTrigger: { type: "curiosity", statement: "", factIds: [] },
+      endingType: "revelation",
+      retention: { pivotBeatId: 1 },
     }),
   }),
   scriptQA: Annotation<ScriptQAOutput, Partial<ScriptQAOutput>>({

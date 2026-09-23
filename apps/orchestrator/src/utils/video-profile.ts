@@ -4,6 +4,7 @@ import type {
   VideoProfile,
   VideoProfileConfig,
 } from "../schemas/video-profile.js";
+import { wordCount } from "./narration-contract.js";
 
 function wordsPerMinuteDefault(): number {
   return config.wordsPerMinute() ?? config.narrationTargetWpm() ?? 160;
@@ -99,7 +100,13 @@ export function wordRangeFor(profile: VideoProfileConfig): {
   };
 }
 
-export function speakingRateWps(profile: VideoProfileConfig): number {
+/**
+ * Words per second of narration at the resolved speaking rate. This is
+ * genuinely words-per-SECOND (wpm / 60); never call it a WPM value.
+ */
+export function speakingRateWordsPerSecond(
+  profile: VideoProfileConfig,
+): number {
   return profile.wordsPerMinute / 60;
 }
 
@@ -110,7 +117,7 @@ export function checkNarrationDuration(
 ): string[] {
   const issues: string[] = [];
 
-  const words = narration.trim().split(/\s+/).filter(Boolean).length;
+  const words = wordCount(narration);
   const wordRange = wordRangeFor(profile);
 
   // Long profile: only minimum word count; short profile: both min and max

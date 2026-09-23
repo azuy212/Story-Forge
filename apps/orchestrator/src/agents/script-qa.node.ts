@@ -3,7 +3,7 @@ import {
   checkNarrationDuration,
   canvasGuidanceFor,
   wordRangeFor,
-  speakingRateWps,
+  speakingRateWordsPerSecond,
 } from "../utils/video-profile.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type {
@@ -24,6 +24,7 @@ import {
   validateScriptComplexity,
 } from "../utils/script-complexity.js";
 import { hashIssues } from "../utils/qa-policy.js";
+import { checkScriptContract } from "../utils/script-contract.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
 
@@ -67,6 +68,18 @@ function serializeBeats(
       return `Beat ${b.beatId}\nPurpose: ${b.purpose}${curiosity}\nKey Message: ${b.keyMessage}`;
     })
     .join("\n\n");
+}
+
+function serializeBeatWordCounts(
+  counts: { beatId: number; words: number; targetWords?: number }[],
+): string {
+  if (!counts || counts.length === 0) return "";
+  return counts
+    .map(
+      (c) =>
+        `Beat ${c.beatId}: ${c.words} words${c.targetWords !== undefined ? ` (target ${c.targetWords})` : ""}`,
+    )
+    .join("\n");
 }
 
 export async function scriptQANode(
@@ -140,6 +153,26 @@ export async function scriptQANode(
     }
   }
 
+  // Deterministic re-verification of the writer's declared retention contract
+  // (ending type, ending-narration suffix, pivot existence, pivot→beat
+  // containment, beat mapping, per-beat budgets). Fail-closed like the schema
+  // gates above: code must not delegate structurally checkable invariants to
+  // the LLM. A contract violation is BLOCKING — the QA retry policy would
+  // otherwise accept the best available script after one minor revision even
+  // though the declared anchors (ending, pivot) do not actually hold.
+  const contract = checkScriptContract(state, narration);
+  if (contract.issues.length > 0) {
+    return {
+      scriptQA: {
+        status: "major_revision",
+        feedback: `Script QA: retention contract violation.\n${contract.issues.join("\n")}`,
+        issues: contract.issues,
+      },
+      diagnostics: {},
+      execution: execution(AgentModel.ScriptQA),
+    };
+  }
+
   if (!configUtils.enableScriptQA()) {
     return {
       scriptQA: { status: "approved" } as ScriptQAOutput,
@@ -150,7 +183,7 @@ export async function scriptQANode(
 
   const canvasGuidance = canvasGuidanceFor(videoProfile);
   const wordRange = wordRangeFor(videoProfile);
-  const speakingRate = speakingRateWps(videoProfile);
+  const speakingRate = speakingRateWordsPerSecond(videoProfile);
 
   const label = nodeLabel(AgentModel.ScriptQA);
   logger.nodeStart(label);
@@ -161,6 +194,8 @@ export async function scriptQANode(
     videoProfile.profile === "long"
       ? `at least ${wordRange.min}`
       : `${wordRange.min}-${wordRange.max}`;
+
+  const derivation = contract.derivation;
 
   const result = await runAgent<ScriptQAOutput>({
     agent: AgentModel.ScriptQA,
@@ -175,9 +210,19 @@ export async function scriptQANode(
       ),
       targetDurationSeconds: String(videoProfile.targetDurationSec),
       targetWordRange,
-      speakingRateWps: String(speakingRate),
+      speakingRateWordsPerSecond: String(speakingRate),
       researchFacts: serializeFacts(research?.facts),
       storyBeats: serializeBeats(state.storyPlan?.storyBeats),
+      audienceTrigger: state.storyPlan?.audienceTrigger?.type ?? "",
+      audienceTriggerStatement:
+        state.storyPlan?.audienceTrigger?.statement ?? "",
+      audienceTriggerFactIds:
+        state.storyPlan?.audienceTrigger?.factIds?.join(", ") ?? "",
+      endingType: state.storyPlan?.endingType ?? "",
+      derivedHookSentence: derivation.hookSentence,
+      derivedPivotWordPosition: String(derivation.pivotWordPosition ?? -1),
+      pivotBeatId: String(derivation.pivotBeatId ?? ""),
+      beatWordCounts: serializeBeatWordCounts(derivation.beatWordCounts),
       complexityReport: complexityFeedback,
       canvasGuidance: canvasGuidance.formatGuidance,
     },

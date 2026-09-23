@@ -32,6 +32,8 @@ function makeScenes(narrations: string[]) {
     sceneGoal: "Hook",
     visualDescription: "Aerial view",
     sceneType: "landscape" as const,
+    assetMode: "generated" as const,
+    sceneRole: "narrative" as const,
     cameraShot: "aerial" as const,
     cameraMotion: "drone-flyover" as const,
     transition: "cut" as const,

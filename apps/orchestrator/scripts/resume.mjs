@@ -11,6 +11,10 @@ import {
   setActiveSink as setRunNextActiveSink,
 } from "./run-next.mjs";
 import { loadSeedFromFile } from "./seed-build.mjs";
+import {
+  resetLastStepQaRetries,
+  describeQaRetryReset,
+} from "./qa-retry-reset.mjs";
 
 function appendRunLogEvent(sink, event) {
   if (!sink) return;
@@ -292,6 +296,7 @@ export function parseArgs(args) {
     profile: null,
     seed: null,
     dryRun: false,
+    resetQaRetries: false,
     help: false,
   };
 
@@ -301,6 +306,8 @@ export function parseArgs(args) {
       parsed.help = true;
     } else if (arg === "--dry-run") {
       parsed.dryRun = true;
+    } else if (arg === "--reset-qa-retries") {
+      parsed.resetQaRetries = true;
     } else if (arg === "--pillar") {
       if (!args[i + 1] || args[i + 1].startsWith("--"))
         throw new Error("--pillar requires a value");
@@ -345,6 +352,10 @@ Options:
                           run.json.seed; required for older runs that predate
                           the persisted-seed feature.
   --dry-run               Show status and exit without running
+  --reset-qa-retries      Clear cached artifacts for the last QC-gated step
+                          (and any residue after it) so the resume re-runs
+                          that step with a fresh QA retry budget. With
+                          --dry-run, only prints what would be cleared.
   --help, -h              Show this help
 
 Examples:
@@ -443,6 +454,11 @@ async function main() {
       "\nRun already published (publish artifact complete). Nothing to resume.",
     );
     process.exit(0);
+  }
+
+  if (parsed.resetQaRetries) {
+    const resetResult = resetLastStepQaRetries(RUNS_DIR, ns, { dryRun });
+    console.log(describeQaRetryReset(resetResult));
   }
 
   if (dryRun) {

@@ -29,6 +29,7 @@ function makeBeat(id: number) {
     keyMessage: "Message",
     referencedFacts: ["fact-001"],
     priority: "medium" as const,
+    targetWords: 12,
     estimatedDurationSeconds: 20,
   };
 }
@@ -40,6 +41,8 @@ function makeScene(id: number) {
     sceneGoal: "Goal",
     visualDescription: "Visual",
     sceneType: "landscape" as const,
+    assetMode: "generated" as const,
+    sceneRole: "narrative" as const,
     cameraShot: "wide" as const,
     cameraMotion: "static" as const,
     transition: "cut" as const,
@@ -114,6 +117,13 @@ describe("long video profile: min-only enforcement", () => {
       content: { title: "Long doc", hook: "Open with surprise." },
       storyType: "discovery",
       storySummary: "A long story.",
+      audienceTrigger: {
+        type: "curiosity",
+        statement: "A long story hook.",
+        factIds: ["fact-001"],
+      },
+      endingType: "open_question",
+      retention: { pivotBeatId: 25 },
       storyBeats: beats,
     });
     expect(result.success).toBe(true);
@@ -127,6 +137,13 @@ describe("long video profile: min-only enforcement", () => {
       content: { title: "Short", hook: "Open." },
       storyType: "discovery" as const,
       storySummary: "A short story.",
+      audienceTrigger: {
+        type: "curiosity" as const,
+        statement: "A short hook.",
+        factIds: ["fact-001"],
+      },
+      endingType: "open_question" as const,
+      retention: { pivotBeatId: 1 },
     };
     expect(schema.safeParse({ ...base, storyBeats: tooFew }).success).toBe(
       false,

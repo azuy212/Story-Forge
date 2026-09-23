@@ -181,10 +181,13 @@ export const api = {
     jsonFetch<LogTail>(
       `/api/orchestrator/runs/${encodeURIComponent(ns)}/log?from=${from}`,
     ),
-  launchRunNext: (profile: "short" | "long") =>
+  launchRunNext: (
+    profile: "short" | "long",
+    resetQaRetries = false,
+  ) =>
     jsonFetch<{ ns: string; action: string; none?: boolean; reason?: string }>(
       "/api/orchestrator/launch/run-next",
-      { method: "POST", body: JSON.stringify({ profile }) },
+      { method: "POST", body: JSON.stringify({ profile, resetQaRetries }) },
     ),
   launchSeed: (body: Record<string, unknown>) =>
     jsonFetch<{ ns: string; action: string }>("/api/orchestrator/launch/seed", {

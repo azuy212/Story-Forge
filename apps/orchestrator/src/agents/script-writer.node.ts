@@ -3,7 +3,7 @@ import {
   formatLabelFor,
   canvasGuidanceFor,
   wordRangeFor,
-  speakingRateWps,
+  speakingRateWordsPerSecond,
 } from "../utils/video-profile.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import type {
@@ -54,6 +54,7 @@ function serializeBeats(
         keyMessage: string;
         referencedFacts: string[];
         priority: string;
+        targetWords?: number;
         estimatedDurationSeconds: number;
       }[]
     | undefined,
@@ -62,7 +63,7 @@ function serializeBeats(
   return beats
     .map(
       (b) =>
-        `Beat ${b.beatId}\nPriority: ${b.priority.toUpperCase()}\nDuration: ${b.estimatedDurationSeconds} sec\nPurpose: ${b.purpose}\nViewer Question: ${b.viewerQuestion}\nCuriosity Question: ${b.curiosityQuestion ?? ""}\nKey Message: ${b.keyMessage}\nReferenced Facts: ${b.referencedFacts.join(", ")}`,
+        `Beat ${b.beatId}\nPriority: ${b.priority.toUpperCase()}\nDuration: ${b.estimatedDurationSeconds} sec\nTarget Words: ${b.targetWords ?? ""}\nPurpose: ${b.purpose}\nViewer Question: ${b.viewerQuestion}\nCuriosity Question: ${b.curiosityQuestion ?? ""}\nKey Message: ${b.keyMessage}\nReferenced Facts: ${b.referencedFacts.join(", ")}`,
     )
     .join("\n\n");
 }
@@ -81,6 +82,26 @@ function serializePreviousScript(
     parts.push(`Estimated duration: ${content.estimatedDurationSeconds} sec`);
   }
   return parts.join("\n\n");
+}
+
+/**
+ * The writer commits one narration beat per story-plan beat (sequential ids
+ * from 1). Any mismatch is a structural failure — the retention contract
+ * cannot be verified against a partial mapping.
+ */
+function validateBeatMapping(
+  beats: { beatId: number }[] | undefined,
+  plannerBeatCount: number,
+): string | null {
+  if (!beats || beats.length !== plannerBeatCount) {
+    return `narration must have exactly one beat per story-plan beat (expected ${plannerBeatCount}, received ${beats?.length ?? 0})`;
+  }
+  for (let i = 0; i < beats.length; i++) {
+    if (beats[i].beatId !== i + 1) {
+      return `narration beat ${i + 1} has beatId ${beats[i].beatId}; expected ${i + 1}`;
+    }
+  }
+  return null;
 }
 
 export async function scriptWriterNode(
@@ -104,7 +125,7 @@ export async function scriptWriterNode(
     return {
       // Clear generated fields (keep title/hook owned by ScriptPlanner): the
       // merge reducer would otherwise let a stale script pass the guard.
-      content: { script: "", narration: "", callToAction: "" },
+      content: { script: "", narration: "", callToAction: "", beats: [] },
       diagnostics: {
         errors: [
           `${AgentModel.ScriptWriter}: research is required before script generation.`,
@@ -124,7 +145,7 @@ export async function scriptWriterNode(
     return {
       // Clear generated fields (keep title/hook owned by ScriptPlanner): the
       // merge reducer would otherwise let a stale script pass the guard.
-      content: { script: "", narration: "", callToAction: "" },
+      content: { script: "", narration: "", callToAction: "", beats: [] },
       diagnostics: {
         errors: [
           `${AgentModel.ScriptWriter}: story plan is required before script generation.`,
@@ -158,7 +179,7 @@ export async function scriptWriterNode(
 
   const targetDurationSec = videoProfile.targetDurationSec;
   const wordRange = wordRangeFor(videoProfile);
-  const speakingRate = speakingRateWps(videoProfile);
+  const speakingRate = speakingRateWordsPerSecond(videoProfile);
   const formatLabel = formatLabelFor(videoProfile);
   const canvasGuidance = canvasGuidanceFor(videoProfile);
 
@@ -178,8 +199,13 @@ export async function scriptWriterNode(
       storyType: storyPlan.storyType ?? "",
       storySummary: storyPlan.storySummary ?? "",
       storyBeats: serializeBeats(storyPlan.storyBeats),
+      audienceTrigger: storyPlan.audienceTrigger?.type ?? "",
+      audienceTriggerStatement: storyPlan.audienceTrigger?.statement ?? "",
+      endingType: storyPlan.endingType ?? "",
+      pivotBeatId: String(storyPlan.retention?.pivotBeatId ?? ""),
+      audienceTriggerFactIds:
+        storyPlan.audienceTrigger?.factIds?.join(", ") ?? "",
       channel: branding.channel,
-      cta: branding.outroCta,
       qaFeedback,
       previousScript: needsRevision
         ? serializePreviousScript(state.content)
@@ -188,7 +214,7 @@ export async function scriptWriterNode(
       canvasGuidance: canvasGuidance.canvasGuidance,
       targetDurationSeconds: String(targetDurationSec),
       targetWordRange: `${wordRange.min}-${wordRange.max}`,
-      speakingRateWps: String(speakingRate),
+      speakingRateWordsPerSecond: String(speakingRate),
     },
     inject,
     configurable: withTopic(config, state).configurable,
@@ -199,7 +225,7 @@ export async function scriptWriterNode(
     return {
       // Clear generated fields (keep title/hook owned by ScriptPlanner): the
       // merge reducer would otherwise let a stale script pass the guard.
-      content: { script: "", narration: "", callToAction: "" },
+      content: { script: "", narration: "", callToAction: "", beats: [] },
       diagnostics: {
         errors: [`${AgentModel.ScriptWriter}: ${result.error}`],
         telemetry: { [AgentModel.ScriptWriter]: result.telemetry },
@@ -218,13 +244,54 @@ export async function scriptWriterNode(
 
   const { content } = result.data;
 
+  const beatMappingIssue = validateBeatMapping(
+    content.beats,
+    storyPlan.storyBeats.length,
+  );
+  if (beatMappingIssue) {
+    logger.nodeFailed(label, beatMappingIssue);
+    return {
+      // Clear generated fields (keep title/hook owned by ScriptPlanner): the
+      // merge reducer would otherwise let a stale script pass the guard.
+      content: { script: "", narration: "", callToAction: "", beats: [] },
+      diagnostics: {
+        errors: [`${AgentModel.ScriptWriter}: ${beatMappingIssue}`],
+        telemetry: { [AgentModel.ScriptWriter]: result.telemetry },
+      },
+      execution: {
+        currentNode: AgentModel.ScriptWriter,
+        retryCount: {
+          ...state.execution?.retryCount,
+          ScriptWriter: retryCount,
+        },
+      },
+    };
+  }
+
+  // Retention narration is assembled in code from the beat narrations so the
+  // pivot/beat containment verified by ScriptQA is deterministic: it is always
+  // exactly beat1 + beat2 + ... with token positions derived from that string.
+  const beats = content.beats.map((beat) => ({
+    beatId: beat.beatId,
+    narration: beat.narration.trim(),
+  }));
+  const narration = beats.map((b) => b.narration).join(" ");
+
   return {
     content: {
       script: content.script.trim(),
-      narration: content.narration.trim(),
+      narration,
       // CTA is configuration-owned. Never trust model-generated CTA text.
       callToAction: branding.outroCta,
       estimatedDurationSeconds: content.estimatedDurationSeconds,
+      beats,
+      ...(content.retention
+        ? {
+            retention: {
+              pivotSentence: content.retention.pivotSentence.trim(),
+            },
+          }
+        : {}),
       ...(content.ending
         ? {
             ending: {

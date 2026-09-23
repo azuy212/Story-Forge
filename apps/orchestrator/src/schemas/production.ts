@@ -181,6 +181,8 @@ export const SceneSchema = z.object({
     .optional(),
   assetType: AssetTypeEnum.optional(),
   assetMode: AssetModeEnum.optional(),
+  sceneRole: z.enum(["narrative", "b-roll"]).optional(),
+  visualAnchor: z.string().optional(),
   assetKind: AssetKindEnum.optional(),
   entities: z.array(SceneEntitySchema).optional(),
   sourceAssetIds: z.array(z.string()).optional(),
@@ -228,7 +230,7 @@ export type ProviderErrorInfo = z.input<typeof ProviderErrorSchema>;
 export type Scene = z.input<typeof SceneSchema>;
 
 export const DirectorReviewSchema = z.object({
-  status: z.enum(["approved", "minor_revision"]),
+  status: z.enum(["approved", "minor_revision", "major_revision"]),
   feedback: z.string(),
 });
 

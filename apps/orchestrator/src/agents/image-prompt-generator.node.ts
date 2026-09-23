@@ -34,6 +34,10 @@ export async function imagePromptGeneratorNode(
   const promptQA = state.production?.promptQA;
   const { pillar, topic } = state.project;
   const { style, colorPalette, logo } = state.branding ?? {};
+  const channel = state.branding?.channel ?? "";
+  const audienceTrigger = state.storyPlan?.audienceTrigger?.type ?? "";
+  const audienceTriggerStatement =
+    state.storyPlan?.audienceTrigger?.statement ?? "";
   const videoProfile: VideoProfileConfig =
     state.videoProfile ?? resolveVideoProfile({});
   const inject = (config.configurable ?? {}) as AgentInject;
@@ -58,6 +62,41 @@ export async function imagePromptGeneratorNode(
 
   const canvasGuidance = canvasGuidanceFor(videoProfile);
 
+  // On failure, prompts from a previous attempt must not survive: they were
+  // either never produced or already rejected by PromptQA, and the merge
+  // reducer would let them pass hasScenePrompts again.
+  const clearedScenes: Scene[] = scenes.map((s) => ({
+    ...s,
+    generationPrompt: undefined,
+    promptId: undefined,
+  }));
+
+  // assetMode is a mandatory pipeline decision (VisualDirector always emits
+  // it). Never fall back to a silent default: a scene without an explicit
+  // asset origin must not be silently assumed "generated".
+  const missingAssetMode = scenes.filter((s) => !s.assetMode);
+  if (missingAssetMode.length > 0) {
+    return {
+      production: { scenes: clearedScenes },
+      diagnostics: {
+        errors: [
+          `${AgentModel.ImagePromptGenerator}: scenes [${missingAssetMode
+            .map((s) => s.sceneId)
+            .join(
+              ", ",
+            )}] are missing assetMode; every scene must declare an asset origin`,
+        ],
+      },
+      execution: {
+        currentNode: AgentModel.ImagePromptGenerator,
+        retryCount: {
+          ...state.execution?.retryCount,
+          ImagePromptGenerator: retryCount,
+        },
+      },
+    };
+  }
+
   const planMap = new Map(visualPlan.map((p) => [p.sceneId, p]));
 
   const scenesJson = JSON.stringify(
@@ -66,7 +105,9 @@ export async function imagePromptGeneratorNode(
       return {
         sceneId: s.sceneId,
         sceneType: s.sceneType,
-        assetMode: s.assetMode ?? "generated",
+        assetMode: s.assetMode,
+        sceneRole: s.sceneRole,
+        visualAnchor: s.visualAnchor,
         entities: s.entities,
         sourceAssetIds: s.sourceAssetIds,
         visualDescription: s.visualDescription,
@@ -116,15 +157,6 @@ export async function imagePromptGeneratorNode(
   const expectedIds = new Set(scenes.map((s) => s.sceneId));
   const maxAttempts = 2;
 
-  // On failure, prompts from a previous attempt must not survive: they were
-  // either never produced or already rejected by PromptQA, and the merge
-  // reducer would let them pass hasScenePrompts again.
-  const clearedScenes: Scene[] = scenes.map((s) => ({
-    ...s,
-    generationPrompt: undefined,
-    promptId: undefined,
-  }));
-
   type AssetPrompt = ImagePromptOutput["assets"][number];
   const collected = new Map<number, AssetPrompt>();
 
@@ -149,9 +181,14 @@ export async function imagePromptGeneratorNode(
       variables: {
         pillar: pillar ?? "",
         topic: topic ?? "",
+        channel,
         style: style ?? "",
         colorPalette: colorPalette ?? "",
         logo: logo ?? "",
+        audienceTrigger,
+        audienceTriggerStatement,
+        audienceTriggerFactIds:
+          state.storyPlan?.audienceTrigger?.factIds?.join(", ") ?? "",
         scenes: scenesJson,
         qaFeedback: `${qaFeedback}${missingHint}`,
         previousPrompts,

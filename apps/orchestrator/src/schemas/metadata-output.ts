@@ -4,7 +4,7 @@ export const MetadataOutputSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
   tags: z.array(z.string()),
-  hashtags: z.array(z.string()),
+  hashtags: z.array(z.string()).length(3, "hashtags must be exactly 3"),
   category: z.string().min(1),
   pinnedComment: z.string().min(1),
 });

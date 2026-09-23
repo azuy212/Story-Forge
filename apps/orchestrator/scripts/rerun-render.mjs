@@ -9,7 +9,13 @@
  *   node scripts/rerun-render.mjs <namespace> [--dry-run]
  */
 
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, copyFileSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  readdirSync,
+  copyFileSync,
+} from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { logger } from "../dist/utils/logger.js";
@@ -19,7 +25,10 @@ import { HttpWhisperXProvider } from "../dist/providers/whisperx-provider.js";
 import { DeterministicSceneSubtitleProvider } from "../dist/providers/scene-subtitle-provider.js";
 import { alignSceneDurationsToAudio } from "../dist/agents/video-composer.node.js";
 import { FfmpegComposerProvider } from "../dist/providers/composer/ffmpeg-composer.provider.js";
-import { resolveBranding, selectOutroAssetForProfile } from "../dist/utils/branding.js";
+import {
+  resolveBranding,
+  selectOutroAssetForProfile,
+} from "../dist/utils/branding.js";
 import { resolveVideoProfile } from "../dist/utils/video-profile.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -47,7 +56,9 @@ async function main() {
   const dryRun = args.includes("--dry-run");
   const namespace = args.find((a) => !a.startsWith("--"));
   if (!namespace) {
-    console.error("Usage: node scripts/rerun-render.mjs <namespace> [--dry-run]");
+    console.error(
+      "Usage: node scripts/rerun-render.mjs <namespace> [--dry-run]",
+    );
     process.exit(1);
   }
 
@@ -106,7 +117,9 @@ async function main() {
   console.log("\n--- Step 1: WhisperX subtitle alignment ---");
 
   const videoProfile = resolveVideoProfile({ videoProfile: profile });
-  const whisperx = new WhisperXSceneSubtitleProvider(new HttpWhisperXProvider());
+  const whisperx = new WhisperXSceneSubtitleProvider(
+    new HttpWhisperXProvider(),
+  );
   const deterministic = new DeterministicSceneSubtitleProvider();
 
   let subtitleResult;
@@ -117,8 +130,12 @@ async function main() {
       videoProfile,
       { combinedAudioUrl, fullNarration, runId: ns },
     );
-    console.log(`WhisperX alignment: ${subtitleResult.wordTimestamps.length} word timestamps`);
-    console.log(`First cue: ${subtitleResult.srt.split("\n").slice(0, 4).join(" | ")}`);
+    console.log(
+      `WhisperX alignment: ${subtitleResult.wordTimestamps.length} word timestamps`,
+    );
+    console.log(
+      `First cue: ${subtitleResult.srt.split("\n").slice(0, 4).join(" | ")}`,
+    );
   } catch (err) {
     console.warn(`WhisperX failed: ${err.message}`);
     console.warn("Falling back to deterministic timing");

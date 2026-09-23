@@ -21,7 +21,7 @@ import {
   formatLabelFor,
   canvasGuidanceFor,
   wordRangeFor,
-  speakingRateWps,
+  speakingRateWordsPerSecond,
   resolveVideoProfile,
 } from "../utils/video-profile.js";
 
@@ -41,16 +41,32 @@ function formatFacts(
     .join("\n");
 }
 
+function emptyStoryPlan(): ScriptPlannerOutput {
+  return {
+    content: { title: "", hook: "" },
+    storyType: "mystery",
+    storySummary: "",
+    storyBeats: [],
+    audienceTrigger: { type: "curiosity", statement: "", factIds: [] },
+    endingType: "revelation",
+    retention: { pivotBeatId: 1 },
+  };
+}
+
 function validateStoryPlan(
   data: ScriptPlannerOutput,
   approvedFactIds: string[],
-): string[] {
+): { errors: string[]; warnings: string[] } {
+  const errors: string[] = [];
   const warnings: string[] = [];
 
-  // beatId contiguity, exact duration sums, and the final/non-final
-  // curiosityQuestion contract are enforced by the schema (deterministic
-  // structural invariants); the composer normalizes timing anyway. Only
-  // semantic checks that code cannot repair are kept here.
+  // beatId contiguity, exact duration sums, the final/non-final
+  // curiosityQuestion contract, trigger-fact consistency, and the targetWords
+  // total are enforced by the schema (deterministic structural invariants);
+  // the composer normalizes timing anyway. Only semantic checks against the
+  // APPROVED fact set are kept here — and references code cannot repair are
+  // hard failures: a plan that cites unapproved facts cannot produce a
+  // faithful script, and the writer would inherit an untraceable claim.
 
   const referencedIds = new Set(
     data.storyBeats.flatMap((b) => b.referencedFacts),
@@ -59,7 +75,7 @@ function validateStoryPlan(
 
   for (const rid of referencedIds) {
     if (!approvedSet.has(rid)) {
-      warnings.push(
+      errors.push(
         `StoryPlanner: beat references fact "${rid}" which is not in approved facts`,
       );
     }
@@ -72,7 +88,16 @@ function validateStoryPlan(
     );
   }
 
-  return warnings;
+  const triggerFactIds = new Set(data.audienceTrigger?.factIds ?? []);
+  for (const rid of triggerFactIds) {
+    if (!approvedSet.has(rid)) {
+      errors.push(
+        `StoryPlanner: audienceTrigger references fact "${rid}" which is not in approved facts`,
+      );
+    }
+  }
+
+  return { errors, warnings };
 }
 
 export async function scriptPlannerNode(
@@ -80,11 +105,7 @@ export async function scriptPlannerNode(
   config: RunnableConfig,
 ): Promise<{
   content: Partial<Content>;
-  storyPlan: {
-    storyType: ScriptPlannerOutput["storyType"];
-    storySummary: string;
-    storyBeats: ScriptPlannerOutput["storyBeats"];
-  };
+  storyPlan: ScriptPlannerOutput;
   diagnostics: Partial<Diagnostics>;
   execution: Partial<Execution>;
 }> {
@@ -98,7 +119,7 @@ export async function scriptPlannerNode(
   if (!research?.summary || !research?.facts || research.facts.length === 0) {
     return {
       content: {},
-      storyPlan: { storyType: "mystery", storySummary: "", storyBeats: [] },
+      storyPlan: emptyStoryPlan(),
       diagnostics: {
         errors: [
           `${AgentModel.ScriptPlanner}: research is required before script planning.`,
@@ -110,7 +131,7 @@ export async function scriptPlannerNode(
 
   const targetDurationSec = videoProfile.targetDurationSec;
   const wordRange = wordRangeFor(videoProfile);
-  const speakingRate = speakingRateWps(videoProfile);
+  const speakingRate = speakingRateWordsPerSecond(videoProfile);
   const formatLabel = formatLabelFor(videoProfile);
   const canvasGuidance = canvasGuidanceFor(videoProfile);
   const beatRange = beatCountRangeFor(videoProfile);
@@ -138,7 +159,7 @@ export async function scriptPlannerNode(
       formatLabel,
       canvasGuidance: canvasGuidance.canvasGuidance,
       targetWordRange: `${wordRange.min}-${wordRange.max}`,
-      speakingRateWps: String(speakingRate),
+      speakingRateWordsPerSecond: String(speakingRate),
       beatCountRange,
     },
     inject,
@@ -153,7 +174,7 @@ export async function scriptPlannerNode(
     logger.nodeFailed(label, result.error ?? "Unknown LLM error");
     return {
       content: {},
-      storyPlan: { storyType: "mystery", storySummary: "", storyBeats: [] },
+      storyPlan: emptyStoryPlan(),
       diagnostics: {
         errors: [`${AgentModel.ScriptPlanner}: ${result.error}`],
         telemetry: { [AgentModel.ScriptPlanner]: result.telemetry },
@@ -164,14 +185,43 @@ export async function scriptPlannerNode(
 
   logger.nodeDone(label, result.telemetry.durationMs);
 
-  const { content, storyType, storySummary, storyBeats } = result.data;
+  const {
+    content,
+    storyType,
+    storySummary,
+    storyBeats,
+    audienceTrigger,
+    endingType,
+    retention,
+  } = result.data;
 
   const approvedFactIds = research.facts.map((f) => f.id);
-  const warnings = validateStoryPlan(result.data, approvedFactIds);
+  const { errors, warnings } = validateStoryPlan(result.data, approvedFactIds);
+
+  if (errors.length > 0) {
+    logger.nodeFailed(label, errors[0]);
+    return {
+      content: {},
+      storyPlan: emptyStoryPlan(),
+      diagnostics: {
+        errors,
+        telemetry: { [AgentModel.ScriptPlanner]: result.telemetry },
+      },
+      execution: { currentNode: AgentModel.ScriptPlanner },
+    };
+  }
 
   return {
     content: { title: content.title.trim(), hook: content.hook.trim() },
-    storyPlan: { storyType, storySummary, storyBeats },
+    storyPlan: {
+      content: { title: content.title.trim(), hook: content.hook.trim() },
+      storyType,
+      storySummary,
+      storyBeats,
+      audienceTrigger,
+      endingType,
+      retention,
+    },
     diagnostics: {
       warnings,
       telemetry: { [AgentModel.ScriptPlanner]: result.telemetry },

@@ -1,9 +1,16 @@
-import { jest, describe, it, expect } from "@jest/globals";
+import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 import {
   releaseValidationNode,
   validatePackage,
 } from "../src/agents/release-validation.node.js";
 import type { ProjectState } from "../src/types/index.js";
+
+beforeEach(() => {
+  // The node resolves the default video profile from env; clear local overrides
+  // (.env may set a custom pacing target) so assertions use the 160 wpm default.
+  delete process.env.WORDS_PER_MINUTE;
+  delete process.env.NARRATION_TARGET_WPM;
+});
 
 const DEFAULT_SCENE = {
   sceneId: 1,

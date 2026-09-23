@@ -48,6 +48,8 @@ export const EmotionalBeatEnum = z.enum([
   "reflection",
 ]);
 
+const SceneRoleEnum = z.enum(["narrative", "b-roll"]);
+
 const ScenePlanSchema = z.object({
   sceneId: z
     .number()
@@ -63,7 +65,9 @@ const ScenePlanSchema = z.object({
   emphasis: EmphasisEnum.optional(),
   emotionalBeat: EmotionalBeatEnum,
   assetType: AssetTypeEnum.optional(),
-  assetMode: AssetModeEnum.optional(),
+  assetMode: AssetModeEnum,
+  sceneRole: SceneRoleEnum,
+  visualAnchor: z.string().optional(),
   entities: z.array(SceneEntitySchema).optional(),
   references: z.array(z.string()).optional(),
 });

@@ -265,17 +265,30 @@ const scriptRouter = (state: typeof StateAnnotation.State) => {
 
 const promptRouter = (state: typeof StateAnnotation.State) => {
   const status = state.production?.promptQA?.status;
-  // Major revisions trace back to the visual plan (VisualDirector); minor and
-  // fatal revisions regenerate the prompts (ImagePromptGenerator). Each uses
-  // its own producer's run counter.
-  const planIssue = status === "major_revision";
+  const revisionTarget = state.production?.promptQA?.revisionTarget;
+  // Root-cause routing driven by the QA model's revisionTarget classification,
+  // handled deterministically: "prompts" regenerates prompts
+  // (ImagePromptGenerator), "visual_plan"/"both" re-plans visual direction
+  // (VisualDirector — "both" first reruns the visual plan, then prompts are
+  // regenerated from the new plan). When the model did not classify (or said
+  // "none"), fall back on status: major revisions trace to the visual plan,
+  // minor/fatal regenerate prompts. Each route counts against its own
+  // producer's run counter.
+  const explicitlyTargeted =
+    revisionTarget === "prompts" ||
+    revisionTarget === "visual_plan" ||
+    revisionTarget === "both";
+  const routesVisualDirector =
+    revisionTarget === "visual_plan" ||
+    revisionTarget === "both" ||
+    (!explicitlyTargeted && status === "major_revision");
+  const producer = routesVisualDirector
+    ? "VisualDirector"
+    : "ImagePromptGenerator";
   const decision = decideQaRetry({
     node: "PromptQA",
     status,
-    revisionAttempts: retryCount(
-      state,
-      planIssue ? "VisualDirector" : "ImagePromptGenerator",
-    ),
+    revisionAttempts: retryCount(state, producer),
     qaAttempts: retryCount(state, "PromptQA"),
     repeated: state.production?.promptQA?.repeated,
     infraMax: PROMPT_QA_MAX_RETRIES,
@@ -284,27 +297,22 @@ const promptRouter = (state: typeof StateAnnotation.State) => {
     decision.action === "continue"
       ? "AssetGenerator"
       : decision.action === "revise"
-        ? planIssue
-          ? "VisualDirector"
-          : "ImagePromptGenerator"
+        ? producer
         : decision.action === "retry"
           ? "PromptQA"
           : FINALIZE;
   logRouterDecision("PromptQA", status, next, {
-    revisionAttempts: retryCount(
-      state,
-      planIssue ? "VisualDirector" : "ImagePromptGenerator",
-    ),
+    revisionAttempts: retryCount(state, producer),
     qaAttempts: retryCount(state, "PromptQA"),
     decision: {
       action: decision.action,
       reason: decision.reason,
       blocking: decision.blocking,
     },
+    meta: { revisionTarget, producer },
   });
   if (decision.action === "continue") return "AssetGenerator";
-  if (decision.action === "revise")
-    return planIssue ? "VisualDirector" : "ImagePromptGenerator";
+  if (decision.action === "revise") return producer;
   if (decision.action === "retry") return "PromptQA";
   return FINALIZE;
 };

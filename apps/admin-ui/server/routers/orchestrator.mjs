@@ -428,12 +428,9 @@ export async function orchestratorRouter(app) {
     const before = listNamespaces();
     const controller = makeController();
     register(`run-next-${Date.now()}`, controller);
-    spawnScript(
-      "run-next.mjs",
-      [`--profile=${profile}`],
-      `run-next-${Date.now()}`,
-      () => {},
-    );
+    const launchArgs = [`--profile=${profile}`];
+    if (req.body?.resetQaRetries) launchArgs.push("--reset-qa-retries");
+    spawnScript("run-next.mjs", launchArgs, `run-next-${Date.now()}`, () => {});
     const ns = await watchForNewNamespace(before, 5000);
     if (!ns) {
       return { none: true, reason: "no-pending-row-or-no-slot" };
@@ -497,6 +494,7 @@ export async function orchestratorRouter(app) {
     if (body.profile) args.push(`--profile=${body.profile}`);
     if (body.seed) args.push(`--seed=${body.seed}`);
     if (body.dryRun) args.push("--dry-run");
+    if (body.resetQaRetries) args.push("--reset-qa-retries");
     const controller = makeController();
     register(ns, controller);
     spawnScript("resume.mjs", args, ns, () => {});

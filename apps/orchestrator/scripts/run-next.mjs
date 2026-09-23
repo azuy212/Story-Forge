@@ -25,7 +25,7 @@
 // advance the bar. In JSON log mode the bar is a no-op so logs stay clean.
 //
 // Usage (from apps/orchestrator):
-//   node scripts/run-next.mjs [--profile short|long]
+//   node scripts/run-next.mjs [--profile short|long] [--reset-qa-retries]
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -40,6 +40,10 @@ import {
   COLUMN,
 } from "../src/integrations/google-sheets/sheets-format.mjs";
 import { getAssistantId, resumeRun } from "./resume.mjs";
+import {
+  resetLastStepQaRetries,
+  describeQaRetryReset,
+} from "./qa-retry-reset.mjs";
 import { logger } from "../dist/utils/logger.js";
 import { prettyFormatter } from "../dist/utils/pretty-formatter.js";
 import { closeAllRunLogSinks, getRunLogSink } from "../dist/utils/run-log.js";
@@ -558,9 +562,11 @@ export async function runLauncher({
   env = process.env,
   runsDir = RUNS_DIR,
   profile = "short",
+  resetQaRetries = false,
   readRows = readSheetRows,
   getAssistantId: getAssistant = getAssistantId,
   resumeRun: runPipeline = resumeRun,
+  resetQaResume = resetLastStepQaRetries,
 } = {}) {
   validateProfile(profile);
   const clientId = env.YOUTUBE_CLIENT_ID;
@@ -671,6 +677,10 @@ export async function runLauncher({
       } else {
         logger.info("  No free publish slot within 30 days; publishing as-is.");
       }
+      if (resetQaRetries) {
+        const resetResult = resetQaResume(runsDir, decision.ns);
+        logger.info(describeQaRetryReset(resetResult));
+      }
     } else {
       logger.info(
         `New backlog run "${decision.topic}" (video ${decision.projectId}) at slot ${decision.youtubePublishAt}`,
@@ -713,7 +723,12 @@ if (
   program
     .name("run-next")
     .description("Backlog-driven run launcher")
-    .option("--profile <short|long>", "video profile", "short");
+    .option("--profile <short|long>", "video profile", "short")
+    .option(
+      "--reset-qa-retries",
+      "on resume, clear cached artifacts for the last QC-gated step so it re-runs with a fresh QA retry budget",
+      false,
+    );
   program.parse(process.argv);
 
   const opts = program.opts();
@@ -725,12 +740,14 @@ if (
     process.exit(1);
   }
 
-  runLauncher({ profile }).catch((e) => {
-    if (e instanceof LauncherError) {
-      console.error(`run-next: ${e.message}`);
-    } else {
-      console.error(e?.stack || e);
-    }
-    process.exitCode = 1;
-  });
+  runLauncher({ profile, resetQaRetries: Boolean(opts.resetQaRetries) }).catch(
+    (e) => {
+      if (e instanceof LauncherError) {
+        console.error(`run-next: ${e.message}`);
+      } else {
+        console.error(e?.stack || e);
+      }
+      process.exitCode = 1;
+    },
+  );
 }

@@ -23,6 +23,7 @@ import {
 } from "../scripts/run-next.mjs";
 import { getAssistantId, resumeRun } from "../scripts/resume.mjs";
 import { closeAllRunLogSinks } from "../dist/utils/run-log.js";
+import { logger } from "../dist/utils/logger.js";
 import { EXPECTED_HEADERS } from "../src/integrations/google-sheets/sheets-format.mjs";
 
 let runsDir: string;
@@ -313,6 +314,73 @@ describe("runLauncher", () => {
     expect(options.youtubePublishAt).toMatch(
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
     );
+  });
+
+  it("resets QA retries for the last step before resuming when the flag is set", async () => {
+    addRun("geo-run-reset", {
+      topic: "Unrecognized Countries",
+      pillar: "Geography",
+      projectId: "legacy-1",
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    const deps = baseDeps();
+    const resetQaResume = jest.fn(() => ({
+      reason: null,
+      frontier: "scriptQA",
+      resetTypes: ["script", "scriptQA"],
+      dryRun: false,
+      deleted: { script: 3, scriptQA: 5 },
+    }));
+    await expect(
+      runLauncher({ ...deps, resetQaRetries: true, resetQaResume }),
+    ).resolves.toBeUndefined();
+
+    expect(resetQaResume).toHaveBeenCalledTimes(1);
+    expect(resetQaResume).toHaveBeenCalledWith(runsDir, "geo-run-reset");
+    expect(deps.resumeRun).toHaveBeenCalledTimes(1);
+    const captured = (
+      logger as unknown as {
+        _captured: Array<{ level: string; message: string }>;
+      }
+    )._captured;
+    const logged = captured.filter(
+      (c) => c.level === "info" && c.message.includes("QA retry reset"),
+    );
+    expect(logged.at(-1)?.message).toContain('cleared frontier "scriptQA"');
+  });
+
+  it("never resets QA retries on the create path even with the flag", async () => {
+    const deps = baseDeps();
+    const resetQaResume = jest.fn(() => ({
+      reason: null,
+      frontier: "scriptQA",
+      resetTypes: [],
+      dryRun: false,
+      deleted: {},
+    }));
+    await expect(
+      runLauncher({ ...deps, resetQaRetries: true, resetQaResume }),
+    ).resolves.toBeUndefined();
+
+    expect(resetQaResume).not.toHaveBeenCalled();
+    expect(deps.resumeRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reset QA retries by default", async () => {
+    addRun("geo-run-default", {
+      topic: "Unrecognized Countries",
+      pillar: "Geography",
+      projectId: "legacy-1",
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    const deps = baseDeps();
+    const resetQaResume = jest.fn();
+    await expect(
+      runLauncher({ ...deps, resetQaResume }),
+    ).resolves.toBeUndefined();
+
+    expect(resetQaResume).not.toHaveBeenCalled();
+    expect(deps.resumeRun).toHaveBeenCalledTimes(1);
   });
 
   it("logs a recoverable pipeline failure with ns/topic and resolves normally (exit 0)", async () => {
