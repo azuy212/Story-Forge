@@ -1,3 +1,7 @@
+// Network runtime first: force IPv4-only sockets before any googleapis /
+// google-auth-library client (Sheets, YouTube) issues a request.
+import { configureNetworkRuntime } from "../runtime/bootstrap.js";
+
 import { StateGraph } from "@langchain/langgraph";
 import { StateAnnotation } from "./state.js";
 import { resolveProfileNode } from "../agents/resolve-profile.node.js";
@@ -38,6 +42,9 @@ import {
   SCRIPT_QA_MAX_RETRIES,
   PROMPT_QA_MAX_RETRIES,
 } from "../utils/constants.js";
+
+// Idempotent; bootstrap already configured on first import above.
+configureNetworkRuntime();
 
 // Fan-out fired by VisualDirector once the visual plan exists: the parallel
 // Metadata/Thumbnail enrichment pair.

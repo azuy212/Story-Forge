@@ -8,6 +8,7 @@
 // Usage:
 //   node scripts/sheet-read.mjs                 -> { short: {headers, rows}, long: {...} }
 //   node scripts/sheet-read.mjs --profile short -> just one profile
+import "../src/runtime/network.mjs";
 import dotenv from "dotenv";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";

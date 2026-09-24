@@ -26,6 +26,7 @@
 //
 // Usage (from apps/orchestrator):
 //   node scripts/run-next.mjs [--profile short|long] [--reset-qa-retries]
+import "../src/runtime/network.mjs";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";

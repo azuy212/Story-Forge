@@ -1,5 +1,11 @@
+// Network runtime before googleapis (YouTube videos.insert / playlistItems).
+import { configureNetworkRuntime } from "../../../runtime/bootstrap.js";
+
 import { google } from "googleapis";
 import { createGoogleOAuthClient } from "../../google/google-oauth.js";
+
+// Idempotent; bootstrap already configured when imported above.
+configureNetworkRuntime();
 
 /**
  * The only files that import googleapis are this one and the shared OAuth

@@ -5,7 +5,13 @@
  * tokens). See scripts/oauth-youtube.mjs for the CLI wrapper.
  */
 
+// Network runtime before OAuth2Client.getToken (authorization-code exchange).
+import { configureNetworkRuntime } from "../../../runtime/bootstrap.js";
+
 import { google } from "googleapis";
+
+// Idempotent; bootstrap already configured when imported above.
+configureNetworkRuntime();
 
 export interface OAuthSetupConfig {
   clientId: string;

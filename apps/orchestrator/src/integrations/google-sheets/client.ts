@@ -1,9 +1,15 @@
+// Network runtime before googleapis (Sheets values.get/update/append).
+import { configureNetworkRuntime } from "../../runtime/bootstrap.js";
+
 import { google } from "googleapis";
 import {
   createGoogleOAuthClient,
   type GoogleAuthClient,
 } from "../../providers/google/google-oauth.js";
 import { config } from "../../utils/config.js";
+
+// Idempotent; bootstrap already configured when imported above.
+configureNetworkRuntime();
 
 /**
  * Narrow surface of the Sheets v4 values API the integration uses. Kept as a

@@ -173,6 +173,34 @@ cp .env.example .env
 # Edit .env — add OPENROUTER_API_KEY
 ```
 
+### Network runtime (IPv4-only sockets)
+
+Google OAuth (`oauth2.googleapis.com`) fails with bare `ETIMEDOUT` on hosts
+without a working IPv6 route when Node's Happy Eyeballs auto-selection races
+an unroutable AAAA. DNS ordering alone (`--dns-result-order=ipv4first`) does
+not fix this.
+
+The orchestrator centralizes the fix in `src/runtime/network.ts` (TypeScript)
+and `src/runtime/network.mjs` (plain-JS scripts):
+
+```ts
+dns.setDefaultResultOrder("ipv4first");
+net.setDefaultAutoSelectFamily(false);
+```
+
+Every Google-enabled entrypoint loads this before creating `googleapis` /
+`google-auth-library` clients (graph bootstrap, OAuth factory, Sheets client,
+YouTube client, and all `scripts/*.mjs` that talk to Google). Do not hard-code
+Google IPs; do not reintroduce custom token-exchange HTTPS; do not rely solely
+on `NODE_OPTIONS=--dns-result-order=ipv4first`.
+
+Diagnostics (no secrets printed):
+
+```bash
+pnpm exec node scripts/test-google-network.mjs   # DNS / IPv4 TCP / HTTPS / fetch
+pnpm exec node scripts/test-google-auth.mjs      # OAuth2Client.getAccessToken()
+```
+
 ### Scene-Bounded Narration and Subtitles
 
 `production.scenes[].narration` is authoritative. NarrationGenerator creates

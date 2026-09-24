@@ -1,4 +1,10 @@
+// Ensure IPv4-only sockets before OAuth2Client refresh/Gaxios runs.
+import { configureNetworkRuntime } from "../../runtime/bootstrap.js";
+
 import { google } from "googleapis";
+
+// Idempotent; bootstrap already configured when imported above.
+configureNetworkRuntime();
 
 export interface GoogleOAuthConfig {
   clientId: string;

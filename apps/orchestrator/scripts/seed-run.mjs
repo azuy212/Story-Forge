@@ -45,6 +45,7 @@
 //     to the LLM with SEED_CONVERT_PROMPT; the LLM returns pillar + topic
 //     (unless flags/file already supply them) plus research + content.
 //     Plain-text seeds therefore work without --pillar/--topic.
+import "../src/runtime/network.mjs";
 import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
