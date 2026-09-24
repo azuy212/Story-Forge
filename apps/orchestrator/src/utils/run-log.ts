@@ -54,6 +54,7 @@ export type RunLogEventType =
   | "node_skipped"
   | "node_incomplete"
   | "qa_decision"
+  | "classifier"
   | "router"
   | "scene_event"
   | "llm_call"

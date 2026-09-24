@@ -87,6 +87,37 @@ export const config = {
     if (v !== undefined) return v === "true";
     return read("ENABLE_QA") === "true";
   },
+  // --- Classifier layer (bounded QA decisions, e.g. TypeSafe/Jev) ---
+  // Master switch, default off: existing LLM QA behavior is untouched until
+  // CLASSIFIER_PROVIDER=typesafe is set (requires TYPESAFE_API_KEY).
+  classifierProvider: (): "off" | "typesafe" => {
+    const value = read("CLASSIFIER_PROVIDER");
+    return value === "typesafe" ? "typesafe" : "off";
+  },
+  typesafeApiKey: (): string | undefined =>
+    read("TYPESAFE_API_KEY") || undefined,
+  typesafeDefaultModel: (): string =>
+    read("TYPESAFE_DEFAULT_MODEL") || "jev-latest",
+  // Per-gate activation. Effective only when classifierProvider() !== "off";
+  // defaults to enabled so a single master switch opts gates in together.
+  classifierEnabledFor: (
+    gate: "promptqa" | "researchqa" | "releasereview" | "scriptqa",
+  ): boolean => {
+    if (config.classifierProvider() === "off") return false;
+    const value = read(`CLASSIFIER_${gate.toUpperCase()}`);
+    return value !== "false";
+  },
+  // Per-gate confidence floor (0–1) for a classifier verdict to be trusted
+  // without abstaining to the LLM path. Defaults ship conservative; tune per
+  // gate from qa-eval replay results, never globally.
+  classifierConfidenceMin: (
+    gate: "promptqa" | "researchqa" | "releasereview" | "scriptqa",
+  ): number => {
+    const value = Number(
+      read(`CLASSIFIER_${gate.toUpperCase()}_CONFIDENCE_MIN`),
+    );
+    return Number.isFinite(value) && value >= 0 && value <= 1 ? value : 0.85;
+  },
   supportsVideoAssets: (): boolean => read("ENABLE_VIDEO_ASSETS") === "true",
   narrativeHoldSeconds: (): number => {
     const value = Number(read("NARRATIVE_HOLD_SECONDS") ?? "0.5");
