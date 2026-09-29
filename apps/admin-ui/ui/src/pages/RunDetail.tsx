@@ -25,6 +25,11 @@ import {
 } from "@/lib/api";
 import { StageGrid, STAGES } from "@/components/StageGrid";
 import { StageArtifactDialog } from "@/components/StageArtifactDialog";
+import {
+  InjectArtifactsField,
+  collectInjectArtifacts,
+  type InjectArtifactDraft,
+} from "@/components/InjectArtifactsField";
 import { LogStream } from "@/components/LogStream";
 import { ProgressBar, type NodeStatus } from "@/components/ProgressBar";
 import { AssetsGallery } from "@/components/AssetsGallery";
@@ -972,9 +977,15 @@ function ResumeDialog({
     dryRun: false,
     resetQaRetries: false,
   });
+  const [injectDrafts, setInjectDrafts] = useState<InjectArtifactDraft[]>([]);
   const [busy, setBusy] = useState(false);
 
   async function onRun() {
+    const inject = collectInjectArtifacts(injectDrafts);
+    if (!inject.ok) {
+      toast.error("Invalid artifact injection", inject.error);
+      return;
+    }
     setBusy(true);
     try {
       const body: Record<string, unknown> = {};
@@ -984,6 +995,7 @@ function ResumeDialog({
       if (form.seed) body.seed = form.seed;
       if (form.dryRun) body.dryRun = true;
       if (form.resetQaRetries) body.resetQaRetries = true;
+      if (inject.artifacts.length) body.injectArtifacts = inject.artifacts;
       await api.resumeRun(ns, body);
       onOpenChange(false);
       onResumed();
@@ -1082,6 +1094,12 @@ function ResumeDialog({
               Reset QA retries for last step
             </Label>
           </div>
+        </div>
+        <div className="space-y-3 border-t pt-3">
+          <InjectArtifactsField
+            drafts={injectDrafts}
+            onChange={setInjectDrafts}
+          />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

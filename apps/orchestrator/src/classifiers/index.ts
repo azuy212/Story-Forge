@@ -24,3 +24,9 @@ export {
 export { classificationTelemetry } from "./telemetry.js";
 export { createTypeSafeClassifier, TYPESAFE_PROVIDER } from "./type-safe.js";
 export { classifierEnabledFor, defaultCreateClassifier } from "./factory.js";
+export {
+  tryClassifyQaGate,
+  type QaGateInject,
+  type TrustedClassification,
+} from "./qa-gate.js";
+export { buildGateState, injectFromConfigurable } from "./gate-state.js";

@@ -27,6 +27,6 @@ export const defaultCreateClassifier: ClassifierFactory = (
     return createTypeSafeClassifier(options);
   }
   throw new Error(
-    `CLASSIFIER_PROVIDER is "${provider}" — no classifier backend available. Set CLASSIFIER_PROVIDER=typesafe with TYPESAFE_API_KEY.`,
+    `CLASSIFIER_PROVIDER is "${provider}" — no classifier backend available. Set CLASSIFIER_PROVIDER=typesafe (uses OPENROUTER_API_KEY).`,
   );
 };

@@ -150,6 +150,15 @@ export type DeleteStageResult = {
 
 export type Health = Record<string, string>;
 
+// Manual artifact override: serve a local payload in place of that node's
+// LLM/provider call. Exactly one of `path` (file on disk) or `json` (payload
+// the server materializes to a temp file) per entry.
+export type InjectArtifact = {
+  type: string;
+  path?: string;
+  json?: string;
+};
+
 export type AppConfig = {
   ttsProvider: string;
   ttsEnabled: boolean;
@@ -184,10 +193,18 @@ export const api = {
   launchRunNext: (
     profile: "short" | "long",
     resetQaRetries = false,
+    injectArtifacts: InjectArtifact[] = [],
   ) =>
     jsonFetch<{ ns: string; action: string; none?: boolean; reason?: string }>(
       "/api/orchestrator/launch/run-next",
-      { method: "POST", body: JSON.stringify({ profile, resetQaRetries }) },
+      {
+        method: "POST",
+        body: JSON.stringify({
+          profile,
+          resetQaRetries,
+          ...(injectArtifacts.length ? { injectArtifacts } : {}),
+        }),
+      },
     ),
   launchSeed: (body: Record<string, unknown>) =>
     jsonFetch<{ ns: string; action: string }>("/api/orchestrator/launch/seed", {

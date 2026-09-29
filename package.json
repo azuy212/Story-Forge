@@ -20,7 +20,8 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
-      "playwright"
+      "playwright",
+      "unrs-resolver"
     ],
     "overrides": {
       "filelist>minimatch": "5.1.8"

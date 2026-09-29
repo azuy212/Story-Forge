@@ -10,7 +10,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc && node scripts/copy-mjs.mjs",
-    "dev": "npx @langchain/langgraph-cli dev --no-browser --server-log-level warn",
+    "dev": "npx @langchain/langgraph-cli dev --no-browser --no-reload",
     "clean": "rm -rf dist",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns=\\.test\\.ts$ --testPathIgnorePatterns=\\.int\\.test\\.ts$",
     "test:int": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns=\\.int\\.test\\.ts$",
@@ -38,6 +38,7 @@
   },
   "devDependencies": {
     "@jest/globals": "^30.4.1",
+    "@langchain/langgraph-cli": "^1.5.1",
     "@tsconfig/recommended": "^1.0.13",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.14.0",

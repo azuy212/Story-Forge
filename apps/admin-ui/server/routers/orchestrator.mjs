@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
-import { dirname, join, isAbsolute, basename } from "node:path";
+import { dirname, join, isAbsolute, basename, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 import {
   readFileSync,
@@ -36,9 +37,55 @@ import {
   spawnTracked,
 } from "../lib/child.mjs";
 import { sseHeaders, sseSend, sseComment, heartbeat } from "../lib/sse.mjs";
+import { google } from "googleapis";
+import {
+  assertHeaders,
+  pickPendingRow,
+  nextPublishSlot,
+  nextLongPublishSlot,
+  COLUMN,
+} from "../../../orchestrator/src/integrations/google-sheets/sheets-format.mjs";
+import { decideRun } from "../../../orchestrator/scripts/run-next.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPT_PATH = join(PATHS.ORCHESTRATOR, "scripts");
+
+/**
+ * Read the backlog sheet and decide the run (create/resume/none) without
+ * actually launching the pipeline. Returns { action, ns, profile, reason?, topic? }.
+ */
+async function decideRunFromEnv(profile = "short") {
+  const clientId = process.env.YOUTUBE_CLIENT_ID;
+  const clientSecret = process.env.YOUTUBE_CLIENT_SECRET;
+  const refreshToken = process.env.YOUTUBE_REFRESH_TOKEN;
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  const sheetName =
+    profile === "long"
+      ? process.env.GOOGLE_SHEETS_SHEET_NAME_LONG || "Long Videos"
+      : process.env.GOOGLE_SHEETS_SHEET_NAME || "Sheet1";
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error("missing YOUTUBE_CLIENT_ID / YOUTUBE_CLIENT_SECRET / YOUTUBE_REFRESH_TOKEN");
+  }
+  if (!spreadsheetId) {
+    throw new Error("missing GOOGLE_SHEETS_SPREADSHEET_ID");
+  }
+
+  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
+  oauth2Client.setCredentials({ refresh_token: refreshToken });
+  const sheets = google.sheets({ version: "v4", auth: oauth2Client });
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `'${sheetName}'!A:Q`,
+  });
+  const rows = res.data?.values ?? [];
+
+  assertHeaders(rows);
+
+  const runsDir = PATHS.RUNS;
+  return decideRun(runsDir, rows, profile);
+}
 
 // Per-OAuth-flow state, keyed by the same `oauth-<timestamp>` id returned
 // from /auth/youtube/start. Used by the UI to fetch the refresh token after
@@ -54,6 +101,86 @@ function spawnScript(script, args, ns, onEvent) {
     onEvent,
   });
   return child;
+}
+
+/**
+ * Translate request-body `injectArtifacts` entries into repeatable
+ * `--inject-artifact <type>=<path>` CLI args (the two-token form both
+ * resume.mjs and run-next.mjs accept).
+ *
+ * Each entry: { type, path? , json? } — exactly one of path/json.
+ *  - path: resolved to absolute against the orchestrator cwd (the spawn cwd)
+ *    and must exist; the CLI re-validates against the artifact registry.
+ *  - json: parsed server-side, then materialized to a temp file whose path is
+ *    passed through (the orchestrator CLI only accepts file paths).
+ *
+ * Returns { args } on success or { error, ...details } for a 400 reply.
+ */
+function buildInjectArtifactArgs(list) {
+  if (list == null) return { args: [] };
+  if (!Array.isArray(list)) return { error: "inject_artifacts_invalid" };
+  const seen = new Set();
+  const args = [];
+  for (const entry of list) {
+    if (!entry || typeof entry !== "object") {
+      return { error: "inject_artifacts_invalid" };
+    }
+    const t = typeof entry.type === "string" ? entry.type.trim() : "";
+    if (!t || t.includes("=")) {
+      return { error: "inject_artifact_invalid_type", type: entry.type };
+    }
+    if (seen.has(t)) {
+      return { error: "inject_artifact_duplicate_type", type: t };
+    }
+    seen.add(t);
+    const path =
+      typeof entry.path === "string" && entry.path.trim()
+        ? entry.path.trim()
+        : null;
+    const json =
+      typeof entry.json === "string" && entry.json.trim()
+        ? entry.json.trim()
+        : null;
+    if (path && json) {
+      return { error: "inject_artifact_ambiguous", type: t };
+    }
+    if (path) {
+      const abs = isAbsolute(path) ? path : resolve(PATHS.ORCHESTRATOR, path);
+      if (!existsSync(abs)) {
+        return { error: "inject_artifact_file_not_found", type: t, path: abs };
+      }
+      args.push("--inject-artifact", `${t}=${abs}`);
+      continue;
+    }
+    if (json) {
+      let parsed;
+      try {
+        parsed = JSON.parse(json);
+      } catch (e) {
+        return {
+          error: "inject_artifact_invalid_json",
+          type: t,
+          message: e.message,
+        };
+      }
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return {
+          error: "inject_artifact_invalid_json",
+          type: t,
+          message: "payload must be a JSON object",
+        };
+      }
+      const file = join(
+        tmpdir(),
+        `story-forge-inject-${t}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`,
+      );
+      writeFileSync(file, JSON.stringify(parsed, null, 2));
+      args.push("--inject-artifact", `${t}=${file}`);
+      continue;
+    }
+    return { error: "inject_artifact_payload_required", type: t };
+  }
+  return { args };
 }
 
 function spawnScriptRaw(script, args, ns, controller) {
@@ -421,23 +548,34 @@ export async function orchestratorRouter(app) {
     if (profile !== "short" && profile !== "long") {
       return reply.code(400).send({ error: "invalid_profile" });
     }
-    // run-next.mjs reads the sheet, picks a row, and creates the run dir
-    // itself. We don't know the namespace up front, so we snapshot the
-    // directory before spawn and watch for a new entry. Avoids pulling
-    // googleapis into admin-ui's deps.
-    const before = listNamespaces();
-    const controller = makeController();
-    register(`run-next-${Date.now()}`, controller);
-    const launchArgs = [`--profile=${profile}`];
-    if (req.body?.resetQaRetries) launchArgs.push("--reset-qa-retries");
-    spawnScript("run-next.mjs", launchArgs, `run-next-${Date.now()}`, () => {});
-    const ns = await watchForNewNamespace(before, 5000);
-    if (!ns) {
-      return { none: true, reason: "no-pending-row-or-no-slot" };
+    const inject = buildInjectArtifactArgs(req.body?.injectArtifacts);
+    if (inject.error) return reply.code(400).send(inject);
+
+    // First, decide the run by reading the sheet. This tells us the namespace
+    // and action (create/resume/none) upfront, so we don't need to watch for
+    // a new namespace (which fails for resume since the namespace exists).
+    let decision;
+    try {
+      decision = await decideRunFromEnv(profile);
+    } catch (e) {
+      return reply.code(500).send({ error: "decide_failed", message: e.message });
     }
-    // Re-register under the real namespace so /stream and /cancel can find it.
-    const meta = readRunMeta(ns);
-    return { ns, action: meta?.threadHistory ? "resume" : "create", profile };
+
+    if (decision.action === "none") {
+      return { none: true, reason: decision.reason };
+    }
+
+    const ns = decision.ns;
+    const action = decision.action; // "create" | "resume"
+
+    // Register the child under the real namespace so /stream and /cancel work.
+    const controller = makeController();
+    register(ns, controller);
+    const launchArgs = [`--profile=${profile}`, ...inject.args];
+    if (req.body?.resetQaRetries) launchArgs.push("--reset-qa-retries");
+    spawnScript("run-next.mjs", launchArgs, ns, () => {});
+
+    return { ns, action, profile };
   });
 
   app.post("/launch/seed", async (req, reply) => {
@@ -488,6 +626,8 @@ export async function orchestratorRouter(app) {
     const meta = readRunMeta(ns);
     if (!meta) return reply.code(404).send({ error: "run_not_found" });
     const body = req.body ?? {};
+    const inject = buildInjectArtifactArgs(body.injectArtifacts);
+    if (inject.error) return reply.code(400).send(inject);
     const args = [ns];
     if (body.pillar) args.push(`--pillar=${body.pillar}`);
     if (body.topic) args.push(`--topic=${body.topic}`);
@@ -495,6 +635,7 @@ export async function orchestratorRouter(app) {
     if (body.seed) args.push(`--seed=${body.seed}`);
     if (body.dryRun) args.push("--dry-run");
     if (body.resetQaRetries) args.push("--reset-qa-retries");
+    args.push(...inject.args);
     const controller = makeController();
     register(ns, controller);
     spawnScript("resume.mjs", args, ns, () => {});

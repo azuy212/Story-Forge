@@ -274,3 +274,129 @@ describe("promptQANode", () => {
     expect(telemetry!.agentVersion).toBe("1.0.0");
   });
 });
+
+function choice(value: string, confidence: number) {
+  return {
+    type: "choice" as const,
+    choice: value,
+    confidence,
+    probabilities: { [value]: confidence },
+  };
+}
+
+function makeClassifierFactory(answers: Record<string, unknown>) {
+  return jest.fn(() => ({
+    provider: "typesafe",
+    model: "jev-test",
+    classify: jest.fn().mockResolvedValue({
+      answers,
+      provider: "typesafe",
+      model: "jev-test",
+      usage: { inputTokens: 10, outputTokens: 0 },
+      durationMs: 5,
+    }),
+  }));
+}
+
+function withClassifierEnv() {
+  const prev = process.env.CLASSIFIER_PROVIDER;
+  process.env.CLASSIFIER_PROVIDER = "typesafe";
+  return () => {
+    if (prev === undefined) delete process.env.CLASSIFIER_PROVIDER;
+    else process.env.CLASSIFIER_PROVIDER = prev;
+  };
+}
+
+function approvedAnswers() {
+  return {
+    status: choice("approved", 0.97),
+    revision_target: choice("none", 0.95),
+    scene_1: choice("pass", 0.96),
+    scene_2: choice("pass", 0.94),
+  };
+}
+
+describe("promptQANode classifier path", () => {
+  it("trusted approved skips the LLM", async () => {
+    const restore = withClassifierEnv();
+    try {
+      const createClassifier = makeClassifierFactory(approvedAnswers());
+      const mocks = makeMocks();
+      const result = await promptQANode(
+        {
+          project: { pillar: "Geography", topic: "Test" },
+          production: { scenes: SCENES, visualPlan: VISUAL_PLAN },
+          execution: { version: "0.1.0" },
+        } as ProjectState,
+        { configurable: { ...mocks, createClassifier } } as any,
+      );
+
+      expect(result.production?.promptQA?.status).toBe("approved");
+      expect(result.production?.promptQA?.sceneResults).toHaveLength(2);
+      expect(result.production?.promptQA?.revisionTarget).toBe("none");
+      expect(mockGenerate).not.toHaveBeenCalled();
+      expect(result.diagnostics?.telemetry?.PromptQA?.model).toBe(
+        "typesafe/jev-test",
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  it("trusted non-approved cascades to LLM and overrides status", async () => {
+    const restore = withClassifierEnv();
+    try {
+      const answers = approvedAnswers();
+      answers.status = choice("minor_revision", 0.91);
+      answers.revision_target = choice("prompts", 0.9);
+      answers.scene_2 = choice("revise", 0.88);
+      const createClassifier = makeClassifierFactory(answers);
+      mockGenerate.mockResolvedValue(buildResponse());
+      const mocks = makeMocks();
+      const result = await promptQANode(
+        {
+          project: { pillar: "Geography", topic: "Test" },
+          production: { scenes: SCENES, visualPlan: VISUAL_PLAN },
+          execution: { version: "0.1.0" },
+        } as ProjectState,
+        { configurable: { ...mocks, createClassifier } } as any,
+      );
+
+      expect(result.production?.promptQA?.status).toBe("minor_revision");
+      expect(result.production?.promptQA?.revisionTarget).toBe("prompts");
+      expect(
+        result.production?.promptQA?.sceneResults.find((r) => r.sceneId === 2)
+          ?.verdict,
+      ).toBe("revise");
+      expect(mockGenerate).toHaveBeenCalledTimes(1);
+    } finally {
+      restore();
+    }
+  });
+
+  it("low confidence abstains to the LLM path", async () => {
+    const restore = withClassifierEnv();
+    try {
+      const answers = approvedAnswers();
+      answers.status = choice("approved", 0.4);
+      answers.revision_target = choice("none", 0.4);
+      const createClassifier = makeClassifierFactory(answers);
+      mockGenerate.mockResolvedValue(buildResponse());
+      const mocks = makeMocks();
+      const result = await promptQANode(
+        {
+          project: { pillar: "Geography", topic: "Test" },
+          production: { scenes: SCENES, visualPlan: VISUAL_PLAN },
+          execution: { version: "0.1.0" },
+        } as ProjectState,
+        { configurable: { ...mocks, createClassifier } } as any,
+      );
+
+      expect(result.production?.promptQA?.status).toBe("approved");
+      expect(mockGenerate).toHaveBeenCalledTimes(1);
+      expect(result.diagnostics?.telemetry?.PromptQA?.model).toBe("test-model");
+    } finally {
+      restore();
+    }
+  });
+});

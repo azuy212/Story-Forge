@@ -258,6 +258,62 @@ The `langgraph dev` server uses a `MemorySaver` checkpointer synced to `.langgra
 
 **The `runs/` artifact store is the durable source of truth.** Do not run two dev servers against the same `runs/` directory. The resume CLI creates a fresh thread and replays from the last cached artifact using `configurable.runId`, making the run visible again in Studio.
 
+## Manual Artifact Override
+
+When a run is stuck at a producer or QA gate (bad LLM output, endless revisions,
+provider outage), serve a hand-authored payload in place of that node's
+LLM/provider call for one resume:
+
+```bash
+pnpm --filter youtube-shorts-orchestrator resume <ns> \
+  --inject-artifact promptQA=./prompt-qa.json \
+  --inject-artifact scriptQA=./script-qa.json
+```
+
+- **Repeatable** — one `<type>=<path>` per flag. `--dry-run` prints the
+  configured injections without running.
+- **`run-next` too** — the backlog launcher accepts the same repeatable flag:
+  `node scripts/run-next.mjs --inject-artifact promptQA=./prompt-qa.json`.
+  It validates identically and forwards the run's resolved profile (persisted
+  `videoProfile` on resume, CLI `--profile` on create) as
+  `manualArtifactProfile`.
+- **Fail-fast CLI validation** — every type must be a registry artifact type and
+  every path must exist; paths are resolved to absolute (the dev server may run
+  with a different CWD). The CLI reads `dist/artifacts/registry.js`, so run
+  `pnpm build` first.
+- **Payload shape** — the file must contain the node's zod **data payload**,
+  exactly what the LLM would have returned (e.g.
+  `{"status":"approved","feedback":"","issues":[]}` for `scriptQA`). It is
+  validated with `validateArtifact` (profile-aware for `scriptPlan` /
+  `visualDirector`) plus the node's own `validate` hook when one exists; a
+  broken override fails the run loudly rather than silently re-running the
+  stuck node.
+- **Directory form** (keyed outputs) — a directory of `scene-<id>.json` files
+  serves per-scene cache calls (a scene without a matching file falls through
+  to the normal hash path); `<kind>.json` serves kind-keyed calls, and a lone
+  non-scene file also works for kind-keyed lookups. Unkeyed calls require a
+  single file — a multi-file directory is ambiguous and errors.
+- **Checked before the hash gate** in `runWithArtifactCache` /
+  `cacheNodeResult`. On a hit the payload is persisted as a `complete` artifact
+  with `inputHash: ""` and `sourceOverride: true` and recorded in
+  `state/execution.json`; telemetry shows `model: "manual"`, `fromCache: true`,
+  `durationMs: 0`.
+- **Re-pass on every resume** while the override is needed: the empty
+  `inputHash` never matches a normal cache key, so a later plain resume
+  recomputes instead of accidentally reusing the override. Resuming again with
+  the flag re-applies it (a new artifact version is appended).
+- **Profile-sensitive types** — the CLI forwards the resolved video profile as
+  `configurable.manualArtifactProfile`; override with `--profile short|long`
+  when the run's stored profile is wrong (long-profile `visualDirector` /
+  `scriptPlan` payloads validate against short-profile bounds otherwise).
+- **Types** — any registry type: `research`, `researchQA`, `scriptPlan`,
+  `script`, `scriptQA`, `metadata`, `thumbnail`, `thumbnailImage`,
+  `visualDirector`, `prompts`, `promptQA`, `assets`, `audio`, `subtitles`,
+  `videoPlan`, `releaseValidation`, `releaseReview`, `publish`. Typical QA-gate
+  unblocks: `scriptQA`, `promptQA`, `researchQA`, `releaseReview`.
+- **Programmatic** — pass
+  `configurable: { manualArtifacts: { promptQA: "/abs/promptQA.json" }, manualArtifactProfile: "long" }`.
+
 ## Key Files
 
 - `src/artifacts/types.ts` — schemas: ArtifactRecord, ArtifactMeta, Manifest, CacheKey.

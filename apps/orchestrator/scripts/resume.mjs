@@ -2,7 +2,7 @@
 
 import "../src/runtime/network.mjs";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join, dirname, resolve as resolvePath } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createOrAppendRunMeta } from "../src/artifacts/run-meta.mjs";
 import { logger } from "../dist/utils/logger.js";
@@ -190,7 +190,11 @@ export async function runStream(
   input,
   runId,
   devApi = DEV_API,
-  { streamMode = ["events", "values"] } = {},
+  {
+    streamMode = ["events", "values"],
+    manualArtifacts = null,
+    manualArtifactProfile = null,
+  } = {},
 ) {
   const res = await fetch(`${devApi}/threads/${threadId}/runs/stream`, {
     method: "POST",
@@ -198,7 +202,16 @@ export async function runStream(
     body: JSON.stringify({
       assistant_id: assistantId,
       input,
-      config: { configurable: { runId, thread_id: threadId } },
+      config: {
+        configurable: {
+          runId,
+          thread_id: threadId,
+          // Manual artifact override: type -> file path(s) served in place of
+          // the LLM/provider call (checked in the artifact cache layer).
+          ...(manualArtifacts ? { manualArtifacts } : {}),
+          ...(manualArtifactProfile ? { manualArtifactProfile } : {}),
+        },
+      },
       multitask_strategy: "interrupt",
       stream_mode: streamMode,
     }),
@@ -298,6 +311,7 @@ export function parseArgs(args) {
     seed: null,
     dryRun: false,
     resetQaRetries: false,
+    injectArtifacts: null,
     help: false,
   };
 
@@ -309,6 +323,28 @@ export function parseArgs(args) {
       parsed.dryRun = true;
     } else if (arg === "--reset-qa-retries") {
       parsed.resetQaRetries = true;
+    } else if (arg === "--inject-artifact") {
+      if (!args[i + 1] || args[i + 1].startsWith("--"))
+        throw new Error(
+          "--inject-artifact requires a value of the form <type>=<path>",
+        );
+      const val = args[++i];
+      const eq = val.indexOf("=");
+      if (eq <= 0 || eq === val.length - 1)
+        throw new Error(
+          "--inject-artifact requires <type>=<path> (e.g. promptQA=./promptQA.json)",
+        );
+      const type = val.slice(0, eq);
+      const filePath = val.slice(eq + 1);
+      if (!parsed.injectArtifacts) parsed.injectArtifacts = {};
+      const existing = parsed.injectArtifacts[type];
+      if (existing === undefined) {
+        parsed.injectArtifacts[type] = filePath;
+      } else if (Array.isArray(existing)) {
+        existing.push(filePath);
+      } else {
+        parsed.injectArtifacts[type] = [existing, filePath];
+      }
     } else if (arg === "--pillar") {
       if (!args[i + 1] || args[i + 1].startsWith("--"))
         throw new Error("--pillar requires a value");
@@ -357,6 +393,18 @@ Options:
                           (and any residue after it) so the resume re-runs
                           that step with a fresh QA retry budget. With
                           --dry-run, only prints what would be cleared.
+  --inject-artifact <type>=<path>
+                          Serve a local JSON file as that node's artifact for
+                          this resume, bypassing its LLM/provider call. The
+                          file must contain the node's zod output (e.g.
+                          {"status":"approved"} for scriptQA). Repeatable;
+                          <path> may be a directory of scene-<id>.json /
+                          <kind>.json files for keyed node outputs. Must be
+                          re-passed on every resume while the override is
+                          needed. Types: research, researchQA, scriptPlan,
+                          script, scriptQA, visualDirector, metadata,
+                          thumbnail, prompts, promptQA, subtitles, videoPlan,
+                          releaseValidation, releaseReview.
   --help, -h              Show this help
 
 Examples:
@@ -364,7 +412,8 @@ Examples:
   pnpm resume "why your brain" --pillar Psychology --topic "Why Your Brain Makes You Remember Things That Never Happened"
   pnpm resume <ns> --profile long --dry-run
   pnpm resume <ns> --seed ./napal-flood.json   # resume a seed run (re-inject research + script)
-`);
+  pnpm resume <ns> --inject-artifact promptQA=./prompt-qa.json   # unstick a QA gate
+  `);
 }
 
 // Inline buildSummary to avoid test module resolution issues
@@ -390,6 +439,50 @@ function buildSummary(data) {
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
+/**
+ * Fail-fast validation for --inject-artifact: every type key must be a real
+ * artifact type (checked against the registry in dist) and every path must
+ * exist. Paths are resolved to absolute so the dev-server process (which may
+ * run with a different CWD) can read them server-side. Exits on any problem.
+ */
+export async function resolveInjectArtifacts(map) {
+  if (!map) return null;
+
+  let validTypes;
+  try {
+    const registry = await import("../dist/artifacts/registry.js");
+    validTypes = new Set(registry.ARTIFACT_TYPES.map((d) => d.type));
+  } catch (e) {
+    console.error(
+      `Failed to load artifact registry (run \`pnpm build\` first): ${e.message}`,
+    );
+    process.exit(1);
+  }
+
+  const resolved = {};
+  for (const [type, entry] of Object.entries(map)) {
+    if (!validTypes.has(type)) {
+      console.error(
+        `--inject-artifact: "${type}" is not an injectable artifact type (valid: ${[...validTypes].join(", ")})`,
+      );
+      process.exit(1);
+    }
+    const paths = Array.isArray(entry) ? entry : [entry];
+    for (const p of paths) {
+      if (!existsSync(p)) {
+        console.error(
+          `--inject-artifact ${type}=${p}: no such file or directory`,
+        );
+        process.exit(1);
+      }
+    }
+    resolved[type] = Array.isArray(entry)
+      ? paths.map((p) => resolvePath(p))
+      : resolvePath(paths[0]);
+  }
+  return resolved;
+}
+
 async function main() {
   let parsed;
   try {
@@ -403,6 +496,8 @@ async function main() {
     showHelp();
     process.exit(0);
   }
+
+  const injectArtifacts = await resolveInjectArtifacts(parsed.injectArtifacts);
 
   const ns = resolveNamespace(parsed.namespace);
   const pillarOverride = parsed.pillar;
@@ -463,6 +558,13 @@ async function main() {
   }
 
   if (dryRun) {
+    if (injectArtifacts) {
+      console.log("\nWould inject artifacts:");
+      for (const [type, entry] of Object.entries(injectArtifacts)) {
+        const paths = Array.isArray(entry) ? entry : [entry];
+        console.log(`  ${type} <- ${paths.join(", ")}`);
+      }
+    }
     console.log("\nDry run complete. Use without --dry-run to resume.");
     process.exit(0);
   }
@@ -510,6 +612,12 @@ async function main() {
   logger.info(`  Topic: ${topic}`);
   logger.info(`  Pillar: ${pillar}`);
   if (videoProfile) logger.info(`  Profile: ${videoProfile}`);
+  if (injectArtifacts) {
+    for (const [type, entry] of Object.entries(injectArtifacts)) {
+      const paths = Array.isArray(entry) ? entry : [entry];
+      logger.info(`  Injecting ${type} <- ${paths.join(", ")}`);
+    }
+  }
 
   let assistantId;
   try {
@@ -535,6 +643,10 @@ async function main() {
         // Re-inject the seed for seed runs so the entryRouter jumps to
         // VisualDirector and the artifact cache replays completed stages.
         ...(resumeSeed ? { seed: resumeSeed } : {}),
+        ...(injectArtifacts ? { manualArtifacts: injectArtifacts } : {}),
+        ...(videoProfile === "short" || videoProfile === "long"
+          ? { manualArtifactProfile: videoProfile }
+          : {}),
       },
     );
     const status =
@@ -569,6 +681,10 @@ export async function resumeRun(
     // Extra graph-input channels to seed (e.g. { research, content }). Merged
     // into the run input so the entry router can skip seeded producers.
     seed = {},
+    // Manual artifact override map (type -> path(s)) forwarded via
+    // config.configurable so the artifact cache can short-circuit nodes.
+    manualArtifacts = null,
+    manualArtifactProfile = null,
     createThread: createThreadImpl = createThread,
     runStream: runStreamImpl = runStream,
     drainStream: drainStreamImpl = drainStream,
@@ -611,7 +727,14 @@ export async function resumeRun(
     ...seed,
   };
   logger.info("Starting run...");
-  const stream = await runStreamImpl(threadId, assistantId, input, ns);
+  const stream = await runStreamImpl(
+    threadId,
+    assistantId,
+    input,
+    ns,
+    undefined,
+    { manualArtifacts, manualArtifactProfile },
+  );
   // The dev server runs the graph in a separate process; nothing inside the
   // graph nodes can write to our run.log. Re-emit every SSE chain/chat
   // event into the sink here so post-mortem has a full per-node + per-LLM

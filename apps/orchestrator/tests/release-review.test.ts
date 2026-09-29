@@ -166,3 +166,177 @@ describe("releaseReviewNode", () => {
     }
   });
 });
+
+function choice(value: string, confidence: number) {
+  return {
+    type: "choice" as const,
+    choice: value,
+    confidence,
+    probabilities: { [value]: confidence },
+  };
+}
+
+function makeClassifierFactory(answers: Record<string, unknown>) {
+  return jest.fn(() => ({
+    provider: "typesafe",
+    model: "jev-test",
+    classify: jest.fn().mockResolvedValue({
+      answers,
+      provider: "typesafe",
+      model: "jev-test",
+      usage: { inputTokens: 10, outputTokens: 0 },
+      durationMs: 5,
+    }),
+  }));
+}
+
+function withClassifierEnv() {
+  const prev = process.env.CLASSIFIER_PROVIDER;
+  process.env.CLASSIFIER_PROVIDER = "typesafe";
+  return () => {
+    if (prev === undefined) delete process.env.CLASSIFIER_PROVIDER;
+    else process.env.CLASSIFIER_PROVIDER = prev;
+  };
+}
+
+describe("releaseReviewNode classifier path", () => {
+  it("trusted approved skips the LLM", async () => {
+    const restore = withClassifierEnv();
+    try {
+      const createClassifier = makeClassifierFactory({
+        status: choice("approved", 0.98),
+      });
+      const mocks = makeMocks();
+      const result = await releaseReviewNode(
+        {
+          project: { pillar: "Geography", topic: "Test" },
+          content: {
+            title: "Test Title",
+            hook: "Test hook",
+            narration: "Narration text.",
+          },
+          metadataOutput: {
+            title: "Meta Title",
+            description: "Meta description.",
+            tags: ["geography"],
+            hashtags: ["geo"],
+            category: "Education",
+            pinnedComment: "Comment?",
+          },
+          thumbnail: {
+            thumbnailPrompt: "P",
+            thumbnailText: "T",
+            textPosition: "center",
+            colorScheme: "blue",
+          },
+          branding: { channel: "TestChannel", creator: "", cta: "" },
+          execution: { version: "0.1.0" },
+        } as ProjectState,
+        { configurable: { ...mocks, createClassifier } } as any,
+      );
+
+      expect(result.releaseReview?.status).toBe("approved");
+      expect(result.releaseReview?.issues).toEqual([]);
+      expect(mockGenerate).not.toHaveBeenCalled();
+      expect(result.diagnostics?.telemetry?.ReleaseReview?.model).toBe(
+        "typesafe/jev-test",
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  it("trusted fatal cascades to LLM and keeps classifier status", async () => {
+    const restore = withClassifierEnv();
+    try {
+      const createClassifier = makeClassifierFactory({
+        status: choice("fatal", 0.94),
+      });
+      mockGenerate.mockResolvedValueOnce(
+        buildResponse({ status: "approved", issues: [] }),
+      );
+      const mocks = makeMocks();
+      const result = await releaseReviewNode(
+        {
+          project: { pillar: "Geography", topic: "Test" },
+          content: {
+            title: "Test Title",
+            hook: "Test hook",
+            narration: "Narration text.",
+          },
+          metadataOutput: {
+            title: "Meta Title",
+            description: "Meta description.",
+            tags: ["geography"],
+            hashtags: ["geo"],
+            category: "Education",
+            pinnedComment: "Comment?",
+          },
+          thumbnail: {
+            thumbnailPrompt: "P",
+            thumbnailText: "T",
+            textPosition: "center",
+            colorScheme: "blue",
+          },
+          branding: { channel: "TestChannel", creator: "", cta: "" },
+          execution: { version: "0.1.0" },
+        } as ProjectState,
+        { configurable: { ...mocks, createClassifier } } as any,
+      );
+
+      expect(result.releaseReview?.status).toBe("fatal");
+      expect(mockGenerate).toHaveBeenCalledTimes(1);
+      expect(result.diagnostics?.errors).toBeDefined();
+    } finally {
+      restore();
+    }
+  });
+
+  it("low confidence abstains to the LLM path", async () => {
+    const restore = withClassifierEnv();
+    try {
+      const createClassifier = makeClassifierFactory({
+        status: choice("fatal", 0.4),
+      });
+      mockGenerate.mockResolvedValueOnce(
+        buildResponse({ status: "approved", issues: [] }),
+      );
+      const mocks = makeMocks();
+      const result = await releaseReviewNode(
+        {
+          project: { pillar: "Geography", topic: "Test" },
+          content: {
+            title: "Test Title",
+            hook: "Test hook",
+            narration: "Narration text.",
+          },
+          metadataOutput: {
+            title: "Meta Title",
+            description: "Meta description.",
+            tags: ["geography"],
+            hashtags: ["geo"],
+            category: "Education",
+            pinnedComment: "Comment?",
+          },
+          thumbnail: {
+            thumbnailPrompt: "P",
+            thumbnailText: "T",
+            textPosition: "center",
+            colorScheme: "blue",
+          },
+          branding: { channel: "TestChannel", creator: "", cta: "" },
+          execution: { version: "0.1.0" },
+        } as ProjectState,
+        { configurable: { ...mocks, createClassifier } } as any,
+      );
+
+      expect(result.releaseReview?.status).toBe("approved");
+      expect(mockGenerate).toHaveBeenCalledTimes(1);
+      expect(result.diagnostics?.telemetry?.ReleaseReview?.model).toBe(
+        "test-model",
+      );
+    } finally {
+      restore();
+    }
+  });
+});

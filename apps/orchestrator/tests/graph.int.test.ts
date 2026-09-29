@@ -1,5 +1,9 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { graph } from "../src/graph/index.js";
+import { FilesystemArtifactStore } from "../src/artifacts/fs/fs-artifact-store.js";
 import {
   ImageGenerationProviderError,
   normalizeImageGenerationError,
@@ -7,9 +11,36 @@ import {
 
 const mockGenerate = jest.fn<(...args: any[]) => Promise<any>>();
 
+// Attribute every model.generate call to the agent that created the model.
+const agentCallLog: string[] = [];
+
+// Metadata/Thumbnail run as a parallel graph branch, so their relative start
+// order is scheduling-dependent (artifact-store I/O makes the swap observable).
+// They get dedicated once-queues; sharing the linear mockGenerate queue would
+// mis-serve payloads whenever Thumbnail reaches generate first.
+const parallelBranchQueues: Record<string, any[]> = {
+  MetadataGenerator: [],
+  ThumbnailGenerator: [],
+};
+
+function queueParallelBranch(payloads: { metadata: any[]; thumbnail: any[] }) {
+  parallelBranchQueues.MetadataGenerator.push(...payloads.metadata);
+  parallelBranchQueues.ThumbnailGenerator.push(...payloads.thumbnail);
+}
+
 const mockCreateModel = jest
   .fn<(...args: any[]) => { model: string; generate: typeof mockGenerate }>()
-  .mockReturnValue({ model: "test-model", generate: mockGenerate });
+  .mockImplementation((agent: string) => ({
+    model: "test-model",
+    generate: ((...args: any[]) => {
+      agentCallLog.push(String(agent));
+      const queue = parallelBranchQueues[agent];
+      if (queue && queue.length > 0) {
+        return Promise.resolve(queue.shift());
+      }
+      return mockGenerate(...args);
+    }) as typeof mockGenerate,
+  }));
 
 const MOCK_GUIDELINES = "Editorial guidelines for testing.";
 const MOCK_AGENT_PROMPT = "System.\n---\nUser.";
@@ -239,22 +270,48 @@ function makePromptQAResponse(
 }
 
 /**
+ * Modern ScriptWriter content fixture: one narration beat per story beat
+ * (assembled into the flat narration by the writer node), pivot sentence in
+ * beat 1, and a narrative ending matching the plan's open_question type.
+ */
+function makeWriterContent(options: { estimatedDurationSeconds: number }) {
+  return {
+    script: "Script body.",
+    beats: SCENE_NARRATIONS.map((narration, index) => ({
+      beatId: index + 1,
+      narration,
+    })),
+    retention: { pivotSentence: "Yet it has no borders." },
+    estimatedDurationSeconds: options.estimatedDurationSeconds,
+    ending: {
+      type: "open_question",
+      narration: SCENE_NARRATIONS[SCENE_NARRATIONS.length - 1],
+      visualDirection: "Hold on empty horizon.",
+    },
+  };
+}
+
+/**
  * Queue the standard happy-path LLM mock chain (research → release review).
  * `scriptWriterRuns` controls how many ScriptWriter responses are queued (for
- * revision loops), `scriptQA` is the ordered list of ScriptQA responses, and
- * `promptQA` overrides the single PromptQA verdict.
+ * revision loops), `scriptQA` is the ordered list of ScriptQA responses,
+ * `promptQA` overrides the single PromptQA verdict, and `skipPromptQA` omits
+ * the PromptQA response entirely (for tests that inject that artifact
+ * manually via `manualArtifacts`).
  */
 function queueHappyPathMocks(
   options: {
     scriptWriterRuns?: number;
     scriptQA?: Record<string, unknown>[];
     promptQA?: "approved" | "minor_revision" | "major_revision";
+    skipPromptQA?: boolean;
   } = {},
 ) {
   const {
     scriptWriterRuns = 1,
     scriptQA = [{ status: "approved", feedback: "" }],
     promptQA = "approved",
+    skipPromptQA = false,
   } = options;
   const FACTS = makeFacts(8);
   const BEATS = makeBeats(6);
@@ -292,7 +349,7 @@ function queueHappyPathMocks(
           factIds: ["fact-001"],
         },
         endingType: "open_question",
-        retention: { pivotBeatId: 3 },
+        retention: { pivotBeatId: 1 },
         storyBeats: BEATS,
       }),
       usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
@@ -362,49 +419,60 @@ function queueHappyPathMocks(
     }
   }
 
+  // Parallel-branch payloads live on per-agent queues: their relative start
+  // order is scheduling-dependent and must not share the linear once-queue.
+  queueParallelBranch({
+    metadata: [
+      {
+        output: JSON.stringify({
+          title: "Mystery Island Video",
+          description: "D",
+          tags: ["geography"],
+          hashtags: ["t", "test", "video"],
+          category: "Education",
+          pinnedComment: "C",
+        }),
+        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+      },
+    ],
+    thumbnail: [
+      {
+        output: JSON.stringify({
+          thumbnailPrompt: "Mysterious island aerial",
+          thumbnailText: "Doesn't Exist?",
+          textPosition: "bottom-third",
+          colorScheme: "cold blue",
+        }),
+        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
+      },
+    ],
+  });
+
   mockGenerate
     // 5. VisualDirector (gates the Metadata/Thumbnail fan-out)
     .mockResolvedValueOnce({
       output: JSON.stringify({ scenes: SCENES, visualPlans: VISUAL_PLANS }),
       usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
     })
-    // 6. MetadataGenerator (parallel branch after VisualDirector)
-    .mockResolvedValueOnce({
-      output: JSON.stringify({
-        title: "T",
-        description: "D",
-        tags: ["geography"],
-        hashtags: ["t", "test", "video"],
-        category: "Education",
-        pinnedComment: "C",
-      }),
-      usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-    })
-    // 7. ThumbnailGenerator (parallel branch after VisualDirector)
-    .mockResolvedValueOnce({
-      output: JSON.stringify({
-        thumbnailPrompt: "Mysterious island aerial",
-        thumbnailText: "Doesn't Exist?",
-        textPosition: "bottom-third",
-        colorScheme: "cold blue",
-      }),
-      usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
-    })
-    // 8. ImagePromptGenerator
+    // 6. ImagePromptGenerator (after BranchJoin; parallel branch is queued above)
     .mockResolvedValueOnce({
       output: JSON.stringify({ assets: ASSETS }),
       usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
-    })
-    // 9. PromptQA
-    .mockResolvedValueOnce({
+    });
+
+  // 9. PromptQA (skipped when the test serves the artifact manually)
+  if (!skipPromptQA) {
+    mockGenerate.mockResolvedValueOnce({
       output: JSON.stringify(makePromptQAResponse(promptQA, SCENES)),
       usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
-    })
-    // 10. ReleaseReview
-    .mockResolvedValueOnce({
-      output: JSON.stringify({ status: "approved", issues: [] }),
-      usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
     });
+  }
+
+  mockGenerate.mockResolvedValueOnce({
+    // 10. ReleaseReview
+    output: JSON.stringify({ status: "approved", issues: [] }),
+    usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
+  });
 
   return { SCENES, NARRATIONS };
 }
@@ -546,6 +614,9 @@ beforeEach(() => {
   // per scene, each 7000ms). Opt into scene mode explicitly.
   process.env.NARRATION_GENERATION_MODE = "scene";
   mockGenerate.mockReset();
+  agentCallLog.length = 0;
+  parallelBranchQueues.MetadataGenerator.length = 0;
+  parallelBranchQueues.ThumbnailGenerator.length = 0;
 });
 
 describe("Graph", () => {
@@ -587,7 +658,7 @@ describe("Graph", () => {
             factIds: ["fact-001"],
           },
           endingType: "open_question",
-          retention: { pivotBeatId: 3 },
+          retention: { pivotBeatId: 1 },
           storyBeats: STORY_BEATS,
         }),
 
@@ -654,31 +725,36 @@ describe("Graph", () => {
         }),
 
         usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      // MetadataGenerator (parallel branch after VisualDirector)
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          title: "Test Title",
-          description: "Test description.",
-          tags: ["geography"],
-          hashtags: ["geo", "test", "video"],
-          category: "Education",
-          pinnedComment: "Comment?",
-        }),
+      });
 
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      // ThumbnailGenerator (parallel branch after VisualDirector)
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          thumbnailPrompt: "High contrast aerial view",
-          thumbnailText: "Doesn't Exist?",
-          textPosition: "bottom-third",
-          colorScheme: "cold blue and white",
-        }),
+    queueParallelBranch({
+      metadata: [
+        {
+          output: JSON.stringify({
+            title: "Test Title",
+            description: "Test description.",
+            tags: ["geography"],
+            hashtags: ["geo", "test", "video"],
+            category: "Education",
+            pinnedComment: "Comment?",
+          }),
+          usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+        },
+      ],
+      thumbnail: [
+        {
+          output: JSON.stringify({
+            thumbnailPrompt: "High contrast aerial view",
+            thumbnailText: "Doesn't Exist?",
+            textPosition: "bottom-third",
+            colorScheme: "cold blue and white",
+          }),
+          usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
+        },
+      ],
+    });
 
-        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
-      })
+    mockGenerate
       .mockResolvedValueOnce({
         output: JSON.stringify({ assets: ASSETS }),
         usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
@@ -1002,19 +1078,7 @@ describe("Graph", () => {
       })
       .mockResolvedValueOnce({
         output: JSON.stringify({
-          content: {
-            script: "Script.",
-            narration: SCENE_NARRATIONS.join(" "),
-            callToAction: "Subscribe.",
-            estimatedDurationSeconds: 48,
-            retention: {
-              hookSentence: "Hook?",
-              pivotSentence: "Yet it has no borders.",
-              endingSentence:
-                "Even then, the journey across the open sea takes several days.",
-              pivotWordPosition: 13,
-            },
-          },
+          content: makeWriterContent({ estimatedDurationSeconds: 48 }),
         }),
 
         usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
@@ -1031,29 +1095,36 @@ describe("Graph", () => {
         }),
 
         usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          title: "T",
-          description: "D",
-          tags: ["geography"],
-          hashtags: [],
-          category: "Education",
-          pinnedComment: "C",
-        }),
+      });
 
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          thumbnailPrompt: "P",
-          thumbnailText: "T",
-          textPosition: "center",
-          colorScheme: "blue",
-        }),
+    queueParallelBranch({
+      metadata: [
+        {
+          output: JSON.stringify({
+            title: "T",
+            description: "D",
+            tags: ["geography"],
+            hashtags: ["#geo", "#test", "#video"],
+            category: "Education",
+            pinnedComment: "C",
+          }),
+          usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+        },
+      ],
+      thumbnail: [
+        {
+          output: JSON.stringify({
+            thumbnailPrompt: "P",
+            thumbnailText: "T",
+            textPosition: "center",
+            colorScheme: "blue",
+          }),
+          usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
+        },
+      ],
+    });
 
-        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
-      })
+    mockGenerate
       .mockResolvedValueOnce({
         output: JSON.stringify({ assets: ASSETS }),
         usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
@@ -1152,19 +1223,7 @@ describe("Graph", () => {
       })
       .mockResolvedValueOnce({
         output: JSON.stringify({
-          content: {
-            script: "Script.",
-            narration: SCENE_NARRATIONS.join(" "),
-            callToAction: "Subscribe.",
-            estimatedDurationSeconds: 48,
-            retention: {
-              hookSentence: "Hook?",
-              pivotSentence: "Yet it has no borders.",
-              endingSentence:
-                "Even then, the journey across the open sea takes several days.",
-              pivotWordPosition: 13,
-            },
-          },
+          content: makeWriterContent({ estimatedDurationSeconds: 48 }),
         }),
 
         usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
@@ -1181,29 +1240,36 @@ describe("Graph", () => {
         }),
 
         usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          title: "T",
-          description: "D",
-          tags: ["geography"],
-          hashtags: [],
-          category: "Education",
-          pinnedComment: "C",
-        }),
+      });
 
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          thumbnailPrompt: "P",
-          thumbnailText: "T",
-          textPosition: "center",
-          colorScheme: "blue",
-        }),
+    queueParallelBranch({
+      metadata: [
+        {
+          output: JSON.stringify({
+            title: "T",
+            description: "D",
+            tags: ["geography"],
+            hashtags: ["#geo", "#test", "#video"],
+            category: "Education",
+            pinnedComment: "C",
+          }),
+          usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+        },
+      ],
+      thumbnail: [
+        {
+          output: JSON.stringify({
+            thumbnailPrompt: "P",
+            thumbnailText: "T",
+            textPosition: "center",
+            colorScheme: "blue",
+          }),
+          usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
+        },
+      ],
+    });
 
-        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
-      })
+    mockGenerate
       .mockResolvedValueOnce({
         output: JSON.stringify({ assets: ASSETS }),
         usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
@@ -1322,6 +1388,77 @@ describe("Graph", () => {
     expect(result.publishing?.results).toHaveLength(0);
   }, 30000);
 
+  it("serves a manual promptQA artifact from disk instead of calling the LLM", async () => {
+    const { SCENES } = queueHappyPathMocks({ skipPromptQA: true });
+
+    const payloadDir = mkdtempSync(join(tmpdir(), "graph-manual-payload-"));
+    const storeDir = mkdtempSync(join(tmpdir(), "graph-manual-store-"));
+    const payloadPath = join(payloadDir, "promptQA.json");
+    writeFileSync(
+      payloadPath,
+      JSON.stringify(makePromptQAResponse("approved", SCENES), null, 2),
+      "utf-8",
+    );
+    const prevStoreDir = process.env.ARTIFACT_STORE_DIR;
+    process.env.ARTIFACT_STORE_DIR = storeDir;
+    const artifactStore = new FilesystemArtifactStore();
+    const runId = "manual-override-int";
+
+    try {
+      const result = await graph.invoke(
+        {
+          project: { pillar: "Geography", topic: "Mystery Island" },
+          branding: { channel: "TestChannel", creator: "", cta: "Subscribe" },
+          execution: { version: "0.1.0" },
+        },
+        {
+          recursionLimit: 100,
+          configurable: {
+            ...happyPathConfigurable(),
+            artifactStore,
+            runId,
+            manualArtifacts: { promptQA: payloadPath },
+          },
+        } as any,
+      );
+
+      // PromptQA never called the LLM: chain minus PromptQA (10 LLM agents).
+      // Count via agentCallLog: parallel-branch calls bypass mockGenerate.
+      expect(agentCallLog).toHaveLength(10);
+      expect(result.production?.promptQA?.status).toBe("approved");
+      expect(result.execution.status).toBe("complete");
+      expect(result.execution.currentNode).toBe("Finalize");
+      expect(result.publishing?.results![0].status).toBe("published");
+
+      // Telemetry proves the value came from the override, not the model.
+      const promptQaTelemetry = result.diagnostics?.telemetry?.["PromptQA"];
+      expect(promptQaTelemetry?.model).toBe("manual");
+      expect(promptQaTelemetry?.fromCache).toBe(true);
+
+      // The override is persisted as a complete artifact with an empty
+      // inputHash so a later plain resume recomputes instead of hitting it.
+      const manifest = await artifactStore.getManifest(runId);
+      expect(manifest?.promptQA?.latest).toBe("v1");
+      expect(
+        manifest?.promptQA?.versions.find((v) => v.version === 1)?.status,
+      ).toBe("complete");
+      const record = await artifactStore.latest(runId, "promptQA");
+      expect(record?.status).toBe("complete");
+      expect(record?.meta.inputHash).toBe("");
+      expect((record?.meta as Record<string, unknown>).sourceOverride).toBe(
+        true,
+      );
+    } finally {
+      if (prevStoreDir === undefined) {
+        delete process.env.ARTIFACT_STORE_DIR;
+      } else {
+        process.env.ARTIFACT_STORE_DIR = prevStoreDir;
+      }
+      rmSync(payloadDir, { recursive: true, force: true });
+      rmSync(storeDir, { recursive: true, force: true });
+    }
+  }, 30000);
+
   it("complete pipeline produces all artifacts end-to-end", async () => {
     const FACTS = makeFacts(8);
     const BEATS = makeBeats(6);
@@ -1369,7 +1506,7 @@ describe("Graph", () => {
             factIds: ["fact-001"],
           },
           endingType: "open_question",
-          retention: { pivotBeatId: 3 },
+          retention: { pivotBeatId: 1 },
           storyBeats: BEATS_ADJUSTED,
         }),
 
@@ -1378,19 +1515,7 @@ describe("Graph", () => {
       // 3. ScriptWriter
       .mockResolvedValueOnce({
         output: JSON.stringify({
-          content: {
-            script: "Script body.",
-            narration: NARRATIONS.join(" "),
-            callToAction: "Subscribe!",
-            estimatedDurationSeconds: 50,
-            retention: {
-              hookSentence: "What if a country wasn't real?",
-              pivotSentence: "Yet it has no borders.",
-              endingSentence:
-                "Even then, the journey across the open sea takes several days.",
-              pivotWordPosition: 13,
-            },
-          },
+          content: makeWriterContent({ estimatedDurationSeconds: 50 }),
         }),
 
         usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
@@ -1409,32 +1534,39 @@ describe("Graph", () => {
         }),
 
         usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      // 6. MetadataGenerator (parallel branch after VisualDirector)
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          title: "Mystery Island Video",
-          description: "Explore the mystery.",
-          tags: ["geography"],
-          hashtags: ["#mystery"],
-          category: "Education",
-          pinnedComment: "What do you think?",
-        }),
+      });
+    // Metadata/Thumbnail fan-out runs in parallel; start order varies, so
+    // both payloads live on per-agent queues.
 
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      // 7. ThumbnailGenerator (parallel branch after VisualDirector)
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          thumbnailPrompt: "Mysterious island aerial",
-          thumbnailText: "Doesn't Exist?",
-          textPosition: "bottom-third",
-          colorScheme: "cold blue",
-        }),
+    queueParallelBranch({
+      metadata: [
+        {
+          output: JSON.stringify({
+            title: "Mystery Island Video",
+            description: "Explore the mystery.",
+            tags: ["geography"],
+            hashtags: ["#mystery", "#island", "#geography"],
+            category: "Education",
+            pinnedComment: "What do you think?",
+          }),
+          usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+        },
+      ],
+      thumbnail: [
+        {
+          output: JSON.stringify({
+            thumbnailPrompt: "Mysterious island aerial",
+            thumbnailText: "Doesn't Exist?",
+            textPosition: "bottom-third",
+            colorScheme: "cold blue",
+          }),
+          usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
+        },
+      ],
+    });
 
-        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
-      })
-      // 8. ImagePromptGenerator
+    mockGenerate
+      // 7. ImagePromptGenerator (after BranchJoin)
       .mockResolvedValueOnce({
         output: JSON.stringify({ assets: ASSETS }),
         usage: { promptTokens: 16, completionTokens: 32, totalTokens: 48 },
@@ -1638,7 +1770,7 @@ describe("Graph", () => {
             factIds: ["fact-001"],
           },
           endingType: "open_question",
-          retention: { pivotBeatId: 3 },
+          retention: { pivotBeatId: 1 },
           storyBeats: BEATS,
         }),
 
@@ -1647,19 +1779,7 @@ describe("Graph", () => {
       // 4. ScriptWriter
       .mockResolvedValueOnce({
         output: JSON.stringify({
-          content: {
-            script: "Script body.",
-            narration: NARRATIONS.join(" "),
-            callToAction: "Subscribe!",
-            estimatedDurationSeconds: 8,
-            retention: {
-              hookSentence: "What if a country wasn't real?",
-              pivotSentence: "Yet it has no borders.",
-              endingSentence:
-                "Even then, the journey across the open sea takes several days.",
-              pivotWordPosition: 13,
-            },
-          },
+          content: makeWriterContent({ estimatedDurationSeconds: 8 }),
         }),
 
         usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
@@ -1678,31 +1798,38 @@ describe("Graph", () => {
         }),
 
         usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      // 7. MetadataGenerator (parallel branch after VisualDirector)
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          title: "Mystery Island Video",
-          description: "Explore the mystery.",
-          tags: ["geography"],
-          hashtags: ["#mystery"],
-          category: "Education",
-          pinnedComment: "What do you think?",
-        }),
+      });
+    // Metadata/Thumbnail fan-out runs in parallel; start order varies, so
+    // both payloads live on per-agent queues.
 
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      // 8. ThumbnailGenerator (parallel branch after VisualDirector)
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          thumbnailPrompt: "Mysterious island aerial",
-          thumbnailText: "Doesn't Exist?",
-          textPosition: "bottom-third",
-          colorScheme: "cold blue",
-        }),
+    queueParallelBranch({
+      metadata: [
+        {
+          output: JSON.stringify({
+            title: "Mystery Island Video",
+            description: "Explore the mystery.",
+            tags: ["geography"],
+            hashtags: ["#mystery", "#island", "#geography"],
+            category: "Education",
+            pinnedComment: "What do you think?",
+          }),
+          usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+        },
+      ],
+      thumbnail: [
+        {
+          output: JSON.stringify({
+            thumbnailPrompt: "Mysterious island aerial",
+            thumbnailText: "Doesn't Exist?",
+            textPosition: "bottom-third",
+            colorScheme: "cold blue",
+          }),
+          usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
+        },
+      ],
+    });
 
-        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
-      })
+    mockGenerate
       // 9. ImagePromptGenerator
       .mockResolvedValueOnce({
         output: JSON.stringify({ assets: ASSETS }),
@@ -1837,7 +1964,7 @@ describe("Graph", () => {
             factIds: ["fact-001"],
           },
           endingType: "open_question",
-          retention: { pivotBeatId: 3 },
+          retention: { pivotBeatId: 1 },
           storyBeats: BEATS,
         }),
 
@@ -1846,19 +1973,7 @@ describe("Graph", () => {
       // 4. ScriptWriter
       .mockResolvedValueOnce({
         output: JSON.stringify({
-          content: {
-            script: "Script body.",
-            narration: NARRATIONS.join(" "),
-            callToAction: "Subscribe!",
-            estimatedDurationSeconds: 8,
-            retention: {
-              hookSentence: "What if a country wasn't real?",
-              pivotSentence: "Yet it has no borders.",
-              endingSentence:
-                "Even then, the journey across the open sea takes several days.",
-              pivotWordPosition: 13,
-            },
-          },
+          content: makeWriterContent({ estimatedDurationSeconds: 8 }),
         }),
 
         usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
@@ -1877,31 +1992,38 @@ describe("Graph", () => {
         }),
 
         usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      // 7. MetadataGenerator (parallel branch after VisualDirector)
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          title: "Mystery Island Video",
-          description: "Explore the mystery.",
-          tags: ["geography"],
-          hashtags: ["#mystery"],
-          category: "Education",
-          pinnedComment: "What do you think?",
-        }),
+      });
+    // Metadata/Thumbnail fan-out runs in parallel; start order varies, so
+    // both payloads live on per-agent queues.
 
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      // 8. ThumbnailGenerator (parallel branch after VisualDirector)
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          thumbnailPrompt: "Mysterious island aerial",
-          thumbnailText: "Doesn't Exist?",
-          textPosition: "bottom-third",
-          colorScheme: "cold blue",
-        }),
+    queueParallelBranch({
+      metadata: [
+        {
+          output: JSON.stringify({
+            title: "Mystery Island Video",
+            description: "Explore the mystery.",
+            tags: ["geography"],
+            hashtags: ["#mystery", "#island", "#geography"],
+            category: "Education",
+            pinnedComment: "What do you think?",
+          }),
+          usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+        },
+      ],
+      thumbnail: [
+        {
+          output: JSON.stringify({
+            thumbnailPrompt: "Mysterious island aerial",
+            thumbnailText: "Doesn't Exist?",
+            textPosition: "bottom-third",
+            colorScheme: "cold blue",
+          }),
+          usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
+        },
+      ],
+    });
 
-        usage: { promptTokens: 16, completionTokens: 12, totalTokens: 28 },
-      })
+    mockGenerate
       // 9. ImagePromptGenerator
       .mockResolvedValueOnce({
         output: JSON.stringify({ assets: ASSETS }),
@@ -2139,7 +2261,7 @@ describe("Graph", () => {
             factIds: ["fact-001"],
           },
           endingType: "open_question",
-          retention: { pivotBeatId: 3 },
+          retention: { pivotBeatId: 1 },
           storyBeats: BEATS,
         }),
 
@@ -2148,19 +2270,7 @@ describe("Graph", () => {
       // 3. ScriptWriter
       .mockResolvedValueOnce({
         output: JSON.stringify({
-          content: {
-            script: "Script body.",
-            narration: NARRATIONS.join(" "),
-            callToAction: "Subscribe!",
-            estimatedDurationSeconds: 50,
-            retention: {
-              hookSentence: "What if a country wasn't real?",
-              pivotSentence: "Yet it has no borders.",
-              endingSentence:
-                "Even then, the journey across the open sea takes several days.",
-              pivotWordPosition: 13,
-            },
-          },
+          content: makeWriterContent({ estimatedDurationSeconds: 50 }),
         }),
 
         usage: { promptTokens: 12, completionTokens: 24, totalTokens: 36 },
@@ -2381,7 +2491,7 @@ describe("Graph", () => {
             factIds: ["fact-001"],
           },
           endingType: "open_question",
-          retention: { pivotBeatId: 3 },
+          retention: { pivotBeatId: 1 },
           storyBeats: BEATS,
         }),
         usage: { promptTokens: 13, completionTokens: 26, totalTokens: 39 },
@@ -2447,24 +2557,27 @@ describe("Graph", () => {
           visualPlans: VISUAL_PLANS,
         }),
         usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      // MetadataGenerator succeeds...
-      .mockResolvedValueOnce({
-        output: JSON.stringify({
-          title: "Mystery Island Video",
-          description: "Explore the mystery.",
-          tags: ["geography"],
-          hashtags: ["#mystery", "#island", "#geography"],
-          category: "Education",
-          pinnedComment: "What do you think?",
-        }),
-        usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-      })
-      // ...while ThumbnailGenerator fails all 3 retry attempts with a
-      // schema-invalid payload.
-      .mockResolvedValueOnce(badThumbnail)
-      .mockResolvedValueOnce(badThumbnail)
-      .mockResolvedValueOnce(badThumbnail);
+      });
+    // Metadata succeeds; Thumbnail fails all 3 retry attempts with a
+    // schema-invalid payload. Parallel start order varies, so both live
+    // on per-agent queues.
+
+    queueParallelBranch({
+      metadata: [
+        {
+          output: JSON.stringify({
+            title: "Mystery Island Video",
+            description: "Explore the mystery.",
+            tags: ["geography"],
+            hashtags: ["#mystery", "#island", "#geography"],
+            category: "Education",
+            pinnedComment: "What do you think?",
+          }),
+          usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
+        },
+      ],
+      thumbnail: [badThumbnail, badThumbnail, badThumbnail],
+    });
 
     const result = await graph.invoke(
       {

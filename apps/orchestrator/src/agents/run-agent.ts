@@ -26,6 +26,7 @@ import {
   getRunLogSinkFromConfig,
   type RunLogSink,
 } from "../utils/run-log.js";
+import type { ClassifierFactory } from "../classifiers/types.js";
 
 const AGENT_VERSION = "1.0.0";
 const DEFAULT_OPTIONS: GenerateOptions = {
@@ -164,6 +165,7 @@ function normalizeError(err: unknown, message: string): string {
 export type AgentInject = {
   createModel?: typeof defaultCreateModel;
   loadPrompt?: typeof defaultLoadPrompt;
+  createClassifier?: ClassifierFactory;
 };
 
 export type RunAgentOptions<T> = {

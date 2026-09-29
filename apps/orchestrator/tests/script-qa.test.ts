@@ -296,3 +296,129 @@ describe("scriptQANode", () => {
     expect(telemetry!.agentVersion).toBe("1.0.0");
   });
 });
+
+function choice(value: string, confidence: number) {
+  return {
+    type: "choice" as const,
+    choice: value,
+    confidence,
+    probabilities: { [value]: confidence },
+  };
+}
+
+function makeClassifierFactory(answers: Record<string, unknown>) {
+  return jest.fn(() => ({
+    provider: "typesafe",
+    model: "jev-test",
+    classify: jest.fn().mockResolvedValue({
+      answers,
+      provider: "typesafe",
+      model: "jev-test",
+      usage: { inputTokens: 10, outputTokens: 0 },
+      durationMs: 5,
+    }),
+  }));
+}
+
+function withClassifierEnv() {
+  const prev = process.env.CLASSIFIER_PROVIDER;
+  process.env.CLASSIFIER_PROVIDER = "typesafe";
+  return () => {
+    if (prev === undefined) delete process.env.CLASSIFIER_PROVIDER;
+    else process.env.CLASSIFIER_PROVIDER = prev;
+  };
+}
+
+describe("scriptQANode classifier path", () => {
+  it("trusted approved skips the LLM", async () => {
+    const restore = withClassifierEnv();
+    try {
+      const createClassifier = makeClassifierFactory({
+        status: choice("approved", 0.96),
+      });
+      const mocks = makeMocks();
+      const result = await scriptQANode(
+        {
+          project: { pillar: "Geography", topic: "Unrecognized Countries" },
+          content: BASE_CONTENT,
+          research: {
+            summary: "A remote island.",
+            facts: [
+              {
+                id: "fact-001",
+                fact: "It is one of the most isolated places on Earth.",
+                confidence: "high" as const,
+                sourceType: "general-knowledge" as const,
+              },
+            ],
+          },
+          execution: { version: "0.1.0" },
+        } as ProjectState,
+        { configurable: { ...mocks, createClassifier } } as any,
+      );
+
+      expect(result.scriptQA?.status).toBe("approved");
+      expect(mockGenerate).not.toHaveBeenCalled();
+      expect(result.diagnostics?.telemetry?.ScriptQA?.model).toBe(
+        "typesafe/jev-test",
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  it("trusted non-approved cascades to LLM and overrides status", async () => {
+    const restore = withClassifierEnv();
+    try {
+      const createClassifier = makeClassifierFactory({
+        status: choice("major_revision", 0.93),
+      });
+      mockGenerate.mockResolvedValue(
+        buildResponse({
+          content: JSON.stringify({ status: "approved", feedback: "" }),
+        }),
+      );
+      const mocks = makeMocks();
+      const result = await scriptQANode(
+        {
+          project: { pillar: "Geography", topic: "Unrecognized Countries" },
+          content: BASE_CONTENT,
+          research: { summary: "A remote island.", facts: [] },
+          execution: { version: "0.1.0" },
+        } as ProjectState,
+        { configurable: { ...mocks, createClassifier } } as any,
+      );
+
+      expect(result.scriptQA?.status).toBe("major_revision");
+      expect(mockGenerate).toHaveBeenCalledTimes(1);
+    } finally {
+      restore();
+    }
+  });
+
+  it("low confidence abstains to the LLM path", async () => {
+    const restore = withClassifierEnv();
+    try {
+      const createClassifier = makeClassifierFactory({
+        status: choice("approved", 0.3),
+      });
+      mockGenerate.mockResolvedValue(buildResponse());
+      const mocks = makeMocks();
+      const result = await scriptQANode(
+        {
+          project: { pillar: "Geography", topic: "Unrecognized Countries" },
+          content: BASE_CONTENT,
+          research: { summary: "A remote island.", facts: [] },
+          execution: { version: "0.1.0" },
+        } as ProjectState,
+        { configurable: { ...mocks, createClassifier } } as any,
+      );
+
+      expect(result.scriptQA?.status).toBe("approved");
+      expect(mockGenerate).toHaveBeenCalledTimes(1);
+      expect(result.diagnostics?.telemetry?.ScriptQA?.model).toBe("test-model");
+    } finally {
+      restore();
+    }
+  });
+});

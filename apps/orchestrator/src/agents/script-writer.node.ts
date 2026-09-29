@@ -215,6 +215,7 @@ export async function scriptWriterNode(
       targetDurationSeconds: String(targetDurationSec),
       targetWordRange: `${wordRange.min}-${wordRange.max}`,
       speakingRateWordsPerSecond: String(speakingRate),
+      storyBeatCount: String(storyPlan.storyBeats.length),
     },
     inject,
     configurable: withTopic(config, state).configurable,

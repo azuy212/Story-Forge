@@ -15,11 +15,20 @@ import { runAgent, type AgentInject } from "./run-agent.js";
 import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { PromptQAOutputSchema } from "../schemas/prompt-qa-output.js";
-import type { PromptQAOutput } from "../schemas/prompt-qa-output.js";
+import type {
+  PromptQAOutput,
+  SceneResult,
+} from "../schemas/prompt-qa-output.js";
 import { config as configUtils } from "../utils/config.js";
 import { hashIssues } from "../utils/qa-policy.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
+import {
+  tryClassifyQaGate,
+  buildGateState,
+  injectFromConfigurable,
+} from "../classifiers/index.js";
+import type { QaPrediction } from "../eval/types.js";
 
 function formatScenes(scenes: Scene[]): string {
   return JSON.stringify(
@@ -62,6 +71,31 @@ function formatVisualPlan(
     null,
     2,
   );
+}
+
+function sceneResultsFromPrediction(
+  prediction: QaPrediction,
+  sceneIds: number[],
+): SceneResult[] {
+  return sceneIds.map((sceneId) => {
+    const raw = prediction.sceneVerdicts?.[sceneId];
+    return {
+      sceneId,
+      verdict: raw === "revise" ? "revise" : "pass",
+    };
+  });
+}
+
+function revisionTargetFromPrediction(
+  prediction: QaPrediction,
+  status: string,
+): PromptQAOutput["revisionTarget"] {
+  if (status === "approved") return "none";
+  const raw = prediction.revisionTarget;
+  if (raw === "prompts" || raw === "visual_plan" || raw === "both") {
+    return raw;
+  }
+  return undefined;
 }
 
 export async function promptQANode(
@@ -118,6 +152,41 @@ export async function promptQANode(
   logger.nodeStart(label);
   logger.nodePhase(label, "reviewing scene prompts");
 
+  const gateState = buildGateState("promptqa", state);
+  const classified = gateState
+    ? await tryClassifyQaGate("promptqa", {
+        state: gateState.state,
+        sceneIds: gateState.sceneIds,
+        agent: AgentModel.PromptQA,
+        inject: injectFromConfigurable(
+          (config.configurable ?? {}) as Record<string, unknown>,
+        ),
+        promptVersion: PromptPaths.PromptQA.replace(/\.md$/, ""),
+      })
+    : null;
+
+  if (classified && classified.prediction.status === "approved") {
+    const sceneResults = sceneResultsFromPrediction(
+      classified.prediction,
+      gateState?.sceneIds ?? scenes.map((s) => s.sceneId),
+    );
+    logger.nodeDone(label, classified.telemetry.durationMs);
+    return {
+      production: {
+        scenes,
+        promptQA: {
+          status: "approved",
+          sceneResults,
+          revisionTarget: "none",
+        },
+      },
+      diagnostics: {
+        telemetry: { [AgentModel.PromptQA]: classified.telemetry },
+      },
+      execution: execution(AgentModel.PromptQA),
+    };
+  }
+
   const result = await runAgent<PromptQAOutput>({
     agent: AgentModel.PromptQA,
     promptPath: PromptPaths.PromptQA,
@@ -139,6 +208,32 @@ export async function promptQANode(
   });
 
   if (result.error || !result.data) {
+    if (classified && classified.prediction.status !== "approved") {
+      const sceneResults = sceneResultsFromPrediction(
+        classified.prediction,
+        gateState?.sceneIds ?? scenes.map((s) => s.sceneId),
+      );
+      logger.nodeDone(label, classified.telemetry.durationMs);
+      return {
+        production: {
+          scenes,
+          promptQA: {
+            status: classified.prediction.status as PromptQAOutput["status"],
+            globalFeedback: `Prompt QA (classifier): ${classified.prediction.status}`,
+            issues: [result.error ?? "LLM call failed"],
+            sceneResults,
+            revisionTarget: revisionTargetFromPrediction(
+              classified.prediction,
+              classified.prediction.status,
+            ),
+          },
+        },
+        diagnostics: {
+          telemetry: { [AgentModel.PromptQA]: classified.telemetry },
+        },
+        execution: execution(AgentModel.PromptQA),
+      };
+    }
     // QA infra failure (not a content verdict): signal the router to retry
     // this cheap QA node instead of regenerating prompts.
     logger.nodeFailed(label, result.error ?? "LLM call failed");
@@ -161,8 +256,26 @@ export async function promptQANode(
 
   logger.nodeDone(label, result.telemetry.durationMs);
 
+  let qa = result.data;
+  if (classified && classified.prediction.status !== "approved") {
+    const sceneResults =
+      classified.prediction.sceneVerdicts && gateState?.sceneIds
+        ? sceneResultsFromPrediction(classified.prediction, gateState.sceneIds)
+        : qa.sceneResults;
+    qa = {
+      ...qa,
+      status: classified.prediction.status as PromptQAOutput["status"],
+      sceneResults,
+      revisionTarget:
+        revisionTargetFromPrediction(
+          classified.prediction,
+          classified.prediction.status,
+        ) ?? qa.revisionTarget,
+    };
+  }
+
   const expectedIds = new Set(scenes.map((s) => s.sceneId));
-  const returnedIds = new Set(result.data.sceneResults.map((r) => r.sceneId));
+  const returnedIds = new Set(qa.sceneResults.map((r) => r.sceneId));
   const missingIds = [...expectedIds].filter((id) => !returnedIds.has(id));
   const extraIds = [...returnedIds].filter((id) => !expectedIds.has(id));
   const errors: string[] = [];
@@ -188,7 +301,7 @@ export async function promptQANode(
           status: "minor_revision",
           globalFeedback: `Scene coverage mismatch: ${errors.join("; ")}. Review the prompts for the listed scenes and return a complete set.`,
           issues: errors,
-          sceneResults: result.data.sceneResults,
+          sceneResults: qa.sceneResults,
         },
       },
       diagnostics: {
@@ -199,7 +312,6 @@ export async function promptQANode(
     };
   }
 
-  const qa = result.data;
   const isRevision =
     qa.status === "minor_revision" ||
     qa.status === "major_revision" ||

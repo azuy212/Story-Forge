@@ -10,6 +10,11 @@ import { config as configUtils } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
 import { formatLabelFor, resolveVideoProfile } from "../utils/video-profile.js";
+import {
+  tryClassifyQaGate,
+  buildGateState,
+  injectFromConfigurable,
+} from "../classifiers/index.js";
 
 function serializeMetadata(
   meta:
@@ -62,6 +67,29 @@ export async function releaseReviewNode(
 
   const videoProfile = state.videoProfile ?? resolveVideoProfile({});
 
+  const gateState = buildGateState("releasereview", state);
+  const classified = gateState
+    ? await tryClassifyQaGate("releasereview", {
+        state: gateState.state,
+        agent: AgentModel.ReleaseReview,
+        inject: injectFromConfigurable(
+          (config.configurable ?? {}) as Record<string, unknown>,
+        ),
+        promptVersion: PromptPaths.ReleaseReview.replace(/\.md$/, ""),
+      })
+    : null;
+
+  if (classified && classified.prediction.status === "approved") {
+    logger.nodeDone(label, classified.telemetry.durationMs);
+    return {
+      releaseReview: { status: "approved", issues: [] },
+      diagnostics: {
+        telemetry: { [AgentModel.ReleaseReview]: classified.telemetry },
+      },
+      execution: { currentNode: AgentModel.ReleaseReview },
+    };
+  }
+
   const result = await runAgent<ReleaseValidationOutput>({
     agent: AgentModel.ReleaseReview,
     promptPath: PromptPaths.ReleaseReview,
@@ -90,6 +118,20 @@ export async function releaseReviewNode(
   });
 
   if (result.error || !result.data) {
+    if (classified && classified.prediction.status !== "approved") {
+      logger.nodeDone(label, classified.telemetry.durationMs);
+      return {
+        releaseReview: {
+          status: "fatal",
+          issues: [result.error ?? "LLM call failed"],
+        },
+        diagnostics: {
+          warnings: [`${AgentModel.ReleaseReview}: ${result.error}`],
+          telemetry: { [AgentModel.ReleaseReview]: classified.telemetry },
+        },
+        execution: { currentNode: AgentModel.ReleaseReview },
+      };
+    }
     logger.nodeFailed(label, result.error ?? "LLM call failed");
     return {
       releaseReview: {
@@ -106,17 +148,25 @@ export async function releaseReviewNode(
 
   logger.nodeDone(label, result.telemetry.durationMs);
 
+  let releaseReview = result.data;
+  if (classified && classified.prediction.status !== "approved") {
+    releaseReview = {
+      ...releaseReview,
+      status: classified.prediction.status as ReleaseValidationOutput["status"],
+    };
+  }
+
   const warnings: string[] = [];
   const errors: string[] = [];
-  if (result.data.status === "fatal") {
-    warnings.push(...(result.data.issues ?? []));
+  if (releaseReview.status === "fatal") {
+    warnings.push(...(releaseReview.issues ?? []));
     errors.push(
-      `${AgentModel.ReleaseReview}: ${(result.data.issues ?? []).join("; ") || "release package rejected"}`,
+      `${AgentModel.ReleaseReview}: ${(releaseReview.issues ?? []).join("; ") || "release package rejected"}`,
     );
   }
 
   return {
-    releaseReview: result.data,
+    releaseReview,
     diagnostics: {
       warnings,
       ...(errors.length > 0 ? { errors } : {}),

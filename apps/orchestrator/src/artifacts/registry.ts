@@ -1,6 +1,9 @@
 import { z } from "zod";
 import type { ArtifactType } from "./types.js";
-import { ScriptPlannerOutputSchema } from "../schemas/script-planner-output.js";
+import {
+  ScriptPlannerOutputSchema,
+  scriptPlannerOutputSchema,
+} from "../schemas/script-planner-output.js";
 import { ResearchOutputSchema } from "../schemas/research-output.js";
 import { ResearchQAOutputSchema } from "../schemas/research-qa-output.js";
 import { ScriptWriterOutputSchema } from "../schemas/script-writer-output.js";
@@ -8,7 +11,10 @@ import { ScriptQAOutputSchema } from "../schemas/script-qa-output.js";
 import { MetadataOutputSchema } from "../schemas/metadata-output.js";
 import { ThumbnailOutputSchema } from "../schemas/thumbnail-output.js";
 import { ThumbnailImageOutputSchema } from "../schemas/thumbnail-image.js";
-import { VisualDirectorOutputSchema } from "../schemas/visual-director-output.js";
+import {
+  VisualDirectorOutputSchema,
+  visualDirectorOutputSchema,
+} from "../schemas/visual-director-output.js";
 import { ImagePromptOutputSchema } from "../schemas/image-prompt-output.js";
 import { PromptQAOutputSchema } from "../schemas/prompt-qa-output.js";
 import { AudioSchema } from "../schemas/audio.js";
@@ -17,6 +23,7 @@ import { VideoSchema } from "../schemas/video.js";
 import { ReleaseValidationOutputSchema } from "../schemas/release-validation-output.js";
 import { ProductionSchema } from "../schemas/production.js";
 import { PublishingSchema } from "../schemas/publishing.js";
+import { resolveVideoProfile } from "../utils/video-profile.js";
 
 export interface ArtifactTypeDef {
   type: ArtifactType;
@@ -148,10 +155,32 @@ export function getArtifactDefByNode(
   return ARTIFACT_TYPES.find((a) => a.node === node);
 }
 
-export function validateArtifact<T>(type: ArtifactType, data: T): T {
+/**
+ * Schema for `type`, rebuilt against the run's video profile for the two
+ * profile-parameterized outputs (scriptPlan beats/word ranges, visualDirector
+ * scene-count bounds). Without a profile the registry defaults (short) apply,
+ * which would reject valid long-profile payloads.
+ */
+function schemaFor(
+  type: ArtifactType,
+  fallback: z.ZodTypeAny,
+  profile?: "short" | "long",
+): z.ZodTypeAny {
+  if (!profile) return fallback;
+  const config = resolveVideoProfile({ videoProfile: profile });
+  if (type === "scriptPlan") return scriptPlannerOutputSchema(config);
+  if (type === "visualDirector") return visualDirectorOutputSchema(config);
+  return fallback;
+}
+
+export function validateArtifact<T>(
+  type: ArtifactType,
+  data: T,
+  profile?: "short" | "long",
+): T {
   const def = getArtifactDef(type);
   if (!def) return data;
-  const result = def.schema.safeParse(data);
+  const result = schemaFor(type, def.schema, profile).safeParse(data);
   if (!result.success) {
     throw new Error(
       `Artifact validation failed for ${type}: ${result.error.issues.map((i) => i.message).join("; ")}`,

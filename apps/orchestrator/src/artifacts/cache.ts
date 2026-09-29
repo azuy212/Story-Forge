@@ -1,5 +1,11 @@
+import { readFile, readdir, stat } from "node:fs/promises";
+import { basename, join } from "node:path";
 import type { RunnableConfig } from "@langchain/core/runnables";
-import type { ArtifactType } from "./store.js";
+import type {
+  ArtifactType,
+  ArtifactReference,
+  ArtifactStore,
+} from "./store.js";
 import {
   getArtifactStore,
   getRunId,
@@ -7,7 +13,13 @@ import {
   recordExecutionRefs,
 } from "./context.js";
 import { hashObject, hashPrompt } from "./hash.js";
+import {
+  ARTIFACT_TYPES,
+  getArtifactDef,
+  validateArtifact,
+} from "./registry.js";
 import { loadPrompt as defaultLoadPrompt } from "../utils/load-prompt.js";
+import { logger } from "../utils/logger.js";
 
 export interface CacheOptions<T> {
   type: ArtifactType;
@@ -21,6 +33,235 @@ export interface CacheOptions<T> {
   loadPrompt?: typeof defaultLoadPrompt;
   deferComplete?: boolean;
   validate?: (artifact: T) => boolean;
+}
+
+interface ManualCandidate<T = unknown> {
+  source: string;
+  fileName: string;
+  data: T;
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function readManualArtifactsMap(
+  config?: RunnableConfig,
+): Record<string, unknown> | null {
+  const cfg = config?.configurable as Record<string, unknown> | undefined;
+  const raw = cfg?.manualArtifacts;
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(
+      'manualArtifacts must be an object mapping artifact type -> file path (or array of paths), e.g. { "promptQA": "/abs/promptQA.json" }',
+    );
+  }
+  return raw as Record<string, unknown>;
+}
+
+function assertInjectableTypeKeys(map: Record<string, unknown>): void {
+  for (const key of Object.keys(map)) {
+    if (!getArtifactDef(key as ArtifactType)) {
+      const valid = ARTIFACT_TYPES.map((d) => d.type).join(", ");
+      throw new Error(
+        `manualArtifacts key "${key}" is not an injectable artifact type (valid: ${valid})`,
+      );
+    }
+  }
+}
+
+async function readJsonCandidate(path: string): Promise<ManualCandidate> {
+  let raw: string;
+  try {
+    raw = await readFile(path, "utf-8");
+  } catch (err) {
+    throw new Error(
+      `Manual artifact override not readable at "${path}": ${errorMessage(err)}`,
+      { cause: err },
+    );
+  }
+  try {
+    return { source: path, fileName: basename(path), data: JSON.parse(raw) };
+  } catch (err) {
+    throw new Error(
+      `Manual artifact override is not valid JSON at "${path}": ${errorMessage(err)}`,
+      { cause: err },
+    );
+  }
+}
+
+async function expandManualPaths(paths: string[]): Promise<ManualCandidate[]> {
+  const candidates: ManualCandidate[] = [];
+  for (const path of paths) {
+    let info;
+    try {
+      info = await stat(path);
+    } catch (err) {
+      throw new Error(
+        `Manual artifact override path not found: "${path}": ${errorMessage(err)}`,
+        { cause: err },
+      );
+    }
+    if (!info.isDirectory()) {
+      candidates.push(await readJsonCandidate(path));
+      continue;
+    }
+    let files: string[];
+    try {
+      files = await readdir(path);
+    } catch (err) {
+      throw new Error(
+        `Manual artifact override directory not readable: "${path}": ${errorMessage(err)}`,
+        { cause: err },
+      );
+    }
+    const jsonFiles = files.filter((f) => f.endsWith(".json")).sort();
+    for (const file of jsonFiles) {
+      candidates.push(await readJsonCandidate(join(path, file)));
+    }
+  }
+  if (candidates.length === 0) {
+    throw new Error(
+      `Manual artifact override resolved no JSON files from: ${paths.join(", ")}`,
+    );
+  }
+  return candidates;
+}
+
+/**
+ * Picks the candidate that applies to this cache call:
+ * - keyed calls (`key.sceneId`, `key.kind`) match `scene-<id>.json` /
+ *   `<kind>.json` names so a directory can serve per-scene artifacts;
+ *   a miss returns null (this call falls through to the normal hash path —
+ *   e.g. combined-only injection must not break cached scene lookups).
+ * - unkeyed LLM-agent calls require a single file (ambiguous otherwise).
+ */
+function selectManualCandidate(
+  candidates: ManualCandidate[],
+  type: ArtifactType,
+  key?: Record<string, unknown>,
+): ManualCandidate | null {
+  const sceneId =
+    typeof key?.sceneId === "number" ? (key.sceneId as number) : undefined;
+  if (sceneId !== undefined) {
+    const wanted = `scene-${sceneId}.json`;
+    return candidates.find((c) => c.fileName === wanted) ?? null;
+  }
+  const kind = typeof key?.kind === "string" ? (key.kind as string) : undefined;
+  if (kind !== undefined) {
+    const wanted = `${kind}.json`;
+    const hit = candidates.find((c) => c.fileName === wanted);
+    if (hit) return hit;
+    const single = candidates.length === 1 ? candidates[0] : null;
+    // Never hand a scene file to a non-scene key (and vice versa): a lone
+    // `scene-N.json` is scene data, not a combined artifact.
+    if (single && !/^scene-\d+\.json$/.test(single.fileName)) return single;
+    return null;
+  }
+  if (candidates.length === 1) return candidates[0];
+  throw new Error(
+    `Manual artifact override for "${type}" is ambiguous (${candidates.length} files: ${candidates
+      .map((c) => c.fileName)
+      .join(", ")}); pass a single file for this type`,
+  );
+}
+
+/**
+ * Manual artifact escape hatch for a stuck run: when
+ * `config.configurable.manualArtifacts[type]` points at a JSON file (or
+ * directory of `scene-<id>.json` / `<kind>.json` files), the file's payload —
+ * the node's zod output — is persisted as a complete artifact and served in
+ * place of the LLM/provider call, bypassing the input-hash check entirely.
+ *
+ * Returns null when no override is configured for this type (or the override
+ * does not match this cache key) so the normal hash path runs. Throws when an
+ * override is configured but unusable (missing file, bad JSON, schema/node
+ * validation failure, unknown type key) — a broken override must surface
+ * loudly rather than silently re-running the stuck node.
+ */
+async function resolveManualOverride<T>(options: {
+  store: ArtifactStore;
+  runId: string;
+  config?: RunnableConfig;
+  type: ArtifactType;
+  nodeName: string;
+  key?: Record<string, unknown>;
+  nodeValidate?: (data: T) => boolean;
+}): Promise<{ data: T; ref: ArtifactReference } | null> {
+  const map = readManualArtifactsMap(options.config);
+  if (!map) return null;
+  assertInjectableTypeKeys(map);
+
+  const entry = map[options.type];
+  if (entry === undefined || entry === null) return null;
+
+  const paths = (Array.isArray(entry) ? entry : [entry]).map((p) => {
+    if (typeof p !== "string" || p.length === 0) {
+      throw new Error(
+        `manualArtifacts["${options.type}"] must be a file path or array of file paths`,
+      );
+    }
+    return p;
+  });
+
+  const candidates = await expandManualPaths(paths);
+  const selected = selectManualCandidate(candidates, options.type, options.key);
+  if (!selected) {
+    logger.debug(
+      "Manual artifact override did not match this cache key; using normal cache path",
+      {
+        type: options.type,
+        available: candidates.map((c) => c.fileName),
+      },
+    );
+    return null;
+  }
+
+  const configurable = options.config?.configurable as
+    Record<string, unknown> | undefined;
+  const profileRaw = configurable?.manualArtifactProfile;
+  const profile =
+    profileRaw === "short" || profileRaw === "long" ? profileRaw : undefined;
+
+  let validated: T;
+  try {
+    validated = validateArtifact(options.type, selected.data as T, profile);
+  } catch (err) {
+    throw new Error(
+      `Manual artifact override invalid for type "${options.type}" (${selected.source}): ${errorMessage(err)}`,
+      { cause: err },
+    );
+  }
+  if (options.nodeValidate && !options.nodeValidate(validated)) {
+    throw new Error(
+      `Manual artifact override rejected by node validation for type "${options.type}" (${selected.source})`,
+    );
+  }
+
+  const ref = await options.store.save(
+    options.runId,
+    options.type,
+    validated,
+    {
+      // Empty hash: the override short-circuits the hash gate, and a later
+      // plain resume (without the flag) must NOT accidentally hit this
+      // record — it recomputes instead.
+      inputHash: "",
+      runId: options.runId,
+      node: options.nodeName,
+      sourceOverride: true,
+      ...(profile ? { manualArtifactProfile: profile } : {}),
+    },
+    "complete",
+  );
+  await recordExecutionRefs(options.config ?? {}, [ref]);
+  logger.debug("Manual artifact override applied", {
+    type: options.type,
+    source: selected.source,
+    version: ref.version,
+    runId: options.runId,
+  });
+  return { data: validated, ref };
 }
 
 export interface ComputeResult<T> {
@@ -56,6 +297,29 @@ export async function runWithArtifactCache<T>(
   if (!store || !runId) {
     const result = await compute();
     return { ...result, telemetry: { ...result.telemetry, fromCache: false } };
+  }
+
+  const override = await resolveManualOverride<T>({
+    store,
+    runId,
+    config,
+    type: options.type,
+    nodeName: options.agent,
+    nodeValidate: options.validate,
+  });
+  if (override) {
+    return {
+      data: override.data,
+      telemetry: {
+        model: "manual",
+        durationMs: 0,
+        retries: 0,
+        promptVersion: options.promptPath.replace(/\.md$/, ""),
+        agentVersion: options.agentVersion ?? "",
+        fromCache: true,
+        artifactRef: override.ref,
+      },
+    };
   }
 
   const loadPrompt = options.loadPrompt ?? defaultLoadPrompt;
@@ -206,6 +470,34 @@ export async function cacheNodeResult<T>(
   if (!store || !runId) {
     const result = await compute();
     return { ...result, fromCache: false };
+  }
+
+  try {
+    const override = await resolveManualOverride<T>({
+      store,
+      runId,
+      config,
+      type: options.type,
+      nodeName: options.node,
+      key: options.key,
+      nodeValidate: options.validate,
+    });
+    if (override) {
+      return {
+        data: override.data,
+        fromCache: true,
+        ref: override.ref,
+      };
+    }
+  } catch (err) {
+    return {
+      data: null,
+      fromCache: false,
+      error:
+        err instanceof Error
+          ? err.message
+          : `Manual artifact override failed: ${String(err)}`,
+    };
   }
 
   const key = { node: options.node, ...options.key };

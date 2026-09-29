@@ -44,6 +44,8 @@ const ENV_KEYS = [
   "CLASSIFIER_PROMPTQA",
   "TYPESAFE_API_KEY",
   "TYPESAFE_DEFAULT_MODEL",
+  "TYPESAFE_BASE_URL",
+  "OPENROUTER_API_KEY",
 ];
 let saved: Record<string, string | undefined> = {};
 
@@ -217,8 +219,8 @@ describe("createTypeSafeClassifier", () => {
     expect(event.error).toMatchObject({ message: "rate limited" });
   });
 
-  it("throws a clear error when TYPESAFE_API_KEY is missing and no client is injected", () => {
-    expect(() => createTypeSafeClassifier()).toThrow("TYPESAFE_API_KEY");
+  it("throws a clear error when no API key is available and no client is injected", () => {
+    expect(() => createTypeSafeClassifier()).toThrow("OPENROUTER_API_KEY");
   });
 });
 
@@ -230,9 +232,9 @@ describe("defaultCreateClassifier / classifierEnabledFor", () => {
     );
   });
 
-  it("builds a TypeSafe classifier when the provider is on and a key exists", () => {
+  it("builds a TypeSafe classifier when the provider is on and OpenRouter key exists", () => {
     process.env.CLASSIFIER_PROVIDER = "typesafe";
-    process.env.TYPESAFE_API_KEY = "sk-test";
+    process.env.OPENROUTER_API_KEY = "sk-or-test";
     expect(classifierEnabledFor("promptqa")).toBe(true);
     const client = fakeClient(() => ({
       model: "jev-latest",
@@ -240,13 +242,14 @@ describe("defaultCreateClassifier / classifierEnabledFor", () => {
       usage: { input_tokens: 0, output_tokens: 0 },
     }));
     // Injected client exercises the same factory selection path used by nodes
-    // once CLASSIFIER_PROVIDER is set (real path constructs TypeSafeClient).
+    // once CLASSIFIER_PROVIDER is set (real path constructs TypeSafeClient
+    // against OpenRouter with OPENROUTER_API_KEY).
     const classifier = defaultCreateClassifier({ client });
     expect(classifier.provider).toBe("typesafe");
   });
 
   it("throws without an API key when provider is typesafe", () => {
     process.env.CLASSIFIER_PROVIDER = "typesafe";
-    expect(() => defaultCreateClassifier()).toThrow("TYPESAFE_API_KEY");
+    expect(() => defaultCreateClassifier()).toThrow("OPENROUTER_API_KEY");
   });
 });

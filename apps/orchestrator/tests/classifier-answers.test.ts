@@ -106,6 +106,8 @@ describe("classifier env defaults", () => {
     "CLASSIFIER_PROMPTQA_CONFIDENCE_MIN",
     "TYPESAFE_API_KEY",
     "TYPESAFE_DEFAULT_MODEL",
+    "TYPESAFE_BASE_URL",
+    "OPENROUTER_API_KEY",
   ];
   let saved: Record<string, string | undefined> = {};
 
@@ -131,12 +133,26 @@ describe("classifier env defaults", () => {
     expect(config.classifierConfidenceMin("promptqa")).toBe(0.85);
     expect(config.typesafeApiKey()).toBeUndefined();
     expect(config.typesafeDefaultModel()).toBe("jev-latest");
+    expect(config.typesafeBaseUrl()).toBe("https://openrouter.ai/api");
+  });
+
+  it("reuses OPENROUTER_API_KEY for the classifier when TYPESAFE_API_KEY is unset", async () => {
+    const { config } = await import("../src/utils/config.js");
+    process.env.OPENROUTER_API_KEY = "sk-or-test";
+    expect(config.typesafeApiKey()).toBe("sk-or-test");
+  });
+
+  it("TYPESAFE_API_KEY overrides OPENROUTER_API_KEY when both are set", async () => {
+    const { config } = await import("../src/utils/config.js");
+    process.env.OPENROUTER_API_KEY = "sk-or-test";
+    process.env.TYPESAFE_API_KEY = "sk-direct";
+    expect(config.typesafeApiKey()).toBe("sk-direct");
   });
 
   it("master switch plus gate flag enable a gate; explicit false disables it", async () => {
     const { config } = await import("../src/utils/config.js");
     process.env.CLASSIFIER_PROVIDER = "typesafe";
-    process.env.TYPESAFE_API_KEY = "sk-test";
+    process.env.OPENROUTER_API_KEY = "sk-or-test";
     expect(config.classifierEnabledFor("promptqa")).toBe(true);
 
     process.env.CLASSIFIER_PROMPTQA = "false";

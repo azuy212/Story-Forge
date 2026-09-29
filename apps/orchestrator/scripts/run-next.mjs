@@ -26,6 +26,7 @@
 //
 // Usage (from apps/orchestrator):
 //   node scripts/run-next.mjs [--profile short|long] [--reset-qa-retries]
+//     [--inject-artifact <type>=<path>]
 import "../src/runtime/network.mjs";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -40,7 +41,11 @@ import {
   nextLongPublishSlot,
   COLUMN,
 } from "../src/integrations/google-sheets/sheets-format.mjs";
-import { getAssistantId, resumeRun } from "./resume.mjs";
+import {
+  getAssistantId,
+  resumeRun,
+  resolveInjectArtifacts,
+} from "./resume.mjs";
 import {
   resetLastStepQaRetries,
   describeQaRetryReset,
@@ -113,6 +118,32 @@ export function validateProfile(value) {
       `invalid profile '${value}': must be 'short' or 'long'`,
     );
   }
+}
+
+/**
+ * Commander collector for repeatable --inject-artifact <type>=<path> flags.
+ * Mirrors resume.mjs parseArgs semantics: repeated flags for the same type
+ * collapse into an array; the path portion may contain "=".
+ */
+export function addInjectArtifact(map = {}, value) {
+  const eq = value.indexOf("=");
+  if (eq <= 0 || eq === value.length - 1) {
+    throw new Error(
+      "--inject-artifact requires <type>=<path> (e.g. promptQA=./promptQA.json)",
+    );
+  }
+  const type = value.slice(0, eq);
+  const filePath = value.slice(eq + 1);
+  const next = { ...map };
+  const existing = next[type];
+  if (existing === undefined) {
+    next[type] = filePath;
+  } else if (Array.isArray(existing)) {
+    next[type] = [...existing, filePath];
+  } else {
+    next[type] = [existing, filePath];
+  }
+  return next;
 }
 
 function formatRunStamp(date = new Date()) {
@@ -564,6 +595,9 @@ export async function runLauncher({
   runsDir = RUNS_DIR,
   profile = "short",
   resetQaRetries = false,
+  // Resolved --inject-artifact map (type -> absolute path(s)), forwarded via
+  // config.configurable so the artifact cache short-circuits those nodes.
+  manualArtifacts = null,
   readRows = readSheetRows,
   getAssistantId: getAssistant = getAssistantId,
   resumeRun: runPipeline = resumeRun,
@@ -689,6 +723,14 @@ export async function runLauncher({
     }
     const { lastEvent } = await runPipeline(decision.ns, input, {
       ...options,
+      ...(manualArtifacts
+        ? {
+            manualArtifacts,
+            ...(decision.profile === "short" || decision.profile === "long"
+              ? { manualArtifactProfile: decision.profile }
+              : {}),
+          }
+        : {}),
       onEvent,
     });
     const status =
@@ -729,6 +771,11 @@ if (
       "--reset-qa-retries",
       "on resume, clear cached artifacts for the last QC-gated step so it re-runs with a fresh QA retry budget",
       false,
+    )
+    .option(
+      "--inject-artifact <type>=<path>",
+      "serve a local JSON file as that node's artifact for this run, bypassing its LLM/provider call (repeatable; e.g. promptQA=./prompt-qa.json)",
+      addInjectArtifact,
     );
   program.parse(process.argv);
 
@@ -741,14 +788,22 @@ if (
     process.exit(1);
   }
 
-  runLauncher({ profile, resetQaRetries: Boolean(opts.resetQaRetries) }).catch(
-    (e) => {
-      if (e instanceof LauncherError) {
-        console.error(`run-next: ${e.message}`);
-      } else {
-        console.error(e?.stack || e);
-      }
-      process.exitCode = 1;
-    },
+  // Fail-fast: validate types against the artifact registry and resolve
+  // paths to absolute (the dev-server process may have a different CWD).
+  const manualArtifacts = await resolveInjectArtifacts(
+    opts.injectArtifact ?? null,
   );
+
+  runLauncher({
+    profile,
+    resetQaRetries: Boolean(opts.resetQaRetries),
+    ...(manualArtifacts ? { manualArtifacts } : {}),
+  }).catch((e) => {
+    if (e instanceof LauncherError) {
+      console.error(`run-next: ${e.message}`);
+    } else {
+      console.error(e?.stack || e);
+    }
+    process.exitCode = 1;
+  });
 }

@@ -3,6 +3,11 @@ import { ArrowRight, CalendarClock, FileUp, Layers3, ListOrdered, Play, Rocket, 
 import { api } from "@/lib/api";
 import { useSheet } from "@/hooks/use-sheet";
 import { PageHeader } from "@/components/shared/page-header";
+import {
+  InjectArtifactsField,
+  collectInjectArtifacts,
+  type InjectArtifactDraft,
+} from "@/components/InjectArtifactsField";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -137,12 +142,18 @@ function NextInLineCard({
 
 function RunNextForm({ onLaunched }: { onLaunched: (ns: string) => void }) {
   const [profile, setProfile] = useState<"short" | "long">("short");
+  const [injectDrafts, setInjectDrafts] = useState<InjectArtifactDraft[]>([]);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit() {
+    const inject = collectInjectArtifacts(injectDrafts);
+    if (!inject.ok) {
+      toast.error("Invalid artifact injection", inject.error);
+      return;
+    }
     setBusy(true);
     try {
-      const r = await api.launchRunNext(profile);
+      const r = await api.launchRunNext(profile, false, inject.artifacts);
       if (r.none) {
         toast.warning(
           "Nothing to launch",
@@ -187,6 +198,12 @@ function RunNextForm({ onLaunched }: { onLaunched: (ns: string) => void }) {
               </SelectContent>
             </Select>
           </div>
+        </div>
+        <div className="border-t pt-4">
+          <InjectArtifactsField
+            drafts={injectDrafts}
+            onChange={setInjectDrafts}
+          />
         </div>
         <Button onClick={onSubmit} disabled={busy}>
           {busy ? "Launching…" : "Launch next"}

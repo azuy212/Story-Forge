@@ -11,10 +11,17 @@ import { runAgent, type AgentInject } from "./run-agent.js";
 import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import { ResearchQAOutputSchema } from "../schemas/research-qa-output.js";
+import type { FactVerdict } from "../schemas/research-qa-output.js";
 import { config as configUtils } from "../utils/config.js";
 import { hashIssues } from "../utils/qa-policy.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
+import {
+  tryClassifyQaGate,
+  buildGateState,
+  injectFromConfigurable,
+} from "../classifiers/index.js";
+import type { QaPrediction } from "../eval/types.js";
 
 function serializeFacts(
   facts:
@@ -35,6 +42,27 @@ function serializeFacts(
       return `- ${f.id} (confidence: ${f.confidence})${cls}: ${f.fact}`;
     })
     .join("\n");
+}
+
+function factVerdictsFromPrediction(
+  prediction: QaPrediction,
+  factIds: string[],
+): FactVerdict[] {
+  return factIds.map((factId) => {
+    const raw = prediction.factVerdicts?.[factId];
+    const verdict = raw === "remove" || raw === "revise" ? raw : "keep";
+    return { factId, verdict, reason: "Classifier verdict" };
+  });
+}
+
+function regenerateFromVerdicts(factVerdicts: FactVerdict[]): {
+  factsToRegenerate: number;
+  factsToRegenerateIds: string[];
+} {
+  const ids = factVerdicts
+    .filter((v) => v.verdict === "remove" || v.verdict === "revise")
+    .map((v) => v.factId);
+  return { factsToRegenerate: ids.length, factsToRegenerateIds: ids };
 }
 
 export async function researchQANode(
@@ -94,6 +122,53 @@ export async function researchQANode(
   logger.nodeStart(label);
   logger.nodePhase(label, "reviewing research quality");
 
+  const gateState = buildGateState("researchqa", state);
+  const classified = gateState
+    ? await tryClassifyQaGate("researchqa", {
+        state: gateState.state,
+        factIds: gateState.factIds,
+        agent: AgentModel.ResearchQA,
+        inject: injectFromConfigurable(
+          (config.configurable ?? {}) as Record<string, unknown>,
+        ),
+        promptVersion: PromptPaths.ResearchQA.replace(/\.md$/, ""),
+      })
+    : null;
+
+  if (classified && classified.prediction.status === "approved") {
+    const factVerdicts = factVerdictsFromPrediction(
+      classified.prediction,
+      facts.map((f) => f.id),
+    );
+    const qa: ResearchQAOutput = {
+      status: "approved",
+      factVerdicts,
+      ...regenerateFromVerdicts(factVerdicts),
+    };
+    const verdicts = new Map(qa.factVerdicts.map((v) => [v.factId, v]));
+    const verifiedFacts = facts.map((f) => {
+      const v = verdicts.get(f.id);
+      if (!v) return f;
+      if (v.verdict !== "keep") return f;
+      return {
+        ...f,
+        verified: true as const,
+        reason: v.reason,
+        classification: v.classification ?? f.classification,
+      };
+    });
+
+    logger.nodeDone(label, classified.telemetry.durationMs);
+    return {
+      research: { facts: verifiedFacts },
+      researchQA: qa,
+      diagnostics: {
+        telemetry: { [AgentModel.ResearchQA]: classified.telemetry },
+      },
+      execution: execution(AgentModel.ResearchQA),
+    };
+  }
+
   const result = await runAgent<ResearchQAOutput>({
     agent: AgentModel.ResearchQA,
     promptPath: PromptPaths.ResearchQA,
@@ -113,6 +188,29 @@ export async function researchQANode(
   });
 
   if (result.error || !result.data) {
+    // Trusted non-approved classifier verdict still stands when the LLM
+    // cascade fails for prose: return the classifier status instead of retry.
+    if (classified && classified.prediction.status !== "approved") {
+      const factVerdicts = factVerdictsFromPrediction(
+        classified.prediction,
+        facts.map((f) => f.id),
+      );
+      logger.nodeDone(label, classified.telemetry.durationMs);
+      return {
+        research: {},
+        researchQA: {
+          status: classified.prediction.status as ResearchQAOutput["status"],
+          feedback: `Research QA (classifier): ${classified.prediction.status}`,
+          issues: [result.error ?? "LLM call failed"],
+          factVerdicts,
+          ...regenerateFromVerdicts(factVerdicts),
+        },
+        diagnostics: {
+          telemetry: { [AgentModel.ResearchQA]: classified.telemetry },
+        },
+        execution: execution(AgentModel.ResearchQA),
+      };
+    }
     // QA infra failure (not a content verdict): signal the router to retry
     // this cheap QA node instead of regenerating the whole research.
     logger.nodeFailed(label, result.error ?? "LLM call failed");
@@ -134,7 +232,21 @@ export async function researchQANode(
 
   logger.nodeDone(label, result.telemetry.durationMs);
 
-  const qa = result.data;
+  let qa = result.data;
+  if (classified && classified.prediction.status !== "approved") {
+    const factVerdicts = classified.prediction.factVerdicts
+      ? factVerdictsFromPrediction(
+          classified.prediction,
+          facts.map((f) => f.id),
+        )
+      : qa.factVerdicts;
+    qa = {
+      ...qa,
+      status: classified.prediction.status as ResearchQAOutput["status"],
+      factVerdicts,
+      ...regenerateFromVerdicts(factVerdicts),
+    };
+  }
 
   if (qa.status === "approved") {
     const verdicts = new Map(qa.factVerdicts.map((v) => [v.factId, v]));

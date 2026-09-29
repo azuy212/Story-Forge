@@ -89,13 +89,18 @@ export const config = {
   },
   // --- Classifier layer (bounded QA decisions, e.g. TypeSafe/Jev) ---
   // Master switch, default off: existing LLM QA behavior is untouched until
-  // CLASSIFIER_PROVIDER=typesafe is set (requires TYPESAFE_API_KEY).
+  // CLASSIFIER_PROVIDER=typesafe is set. Auth reuses OPENROUTER_API_KEY and
+  // routes through OpenRouter's System One endpoint; only the model and the
+  // on/off switch are user-facing config.
   classifierProvider: (): "off" | "typesafe" => {
     const value = read("CLASSIFIER_PROVIDER");
     return value === "typesafe" ? "typesafe" : "off";
   },
   typesafeApiKey: (): string | undefined =>
-    read("TYPESAFE_API_KEY") || undefined,
+    read("TYPESAFE_API_KEY") || read("OPENROUTER_API_KEY") || undefined,
+  // OpenRouter hosts TypeSafe's System One API; the SDK appends /v1/systemone.
+  typesafeBaseUrl: (): string =>
+    read("TYPESAFE_BASE_URL") || "https://openrouter.ai/api",
   typesafeDefaultModel: (): string =>
     read("TYPESAFE_DEFAULT_MODEL") || "jev-latest",
   // Per-gate activation. Effective only when classifierProvider() !== "off";

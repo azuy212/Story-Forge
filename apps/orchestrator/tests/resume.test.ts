@@ -37,6 +37,7 @@ describe("parseArgs", () => {
       seed: null,
       dryRun: true,
       resetQaRetries: false,
+      injectArtifacts: null,
       help: false,
     });
   });
@@ -45,6 +46,58 @@ describe("parseArgs", () => {
     const parsed = parseArgs(["ns", "--reset-qa-retries"]);
     expect(parsed.resetQaRetries).toBe(true);
     expect(parsed.dryRun).toBe(false);
+  });
+
+  it("parses a single --inject-artifact as type=path", () => {
+    expect(
+      parseArgs(["ns", "--inject-artifact", "promptQA=./prompt-qa.json"]),
+    ).toEqual(
+      expect.objectContaining({
+        injectArtifacts: { promptQA: "./prompt-qa.json" },
+      }),
+    );
+  });
+
+  it("collects repeated --inject-artifact flags for the same type into an array", () => {
+    const parsed = parseArgs([
+      "ns",
+      "--inject-artifact",
+      "subtitles=./a.json",
+      "--inject-artifact",
+      "subtitles=./b.json",
+      "--inject-artifact",
+      "promptQA=./p.json",
+    ]);
+    expect(parsed.injectArtifacts).toEqual({
+      subtitles: ["./a.json", "./b.json"],
+      promptQA: "./p.json",
+    });
+  });
+
+  it("allows = inside the path portion of --inject-artifact", () => {
+    const parsed = parseArgs([
+      "ns",
+      "--inject-artifact",
+      "scriptQA=/tmp/a=b.json",
+    ]);
+    expect(parsed.injectArtifacts).toEqual({
+      scriptQA: "/tmp/a=b.json",
+    });
+  });
+
+  it("rejects malformed --inject-artifact values", () => {
+    expect(() => parseArgs(["ns", "--inject-artifact"])).toThrow(
+      "--inject-artifact requires a value of the form <type>=<path>",
+    );
+    expect(() => parseArgs(["ns", "--inject-artifact", "no-equals"])).toThrow(
+      "--inject-artifact requires <type>=<path>",
+    );
+    expect(() => parseArgs(["ns", "--inject-artifact", "=path.json"])).toThrow(
+      "--inject-artifact requires <type>=<path>",
+    );
+    expect(() => parseArgs(["ns", "--inject-artifact", "type="])).toThrow(
+      "--inject-artifact requires <type>=<path>",
+    );
   });
 
   it("sets help for --help or -h anywhere in the args", () => {
@@ -274,6 +327,45 @@ describe("runStream", () => {
       runStream("thread-1", "ast-1", {}, "my-run", "http://dev"),
     ).rejects.toThrow("Run stream failed: 500");
   });
+
+  it("adds manualArtifacts and manualArtifactProfile to config.configurable when provided", async () => {
+    const fetchMock = jest
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response("ok", { status: 200 }));
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    await runStream(
+      "thread-1",
+      "ast-1",
+      { project: { pillar: "P", topic: "T" } },
+      "my-run",
+      "http://dev",
+      {
+        manualArtifacts: { promptQA: "/abs/prompt-qa.json" },
+        manualArtifactProfile: "long",
+      },
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://dev/threads/thread-1/runs/stream",
+      expect.objectContaining({
+        body: JSON.stringify({
+          assistant_id: "ast-1",
+          input: { project: { pillar: "P", topic: "T" } },
+          config: {
+            configurable: {
+              runId: "my-run",
+              thread_id: "thread-1",
+              manualArtifacts: { promptQA: "/abs/prompt-qa.json" },
+              manualArtifactProfile: "long",
+            },
+          },
+          multitask_strategy: "interrupt",
+          stream_mode: ["events", "values"],
+        }),
+      }),
+    );
+  });
 });
 
 describe("resumeRun", () => {
@@ -348,6 +440,8 @@ describe("resumeRun", () => {
       "ast-1",
       { project: { pillar: "P", topic: "T" } },
       "ns",
+      undefined,
+      { manualArtifacts: null, manualArtifactProfile: null },
     );
     expect(result).toEqual({
       threadId: "t-new",
@@ -356,5 +450,58 @@ describe("resumeRun", () => {
         data: { execution: { status: "complete" } },
       },
     });
+  });
+
+  it("forwards manualArtifacts and manualArtifactProfile to runStream", async () => {
+    const runStreamMock = jest
+      .fn<typeof runStream>()
+      .mockResolvedValue(new Response("ok", { status: 200 }));
+    const drainStreamMock = jest
+      .fn<
+        () => Promise<{
+          lastEvent: {
+            event: string;
+            data: { execution: { status: string } };
+          };
+        }>
+      >()
+      .mockResolvedValue({
+        lastEvent: {
+          event: "values",
+          data: { execution: { status: "complete" } },
+        },
+      });
+    const createThreadMock = jest
+      .fn<() => Promise<{ thread_id: string }>>()
+      .mockResolvedValue({ thread_id: "t-new" });
+    const recordThread = jest
+      .fn<(threadId: string) => Promise<void>>()
+      .mockResolvedValue(undefined);
+
+    await resumeRun(
+      "ns",
+      { pillar: "P", topic: "T" },
+      {
+        assistantId: "ast-1",
+        createThread: createThreadMock,
+        runStream: runStreamMock,
+        drainStream: drainStreamMock,
+        recordThread,
+        manualArtifacts: { promptQA: "/abs/prompt-qa.json" },
+        manualArtifactProfile: "long",
+      },
+    );
+
+    expect(runStreamMock).toHaveBeenCalledWith(
+      "t-new",
+      "ast-1",
+      { project: { pillar: "P", topic: "T" } },
+      "ns",
+      undefined,
+      {
+        manualArtifacts: { promptQA: "/abs/prompt-qa.json" },
+        manualArtifactProfile: "long",
+      },
+    );
   });
 });

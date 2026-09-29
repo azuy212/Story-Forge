@@ -106,10 +106,13 @@ function buildClient(options: CreateClassifierOptions): SystemOneClient {
   const apiKey = configUtils.typesafeApiKey();
   if (!apiKey) {
     throw new Error(
-      "TYPESAFE_API_KEY not set in environment. Add it to .env to use the typesafe classifier provider.",
+      "No API key for the typesafe classifier. Set OPENROUTER_API_KEY in .env (or override with TYPESAFE_API_KEY).",
     );
   }
-  const real = new TypeSafeClient({ apiKey });
+  const real = new TypeSafeClient({
+    apiKey,
+    baseURL: configUtils.typesafeBaseUrl(),
+  });
   return {
     systemOne(request) {
       return real.systemOne(request as Parameters<typeof real.systemOne>[0]);
@@ -122,8 +125,8 @@ export function createTypeSafeClassifier(
 ): Classifier {
   const client = buildClient(options);
   const sink: RunLogSink | null = options.runLogSink ?? null;
-  // Model is per-request (a gate may override); the classifier reports the
-  // client default so telemetry has a stable label before the first call.
+  // Model is per-request (a gate may override); always sent so OpenRouter's
+  // System One endpoint resolves the configured default when unspecified.
   const fallbackModel = configUtils.typesafeDefaultModel();
 
   return {
@@ -145,7 +148,7 @@ export function createTypeSafeClassifier(
       const payload: SystemOneRequest = {
         state: request.state,
         questions: sdkQuestions,
-        model: request.model,
+        model: request.model ?? fallbackModel,
       };
 
       try {

@@ -27,6 +27,11 @@ import { hashIssues } from "../utils/qa-policy.js";
 import { checkScriptContract } from "../utils/script-contract.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
+import {
+  tryClassifyQaGate,
+  buildGateState,
+  injectFromConfigurable,
+} from "../classifiers/index.js";
 
 function serializeFacts(
   facts:
@@ -189,6 +194,29 @@ export async function scriptQANode(
   logger.nodeStart(label);
   logger.nodePhase(label, "checking script");
 
+  const gateState = buildGateState("scriptqa", state);
+  const classified = gateState
+    ? await tryClassifyQaGate("scriptqa", {
+        state: gateState.state,
+        agent: AgentModel.ScriptQA,
+        inject: injectFromConfigurable(
+          (config.configurable ?? {}) as Record<string, unknown>,
+        ),
+        promptVersion: PromptPaths.ScriptQA.replace(/\.md$/, ""),
+      })
+    : null;
+
+  if (classified && classified.prediction.status === "approved") {
+    logger.nodeDone(label, classified.telemetry.durationMs);
+    return {
+      scriptQA: { status: "approved" } as ScriptQAOutput,
+      diagnostics: {
+        telemetry: { [AgentModel.ScriptQA]: classified.telemetry },
+      },
+      execution: execution(AgentModel.ScriptQA),
+    };
+  }
+
   // For long profile, only enforce minimum word count
   const targetWordRange =
     videoProfile.profile === "long"
@@ -235,6 +263,20 @@ export async function scriptQANode(
   });
 
   if (result.error || !result.data) {
+    if (classified && classified.prediction.status !== "approved") {
+      logger.nodeDone(label, classified.telemetry.durationMs);
+      return {
+        scriptQA: {
+          status: classified.prediction.status as ScriptQAOutput["status"],
+          feedback: `Script QA (classifier): ${classified.prediction.status}`,
+          issues: [result.error ?? "LLM call failed"],
+        },
+        diagnostics: {
+          telemetry: { [AgentModel.ScriptQA]: classified.telemetry },
+        },
+        execution: execution(AgentModel.ScriptQA),
+      };
+    }
     // QA infra failure (not a content verdict): signal the router to retry
     // this cheap QA node instead of regenerating the whole script.
     logger.nodeFailed(label, result.error ?? "LLM call failed");
@@ -253,7 +295,13 @@ export async function scriptQANode(
 
   logger.nodeDone(label, result.telemetry.durationMs);
 
-  const qa = result.data;
+  let qa = result.data;
+  if (classified && classified.prediction.status !== "approved") {
+    qa = {
+      ...qa,
+      status: classified.prediction.status as ScriptQAOutput["status"],
+    };
+  }
 
   const isRevision =
     qa.status === "minor_revision" ||

@@ -1,4 +1,11 @@
-import { jest, describe, it, expect, beforeEach } from "@jest/globals";
+import {
+  jest,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from "@jest/globals";
 import { researchQANode } from "../src/agents/research-qa.node.js";
 import type { ProjectState } from "../src/types/index.js";
 
@@ -271,5 +278,142 @@ describe("researchQANode", () => {
     await promise;
 
     expect(mocks.loadPrompt).toHaveBeenCalledWith("research-qa/v1.md");
+  });
+});
+
+const CLASSIFIER_ENV_KEYS = ["CLASSIFIER_PROVIDER"] as const;
+let savedClassifierEnv: Record<string, string | undefined> = {};
+
+function withClassifierEnv() {
+  savedClassifierEnv = {};
+  for (const key of CLASSIFIER_ENV_KEYS) {
+    savedClassifierEnv[key] = process.env[key];
+  }
+  process.env.CLASSIFIER_PROVIDER = "typesafe";
+}
+
+function restoreClassifierEnv() {
+  for (const key of CLASSIFIER_ENV_KEYS) {
+    if (savedClassifierEnv[key] === undefined) delete process.env[key];
+    else process.env[key] = savedClassifierEnv[key]!;
+  }
+}
+
+function choice(value: string, confidence: number) {
+  return {
+    type: "choice" as const,
+    choice: value,
+    confidence,
+    probabilities: { [value]: confidence },
+  };
+}
+
+function makeClassifierFactory(answers: Record<string, unknown>) {
+  return jest.fn(() => ({
+    provider: "typesafe",
+    model: "jev-test",
+    classify: jest.fn().mockResolvedValue({
+      answers,
+      provider: "typesafe",
+      model: "jev-test",
+      usage: { inputTokens: 10, outputTokens: 0 },
+      durationMs: 5,
+    }),
+  }));
+}
+
+function researchApprovedAnswers() {
+  const answers: Record<string, unknown> = {
+    status: choice("approved", 0.97),
+  };
+  for (const f of FACTS) {
+    answers[`fact_${f.id}`] = choice("keep", 0.95);
+  }
+  return answers;
+}
+
+describe("researchQANode classifier path", () => {
+  beforeEach(() => {
+    withClassifierEnv();
+  });
+
+  afterEach(() => {
+    restoreClassifierEnv();
+  });
+
+  it("trusted approved skips the LLM and verifies facts", async () => {
+    const createClassifier = makeClassifierFactory(researchApprovedAnswers());
+    const mocks = makeMocks();
+    const result = await researchQANode(
+      {
+        project: { pillar: "Geography", topic: "Unrecognized Countries" },
+        research: { summary: "A summary.", facts: FACTS },
+        execution: { version: "0.1.0" },
+      } as ProjectState,
+      { configurable: { ...mocks, createClassifier } } as any,
+    );
+
+    expect(result.researchQA?.status).toBe("approved");
+    expect(result.research?.facts![0].verified).toBe(true);
+    expect(result.research?.facts![0].reason).toBe("Classifier verdict");
+    expect(mockGenerate).not.toHaveBeenCalled();
+    expect(createClassifier).toHaveBeenCalled();
+    expect(result.diagnostics?.telemetry?.ResearchQA?.model).toBe(
+      "typesafe/jev-test",
+    );
+  });
+
+  it("trusted non-approved cascades to LLM and overrides status", async () => {
+    const answers = researchApprovedAnswers();
+    answers.status = choice("minor_revision", 0.92);
+    const createClassifier = makeClassifierFactory(answers);
+    mockGenerate.mockResolvedValueOnce(
+      buildResponse({
+        status: "approved",
+        feedback: "",
+        issues: [],
+        factsToRegenerate: 0,
+        factVerdicts: FACTS.map((f) => ({
+          factId: f.id,
+          verdict: "keep",
+          reason: "ok",
+        })),
+      }),
+    );
+
+    const mocks = makeMocks();
+    const result = await researchQANode(
+      {
+        project: { pillar: "Geography", topic: "Unrecognized Countries" },
+        research: { summary: "A summary.", facts: FACTS },
+        execution: { version: "0.1.0" },
+      } as ProjectState,
+      { configurable: { ...mocks, createClassifier } } as any,
+    );
+
+    expect(result.researchQA?.status).toBe("minor_revision");
+    expect(mockGenerate).toHaveBeenCalledTimes(1);
+    expect(result.research).toEqual({});
+  });
+
+  it("low confidence abstains to the LLM path", async () => {
+    const answers = researchApprovedAnswers();
+    answers.status = choice("approved", 0.4);
+    const createClassifier = makeClassifierFactory(answers);
+    mockGenerate.mockResolvedValueOnce(buildResponse(approvedResponse()));
+
+    const mocks = makeMocks();
+    const result = await researchQANode(
+      {
+        project: { pillar: "Geography", topic: "Unrecognized Countries" },
+        research: { summary: "A summary.", facts: FACTS },
+        execution: { version: "0.1.0" },
+      } as ProjectState,
+      { configurable: { ...mocks, createClassifier } } as any,
+    );
+
+    expect(result.researchQA?.status).toBe("approved");
+    expect(mockGenerate).toHaveBeenCalledTimes(1);
+    expect(result.research?.facts![0].reason).toContain("Accepted:");
   });
 });

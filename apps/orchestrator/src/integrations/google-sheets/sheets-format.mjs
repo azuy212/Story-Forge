@@ -49,7 +49,7 @@ export const COLUMN = {
 
 export const PLANNED_STATUS = "planned";
 
-export const SLOT_HOURS = [12, 20];
+export const SLOT_HOURS = [18];
 
 /** Days of the week for long-form publish slots (Tue=2, Fri=5). */
 export const LONG_SLOT_DAYS = [2, 5];

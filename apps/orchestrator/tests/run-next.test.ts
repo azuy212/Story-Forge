@@ -20,6 +20,7 @@ import {
   runLauncher,
   validateProfile,
   readSheetRows,
+  addInjectArtifact,
 } from "../scripts/run-next.mjs";
 import { getAssistantId, resumeRun } from "../scripts/resume.mjs";
 import { closeAllRunLogSinks } from "../dist/utils/run-log.js";
@@ -462,6 +463,84 @@ describe("runLauncher", () => {
     const deps = baseDeps();
     await expect(runLauncher({ ...deps, profile: "invalid" })).rejects.toThrow(
       "invalid profile 'invalid'",
+    );
+  });
+
+  it("forwards manualArtifacts and manualArtifactProfile to resumeRun (create path)", async () => {
+    const deps = baseDeps();
+    const manualArtifacts = { promptQA: "/abs/prompt-qa.json" };
+    await expect(
+      runLauncher({ ...deps, manualArtifacts }),
+    ).resolves.toBeUndefined();
+
+    expect(deps.resumeRun).toHaveBeenCalledTimes(1);
+    const options: any = deps.resumeRun.mock.calls[0][2];
+    expect(options.manualArtifacts).toEqual(manualArtifacts);
+    expect(options.manualArtifactProfile).toBe("short");
+  });
+
+  it("uses the run's persisted profile for manualArtifactProfile on resume", async () => {
+    addRun("geo-run-long", {
+      topic: "Unrecognized Countries",
+      pillar: "Geography",
+      projectId: "legacy-1",
+      videoProfile: "long",
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    const deps = baseDeps();
+    await expect(
+      runLauncher({
+        ...deps,
+        manualArtifacts: { scriptQA: "/abs/script-qa.json" },
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(deps.resumeRun).toHaveBeenCalledTimes(1);
+    const options: any = deps.resumeRun.mock.calls[0][2];
+    expect(options.manualArtifacts).toEqual({
+      scriptQA: "/abs/script-qa.json",
+    });
+    expect(options.manualArtifactProfile).toBe("long");
+  });
+
+  it("omits manualArtifacts/manualArtifactProfile when none are configured", async () => {
+    const deps = baseDeps();
+    await expect(runLauncher(deps)).resolves.toBeUndefined();
+
+    const options: any = deps.resumeRun.mock.calls[0][2];
+    expect(options.manualArtifacts).toBeUndefined();
+    expect(options.manualArtifactProfile).toBeUndefined();
+  });
+});
+
+describe("addInjectArtifact", () => {
+  it("parses a single <type>=<path> value", () => {
+    expect(addInjectArtifact(undefined, "promptQA=./prompt-qa.json")).toEqual({
+      promptQA: "./prompt-qa.json",
+    });
+  });
+
+  it("collects repeated flags for the same type into an array", () => {
+    let map = addInjectArtifact(undefined, "prompts=./a/");
+    map = addInjectArtifact(map, "prompts=./b/");
+    expect(map).toEqual({ prompts: ["./a/", "./b/"] });
+  });
+
+  it("allows = inside the path portion", () => {
+    expect(addInjectArtifact(undefined, "promptQA=./odd=name.json")).toEqual({
+      promptQA: "./odd=name.json",
+    });
+  });
+
+  it("rejects malformed values", () => {
+    expect(() => addInjectArtifact(undefined, "no-equals")).toThrow(
+      "--inject-artifact requires <type>=<path>",
+    );
+    expect(() => addInjectArtifact(undefined, "=path.json")).toThrow(
+      "--inject-artifact requires <type>=<path>",
+    );
+    expect(() => addInjectArtifact(undefined, "type=")).toThrow(
+      "--inject-artifact requires <type>=<path>",
     );
   });
 });
