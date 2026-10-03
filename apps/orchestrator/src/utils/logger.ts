@@ -268,6 +268,21 @@ export const logger = {
     }
   },
 
+  /**
+   * A node whose output was rejected but recovered from a degraded form. Logged
+   * as a warning rather than a failure because the node did produce usable
+   * output, but the recovery must stay visible — it means the run continued on
+   * a repaired artifact.
+   */
+  nodeRecovered(label: string, detail: string, meta?: LogMeta): void {
+    writeSinkEvent({ event: "node_recovered", node: label, detail, meta });
+    if (usePretty) {
+      prettyFormatter.nodeWarning(label, detail);
+    } else {
+      console.warn(formatNodeMessage(`${label} recovered: ${detail}`));
+    }
+  },
+
   async finalize(
     status: "complete" | "failed",
     summary?: string,

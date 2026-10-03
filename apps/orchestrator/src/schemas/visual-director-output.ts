@@ -10,6 +10,7 @@ import {
   SceneEntitySchema,
 } from "./production.js";
 import { VisualPlanEntrySchema } from "./visual-planner-output.js";
+import { lenientEnum } from "./lenient-enum.js";
 
 const EmphasisEnum = z.enum(["low", "medium", "high"]);
 
@@ -38,7 +39,7 @@ const CameraShotInput = z.preprocess((value) => {
   return CAMERA_SHOT_ALIASES[normalized] ?? value;
 }, CameraShotEnum);
 
-export const EmotionalBeatEnum = z.enum([
+export const EMOTIONAL_BEATS = [
   "mystery",
   "discovery",
   "tension",
@@ -46,7 +47,54 @@ export const EmotionalBeatEnum = z.enum([
   "relief",
   "payoff",
   "reflection",
-]);
+] as const;
+
+export const EmotionalBeatEnum = lenientEnum(EMOTIONAL_BEATS, {
+  // A neutral mid-story beat: unrecognized emotion words are downgraded to it
+  // rather than failing the whole storyboard.
+  fallback: "discovery",
+  aliases: {
+    suspense: "tension",
+    suspenseful: "tension",
+    tensionbuilding: "tension",
+    "rising-tension": "tension",
+    anticipation: "tension",
+    anxious: "tension",
+    wonder: "awe",
+    amazement: "awe",
+    astonishment: "awe",
+    marvel: "awe",
+    spectacular: "awe",
+    inspiration: "awe",
+    reveal: "discovery",
+    realization: "discovery",
+    epiphany: "discovery",
+    insight: "discovery",
+    breakthrough: "discovery",
+    understanding: "discovery",
+    curious: "mystery",
+    curiosity: "mystery",
+    question: "mystery",
+    hook: "mystery",
+    intrigue: "mystery",
+    suspensehook: "mystery",
+    comfort: "relief",
+    calm: "relief",
+    resolution: "relief",
+    ease: "relief",
+    climax: "payoff",
+    conclusion: "payoff",
+    culmination: "payoff",
+    triumph: "payoff",
+    emotionalpayoff: "payoff",
+    contemplation: "reflection",
+    reflective: "reflection",
+    thoughtful: "reflection",
+    closing: "reflection",
+    coda: "reflection",
+    takeaway: "reflection",
+  },
+});
 
 const SceneRoleEnum = z.enum(["narrative", "b-roll"]);
 
@@ -94,6 +142,30 @@ export function visualDirectorOutputSchema(profile?: VideoProfileConfig) {
 }
 
 export const VisualDirectorOutputSchema = visualDirectorOutputSchema();
+
+/**
+ * Relaxed schema used only to recover a storyboard the strict schema rejected.
+ *
+ * Identical field shapes, but the scene-count band is dropped to a floor of
+ * one. The strict band exists to steer the model toward the requested scene
+ * density during a normal run; once every attempt has already failed there is
+ * nothing left to steer, and a short-but-complete storyboard is a usable
+ * "best available result" whereas no storyboard ends the run.
+ *
+ * Everything else stays strict — narration, visual description and the visual
+ * plan entries are still required, so a recovered storyboard is structurally
+ * sound. Only the count preference is given up.
+ */
+export function visualDirectorSalvageSchema() {
+  return z.object({
+    scenes: z.array(ScenePlanSchema).min(1, "must have at least one scene"),
+    visualPlans: z
+      .array(VisualPlanEntrySchema)
+      .min(1, "must have at least one visual plan entry"),
+  });
+}
+
+export const VisualDirectorSalvageSchema = visualDirectorSalvageSchema();
 
 export type VisualDirectorOutput = z.output<typeof VisualDirectorOutputSchema>;
 export type VisualPlanEntry = z.input<typeof VisualPlanEntrySchema>;

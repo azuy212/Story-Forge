@@ -3,6 +3,7 @@ import { VisualPlanEntrySchema } from "./visual-planner-output.js";
 import { PromptQAOutputSchema } from "./prompt-qa-output.js";
 import { ImageGenerationFailureTypeEnum } from "../providers/image-generation-error.js";
 import { VideoSizeSchema } from "./video-profile.js";
+import { lenientEnum } from "./lenient-enum.js";
 
 export const ProviderEnum = z.enum([
   "gpt-image",
@@ -72,7 +73,7 @@ export const AssetModeEnum = z.enum([
   "source_edit",
 ]);
 
-export const SceneEntityTypeEnum = z.enum([
+export const SCENE_ENTITY_TYPES = [
   "person",
   "place",
   "object",
@@ -81,7 +82,59 @@ export const SceneEntityTypeEnum = z.enum([
   "document",
   "landmark",
   "other",
-]);
+] as const;
+
+export const SceneEntityTypeEnum = lenientEnum(SCENE_ENTITY_TYPES, {
+  // `other` is the enum's own catch-all, so an unrecognized entity kind is
+  // recorded rather than rejected — the entity is still usable downstream.
+  fallback: "other",
+  aliases: {
+    human: "person",
+    humans: "person",
+    man: "person",
+    woman: "person",
+    people: "person",
+    individual: "person",
+    character: "person",
+    location: "place",
+    city: "place",
+    country: "place",
+    region: "place",
+    geography: "place",
+    venue: "place",
+    setting: "place",
+    thing: "object",
+    item: "object",
+    artifact: "object",
+    element: "object",
+    noun: "object",
+    org: "organization",
+    company: "organization",
+    institution: "organization",
+    agency: "organization",
+    group: "organization",
+    brand: "organization",
+    corporation: "organization",
+    corp: "organization",
+    enterprise: "organization",
+    startup: "organization",
+    nonprofit: "organization",
+    foundation: "organization",
+    government: "organization",
+    device: "product",
+    gadget: "product",
+    model: "product",
+    paper: "document",
+    report: "document",
+    file: "document",
+    record: "document",
+    article: "document",
+    monument: "landmark",
+    building: "landmark",
+    structure: "landmark",
+    site: "landmark",
+  },
+});
 
 export const SceneEntitySchema = z.object({
   type: SceneEntityTypeEnum,
@@ -219,7 +272,7 @@ export type CameraMotion = z.input<typeof CameraMotionEnum>;
 export type Transition = z.input<typeof TransitionEnum>;
 export type AssetType = z.input<typeof AssetTypeEnum>;
 export type AssetMode = z.input<typeof AssetModeEnum>;
-export type SceneEntityType = z.input<typeof SceneEntityTypeEnum>;
+export type SceneEntityType = (typeof SCENE_ENTITY_TYPES)[number];
 export type SceneEntity = z.input<typeof SceneEntitySchema>;
 export type SourceAsset = z.input<typeof SourceAssetSchema>;
 export type AssetKind = z.input<typeof AssetKindEnum>;

@@ -267,6 +267,12 @@ async function resolveManualOverride<T>(options: {
 export interface ComputeResult<T> {
   data: T | null;
   error?: string;
+  /**
+   * Passed through untouched from `compute`. Carries the last parsed-but-
+   * schema-rejected payload so callers can attempt a lenient recovery; the
+   * cache never persists it (a rejected payload is not a valid artifact).
+   */
+  rejected?: unknown;
   telemetry: {
     model: string;
     durationMs: number;

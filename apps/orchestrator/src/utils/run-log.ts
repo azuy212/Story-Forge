@@ -51,6 +51,7 @@ export type RunLogEventType =
   | "node_end"
   | "node_failed"
   | "node_retry"
+  | "node_recovered"
   | "node_skipped"
   | "node_incomplete"
   | "qa_decision"

@@ -200,6 +200,17 @@ export type AgentResult<T> = {
     };
   };
   error?: string;
+  /**
+   * Most recent response that parsed as JSON but failed schema validation,
+   * returned alongside `error` when every attempt was rejected.
+   *
+   * A strict schema can reject a payload whose only defects are cosmetic, and
+   * discarding the parsed value there leaves the caller with nothing to fall
+   * back on. Callers that can repair structurally-sound output may attempt
+   * their own lenient parse of this before giving up. Undefined when no attempt
+   * ever produced parseable JSON (timeout / transport failures).
+   */
+  rejected?: unknown;
 };
 
 function buildTelemetry(
@@ -292,6 +303,8 @@ export async function runAgent<T>({
 
     let lastError: string | null = null;
     let retryFeedback: string | null = null;
+    let lastRejected: unknown;
+    let sawRejected = false;
 
     for (let attempt = 1; attempt <= attempts; attempt++) {
       if (attempt > 1 && lastError) {
@@ -365,6 +378,10 @@ export async function runAgent<T>({
           const issues = result.error.issues
             .map((i) => `${i.path.map(String).join(".")}: ${i.message}`)
             .join("; ");
+          // Retain the parsed value so a caller that can repair cosmetic schema
+          // drift still has a candidate once every attempt has been rejected.
+          lastRejected = parsed;
+          sawRejected = true;
           throw new LLMError(`Schema validation failed: ${issues}`);
         }
 
@@ -452,6 +469,7 @@ export async function runAgent<T>({
     const durationMs = Date.now() - startedAt;
     return {
       data: null as T | null,
+      ...(sawRejected ? { rejected: lastRejected } : {}),
       telemetry: {
         model: model.model,
         durationMs,
@@ -500,6 +518,7 @@ export async function runAgent<T>({
             promptVersion,
           ),
           error: result.error ?? "Unknown LLM error",
+          rejected: result.rejected,
         };
       }
       return {
@@ -537,6 +556,7 @@ export async function runAgent<T>({
           promptVersion,
         ),
         error: result.error ?? "Unknown LLM error",
+        rejected: result.rejected,
       };
     }
     return {

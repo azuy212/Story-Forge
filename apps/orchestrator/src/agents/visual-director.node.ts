@@ -16,13 +16,17 @@ import { AgentModel } from "../types/index.js";
 import { runAgent, type AgentInject } from "./run-agent.js";
 import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
-import { visualDirectorOutputSchema } from "../schemas/visual-director-output.js";
+import {
+  visualDirectorOutputSchema,
+  visualDirectorSalvageSchema,
+} from "../schemas/visual-director-output.js";
 import type {
   VisualDirectorOutput,
   VisualPlanEntry,
 } from "../schemas/visual-director-output.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
+import { MINOR_REVISION_MAX } from "../utils/constants.js";
 import {
   endsWithTokens,
   tokenizeText,
@@ -78,14 +82,63 @@ function isRecoverableOutputError(error: string | undefined): boolean {
 }
 
 /**
+ * Re-validate a schema-rejected payload against the relaxed salvage schema.
+ *
+ * Returns undefined when there is nothing to recover or the payload is not a
+ * structurally sound storyboard. Never throws: recovery is best-effort, so the
+ * caller still has its normal failure paths available.
+ */
+function salvageRejectedOutput(
+  rejected: unknown,
+): VisualDirectorOutput | undefined {
+  if (rejected == null) return undefined;
+  const parsed = visualDirectorSalvageSchema().safeParse(rejected);
+  if (!parsed.success) return undefined;
+  return parsed.data;
+}
+
+/**
+ * Whitespace-word count of the shortest tail of `words` that carries the whole
+ * declared ending as a token suffix, or 0 when no tail does.
+ *
+ * The re-segmentation slices on whitespace words while the ending contract
+ * compares tokens, so the boundary has to be found by walking candidate tails
+ * rather than assumed to be word-for-word equal to the ending.
+ */
+function endingTailWordCount(words: string[], ending: string): number {
+  const suffix = tokenizeText(ending);
+  if (suffix.length === 0) return 0;
+  const carriesSuffix = (tokens: string[]): boolean =>
+    tokens.length >= suffix.length &&
+    suffix.every(
+      (word, i) => tokens[tokens.length - suffix.length + i] === word,
+    );
+  // A tail can never need fewer whitespace words than the ending has tokens,
+  // so start there instead of at 1.
+  for (let k = suffix.length; k <= words.length; k++) {
+    if (carriesSuffix(tokenizeText(words.slice(words.length - k).join("")))) {
+      return k;
+    }
+  }
+  return 0;
+}
+
+/**
  * Split the narration into `n` contiguous pieces whose word counts follow
  * `proportions`. The pieces cover the narration exactly (nothing dropped,
  * nothing added) — this is the deterministic repair for an LLM that
  * paraphrased, dropped, or padded words.
+ *
+ * `reservedTailWords` pins the final piece so it always spans the declared
+ * ending. Proportional sizing alone lets a model that under-reports its last
+ * scene clip that scene mid-ending, which then fails the ending contract on an
+ * otherwise complete storyboard — a failure no revision can fix, because every
+ * re-split clips the same way.
  */
 function splitNarrationProportional(
   narration: string,
   proportions: number[],
+  reservedTailWords = 0,
 ): string[] {
   const total = proportions.reduce((a, b) => a + b, 0);
   if (total <= 0) return Array.from({ length: proportions.length }, () => "");
@@ -100,18 +153,38 @@ function splitNarrationProportional(
     targets[i] = (acc / total) * words.length;
   }
 
-  const parts: string[] = [];
-  let start = 0;
+  // bounds[i] is where piece i starts; bounds[n] is the exclusive end.
+  const bounds: number[] = [0];
   for (let i = 0; i < proportions.length; i++) {
     const isLast = i === proportions.length - 1;
-    let end = isLast
+    const end = isLast
       ? words.length
-      : Math.max(start + 1, Math.round(targets[i]));
-    end = Math.min(words.length, Math.max(start + 1, end));
-    parts.push(words.slice(start, end).join(""));
-    start = end;
+      : Math.min(words.length, Math.max(bounds[i] + 1, Math.round(targets[i])));
+    bounds.push(end);
   }
-  return parts;
+
+  if (reservedTailWords > 0 && proportions.length > 1) {
+    const lastStart = bounds.length - 2;
+    // Every piece keeps at least one word, so the reservation can never push
+    // the final cut before the piece before it.
+    const cut = Math.max(lastStart, words.length - reservedTailWords);
+    // Move the final cut earlier so the last piece spans the whole ending. The
+    // words it gains come off the tails of the preceding pieces, so each of
+    // those boundaries has to step back in turn — clamping only the last one
+    // would strand the reservation against a neighbour that is already one
+    // word long.
+    for (let i = lastStart - 1; i >= 1; i--) {
+      bounds[i] = Math.min(
+        bounds[i],
+        Math.max(bounds[i - 1] + 1, cut - (lastStart - i)),
+      );
+    }
+    bounds[lastStart] = Math.max(bounds[lastStart - 1] + 1, cut);
+  }
+
+  return bounds
+    .slice(0, -1)
+    .map((start, i) => words.slice(start, bounds[i + 1]).join(""));
 }
 
 /**
@@ -164,12 +237,15 @@ interface NormalizedScenes {
 /**
  * Reindex sceneIds to 1..N, dedupe references, drop hallucinated fact IDs
  * (safe repair: a scene just cites less), and repair narration coverage by
- * re-segmenting the original narration in code when the LLM deviated.
+ * re-segmenting the original narration in code when the LLM deviated. When an
+ * ending is declared, the re-segmentation reserves it so the final scene keeps
+ * the whole ending.
  */
 function normalizeOutput(
   data: VisualDirectorOutput,
   narration: string,
   validFactIds: Set<string>,
+  endingNarration?: string,
 ): NormalizedScenes {
   const warnings: string[] = [];
 
@@ -193,14 +269,41 @@ function normalizeOutput(
   const backward = subsequenceCoverage(concatTokens, originalTokens);
 
   let scenes = reindexed;
-  if (forward < COVERAGE_ACCEPT || backward < COVERAGE_ACCEPT) {
-    // The LLM paraphrased, dropped, or padded narration. Repair deterministically:
-    // re-split the original narration proportionally to the LLM's segment sizes.
+  // Whitespace-word span the declared ending occupies at the tail of the
+  // narration, or 0 when the narration does not end with it. ScriptQA's
+  // contract says it must, so 0 means there is nothing safe to reserve and the
+  // ending check below reports the mismatch honestly.
+  const endingTailWords = endingNarration
+    ? endingTailWordCount(narration.match(/\S+\s*/g) ?? [], endingNarration)
+    : 0;
+  // The ending contract needs the WHOLE ending inside the final scene. A model
+  // that spreads it across the last two scenes misses that bar while covering
+  // the narration perfectly, so coverage alone cannot be the repair trigger.
+  const endingSpansFinalScene =
+    endingTailWords === 0 ||
+    endsWithTokens(reindexed.at(-1)?.narration ?? "", endingNarration ?? "");
+  const endingRepaired = endingTailWords > 0 && !endingSpansFinalScene;
+
+  if (
+    forward < COVERAGE_ACCEPT ||
+    backward < COVERAGE_ACCEPT ||
+    endingRepaired
+  ) {
+    // The LLM paraphrased, dropped, or padded narration — or cut the ending
+    // across two scenes. Repair deterministically: re-split the original
+    // narration proportionally to the LLM's segment sizes. Re-splitting the
+    // original invents nothing, it only moves where the existing words are cut.
     const proportions = reindexed.map((s) => wordCount(s.narration));
-    const repaired = splitNarrationProportional(narration, proportions);
+    const repaired = splitNarrationProportional(
+      narration,
+      proportions,
+      endingTailWords,
+    );
     scenes = reindexed.map((s, i) => ({ ...s, narration: repaired[i] }));
     warnings.push(
-      `VisualDirector: narration re-segmented in code (coverage forward=${(forward * 100).toFixed(1)}%, backward=${(backward * 100).toFixed(1)}%)`,
+      `VisualDirector: narration re-segmented in code (coverage forward=${(forward * 100).toFixed(1)}%, backward=${(backward * 100).toFixed(1)}%${
+        endingRepaired ? ", ending reserved for the final scene" : ""
+      })`,
     );
   }
 
@@ -418,7 +521,14 @@ export async function visualDirectorNode(
     },
   });
 
-  if (result.error || !result.data) {
+  // A rejected payload can still be a structurally sound storyboard that only
+  // missed the strict scene-count band. Recover it before giving up so the
+  // router has a real "best available result" to accept once its minor
+  // revision budget is spent — without this, an exhausted budget means no
+  // scenes at all and the run ends.
+  const salvaged = salvageRejectedOutput(result.rejected);
+
+  if ((result.error || !result.data) && !salvaged) {
     const directorReview = isRecoverableOutputError(result.error)
       ? {
           status: "minor_revision" as const,
@@ -445,14 +555,26 @@ export async function visualDirectorNode(
     };
   }
 
+  const recovered = result.data == null;
+  if (salvaged) {
+    logger.nodeRecovered(
+      label,
+      `${result.error} — accepted the rejected payload after re-validating it ` +
+        `against the relaxed salvage schema`,
+    );
+  }
+
   logger.nodeDone(label, result.telemetry.durationMs);
 
   const validFactIds = new Set(approvedFacts.map((f) => f.id));
-  const {
-    scenes: normalized,
-    visualPlans,
-    warnings,
-  } = normalizeOutput(result.data, narration ?? "", validFactIds);
+  const normalizedOutput = normalizeOutput(
+    result.data ?? salvaged!,
+    narration ?? "",
+    validFactIds,
+    ending?.narration,
+  );
+  const { scenes: normalized, visualPlans } = normalizedOutput;
+  let { warnings } = normalizedOutput;
 
   // Hard structural failure: visual plan coverage is not repairable in code.
   // Surface a minor_revision so the router retries VisualDirector with
@@ -485,6 +607,31 @@ export async function visualDirectorNode(
     };
   }
 
+  // A recovered payload exists to finish a run that would otherwise die, so it
+  // must not re-introduce a veto. These two content contracts stay hard failures
+  // for a cleanly validated response; on a recovered one they are downgraded to
+  // warnings, because rejecting again would discard the only usable storyboard
+  // and leave the minor-revision "accept best available" path with nothing.
+  const acceptedAnywayWarnings = (
+    feedback: string,
+    reason: string,
+  ): string[] => [
+    ...warnings,
+    `${AgentModel.VisualDirector}: ${feedback} (accepted anyway — ${reason})`,
+  ];
+  const recoveredWarnings = (feedback: string): string[] =>
+    acceptedAnywayWarnings(
+      feedback,
+      "storyboard was recovered from a rejected response",
+    );
+
+  // The router's minor-revision budget allows MINOR_REVISION_MAX revisions on
+  // top of the initial run, so once this run is the last affordable one there is
+  // no retry left to resolve a content contract. Rejecting then would hand the
+  // router an empty storyboard and make its "accept best available result"
+  // decision vacuous — the run dies holding a complete plan it chose to discard.
+  const lastAffordableRun = retryCount >= MINOR_REVISION_MAX + 1;
+
   // Narrative scenes must stay grounded in approved research. Normalization
   // only drops hallucinated IDs (never adds), so a narrative scene that ends
   // up with zero references is a structural failure — its narration cannot be
@@ -492,7 +639,7 @@ export async function visualDirectorNode(
   const ungroundedNarrative = normalized.filter(
     (s) => s.sceneRole === "narrative" && (s.references ?? []).length === 0,
   );
-  if (ungroundedNarrative.length > 0) {
+  if (ungroundedNarrative.length > 0 && !recovered) {
     const feedback = `Narrative scene(s) [${ungroundedNarrative
       .map((s) => s.sceneId)
       .join(
@@ -517,19 +664,27 @@ export async function visualDirectorNode(
       },
     };
   }
+  if (ungroundedNarrative.length > 0) {
+    warnings = recoveredWarnings(
+      `ungrounded narrative scene(s) [${ungroundedNarrative
+        .map((s) => s.sceneId)
+        .join(", ")}]`,
+    );
+  }
 
   const timed = computeTiming(
     normalized.map((s) => s.narration),
     targetDurationSec,
   );
 
-  if (
+  const endingViolation =
     ending &&
     (!endsWithTokens(normalized.at(-1)?.narration ?? "", ending.narration) ||
       !["payoff", "reflection"].includes(
         normalized.at(-1)?.emotionalBeat ?? "",
-      ))
-  ) {
+      ));
+
+  if (endingViolation && !recovered && !lastAffordableRun) {
     const feedback =
       "Final visual scene must contain exact narrative ending and use emotionalBeat payoff or reflection.";
     return {
@@ -550,6 +705,16 @@ export async function visualDirectorNode(
         },
       },
     };
+  }
+  if (endingViolation) {
+    warnings = acceptedAnywayWarnings(
+      recovered
+        ? "final scene does not satisfy the ending contract"
+        : "final scene does not satisfy the ending contract and no revision budget remains",
+      recovered
+        ? "storyboard was recovered from a rejected response"
+        : "discarding it would leave the run with no storyboard at all",
+    );
   }
 
   const scenes: Scene[] = normalized.map((s, i) => ({
@@ -582,7 +747,24 @@ export async function visualDirectorNode(
     production: {
       scenes,
       visualPlan: visualPlans,
-      directorReview: { status: "approved", feedback: "" },
+      // A recovered storyboard is reported as a minor revision rather than
+      // approved: it is usable, but QA downstream (and any later VisualDirector
+      // re-entry) should know it came from a rejected response. Same for one
+      // accepted with an unmet content contract — the scenes are kept, the
+      // defect is still recorded, and `hasScenes` is what advances the graph.
+      directorReview: recovered
+        ? {
+            status: "minor_revision",
+            feedback:
+              "Storyboard recovered from a schema-rejected response; scene count and visual direction may not match the requested format.",
+          }
+        : endingViolation
+          ? {
+              status: "minor_revision",
+              feedback:
+                "Storyboard accepted with no revision budget left; the final scene does not satisfy the ending contract.",
+            }
+          : { status: "approved", feedback: "" },
     },
     diagnostics: {
       warnings,

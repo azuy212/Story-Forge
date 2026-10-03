@@ -332,6 +332,11 @@ const promptRouter = (state: typeof StateAnnotation.State) => {
  * VisualDirector with the feedback within the minor budget; when no scenes
  * exist after the budget the run fails through the shared terminal.
  * Metadata/Thumbnail therefore never start unless the visual plan succeeded.
+ *
+ * The `hasScenes` branch is what makes "accept best available" work: any
+ * scenes in state — including a storyboard the node recovered from a rejected
+ * response — advance the graph, so an exhausted minor budget only ends the run
+ * when the node genuinely produced nothing.
  */
 const visualDirectorRouter = (state: typeof StateAnnotation.State) => {
   if (hasScenes(state)) {
@@ -350,12 +355,16 @@ const visualDirectorRouter = (state: typeof StateAnnotation.State) => {
   });
   // If budget exhausted but no valid scenes, do NOT continue — fail the run.
   // "Accepting best available result" only applies when there IS a valid result.
+  // The reason is spelled out here rather than reusing the policy's, which
+  // describes the opposite outcome and would read as a contradiction in the log.
   if (decision.action === "continue" && !hasScenes(state)) {
     logRouterDecision("VisualDirector", review?.status, FINALIZE, {
       revisionAttempts: retryCount(state, "VisualDirector"),
       decision: {
         action: "continue_no_scenes",
-        reason: "no scenes after budget",
+        reason:
+          "minor revision budget exhausted and no scenes were produced; " +
+          "there is no best available result to accept",
       },
     });
     return FINALIZE;

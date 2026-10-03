@@ -196,6 +196,92 @@ describe("visualDirectorNode", () => {
     expect(result.production?.directorReview?.status).toBe("minor_revision");
   });
 
+  it("reserves the declared ending for the final scene when the model splits it across two scenes", async () => {
+    // Regression for the reported failure: the storyboard covered the narration
+    // perfectly but cut the declared ending across scenes 3 and 4, so the
+    // ending contract failed on a structurally complete plan. Both attempts
+    // burned the minor budget and the router's "accept best available result"
+    // then had an empty storyboard to accept, ending the run at Finalize.
+    const scenes = makeScenes([
+      "Alpha beta gamma delta.",
+      "Epsilon zeta eta theta.",
+      "Iota kappa lambda mu. Nu xi",
+      "omicron pi.",
+    ]);
+    (scenes[3] as any).emotionalBeat = "reflection";
+    mockGenerate.mockResolvedValue(
+      buildResponse({ scenes, visualPlans: makePlans(4) }),
+    );
+
+    const { promise } = runNode({
+      content: {
+        title: "Title",
+        narration: NARRATION,
+        estimatedDurationSeconds: 50,
+        ending: {
+          type: "open_question",
+          narration: "Nu xi omicron pi.",
+          visualDirection: "Hold on the final evidence.",
+        },
+      },
+    });
+    const result = await promise;
+    const out = result.production?.scenes!;
+
+    expect(out).toHaveLength(4);
+    expect(result.production?.directorReview?.status).toBe("approved");
+    expect(out.at(-1)?.narration).toBe("Nu xi omicron pi.");
+    // The repair re-cuts the ORIGINAL narration, so it must still cover it
+    // exactly — no dropped or invented words.
+    expect(out.map((s) => s.narration).join(" ")).toContain(NARRATION);
+    expect(
+      result.diagnostics?.warnings?.some((w) =>
+        w.includes("ending reserved for the final scene"),
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps a complete storyboard when the ending contract cannot be met and no revision budget remains", async () => {
+    // The ending is not a suffix of the narration at all, so no re-cut can
+    // honour it. On the last affordable producer run there is no retry left, so
+    // rejecting would hand the router an empty storyboard and make its
+    // "accept best available result" decision vacuous.
+    const scenes = makeScenes([
+      "Alpha beta gamma delta.",
+      "Epsilon zeta eta theta.",
+      "Iota kappa lambda mu.",
+      "Nu xi omicron pi.",
+    ]);
+    (scenes[3] as any).emotionalBeat = "mystery";
+    mockGenerate.mockResolvedValue(
+      buildResponse({ scenes, visualPlans: makePlans(4) }),
+    );
+
+    const { promise } = runNode({
+      content: {
+        title: "Title",
+        narration: NARRATION,
+        estimatedDurationSeconds: 50,
+        ending: {
+          type: "open_question",
+          narration: "A different final sentence.",
+        },
+      },
+      execution: { version: "0.1.0", retryCount: { VisualDirector: 1 } },
+    });
+    const result = await promise;
+
+    expect(result.production?.scenes).toHaveLength(4);
+    expect(result.production?.directorReview?.status).toBe("minor_revision");
+    expect(
+      result.diagnostics?.warnings?.some(
+        (w) =>
+          w.includes("does not satisfy the ending contract") &&
+          w.includes("accepted anyway"),
+      ),
+    ).toBe(true);
+  });
+
   it("attaches the previous visual plan on promptQA major_revision", async () => {
     mockGenerate.mockResolvedValue(
       buildResponse({
@@ -485,5 +571,121 @@ describe("visualDirectorNode", () => {
     expect(userMsg!.content).toContain("Fresh structural feedback");
     expect(userMsg!.content).not.toContain("Stale PromptQA feedback");
     expect(mocks.loadPrompt).toHaveBeenCalledWith("visual-director/v1.md");
+  });
+
+  it("accepts enum spellings that only drifted cosmetically", async () => {
+    const scenes = makeScenes([
+      "Alpha beta gamma delta.",
+      "Epsilon zeta eta theta.",
+      "Iota kappa lambda mu.",
+      "Nu xi omicron pi.",
+    ]).map((s, i) => ({
+      ...s,
+      emotionalBeat: i === 0 ? "Intrigue" : "Mystery",
+      entities: [{ name: "Ada", type: "Human" }],
+    }));
+    mockGenerate.mockResolvedValue(
+      buildResponse({
+        scenes,
+        visualPlans: makePlans(4).map((p, i) => ({
+          ...p,
+          renderStyle: ["Photoreal", "3d", "archival", "oil-painting"][i],
+        })),
+      }),
+    );
+
+    const { promise } = runNode();
+    const result = await promise;
+
+    const out = result.production?.scenes!;
+    expect(out).toHaveLength(4);
+    expect(out[0].emotionalBeat).toBe("mystery");
+    expect(out[0].entities?.[0]?.type).toBe("person");
+    expect(result.production?.visualPlan?.map((p) => p.renderStyle)).toEqual([
+      "photorealistic",
+      "3D",
+      "archive-style",
+      "photorealistic",
+    ]);
+    expect(result.production?.directorReview?.status).toBe("approved");
+  });
+
+  /**
+   * Regression: an exhausted minor-revision budget could only "accept the best
+   * available result" if one existed, but every failure path returned
+   * `scenes: []`, so the router always finalized. The node now re-validates a
+   * rejected payload against a relaxed schema and keeps it when it is a
+   * structurally sound storyboard.
+   */
+  it("recovers a rejected storyboard that only missed the scene-count band", async () => {
+    // Two scenes whose narration concatenates back to the full narration, so
+    // normalization does not have to re-segment it.
+    const scenes = makeScenes([
+      "Alpha beta gamma delta. Epsilon zeta eta theta.",
+      "Iota kappa lambda mu. Nu xi omicron pi.",
+    ]);
+    mockGenerate.mockResolvedValue(
+      buildResponse({ scenes, visualPlans: makePlans(2) }),
+    );
+
+    const { promise } = runNode();
+    const result = await promise;
+
+    // Strict schema wants >= 4 scenes for the short profile.
+    expect(scenes).toHaveLength(2);
+    const out = result.production?.scenes!;
+    expect(out).toHaveLength(2);
+    expect(out.map((s) => s.narration).join(" ")).toBe(NARRATION);
+    expect(result.production?.visualPlan).toHaveLength(2);
+    // Reported as a minor revision, not approved: QA must know it was repaired.
+    expect(result.production?.directorReview?.status).toBe("minor_revision");
+    expect(result.production?.directorReview?.feedback).toContain("recovered");
+    expect(result.diagnostics?.errors).toBeUndefined();
+  });
+
+  it("still fails when a rejected payload is not a usable storyboard", async () => {
+    const scenes = makeScenes([
+      "Alpha beta gamma delta. Epsilon zeta eta theta.",
+      "Iota kappa lambda mu. Nu xi omicron pi.",
+    ]);
+    // Too few scenes to salvage, and no visual plans to cover them.
+    mockGenerate.mockResolvedValue(buildResponse({ scenes, visualPlans: [] }));
+
+    const { promise } = runNode();
+    const result = await promise;
+
+    expect(result.production?.scenes).toEqual([]);
+    expect(result.production?.directorReview?.status).toBe("minor_revision");
+    expect(result.production?.directorReview?.feedback).toContain(
+      "Schema validation failed",
+    );
+  });
+
+  it("does not salvage a payload the model never produced as JSON", async () => {
+    mockGenerate.mockResolvedValue({
+      output: "not json at all",
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+    });
+
+    const { promise } = runNode();
+    const result = await promise;
+
+    expect(result.production?.scenes).toEqual([]);
+    expect(result.production?.directorReview?.status).toBe("minor_revision");
+    expect(result.diagnostics?.errors?.[0]).toContain("Invalid JSON");
+  });
+
+  it("does not salvage when the transport failed before any response", async () => {
+    mockGenerate.mockRejectedValue(
+      Object.assign(new Error("boom"), { status: 401 }),
+    );
+
+    const { promise } = runNode();
+    const result = await promise;
+
+    expect(result.production?.scenes).toEqual([]);
+    // No recoverable review: the router's default branch finalizes the run.
+    expect(result.production?.directorReview).toBeUndefined();
+    expect(result.diagnostics?.errors?.[0]).toContain("boom");
   });
 });

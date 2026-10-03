@@ -253,6 +253,26 @@ function makeAssets(
   }));
 }
 
+/**
+ * Split `text` into exactly `count` contiguous chunks covering every word, so
+ * a re-segmented storyboard still reproduces the narration verbatim.
+ */
+function splitNarrationEvenly(text: string, count: number): string[] {
+  const words = text.match(/\S+\s*/g) ?? [];
+  const chunks: string[] = [];
+  let start = 0;
+  for (let i = 0; i < count; i++) {
+    const isLast = i === count - 1;
+    const target = Math.round(((i + 1) / count) * words.length);
+    const end = isLast
+      ? words.length
+      : Math.min(words.length, Math.max(start + 1, target));
+    chunks.push(words.slice(start, end).join(""));
+    start = end;
+  }
+  return chunks;
+}
+
 function makePromptQAResponse(
   status: "approved" | "minor_revision" | "major_revision",
   scenes: ReturnType<typeof makeScenes>,
@@ -305,6 +325,16 @@ function queueHappyPathMocks(
     scriptQA?: Record<string, unknown>[];
     promptQA?: "approved" | "minor_revision" | "major_revision";
     skipPromptQA?: boolean;
+    /**
+     * Replace the VisualDirector payload (and everything derived from it).
+     * `attempts` queues that many identical responses, because runAgent burns
+     * its own retry budget before the node ever sees a rejected payload.
+     */
+    visualDirector?: {
+      scenes: ReturnType<typeof makeScenes>;
+      visualPlans: ReturnType<typeof makeVisualPlans>;
+      attempts?: number;
+    };
   } = {},
 ) {
   const {
@@ -312,12 +342,14 @@ function queueHappyPathMocks(
     scriptQA = [{ status: "approved", feedback: "" }],
     promptQA = "approved",
     skipPromptQA = false,
+    visualDirector,
   } = options;
   const FACTS = makeFacts(8);
   const BEATS = makeBeats(6);
   const NARRATIONS = SCENE_NARRATIONS;
-  const SCENES = makeScenes(NARRATIONS, [8, 8, 8, 8, 8, 10]);
-  const VISUAL_PLANS = makeVisualPlans(SCENES);
+  const SCENES =
+    visualDirector?.scenes ?? makeScenes(NARRATIONS, [8, 8, 8, 8, 8, 10]);
+  const VISUAL_PLANS = visualDirector?.visualPlans ?? makeVisualPlans(SCENES);
   const ASSETS = makeAssets(SCENES, LONG_PROMPT);
 
   mockGenerate
@@ -448,12 +480,17 @@ function queueHappyPathMocks(
     ],
   });
 
-  mockGenerate
-    // 5. VisualDirector (gates the Metadata/Thumbnail fan-out)
-    .mockResolvedValueOnce({
+  // 5. VisualDirector (gates the Metadata/Thumbnail fan-out). One response
+  // per LLM attempt: a payload the strict schema rejects consumes the node's
+  // whole runAgent budget before the node can recover it.
+  const visualDirectorAttempts = visualDirector?.attempts ?? 1;
+  for (let i = 0; i < visualDirectorAttempts; i++) {
+    mockGenerate.mockResolvedValueOnce({
       output: JSON.stringify({ scenes: SCENES, visualPlans: VISUAL_PLANS }),
       usage: { promptTokens: 14, completionTokens: 28, totalTokens: 42 },
-    })
+    });
+  }
+  mockGenerate
     // 6. ImagePromptGenerator (after BranchJoin; parallel branch is queued above)
     .mockResolvedValueOnce({
       output: JSON.stringify({ assets: ASSETS }),
@@ -2380,6 +2417,60 @@ describe("Graph", () => {
     expect(result.diagnostics?.errors!.join("\n")).not.toContain(
       "composition failed",
     );
+  }, 30000);
+
+  /**
+   * Regression for the reported failure: every VisualDirector attempt was
+   * rejected by the strict schema, so the node returned `scenes: []` and the
+   * router's "accept best available result" had nothing to accept — the run
+   * ended at Finalize. A payload the strict schema rejects only for being over
+   * the scene-count band is still a structurally sound storyboard, so the node
+   * now recovers it and the run continues.
+   */
+  it("recovers a VisualDirector payload rejected only for its scene count", async () => {
+    // 13 scenes: over the short-profile maximum of 12, so the strict schema
+    // rejects all three LLM attempts. Coverage stays exact because the
+    // narration is split evenly rather than truncated.
+    const narrations = splitNarrationEvenly(SCENE_NARRATIONS.join(" "), 13);
+    const overlongScenes = makeScenes(
+      narrations,
+      Array.from({ length: 13 }, () => 4),
+    ).map((s, i) => ({
+      ...s,
+      // Stay inside the eight approved facts so no reference is dropped.
+      references: [`fact-${String((i % 8) + 1).padStart(3, "0")}`],
+    }));
+
+    queueHappyPathMocks({
+      visualDirector: {
+        scenes: overlongScenes,
+        visualPlans: makeVisualPlans(overlongScenes),
+        attempts: 3,
+      },
+    });
+
+    const result = await graph.invoke(
+      {
+        project: { pillar: "Geography", topic: "Mystery Island" },
+        branding: { channel: "TestChannel", creator: "", cta: "Subscribe" },
+        execution: { version: "0.1.0" },
+      },
+      {
+        recursionLimit: 100,
+        configurable: happyPathConfigurable(),
+      } as any,
+    );
+
+    // The recovered storyboard is usable, so the graph left VisualDirector.
+    expect(result.production?.scenes).toHaveLength(13);
+    // Flagged as a revision, not approved, so downstream QA knows it was repaired.
+    expect(result.production?.directorReview?.status).toBe("minor_revision");
+    // The gated branches ran — before the fix these never started.
+    expect(result.metadataOutput?.title).toBeDefined();
+    expect(result.thumbnail?.thumbnailPrompt).toBeDefined();
+    // And the run finished rather than dying at Finalize.
+    expect(result.execution.status).toBe("complete");
+    expect(result.publishing?.results![0].status).toBe("published");
   }, 30000);
 
   it("PublishReady single-fire: Metadata/Thumbnail synchronize at BranchJoin, PublishReady runs once post-ReleaseReview", async () => {
