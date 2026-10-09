@@ -72,14 +72,21 @@ export function assertHeaders(rows) {
 }
 
 /**
- * First backlog row with Status "planned" and non-empty Video ID, Category,
- * and Topic. Planned rows missing any required field are skipped and reported
- * through `log` so a malformed row can never seed an invalid project. Rows
- * are 1-based sheet positions; the header row is row 1.
+ * Every backlog row with Status "planned" and non-empty Video ID, Category,
+ * and Topic, in sheet order. Planned rows missing any required field are
+ * skipped and reported through `log` so a malformed row can never seed an
+ * invalid project. Rows are 1-based sheet positions; the header row is row 1.
  *
- * @returns {null | { videoId: string, category: string, topic: string, rowIndex: number }}
+ * Callers that only need the head of the backlog should use
+ * `pickPendingRow`; the launcher needs the full list so it can step past a
+ * row whose run already published (the sheet row stays "planned" whenever
+ * the post-publish write-back fails, and re-running that row would loop
+ * forever).
+ *
+ * @returns {Array<{ videoId: string, category: string, topic: string, rowIndex: number }>}
  */
-export function pickPendingRow(rows, log = () => {}) {
+export function pickPendingRows(rows, log = () => {}) {
+  const pending = [];
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i] ?? [];
     const status = String(row[COLUMN.STATUS] ?? "").trim();
@@ -99,9 +106,19 @@ export function pickPendingRow(rows, log = () => {}) {
       continue;
     }
 
-    return { videoId, category, topic, rowIndex: i + 1 };
+    pending.push({ videoId, category, topic, rowIndex: i + 1 });
   }
-  return null;
+  return pending;
+}
+
+/**
+ * First backlog row with Status "planned" and non-empty Video ID, Category,
+ * and Topic — the head of `pickPendingRows`.
+ *
+ * @returns {null | { videoId: string, category: string, topic: string, rowIndex: number }}
+ */
+export function pickPendingRow(rows, log = () => {}) {
+  return pickPendingRows(rows, log)[0] ?? null;
 }
 
 /**

@@ -40,6 +40,11 @@ function boundedCellRange(sheetName: string, rowNumber: number): string {
  * Reads the full sheet, validates headers, matches an existing row, and either
  * updates it in place or appends a new one. Throws a classified `SheetsError`
  * on any failure so callers decide how to degrade.
+ *
+ * The target tab is chosen by the run's resolved video profile (see
+ * `googleSheetsSheetNameForSource`), so the Video ID is unique within the tab
+ * the run belongs to and the match is unambiguous — no content comparison is
+ * needed or wanted here.
  */
 export async function syncVideoRecord(
   options: SyncVideoRecordOptions,
@@ -187,11 +192,16 @@ export async function syncPublishResults(options: {
     } catch (error) {
       const classified =
         error instanceof Error && "info" in error
-          ? (error as { info: { code: string; retryable: boolean } }).info
-          : { code: "unknown", retryable: false };
+          ? (
+              error as {
+                info: { code: string; retryable: boolean; message?: string };
+              }
+            ).info
+          : { code: "unknown", retryable: false, message: undefined };
       logger.error(`Google Sheets sync failed for video ${projectId}`, {
         code: classified.code,
         retryable: classified.retryable,
+        message: classified.message,
       });
     }
   }

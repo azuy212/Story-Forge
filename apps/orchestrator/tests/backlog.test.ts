@@ -1,6 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
 import {
   pickPendingRow,
+  pickPendingRows,
   nextPublishSlot,
   EXPECTED_HEADERS,
 } from "../src/integrations/google-sheets/sheets-format.mjs";
@@ -61,6 +62,51 @@ describe("pickPendingRow", () => {
 
   it("returns null for an empty sheet", () => {
     expect(pickPendingRow([])).toBeNull();
+  });
+});
+
+describe("pickPendingRows", () => {
+  it("returns every valid planned row in sheet order", () => {
+    const rows = [
+      EXPECTED_HEADERS,
+      plannedRow(),
+      plannedRow({ 4: "published" }),
+      plannedRow({ 0: "def456", 2: "The Mary Celeste" }),
+    ];
+    expect(pickPendingRows(rows)).toEqual([
+      {
+        videoId: "abc123",
+        category: "Geography",
+        topic: "Unrecognized Countries",
+        rowIndex: 2,
+      },
+      {
+        videoId: "def456",
+        category: "Geography",
+        topic: "The Mary Celeste",
+        rowIndex: 4,
+      },
+    ]);
+  });
+
+  it("skips malformed planned rows and logs each reason", () => {
+    const logs: string[] = [];
+    const rows = [
+      EXPECTED_HEADERS,
+      plannedRow({ 2: "" }),
+      plannedRow({ 0: "ok123" }),
+    ];
+    expect(
+      pickPendingRows(rows, (m) => logs.push(m)).map((r) => r.videoId),
+    ).toEqual(["ok123"]);
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toContain("missing Topic");
+  });
+
+  it("returns an empty list when nothing is planned", () => {
+    expect(
+      pickPendingRows([EXPECTED_HEADERS, plannedRow({ 4: "done" })]),
+    ).toEqual([]);
   });
 });
 

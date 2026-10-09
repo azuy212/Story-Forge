@@ -5,13 +5,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatRelativeTime(iso: string | null | undefined): string {
+export function formatRelativeTime(
+  iso: string | null | undefined,
+): string {
   if (!iso) return "—";
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return "—";
-  const diff = Date.now() - t;
+  const timestamp = new Date(iso).getTime();
+  if (Number.isNaN(timestamp)) return "—";
+  const diff = timestamp - Date.now();
   const abs = Math.abs(diff);
-  const sign = diff < 0 ? -1 : 1;
+
   const units: [Intl.RelativeTimeFormatUnit, number][] = [
     ["year", 365 * 24 * 60 * 60 * 1000],
     ["month", 30 * 24 * 60 * 60 * 1000],
@@ -21,10 +23,12 @@ export function formatRelativeTime(iso: string | null | undefined): string {
     ["minute", 60 * 1000],
     ["second", 1000],
   ];
-  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  const rtf = new Intl.RelativeTimeFormat(undefined, {
+    numeric: "auto",
+  });
   for (const [unit, ms] of units) {
     if (abs >= ms || unit === "second") {
-      return rtf.format(sign * Math.round(abs / ms), unit);
+      return rtf.format(Math.round(diff / ms), unit);
     }
   }
   return "—";

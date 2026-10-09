@@ -1,14 +1,19 @@
 #!/usr/bin/env node
 // Backlog-driven run launcher.
 //
-// Reads the Google Sheets backlog, picks the first valid "planned" row
-// (Video ID + Category + Topic), then:
-//   - if a run already exists for that topic, resumes it from its persisted
-//     state (the run's persisted projectId is preserved; the next free
-//     publish slot is (re)seeded so a resumed run still publishes at a
-//     valid schedule time),
+// Reads the Google Sheets backlog and walks the valid "planned" rows
+// (Video ID + Category + Topic) in sheet order until one is actionable:
+//   - if a run already exists for that topic in the same profile, resumes it
+//     from its persisted state (the run's persisted projectId is preserved;
+//     the next free publish slot is (re)seeded so a resumed run still
+//     publishes at a valid schedule time),
 //   - otherwise creates a new run seeded with the row's projectId, pillar
 //     (Category), topic, and the next free publish slot.
+//
+// Rows whose run already published are reported and stepped past: the sheet
+// row only leaves "planned" when the post-publish write-back succeeds, so a
+// failed write-back would otherwise resume that finished run on every launch
+// and the backlog would never advance.
 //
 // Publish slots depend on the profile:
 //   - short: {12:00, 20:00} daily
@@ -36,7 +41,7 @@ import dotenv from "dotenv";
 import { Command } from "commander";
 import {
   assertHeaders,
-  pickPendingRow,
+  pickPendingRows,
   nextPublishSlot,
   nextLongPublishSlot,
   COLUMN,
@@ -167,7 +172,7 @@ function buildNamespace(topic) {
   return `${stamp}-${slugify(topic)}`;
 }
 
-export function findRunByTopic(runsDir, topic) {
+export function findRunByTopic(runsDir, topic, profile) {
   const wanted = String(topic ?? "").trim();
   let match = null;
   let matchCreatedAt = "";
@@ -179,6 +184,13 @@ export function findRunByTopic(runsDir, topic) {
     if (!existsSync(path)) continue;
     const meta = JSON.parse(readFileSync(path, "utf-8"));
     if (String(meta?.topic ?? "").trim() !== wanted) continue;
+    // A run belongs to exactly one profile. The same topic can be planned in
+    // both backlog tabs under different Video IDs, so a profile-scoped
+    // launcher (`--profile long`) must never resume a short run that happens
+    // to share the topic. Runs with no recorded profile predate the field and
+    // stay matchable; the caller then honors the requested profile.
+    const runProfile = meta?.videoProfile ?? null;
+    if (profile && runProfile && runProfile !== profile) continue;
     const createdAt = meta?.createdAt ?? "";
     if (!match || createdAt > matchCreatedAt) {
       match = { ns: dir.name, meta };
@@ -188,6 +200,38 @@ export function findRunByTopic(runsDir, topic) {
   return match;
 }
 
+function readManifest(runsDir, ns) {
+  const path = join(runsDir, ns, "manifest.json");
+  if (!existsSync(path)) return null;
+  try {
+    return JSON.parse(readFileSync(path, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True when the run already holds a complete `publish` artifact, i.e. the
+ * platform owns a video for it. `publisher-service.ts` keys publication
+ * records by `<namespace>:<platform>`, so a resume reuses the existing video
+ * instead of uploading a second one — which means resuming such a run from
+ * the backlog accomplishes nothing except burning a run and re-seeding the
+ * publish slot forever. The sheet row stays "planned" in exactly the case
+ * that matters here: the publish succeeded but the post-publish write-back
+ * failed, so the launcher must step past the row rather than loop on it.
+ *
+ * Same manifest signal `qa-retry-reset.mjs` uses for "already-published".
+ */
+export function isRunAlreadyPublished(runsDir, ns) {
+  const manifest = readManifest(runsDir, ns);
+  const entry = manifest?.publish;
+  if (!entry?.versions) return false;
+  const latest = entry.versions.find(
+    (v) => v.version === Number(String(entry.latest ?? "").replace("v", "")),
+  );
+  return latest?.status === "complete";
+}
+
 export function decideRun(runsDir, rows, profile = "short", now = new Date()) {
   const scheduledAtValues = rows
     .slice(1)
@@ -195,41 +239,80 @@ export function decideRun(runsDir, rows, profile = "short", now = new Date()) {
     .map((row) => String(row[COLUMN.SCHEDULED_AT] ?? "").trim())
     .filter(Boolean);
 
-  const pending = pickPendingRow(rows, (message) =>
+  const pendingRows = pickPendingRows(rows, (message) =>
     console.warn(`  ${message}`),
   );
-  if (!pending) {
+  if (pendingRows.length === 0) {
     return { action: "none", reason: "no-pending-row" };
   }
 
-  const existing = findRunByTopic(runsDir, pending.topic);
   const slotFn = profile === "long" ? nextLongPublishSlot : nextPublishSlot;
   const slot = slotFn(scheduledAtValues, now);
-  if (existing) {
+
+  // Walk the backlog in sheet order and take the first row this launcher can
+  // actually act on: a resumable run, or a fresh run when a slot is free.
+  // Rows whose run already published are reported and skipped so the backlog
+  // keeps moving.
+  const skipped = [];
+  for (const pending of pendingRows) {
+    const existing = findRunByTopic(runsDir, pending.topic, profile);
+    if (existing && isRunAlreadyPublished(runsDir, existing.ns)) {
+      skipped.push({
+        row: pending.rowIndex,
+        topic: pending.topic,
+        ns: existing.ns,
+      });
+      continue;
+    }
+
+    if (existing) {
+      return {
+        action: "resume",
+        ns: existing.ns,
+        pillar: existing.meta.pillar,
+        topic: existing.meta.topic,
+        profile: existing.meta.videoProfile ?? profile,
+        projectId: existing.meta.projectId ?? pending.videoId,
+        ...(slot ? { youtubePublishAt: slot } : {}),
+        ...(skipped.length > 0 ? { skipped } : {}),
+      };
+    }
+
+    if (!slot) {
+      return { action: "none", reason: "no-slot" };
+    }
+
     return {
-      action: "resume",
-      ns: existing.ns,
-      pillar: existing.meta.pillar,
-      topic: existing.meta.topic,
-      profile: existing.meta.videoProfile ?? "short",
-      projectId: existing.meta.projectId ?? pending.videoId,
-      ...(slot ? { youtubePublishAt: slot } : {}),
+      action: "create",
+      ns: buildNamespace(pending.topic),
+      pillar: pending.category,
+      topic: pending.topic,
+      profile,
+      projectId: pending.videoId,
+      youtubePublishAt: slot,
+      ...(skipped.length > 0 ? { skipped } : {}),
     };
   }
 
-  if (!slot) {
-    return { action: "none", reason: "no-slot" };
-  }
-
   return {
-    action: "create",
-    ns: buildNamespace(pending.topic),
-    pillar: pending.category,
-    topic: pending.topic,
-    profile,
-    projectId: pending.videoId,
-    youtubePublishAt: slot,
+    action: "none",
+    reason: "all-planned-rows-published",
+    skipped,
   };
+}
+
+/**
+ * Surface every backlog row the launcher stepped past, with the run that
+ * already published it. The sheet row is still "planned" in these cases, so
+ * the operator has to reconcile it by hand — say so loudly instead of
+ * silently moving on.
+ */
+function reportSkippedRows(skipped) {
+  for (const row of skipped ?? []) {
+    logger.warn(
+      `Skipping backlog row ${row.row} "${row.topic}": run ${row.ns} already published. Mark the sheet row scheduled/published or delete the run to retry it.`,
+    );
+  }
 }
 
 export async function readSheetRows(client, spreadsheetId, sheetName) {
@@ -642,12 +725,17 @@ export async function runLauncher({
   }
 
   const decision = decideRun(runsDir, rows, profile);
+  reportSkippedRows(decision.skipped);
   if (decision.action === "none") {
-    logger.info(
-      decision.reason === "no-pending-row"
-        ? "No pending planned rows in the backlog. Done."
-        : "No free publish slot within 30 days. Done.",
-    );
+    if (decision.reason === "no-pending-row") {
+      logger.info("No pending planned rows in the backlog. Done.");
+    } else if (decision.reason === "all-planned-rows-published") {
+      logger.info(
+        "Every planned row already has a published run. Fix the backlog Status column to schedule more. Done.",
+      );
+    } else {
+      logger.info("No free publish slot within 30 days. Done.");
+    }
     return;
   }
 
@@ -669,7 +757,7 @@ export async function runLauncher({
     youtubePublishAt: decision.youtubePublishAt,
   };
 
-  const existing = findRunByTopic(runsDir, decision.topic);
+  const existing = findRunByTopic(runsDir, decision.topic, profile);
   const attempt = existing
     ? (existing.meta?.threadHistory?.length ?? 0) + 1
     : 1;

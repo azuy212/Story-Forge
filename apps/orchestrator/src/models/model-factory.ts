@@ -201,103 +201,149 @@ export function createModel(
       const streamInactivityTimeoutMs = config.llmStreamInactivityTimeoutMs();
 
       const startedAt = Date.now();
-      const requestBody: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
-        model,
-        messages,
-        temperature: generateOptions?.temperature ?? 0.7,
-        max_tokens: generateOptions?.maxTokens,
-        response_format: generateOptions?.responseFormat,
-        stream: true,
-        stream_options: { include_usage: true },
-      };
-      const requestBodyBytes = Buffer.byteLength(
-        JSON.stringify(requestBody),
-        "utf-8",
-      );
-      let responseBytes: number | undefined;
-      let responseText: string | undefined;
-      let responseStatus: number | undefined;
-      let responseId: string | undefined;
-      let normalizedUsage: ReturnType<typeof normalizeUsage>;
-      let errorPayload: Record<string, unknown> | undefined;
+      let lastError: unknown | undefined;
 
-      try {
-        const {
-          text,
-          id,
-          model: responseModel,
-          usage,
-        } = await generateWithStreamTimeouts(
-          (signal) => client.chat.completions.create(requestBody, { signal }),
-          {
-            firstTokenTimeoutMs,
-            streamInactivityTimeoutMs,
-          },
-        );
-        responseStatus = 200;
-        responseId = id;
-        responseText = text;
-        responseBytes = Buffer.byteLength(responseText, "utf-8");
-        normalizedUsage = normalizeUsage(usage, {
-          model: responseModel ?? model,
-          requestId: id,
-        });
-        return {
-          output: responseText,
-          usage: normalizedUsage,
-        };
-      } catch (err) {
-        const status =
-          typeof err === "object" && err !== null && "status" in err
-            ? (err as { status?: unknown }).status
-            : undefined;
-        const isTimeout =
-          typeof err === "object" &&
-          err !== null &&
-          "name" in err &&
-          (err as { name?: unknown }).name === "TimeoutError";
-        responseStatus = typeof status === "number" ? status : undefined;
-        errorPayload = {
-          name: (err as Error)?.name,
-          message: (err as Error)?.message ?? String(err),
-          status,
-          timedOut: isTimeout,
-        };
-        throw err;
-      } finally {
-        appendRunLogEvent(sink, {
-          event: "llm_call",
-          agent,
-          model,
-          promptPath: options.promptPath,
-          promptVersion: options.promptVersion,
-          promptHash: options.promptHash,
-          runId: options.runId,
-          invocationId: options.invocationId,
-          attempt: options.attempt ?? 1,
-          fromCache: options.fromCache ?? false,
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const targetModel = attempt === 0 ? model : config.defaultModel();
+        if (attempt > 0 && targetModel === model) {
+          // Already tried default model (same as original); don't retry same.
+          break;
+        }
+
+        const requestBody: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
+          model: targetModel,
+          messages,
           temperature: generateOptions?.temperature ?? 0.7,
-          maxTokens: generateOptions?.maxTokens,
-          responseFormat: generateOptions?.responseFormat,
-          requestBodyBytes,
-          requestBody: includeMessages
-            ? requestBody
-            : {
-                _omitted: true,
-                messageCount: messages.length,
-                requestBodyBytes,
-              },
-          responseStatus,
-          responseId,
-          responseBytes,
-          responseText: includeMessages ? responseText : undefined,
-          messages: includeMessages ? messages : undefined,
-          messageCount: messages.length,
-          usage: normalizedUsage ?? undefined,
-          requestDurationMs: Date.now() - startedAt,
-          error: errorPayload,
-        });
+          max_tokens: generateOptions?.maxTokens,
+          response_format: generateOptions?.responseFormat,
+          stream: true,
+          stream_options: { include_usage: true },
+        };
+        const requestBodyBytes = Buffer.byteLength(
+          JSON.stringify(requestBody),
+          "utf-8",
+        );
+        let responseBytes: number | undefined;
+        let responseText: string | undefined;
+        let responseStatus: number | undefined;
+        let responseId: string | undefined;
+        let normalizedUsage: ReturnType<typeof normalizeUsage>;
+        let errorPayload: Record<string, unknown> | undefined;
+
+        try {
+          const {
+            text,
+            id,
+            model: responseModel,
+            usage,
+          } = await generateWithStreamTimeouts(
+            (signal) => client.chat.completions.create(requestBody, { signal }),
+            {
+              firstTokenTimeoutMs,
+              streamInactivityTimeoutMs,
+            },
+          );
+          responseStatus = 200;
+          responseId = id;
+          responseText = text;
+          responseBytes = Buffer.byteLength(responseText, "utf-8");
+          normalizedUsage = normalizeUsage(usage, {
+            model: responseModel ?? targetModel,
+            requestId: id,
+          });
+          appendRunLogEvent(sink, {
+            event: "llm_call",
+            agent,
+            model: targetModel,
+            promptPath: options.promptPath,
+            promptVersion: options.promptVersion,
+            promptHash: options.promptHash,
+            runId: options.runId,
+            invocationId: options.invocationId,
+            attempt: options.attempt ?? 1,
+            fromCache: options.fromCache ?? false,
+            temperature: generateOptions?.temperature ?? 0.7,
+            maxTokens: generateOptions?.maxTokens,
+            responseFormat: generateOptions?.responseFormat,
+            requestBodyBytes,
+            requestBody: includeMessages
+              ? requestBody
+              : {
+                  _omitted: true,
+                  messageCount: messages.length,
+                  requestBodyBytes,
+                },
+            responseStatus,
+            responseId,
+            responseBytes,
+            responseText: includeMessages ? responseText : undefined,
+            messages: includeMessages ? messages : undefined,
+            messageCount: messages.length,
+            usage: normalizedUsage ?? undefined,
+            requestDurationMs: Date.now() - startedAt,
+            error: errorPayload,
+          });
+          return {
+            output: responseText,
+            usage: normalizedUsage,
+          };
+        } catch (err) {
+          const status =
+            typeof err === "object" && err !== null && "status" in err
+              ? (err as { status?: unknown }).status
+              : undefined;
+          const isTimeout =
+            typeof err === "object" &&
+            err !== null &&
+            "name" in err &&
+            (err as { name?: unknown }).name === "TimeoutError";
+          responseStatus = typeof status === "number" ? status : undefined;
+          errorPayload = {
+            name: (err as Error)?.name,
+            message: (err as Error)?.message ?? String(err),
+            status,
+            timedOut: isTimeout,
+          };
+          appendRunLogEvent(sink, {
+            event: "llm_call",
+            agent,
+            model: targetModel,
+            promptPath: options.promptPath,
+            promptVersion: options.promptVersion,
+            promptHash: options.promptHash,
+            runId: options.runId,
+            invocationId: options.invocationId,
+            attempt: options.attempt ?? 1,
+            fromCache: options.fromCache ?? false,
+            temperature: generateOptions?.temperature ?? 0.7,
+            maxTokens: generateOptions?.maxTokens,
+            responseFormat: generateOptions?.responseFormat,
+            requestBodyBytes,
+            requestBody: includeMessages
+              ? requestBody
+              : {
+                  _omitted: true,
+                  messageCount: messages.length,
+                  requestBodyBytes,
+                },
+            responseStatus,
+            responseId,
+            responseBytes,
+            responseText: includeMessages ? responseText : undefined,
+            messages: includeMessages ? messages : undefined,
+            messageCount: messages.length,
+            usage: normalizedUsage ?? undefined,
+            requestDurationMs: Date.now() - startedAt,
+            error: errorPayload,
+          });
+          lastError = err;
+          if (status === 404 && attempt === 0) {
+            continue;
+          }
+          throw err;
+        }
       }
+      throw lastError ?? new Error("LLM call failed after fallback");
     },
   };
 }

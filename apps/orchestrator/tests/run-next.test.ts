@@ -12,6 +12,7 @@ import { join } from "node:path";
 import {
   decideRun,
   findRunByTopic,
+  isRunAlreadyPublished,
   parseSseEvent,
   PRODUCER_NODES,
   reemitSseEventToSink,
@@ -52,6 +53,19 @@ function plannedRow(overrides: Partial<Record<number, string>> = {}): string[] {
 function addRun(ns: string, meta: Record<string, unknown>) {
   mkdirSync(join(runsDir, ns), { recursive: true });
   writeFileSync(join(runsDir, ns, "run.json"), JSON.stringify(meta));
+}
+
+function addPublishedRun(ns: string, meta: Record<string, unknown>) {
+  addRun(ns, meta);
+  writeFileSync(
+    join(runsDir, ns, "manifest.json"),
+    JSON.stringify({
+      publish: {
+        latest: "v1",
+        versions: [{ version: 1, status: "complete" }],
+      },
+    }),
+  );
 }
 
 const FIXED_NOW = new Date("2026-08-20T10:00:00");
@@ -229,6 +243,29 @@ describe("findRunByTopic", () => {
     });
     expect(findRunByTopic(runsDir, "Topic")?.ns).toBe("new");
   });
+
+  it("never returns a run from another profile", () => {
+    addRun("short-run", {
+      topic: "Topic",
+      videoProfile: "short",
+      createdAt: "2026-08-10T00:00:00.000Z",
+    });
+    addRun("long-run", {
+      topic: "Topic",
+      videoProfile: "long",
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    expect(findRunByTopic(runsDir, "Topic", "long")?.ns).toBe("long-run");
+    expect(findRunByTopic(runsDir, "Topic", "short")?.ns).toBe("short-run");
+  });
+
+  it("still matches legacy runs with no recorded profile", () => {
+    addRun("legacy", {
+      topic: "Topic",
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    expect(findRunByTopic(runsDir, "Topic", "long")?.ns).toBe("legacy");
+  });
 });
 
 const launcherEnv = () => ({
@@ -315,6 +352,48 @@ describe("runLauncher", () => {
     expect(options.youtubePublishAt).toMatch(
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
     );
+  });
+
+  it("skips an already-published backlog row, warns, and dispatches the next one", async () => {
+    addPublishedRun("done-run", {
+      topic: "Unrecognized Countries",
+      pillar: "Geography",
+      projectId: "abc123",
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    const deps = baseDeps();
+    deps.readRows = jest
+      .fn<typeof readSheetRows>()
+      .mockResolvedValue([
+        EXPECTED_HEADERS,
+        plannedRow(),
+        plannedRow({ 0: "def456", 2: "The Mary Celeste" }),
+      ]);
+    await expect(runLauncher(deps)).resolves.toBeUndefined();
+
+    expect(deps.resumeRun).toHaveBeenCalledTimes(1);
+    const [ns, input]: any[] = deps.resumeRun.mock.calls[0];
+    expect(ns).not.toBe("done-run");
+    expect(input.topic).toBe("The Mary Celeste");
+    const warn = (
+      logger as unknown as {
+        _captured: Array<{ level: string; message: string }>;
+      }
+    )._captured.find(
+      (c) => c.level === "warn" && c.message.includes("done-run"),
+    );
+    expect(warn?.message).toContain("already published");
+  });
+
+  it("does nothing when every planned row already published", async () => {
+    addPublishedRun("done-run", {
+      topic: "Unrecognized Countries",
+      pillar: "Geography",
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    const deps = baseDeps();
+    await expect(runLauncher(deps)).resolves.toBeUndefined();
+    expect(deps.resumeRun).not.toHaveBeenCalled();
   });
 
   it("resets QA retries for the last step before resuming when the flag is set", async () => {
@@ -491,6 +570,7 @@ describe("runLauncher", () => {
     await expect(
       runLauncher({
         ...deps,
+        profile: "long",
         manualArtifacts: { scriptQA: "/abs/script-qa.json" },
       }),
     ).resolves.toBeUndefined();
@@ -589,7 +669,7 @@ describe("decideRun profile routing", () => {
     );
   });
 
-  it("existing run with persisted videoProfile retains it", () => {
+  it("does not resume a run whose persisted profile differs", () => {
     addRun("geo-run-profile", {
       topic: "Unrecognized Countries",
       pillar: "Geography",
@@ -602,10 +682,39 @@ describe("decideRun profile routing", () => {
       "short",
       FIXED_NOW,
     );
-    expect(decision.profile).toBe("long");
+    // The same topic can be planned in both backlog tabs under different
+    // Video IDs; a short launch must never hijack the long run.
+    expect(decision).toMatchObject({
+      action: "create",
+      topic: "Unrecognized Countries",
+      profile: "short",
+      projectId: "abc123",
+    });
   });
 
-  it("legacy run without videoProfile defaults to short", () => {
+  it("resumes a same-profile run and keeps its persisted profile", () => {
+    addRun("geo-run-same-profile", {
+      topic: "Unrecognized Countries",
+      pillar: "Geography",
+      videoProfile: "long",
+      projectId: "legacy-1",
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    const decision: any = decideRun(
+      runsDir,
+      [EXPECTED_HEADERS, plannedRow()],
+      "long",
+      FIXED_NOW,
+    );
+    expect(decision).toMatchObject({
+      action: "resume",
+      ns: "geo-run-same-profile",
+      profile: "long",
+      projectId: "legacy-1",
+    });
+  });
+
+  it("legacy run without videoProfile honors the requested profile", () => {
     addRun("geo-run-legacy", {
       topic: "Unrecognized Countries",
       pillar: "Geography",
@@ -617,7 +726,102 @@ describe("decideRun profile routing", () => {
       "long",
       FIXED_NOW,
     );
-    expect(decision.profile).toBe("short");
+    expect(decision.action).toBe("resume");
+    expect(decision.profile).toBe("long");
+  });
+});
+
+describe("isRunAlreadyPublished", () => {
+  it("is false for a run with no manifest", () => {
+    addRun("no-manifest", { topic: "Topic" });
+    expect(isRunAlreadyPublished(runsDir, "no-manifest")).toBe(false);
+  });
+
+  it("is false when the latest publish artifact is not complete", () => {
+    addRun("pending-publish", { topic: "Topic" });
+    writeFileSync(
+      join(runsDir, "pending-publish", "manifest.json"),
+      JSON.stringify({
+        publish: {
+          latest: "v2",
+          versions: [
+            { version: 1, status: "complete" },
+            { version: 2, status: "pending" },
+          ],
+        },
+      }),
+    );
+    expect(isRunAlreadyPublished(runsDir, "pending-publish")).toBe(false);
+  });
+
+  it("is true once the latest publish artifact is complete", () => {
+    addPublishedRun("published", { topic: "Topic" });
+    expect(isRunAlreadyPublished(runsDir, "published")).toBe(true);
+  });
+
+  it("is false for an unreadable manifest", () => {
+    addRun("corrupt", { topic: "Topic" });
+    writeFileSync(join(runsDir, "corrupt", "manifest.json"), "{not json");
+    expect(isRunAlreadyPublished(runsDir, "corrupt")).toBe(false);
+  });
+});
+
+describe("decideRun backlog advance", () => {
+  it("skips a planned row whose run already published and takes the next one", () => {
+    addPublishedRun("titanic-run", {
+      topic: "Unrecognized Countries",
+      pillar: "Geography",
+      projectId: "abc123",
+      videoProfile: "short",
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    const decision: any = decideRun(
+      runsDir,
+      [
+        EXPECTED_HEADERS,
+        plannedRow(),
+        plannedRow({ 0: "def456", 2: "The Mary Celeste" }),
+      ],
+      "short",
+      FIXED_NOW,
+    );
+    expect(decision).toMatchObject({
+      action: "create",
+      topic: "The Mary Celeste",
+      projectId: "def456",
+    });
+    expect(decision.skipped).toEqual([
+      { row: 2, topic: "Unrecognized Countries", ns: "titanic-run" },
+    ]);
+  });
+
+  it("reports every skipped row when all planned rows already published", () => {
+    addPublishedRun("done-1", {
+      topic: "Unrecognized Countries",
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    addPublishedRun("done-2", {
+      topic: "The Mary Celeste",
+      createdAt: "2026-08-02T00:00:00.000Z",
+    });
+    const decision: any = decideRun(
+      runsDir,
+      [
+        EXPECTED_HEADERS,
+        plannedRow(),
+        plannedRow({ 0: "def456", 2: "The Mary Celeste" }),
+      ],
+      "short",
+      FIXED_NOW,
+    );
+    expect(decision).toMatchObject({
+      action: "none",
+      reason: "all-planned-rows-published",
+    });
+    expect(decision.skipped.map((s: any) => s.ns)).toEqual([
+      "done-1",
+      "done-2",
+    ]);
   });
 });
 

@@ -20,20 +20,33 @@ export const COLUMN: {
 };
 export const PLANNED_STATUS: "planned";
 export const SLOT_HOURS: number[];
+export const LONG_SLOT_DAYS: number[];
 
 export function assertHeaders(rows: (string | number | boolean)[][]): void;
 
-export function pickPendingRow(
-  rows: (string | number | boolean)[][],
-  log?: (message: string) => void,
-): {
+export interface PendingRow {
   videoId: string;
   category: string;
   topic: string;
   rowIndex: number;
-} | null;
+}
+
+export function pickPendingRows(
+  rows: (string | number | boolean)[][],
+  log?: (message: string) => void,
+): PendingRow[];
+
+export function pickPendingRow(
+  rows: (string | number | boolean)[][],
+  log?: (message: string) => void,
+): PendingRow | null;
 
 export function nextPublishSlot(
+  scheduledAtValues?: string[],
+  now?: Date,
+): string | null;
+
+export function nextLongPublishSlot(
   scheduledAtValues?: string[],
   now?: Date,
 ): string | null;

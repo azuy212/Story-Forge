@@ -110,9 +110,21 @@ function allScenesResolved(scenes: Scene[]): boolean {
       scene.generationStatus === "retrying",
   );
   if (unresolved) return false;
-  return scenes
-    .filter((scene) => scene.generationPrompt)
-    .every((scene) => !!scene.assetUrl);
+
+  for (const scene of scenes.filter((s) => s.generationPrompt)) {
+    if (!scene.assetUrl) return false;
+
+    // Fail-closed: scenes that planned a generated asset must not silently
+    // fall back to a raw stock source image (e.g. source-image / source-video)
+    // because of provider failure or missing references.
+    if (scene.assetMode === "generated" || scene.generationMode === "generate") {
+      const kind = scene.assetKind ?? "";
+      if (kind === "source-image" || kind === "source-video") {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 interface AssetArtifact {
