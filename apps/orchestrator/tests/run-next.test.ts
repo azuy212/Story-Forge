@@ -108,7 +108,7 @@ describe("decideRun", () => {
     );
     expect(decision.action).toBe("resume");
     expect(decision.youtubePublishAt).toBe(
-      new Date("2026-08-20T12:00:00").toISOString(),
+      new Date("2026-08-20T18:00:00").toISOString(),
     );
   });
 
@@ -122,25 +122,24 @@ describe("decideRun", () => {
     const scheduled = new Date("2026-08-20T10:00:00");
     const rows = [EXPECTED_HEADERS, plannedRow()];
     for (let day = 0; day < 30; day++) {
-      for (const hour of [12, 20]) {
-        const slot = new Date(scheduled);
-        slot.setDate(slot.getDate() + day);
-        slot.setHours(hour, 0, 0, 0);
-        if (slot.getTime() <= FIXED_NOW.getTime()) continue;
-        rows.push([
-          `other-${day}-${hour}`,
-          "Geography",
-          "Other",
-          "Other",
-          "scheduled",
-          "yt-x",
-          "https://youtu.be/x",
-          "private",
-          slot.toISOString(),
-          "",
-          "",
-        ]);
-      }
+      const hour = 18;
+      const slot = new Date(scheduled);
+      slot.setDate(slot.getDate() + day);
+      slot.setHours(hour, 0, 0, 0);
+      if (slot.getTime() <= FIXED_NOW.getTime()) continue;
+      rows.push([
+        `other-${day}-${hour}`,
+        "Geography",
+        "Other",
+        "Other",
+        "scheduled",
+        "yt-x",
+        "https://youtu.be/x",
+        "private",
+        slot.toISOString(),
+        "",
+        "",
+      ]);
     }
     const decision: any = decideRun(runsDir, rows, "short", FIXED_NOW);
     expect(decision.action).toBe("resume");
@@ -175,7 +174,7 @@ describe("decideRun", () => {
       pillar: "Geography",
       topic: "Unrecognized Countries",
       projectId: "abc123",
-      youtubePublishAt: new Date("2026-08-20T12:00:00").toISOString(),
+      youtubePublishAt: new Date("2026-08-20T18:00:00").toISOString(),
     });
     expect(decision.ns).toMatch(/^\d{8}-\d{6}\.\d{3}-unrecognized-countries$/);
   });
@@ -204,7 +203,7 @@ describe("decideRun", () => {
     const rows = [
       EXPECTED_HEADERS,
       plannedRow(),
-      // A scheduled video occupies today's 12:00 slot.
+      // A scheduled video occupies today's 18:00 slot.
       [
         "other-1",
         "Geography",
@@ -214,7 +213,7 @@ describe("decideRun", () => {
         "yt-1",
         "https://youtu.be/yt-1",
         "private",
-        new Date("2026-08-20T12:00:00").toISOString(),
+        new Date("2026-08-20T18:00:00").toISOString(),
         "",
         "",
       ],
@@ -222,7 +221,7 @@ describe("decideRun", () => {
     const decision: any = decideRun(runsDir, rows, "short", FIXED_NOW);
     expect(decision.action).toBe("create");
     expect(decision.youtubePublishAt).toBe(
-      new Date("2026-08-20T20:00:00").toISOString(),
+      new Date("2026-08-21T18:00:00").toISOString(),
     );
   });
 });
@@ -655,8 +654,8 @@ describe("decideRun profile routing", () => {
     );
   });
 
-  it("short profile picks a daily 12:00 or 20:00 slot", () => {
-    // Wednesday 2026-08-19 10:00 → next short slot is Wednesday 2026-08-19 12:00
+  it("short profile picks a daily 18:00 slot", () => {
+    // Wednesday 2026-08-19 10:00 → next short slot is Wednesday 2026-08-19 18:00
     const now = new Date("2026-08-19T10:00:00");
     const decision: any = decideRun(
       runsDir,
@@ -665,7 +664,7 @@ describe("decideRun profile routing", () => {
       now,
     );
     expect(decision.youtubePublishAt).toBe(
-      new Date("2026-08-19T12:00:00").toISOString(),
+      new Date("2026-08-19T18:00:00").toISOString(),
     );
   });
 

@@ -115,48 +115,43 @@ describe("nextPublishSlot", () => {
 
   it("returns the earliest future slot the same day", () => {
     expect(nextPublishSlot([], fixedNow)).toBe(
-      new Date("2026-08-20T12:00:00").toISOString(),
+      new Date("2026-08-20T18:00:00").toISOString(),
     );
   });
 
-  it("moves to 20:00 after 12:00 has passed", () => {
+  it("moves to 18:00 when before 18:00", () => {
     const now = new Date("2026-08-20T15:00:00");
     expect(nextPublishSlot([], now)).toBe(
-      new Date("2026-08-20T20:00:00").toISOString(),
+      new Date("2026-08-20T18:00:00").toISOString(),
     );
   });
 
   it("skips occupied slots", () => {
     const now = new Date("2026-08-20T10:00:00");
-    const occupied = [new Date("2026-08-20T12:00:00").toISOString()];
+    const occupied = [new Date("2026-08-20T18:00:00").toISOString()];
     expect(nextPublishSlot(occupied, now)).toBe(
-      new Date("2026-08-20T20:00:00").toISOString(),
+      new Date("2026-08-21T18:00:00").toISOString(),
     );
   });
 
-  it("moves to the next day after both slots are gone", () => {
+  it("moves to the next day after the slot has passed", () => {
     const now = new Date("2026-08-20T21:00:00");
     expect(nextPublishSlot([], now)).toBe(
-      new Date("2026-08-21T12:00:00").toISOString(),
+      new Date("2026-08-21T18:00:00").toISOString(),
     );
   });
 
   it("skips consecutive occupied days", () => {
     const now = new Date("2026-08-20T10:00:00");
     const occupied = [
-      new Date("2026-08-20T12:00:00").toISOString(),
-      new Date("2026-08-20T20:00:00").toISOString(),
-      new Date("2026-08-21T12:00:00").toISOString(),
-      new Date("2026-08-21T20:00:00").toISOString(),
-      new Date("2026-08-22T12:00:00").toISOString(),
-      new Date("2026-08-22T20:00:00").toISOString(),
-      new Date("2026-08-23T12:00:00").toISOString(),
-      new Date("2026-08-23T20:00:00").toISOString(),
-      new Date("2026-08-24T12:00:00").toISOString(),
-      new Date("2026-08-24T20:00:00").toISOString(),
+      new Date("2026-08-20T18:00:00").toISOString(),
+      new Date("2026-08-21T18:00:00").toISOString(),
+      new Date("2026-08-22T18:00:00").toISOString(),
+      new Date("2026-08-23T18:00:00").toISOString(),
+      new Date("2026-08-24T18:00:00").toISOString(),
     ];
     expect(nextPublishSlot(occupied, now)).toBe(
-      new Date("2026-08-25T12:00:00").toISOString(),
+      new Date("2026-08-25T18:00:00").toISOString(),
     );
   });
 });
