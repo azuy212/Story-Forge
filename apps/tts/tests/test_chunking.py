@@ -6,6 +6,7 @@ installed.
 """
 
 import pytest
+
 from app.text_splitting import (
     MAX_CHUNK_CHARS,
     _is_valid_sentence_end,

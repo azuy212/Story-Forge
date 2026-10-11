@@ -1,3 +1,8 @@
 [tool.black]
 line-length = 88
 target-version = ["py311"]
+
+# Ruff config lives at the repository root and is shared by both Python
+# services, so their rule selection and line length cannot drift.
+[tool.ruff]
+extend = "../../ruff.toml"

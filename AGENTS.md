@@ -115,7 +115,8 @@ service still honors the envelope after a change.
 
 ## Safety
 
-- Never commit `.env`, API keys, Google browser profiles, generated media/audio, model caches, LangGraph artifacts. Local state: `outputs/`, `cache/`, `browser-profile/`, `runs/`, `dist/`.
+- Never commit `.env`, API keys, Google browser profiles, generated media/audio, model caches, LangGraph artifacts. Local state: `outputs/`, `cache/`, `browser-profile/`, `runs/`, `dist/` (all gitignored).
+- The tracked WAV files in `apps/tts/app/voices/` are the exception: they are voice *reference inputs* the engine prompts from, not generated output. Never write generated audio back into that directory.
 - Keep service HTTP contracts and provider interfaces explicit.
 
 ## Project-Specific Conventions
@@ -128,8 +129,8 @@ service still honors the envelope after a change.
 
 ## Testing Quirks
 
-- 221 unit tests, 8 integration tests passing.
+- Test counts move faster than this file; read them from the last CI run rather than from here.
 - Unit tests inject mock `createModel`/`provider` via `configurable` — no jest.mock.
-- Integration tests run full graph with mock LLM responses.
+- Integration tests run full graph with mock LLM responses; `apps/image-provider/tests/server.test.ts` drives Fastify routes in-process via `app.inject()`.
 - ChatterBox TTS cache fingerprint is a deployment contract: bump `CHATTERBOX_CACHE_VERSION` in `chatterbox-tts-provider.ts` when server-side model/voice pipeline changes, or cached scene audio goes stale.
 - Transcriber smoke test requires macOS `say`, `ffmpeg`, `ffprobe`.

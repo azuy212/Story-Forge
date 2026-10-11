@@ -274,6 +274,8 @@ export async function openRunLogSink(
   const sink = new FsRunLogSink(context.runId, filePath);
   sinks.set(context.runId, sink);
   registerProcessExitHandlers();
+  // Explicit allowlist of non-secret variables. Anything added here must be
+  // safe to commit: no keys, tokens, or paths that identify a user.
   const envSummary: Record<string, string | number | boolean | undefined> = {
     LOG_LEVEL: process.env.LOG_LEVEL,
     LOG_FORMAT: process.env.LOG_FORMAT,
@@ -293,7 +295,7 @@ export async function openRunLogSink(
     NODE_ENV: process.env.NODE_ENV,
     pid: process.pid,
     ppid: process.ppid,
-    cwd: process.cwd(),
+    cwd: relativeCwd(),
   };
   await sink.appendLine({
     runId: context.runId,
@@ -308,6 +310,19 @@ export async function openRunLogSink(
     env: envSummary,
   } as RunLogEventInput);
   return sink;
+}
+
+/**
+ * `process.cwd()` minus the user's home directory, so a run artifact never
+ * records an absolute path that identifies the machine that produced it.
+ */
+function relativeCwd(): string {
+  const cwd = process.cwd();
+  const home = process.env.HOME ?? process.env.USERPROFILE;
+  if (home && cwd.startsWith(home)) {
+    return `~${cwd.slice(home.length)}`;
+  }
+  return cwd;
 }
 
 export function getRunLogSink(runId: string): RunLogSink | null {

@@ -1,6 +1,7 @@
 """Contract tests for the TTS service error envelope."""
 
 import pytest
+
 from app.errors import (
     EmptyTextError,
     EngineBusyError,
