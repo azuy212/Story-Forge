@@ -13,17 +13,21 @@ const CONFIG = {
   generationType: 'image',
 } as unknown as Config;
 
-function makeDeps(overrides: {
-  generate?: () => Promise<never>;
-  isCached?: () => Promise<boolean>;
-  ensureBrowser?: () => Promise<void>;
-} = {}) {
+function makeDeps(
+  overrides: {
+    generate?: () => Promise<never>;
+    isCached?: () => Promise<boolean>;
+    ensureBrowser?: () => Promise<void>;
+  } = {},
+) {
   const logger = new Logger('error');
   const client = {
     isCached: overrides.isCached ?? (async () => true),
-    generate: overrides.generate ?? (async () => {
-      throw new Error('generate not stubbed');
-    }),
+    generate:
+      overrides.generate ??
+      (async () => {
+        throw new Error('generate not stubbed');
+      }),
   } as unknown as GeminiClient;
 
   return {
@@ -88,14 +92,14 @@ describe('http app', () => {
         url: '/generate',
         payload: {
           prompt: 'a red pixel',
-          referenceImages: [{ id: 'r1', filename: 'r.png', mime: 'image/png', base64: 'not base64!!' }],
+          referenceImages: [
+            { id: 'r1', filename: 'r.png', mime: 'image/png', base64: 'not base64!!' },
+          ],
         },
       });
       assert.equal(response.statusCode, 400);
       const details = response.json().error.details;
-      assert.ok(
-        details.some((d: { field: string }) => d.field === 'referenceImages.0.base64'),
-      );
+      assert.ok(details.some((d: { field: string }) => d.field === 'referenceImages.0.base64'));
     });
   });
 
@@ -114,17 +118,20 @@ describe('http app', () => {
         });
         assert.equal(response.statusCode, 422);
         const { requestId, ...error } = response.json().error;
-        assert.deepEqual({ error }, {
-          error: {
-            code: 'content_policy',
-            type: 'content_policy',
-            message: 'policy blocked',
-            rawMessage: 'raw policy text',
-            provider: 'gemini',
-            model: 'gemini-image-model',
-            retryable: false,
+        assert.deepEqual(
+          { error },
+          {
+            error: {
+              code: 'content_policy',
+              type: 'content_policy',
+              message: 'policy blocked',
+              rawMessage: 'raw policy text',
+              provider: 'gemini',
+              model: 'gemini-image-model',
+              retryable: false,
+            },
           },
-        });
+        );
         assert.match(requestId, /^[0-9a-f]{12}$/);
       },
     );
@@ -177,7 +184,10 @@ describe('http app', () => {
           assetType: 'image' as const,
           fromCache: false,
           assets: [
-            { filename: 'image-1', buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) },
+            {
+              filename: 'image-1',
+              buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+            },
           ],
         }),
       }),
@@ -205,7 +215,12 @@ describe('http app', () => {
           prompt: 'a red pixel',
           assetType: 'image' as const,
           fromCache: true,
-          assets: [{ filename: 'image-1', buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) }],
+          assets: [
+            {
+              filename: 'image-1',
+              buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+            },
+          ],
         }),
       }),
       async (app) => {
