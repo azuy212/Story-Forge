@@ -1,18 +1,18 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { ProviderError } from '../../core/errors';
-import type { GeminiClient } from '../../core/gemini-client';
-import type { Logger } from '../../logger';
-import type { Config } from '../../config';
-import type { AssetType, GenerationOptions, GenerationResult } from '../../core/types';
+import { ProviderError } from '../../core/errors.js';
+import type { GeminiClient } from '../../core/gemini-client.js';
+import type { Logger } from '../../logger.js';
+import type { Config } from '../../config.js';
+import type { AssetType, GenerationOptions, GenerationResult } from '../../core/types.js';
 import {
   buildErrorPayload,
   buildValidationError,
   newRequestId,
   PROVIDER_INFO,
   statusForProviderError,
-} from '../error-envelope';
-import { buildMediaPayload, mediaMime } from '../payloads';
-import { GenerateRequestSchema, type GenerateRequest } from '../request-schema';
+} from '../error-envelope.js';
+import { buildMediaPayload, mediaMime } from '../payloads.js';
+import { GenerateRequestSchema, type GenerateRequest } from '../request-schema.js';
 
 export interface GenerateRouteDeps {
   client: GeminiClient;
@@ -43,14 +43,15 @@ export function createGenerateHandler(deps: GenerateRouteDeps) {
     const result = GenerateRequestSchema.safeParse(request.body);
 
     if (!result.success) {
-      return reply
-        .status(400)
-        .send(
-          buildValidationError(requestId, result.error.issues.map((issue) => ({
+      return reply.status(400).send(
+        buildValidationError(
+          requestId,
+          result.error.issues.map((issue) => ({
             field: issue.path.join('.'),
             message: issue.message,
-          }))),
-        );
+          })),
+        ),
+      );
     }
 
     const { prompt, type, mode, referenceImages } = result.data;
@@ -70,11 +71,13 @@ export function createGenerateHandler(deps: GenerateRouteDeps) {
         logger.error('Failed to start browser', { error: msg });
         return reply
           .status(503)
-          .send(buildErrorPayload(
-          new ProviderError(`Browser init failed: ${msg}`, 'server_error'),
-          PROVIDER_INFO,
-          requestId,
-        ));
+          .send(
+            buildErrorPayload(
+              new ProviderError(`Browser init failed: ${msg}`, 'server_error'),
+              PROVIDER_INFO,
+              requestId,
+            ),
+          );
       }
     }
 
@@ -87,7 +90,9 @@ export function createGenerateHandler(deps: GenerateRouteDeps) {
           type: error.type,
           message: error.message,
         });
-        return reply.status(statusForProviderError(error)).send(buildErrorPayload(error, PROVIDER_INFO, requestId));
+        return reply
+          .status(statusForProviderError(error))
+          .send(buildErrorPayload(error, PROVIDER_INFO, requestId));
       }
       const msg = error instanceof Error ? error.message : String(error);
       logger.error('Generation failed', { error: msg });

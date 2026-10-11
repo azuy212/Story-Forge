@@ -1,6 +1,6 @@
 import type { BrowserContext, Page } from 'playwright';
-import type { Config } from '../config';
-import type { Logger } from '../logger';
+import type { Config } from '../config.js';
+import type { Logger } from '../logger.js';
 
 /**
  * Media collection for a generation round: snapshot what is already on the
@@ -57,10 +57,7 @@ export class MediaCollector {
     return new Set(srcs);
   }
 
-  async collectImages(
-    responseCache: Map<string, Buffer>,
-    oldSrcs: Set<string>,
-  ): Promise<Buffer[]> {
+  async collectImages(responseCache: Map<string, Buffer>, oldSrcs: Set<string>): Promise<Buffer[]> {
     const page = this.deps.getPage();
     if (!page) throw new Error('Page closed');
 
@@ -85,10 +82,7 @@ export class MediaCollector {
     return buffers;
   }
 
-  async collectVideos(
-    responseCache: Map<string, Buffer>,
-    oldSrcs: Set<string>,
-  ): Promise<Buffer[]> {
+  async collectVideos(responseCache: Map<string, Buffer>, oldSrcs: Set<string>): Promise<Buffer[]> {
     const page = this.deps.getPage();
     if (!page) throw new Error('Page closed');
 
@@ -206,10 +200,7 @@ export class MediaCollector {
     }, selector);
   }
 
-  private async downloadBuffer(
-    src: string,
-    cache: Map<string, Buffer>,
-  ): Promise<Buffer | null> {
+  private async downloadBuffer(src: string, cache: Map<string, Buffer>): Promise<Buffer | null> {
     if (cache.has(src)) return cache.get(src)!;
 
     if (src.startsWith('blob:')) {

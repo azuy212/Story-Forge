@@ -7,14 +7,14 @@ import { chromium } from 'playwright';
 import {
   assertReferenceUploadCount,
   uploadReferenceImages,
-} from '../src/core/reference-upload';
-import { GeminiClient } from '../src/core/gemini-client';
+} from '../src/core/reference-upload.js';
+import { GeminiClient } from '../src/core/gemini-client.js';
 import {
   GenerateRequestSchema,
   MAX_REFERENCE_IMAGE_BYTES,
-} from '../src/http/request-schema';
-import { loadConfig } from '../src/config';
-import { Logger } from '../src/logger';
+} from '../src/http/request-schema.js';
+import { loadConfig } from '../src/config.js';
+import { Logger } from '../src/logger.js';
 
 test('uploads reference image through Upload & tools file input', async () => {
   const browser = await chromium.launch({ headless: true });

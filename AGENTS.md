@@ -62,6 +62,7 @@ ResolveProfile → ResearchAgent → ResearchQA → ScriptPlanner → ScriptWrit
 ## Key Design Decisions (Orchestrator)
 
 - ESM only — `"type": "module"`, imports use `.js` extensions.
+- Module system: every workspace package is `"type": "module"`. The orchestrator and image-provider compile with `module`/`moduleResolution` = `NodeNext`, so `.js` specifiers are mandatory and `dist/` output runs under plain Node (`node dist/cli/cli.js`). admin-ui stays on Vite's `ESNext`/`Bundler` defaults because its server is plain `.mjs` run by `tsx`/`node` and its UI is bundled by Vite — it never emits Node-consumed relative imports, so NodeNext adds nothing there.
 - No `jest.mock()` — tests inject mocks via `RunnableConfig.configurable`.
 - No `process.env` in agents — accessed through `src/utils/config.ts`.
 - No `instanceof` — duck-type guards from `src/utils/errors.ts`.

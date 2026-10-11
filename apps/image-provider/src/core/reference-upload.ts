@@ -1,5 +1,5 @@
 import type { Page } from 'playwright';
-import type { ReferenceImage } from './types';
+import type { ReferenceImage } from './types.js';
 
 /**
  * Reference-image upload through Gemini's "Upload & tools" control.
@@ -32,10 +32,7 @@ export async function uploadReferenceImages(
   await page.keyboard.press('Escape').catch(() => {});
 }
 
-export function assertReferenceUploadCount(
-  uploadedCount: number,
-  expectedCount: number,
-): void {
+export function assertReferenceUploadCount(uploadedCount: number, expectedCount: number): void {
   if (uploadedCount !== expectedCount) {
     throw new Error(
       `Gemini reference upload accepted ${uploadedCount} of ${expectedCount} image(s)`,

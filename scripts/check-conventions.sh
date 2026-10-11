@@ -103,15 +103,29 @@ PY
 )"
 
 if [ -n "$zod_failures" ]; then
-  printf '%s\n' "$zod_failures" | while IFS= read -r hit; do
+  while IFS= read -r hit; do
     fail "z.record() must take a key and a value schema: ${hit#"$ROOT_DIR"/}"
-  done
+  done < <(printf '%s\n' "$zod_failures")
 fi
 
 # --- 5. No instanceof checks against framework base classes in agents ------
 # Use the duck-type guards in src/utils/errors.ts instead.
 if (cd "$ROOT_DIR" && grep -rn "instanceof BaseChatModel\|instanceof LangChainError" apps/orchestrator/src/agents --include="*.ts"); then
   fail "instanceof on framework base classes is banned in agents; use the duck-type guards in utils/errors.ts"
+fi
+
+# --- 6. ESM only: no CommonJS constructs in workspace sources ----------------
+# Every workspace package is "type": "module" and compiled to ESM. A bare
+# __dirname is the ESM-correct local (derived from import.meta.url), which is
+# allowed; a CJS require/module.exports is not.
+cjs_hits="$(grep -rn -e 'require(' -e 'module\.exports' -e '^exports\.' \
+  apps/orchestrator/src apps/image-provider/src apps/image-provider/tests \
+  apps/admin-ui/server apps/admin-ui/ui 2>/dev/null || true)"
+
+if [ -n "$cjs_hits" ]; then
+  while IFS= read -r hit; do
+    fail "CommonJS construct in an ESM package: $hit"
+  done < <(printf '%s\n' "$cjs_hits")
 fi
 
 if [ "$failures" -ne 0 ]; then

@@ -1,8 +1,8 @@
 import { pathToFileURL } from 'url';
-import { Logger } from '../logger';
-import { loadConfig, type Config } from '../config';
-import { GeminiClient } from '../core/gemini-client';
-import { createApp } from './app';
+import { Logger } from '../logger.js';
+import { loadConfig, type Config } from '../config.js';
+import { GeminiClient } from '../core/gemini-client.js';
+import { createApp } from './app.js';
 
 // Re-exported: these are the HTTP contract other modules (and the integration
 // tests) import from the server entry point.
@@ -10,7 +10,7 @@ export {
   GenerateRequestSchema,
   MAX_REFERENCE_IMAGE_BYTES,
   MAX_REFERENCE_REQUEST_BYTES,
-} from './request-schema';
+} from './request-schema.js';
 
 /**
  * Server lifecycle: lazy browser start, signal handling, and listen. Route

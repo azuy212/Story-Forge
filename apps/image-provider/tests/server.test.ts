@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { GeminiClient } from '../src/core/gemini-client';
-import { ProviderError, type ProviderErrorType } from '../src/core/errors';
-import { Logger } from '../src/logger';
-import { createApp } from '../src/http/app';
-import type { Config } from '../src/config';
+import type { GeminiClient } from '../src/core/gemini-client.js';
+import { ProviderError, type ProviderErrorType } from '../src/core/errors.js';
+import { Logger } from '../src/logger.js';
+import { createApp } from '../src/http/app.js';
+import type { Config } from '../src/config.js';
 
 const CONFIG = {
   logLevel: 'error',

@@ -1,5 +1,5 @@
-import { detectMediaExt, extToMime } from '../storage/asset-downloader';
-import type { GenerationResult } from '../core/types';
+import { detectMediaExt, extToMime } from '../storage/asset-downloader.js';
+import type { GenerationResult } from '../core/types.js';
 
 export interface MediaPayload {
   filename: string;
@@ -18,7 +18,5 @@ export function buildMediaPayload(result: GenerationResult): MediaPayload[] {
 
 /** MIME for a single asset, used by the non-JSON response branch. */
 export function mediaMime(result: GenerationResult): string {
-  return extToMime(
-    detectMediaExt(result.assets[0].buffer, result.assetType),
-  );
+  return extToMime(detectMediaExt(result.assets[0].buffer, result.assetType));
 }

@@ -1,5 +1,5 @@
 import type { Page } from 'playwright';
-import type { Logger } from '../logger';
+import type { Logger } from '../logger.js';
 
 /**
  * Reads the UI's own failure message when a generation produced nothing.

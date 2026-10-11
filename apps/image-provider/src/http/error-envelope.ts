@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { isRetryableType, ProviderError } from '../core/errors';
-import type { ProviderErrorType } from '../core/errors';
+import { isRetryableType, ProviderError } from '../core/errors.js';
+import type { ProviderErrorType } from '../core/errors.js';
 
 /** HTTP status for each normalized failure type. */
 export const ERROR_STATUS: Record<ProviderErrorType, number> = {

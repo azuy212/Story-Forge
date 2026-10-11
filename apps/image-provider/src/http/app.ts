@@ -1,11 +1,12 @@
 import cors from '@fastify/cors';
 import Fastify, { type FastifyError } from 'fastify';
-import type { Config } from '../config';
-import type { Logger } from '../logger';
-import type { GeminiClient } from '../core/gemini-client';
-import { createGenerateHandler } from './routes/generate';
-import { createHealthHandler } from './routes/health';
-import { MAX_REFERENCE_REQUEST_BYTES } from './request-schema';
+import type { Config } from '../config.js';
+import type { Logger } from '../logger.js';
+import type { GeminiClient } from '../core/gemini-client.js';
+import { createGenerateHandler } from './routes/generate.js';
+import type { GenerateRequest } from './request-schema.js';
+import { createHealthHandler } from './routes/health.js';
+import { MAX_REFERENCE_REQUEST_BYTES } from './request-schema.js';
 
 export interface ServerDeps {
   config: Config;
@@ -61,7 +62,7 @@ export function createApp(deps: ServerDeps) {
     createHealthHandler({ authenticated: () => browserReady }),
   );
 
-  app.post<{ Body: import('./request-schema').GenerateRequest }>(
+  app.post<{ Body: GenerateRequest }>(
     '/generate',
     createGenerateHandler({
       client,

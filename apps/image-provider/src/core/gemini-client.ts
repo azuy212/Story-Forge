@@ -1,25 +1,17 @@
 import { chromium, type Page, type BrowserContext, type Locator, type Response } from 'playwright';
-import type { Config } from '../config';
-import type { Logger } from '../logger';
-import { retry, RetryError } from './retry';
-import { ProviderError, isRetryableType, classifyGeminiError } from './errors';
-import { AssetDownloader } from '../storage/asset-downloader';
-import { AssetCache } from '../storage/cache';
-import { MediaCollector } from './media-collector';
-import { GeminiErrorDetector } from './gemini-error-detector';
-import { uploadReferenceImages } from './reference-upload';
-import type {
-  AssetType,
-  GenerationOptions,
-  GenerationResult,
-  MediaAsset,
-} from './types';
+import type { Config } from '../config.js';
+import type { Logger } from '../logger.js';
+import { retry, RetryError } from './retry.js';
+import { ProviderError, isRetryableType, classifyGeminiError } from './errors.js';
+import { AssetDownloader } from '../storage/asset-downloader.js';
+import { AssetCache } from '../storage/cache.js';
+import { MediaCollector } from './media-collector.js';
+import { GeminiErrorDetector } from './gemini-error-detector.js';
+import { uploadReferenceImages } from './reference-upload.js';
+import type { AssetType, GenerationOptions, GenerationResult, MediaAsset } from './types.js';
 
 // Re-exported so existing consumers of this module keep working.
-export {
-  assertReferenceUploadCount,
-  uploadReferenceImages,
-} from './reference-upload';
+export { assertReferenceUploadCount, uploadReferenceImages } from './reference-upload.js';
 
 export class GeminiClient {
   private context: BrowserContext | null = null;
@@ -498,19 +490,6 @@ export class GeminiClient {
 
     return false;
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   private logRetryWarnings(error: Error): void {
     const msg = error.message.toLowerCase();

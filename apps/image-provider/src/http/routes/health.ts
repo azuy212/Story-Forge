@@ -13,10 +13,7 @@ export interface HealthRouteDeps {
  * endpoint answers while a lazy browser start is still in flight.
  */
 export function createHealthHandler(deps: HealthRouteDeps) {
-  return async function health(
-    _request: FastifyRequest,
-    _reply: FastifyReply,
-  ) {
+  return async function health(_request: FastifyRequest, _reply: FastifyReply) {
     return {
       status: 'ok',
       service: SERVICE_NAME,
