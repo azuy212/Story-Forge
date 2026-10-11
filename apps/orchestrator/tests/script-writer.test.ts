@@ -315,6 +315,11 @@ describe("scriptWriterNode", () => {
         hook: "What if a country officially wasn't real?",
         script: "[OLD SCRIPT CONTENT] previous draft script with visual cues.",
         narration: "OLD SCRIPT CONTENT previous draft narration.",
+        beats: [
+          { beatId: 1, narration: "OLD BEAT ONE narration." },
+          { beatId: 2, narration: "OLD BEAT TWO narration." },
+        ],
+        retention: { pivotSentence: "OLD PIVOT SENTENCE declared." },
         callToAction: "Subscribe",
         estimatedDurationSeconds: 45,
       },
@@ -336,6 +341,44 @@ describe("scriptWriterNode", () => {
     expect(userMsg!.content).toContain(
       "OLD SCRIPT CONTENT previous draft narration.",
     );
+  });
+
+  it("carries the declared pivot anchor and beat split into a revision", async () => {
+    mockGenerate.mockResolvedValue(buildResponse());
+
+    const { promise } = runNode({
+      content: {
+        title: "The Country That Doesn't Exist",
+        hook: "What if a country officially wasn't real?",
+        script: "ONE. TWO. THREE.",
+        narration: "ONE. TWO. THREE.",
+        beats: [
+          { beatId: 1, narration: "ONE." },
+          { beatId: 2, narration: "TWO." },
+          { beatId: 3, narration: "THREE." },
+        ],
+        retention: { pivotSentence: "TWO." },
+        callToAction: "Subscribe",
+        estimatedDurationSeconds: 45,
+      },
+      scriptQA: {
+        status: "minor_revision",
+        feedback: "Flow issue.",
+        issues: ["Beat join is a restart"],
+      },
+    });
+    await promise;
+
+    const messages = mockGenerate.mock.calls[0][0] as {
+      role: string;
+      content: string;
+    }[];
+    const userMsg = messages.find((m) => m.role === "user");
+    // A revision baseline without the declared pivot sentence lets the writer
+    // re-declare a different one and fail the deterministic contract.
+    expect(userMsg!.content).toContain("Declared pivot sentence");
+    expect(userMsg!.content).toContain("TWO.");
+    expect(userMsg!.content).toContain("Beat 2: TWO.");
   });
 
   it("does not attach the previous script on a fresh run", async () => {

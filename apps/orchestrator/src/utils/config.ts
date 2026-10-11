@@ -32,6 +32,11 @@ export const config = {
     const value = Number(read("LLM_STREAM_INACTIVITY_TIMEOUT_MS") ?? "120000");
     return Number.isFinite(value) && value > 0 ? value : 120000;
   },
+  // --- Prompt version ---
+  // Every prompt lives at `<agent>/v1.md`; a candidate rollout sits beside it
+  // as v2. This selects which one loads, so an A/B is a single env var and a
+  // revert never touches the active files. Inert until explicitly set.
+  promptVersion: (): string => read("PROMPT_VERSION") || "v1",
   isDebug: (): boolean => read("LOG_LEVEL") === "debug",
   logFormat: (): "pretty" | "json" => {
     const value = read("LOG_FORMAT");

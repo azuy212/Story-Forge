@@ -116,6 +116,9 @@ const ScenePlanSchema = z.object({
   assetMode: AssetModeEnum,
   sceneRole: SceneRoleEnum,
   visualAnchor: z.string().optional(),
+  // Optional so visual plans cached before scene→beat traceability landed
+  // still validate on resume. PromptQA flags a story beat no scene covers.
+  sourceBeatIds: z.array(z.number().int()).optional(),
   entities: z.array(SceneEntitySchema).optional(),
   references: z.array(z.string()).optional(),
 });

@@ -236,6 +236,12 @@ export const SceneSchema = z.object({
   assetMode: AssetModeEnum.optional(),
   sceneRole: z.enum(["narrative", "b-roll"]).optional(),
   visualAnchor: z.string().optional(),
+  /**
+   * Story beats this scene narrates (the planner's beatIds). Optional for
+   * b-roll scenes and for plans produced before scene→beat traceability
+   * existed; PromptQA flags any story beat no scene covers.
+   */
+  sourceBeatIds: z.array(z.number().int()).optional(),
   assetKind: AssetKindEnum.optional(),
   entities: z.array(SceneEntitySchema).optional(),
   sourceAssetIds: z.array(z.string()).optional(),

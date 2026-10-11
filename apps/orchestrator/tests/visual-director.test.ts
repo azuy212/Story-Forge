@@ -356,6 +356,71 @@ describe("visualDirectorNode", () => {
     );
   });
 
+  it("carries continuity fields into the revision baseline", async () => {
+    mockGenerate.mockResolvedValue(
+      buildResponse({
+        scenes: makeScenes([
+          "Alpha beta gamma delta.",
+          "Epsilon zeta eta theta.",
+          "Iota kappa lambda mu.",
+          "Nu xi omicron pi.",
+        ]),
+        visualPlans: makePlans(4),
+      }),
+    );
+
+    const prevScenes = makeScenes([
+      "OLD VISUAL CONTENT scene one.",
+      "OLD VISUAL CONTENT scene two.",
+    ]).map((s, i) =>
+      i === 0
+        ? {
+            ...s,
+            visualAnchor: "Persian Gulf map with shipping lane",
+            transition: "match-cut" as const,
+            emphasis: "high" as const,
+            sourceBeatIds: [1, 2],
+          }
+        : {
+            ...s,
+            visualAnchor: "Persian Gulf map with shipping lane",
+            transition: "cut" as const,
+            emphasis: "low" as const,
+            sourceBeatIds: [3],
+          },
+    );
+
+    const { promise } = runNode({
+      production: {
+        scenes: prevScenes,
+        visualPlan: makePlans(2),
+        promptQA: {
+          status: "major_revision",
+          globalFeedback: "Keep the anchor stable.",
+          issues: ["Anchor changed mid-explanation"],
+          sceneResults: [],
+        },
+      },
+    } as any);
+    await promise;
+
+    const messages = mockGenerate.mock.calls[0][0] as {
+      role: string;
+      content: string;
+    }[];
+    const userMsg = messages.find((m) => m.role === "user");
+    // A baseline without these fields makes the anchor/transition/bookend and
+    // beat-coverage impossible for the revising model to preserve.
+    expect(userMsg!.content).toContain(
+      '"visualAnchor": "Persian Gulf map with shipping lane"',
+    );
+    expect(userMsg!.content).toContain('"transition": "match-cut"');
+    expect(userMsg!.content).toContain('"emphasis": "high"');
+    expect(userMsg!.content).toContain('"sourceBeatIds"');
+    expect(userMsg!.content).toContain('"transition": "cut"');
+    expect(userMsg!.content).toContain('"emphasis": "low"');
+  });
+
   it("does not attach a previous visual plan on a fresh run", async () => {
     mockGenerate.mockResolvedValue(
       buildResponse({
