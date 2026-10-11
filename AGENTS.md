@@ -32,18 +32,29 @@
 
 ## Pipeline Overview (Orchestrator)
 
-22 agents in sequence with conditional retry loops:
+23 nodes (`addNode` calls in `src/graph/index.ts`) wired with conditional edges. The
+declaration order below is the spine; retry loops and the entry router's seeded-state
+shortcuts are listed underneath.
 
 ```
-ResearchAgent → ResearchQA → StoryPlanner → ScriptWriter → ScriptQA
-→ VisualDirector → ImagePromptGenerator → PromptQA → AssetGenerator
-→ NarrationGenerator → SubtitleGenerator → VideoComposer
-→ ReleaseValidation → ReleaseReview → MetadataGenerator
-→ ThumbnailGenerator → Publisher
+ResolveProfile → ResearchAgent → ResearchQA → ScriptPlanner → ScriptWriter
+→ ScriptQA → MetadataGenerator → ThumbnailGenerator → VisualDirector
+→ BranchJoin → AssetStrategy → ImagePromptGenerator → PromptQA
+→ AssetGenerator → ImagePromptRepair → NarrationGenerator
+→ SubtitleGenerator → VideoComposer → ReleaseValidation
+→ ReleaseReview → PublishReady → Publisher → Finalize
 ```
 
+- `scripts/check-graph-docs.sh` derives the node list from `src/graph/index.ts` and asserts
+  this section contains exactly those names in order — rename a node without updating this
+  block and `pnpm lint` fails.
+- Entry router: `ResolveProfile` can jump straight to `VisualDirector` (research + script
+  already seeded) or `ScriptPlanner` (research only); otherwise the spine starts at
+  `ResearchAgent`.
 - QA gates (ResearchQA, ScriptQA, PromptQA, ReleaseValidation, ReleaseReview) can trigger retry loops back to producers.
-- MetadataGenerator/ThumbnailGenerator branch in parallel and join at Publisher; if spine dies at a QA gate, branch work is discarded.
+- `VisualDirector` fans out to `MetadataGenerator` and `ThumbnailGenerator`, which run in parallel and synchronize at `BranchJoin`; only then does the production spine (`AssetStrategy`) start. If a branch dies its guard routes to `Finalize`, so `BranchJoin` can never release with a half pair.
+- `AssetGenerator` routes failing scene prompts through `ImagePromptRepair` and back; only when every scene has an asset does the run reach `NarrationGenerator`.
+- `ReleaseReview` routes to `PublishReady` for the publish-ready handshake and `Publisher` for the upload itself; `Finalize` is the single exit every failure path terminates at.
 - All LLM agents use `runAgent()` harness: loads prompt from `prompts/`, splits on `\n---\n`, renders `{{variable}}`, injects editorial guidelines, invokes OpenRouter with `json_object`, retries on invalid JSON/schema failure, validates with Zod.
 - Scene-bounded narration: `NarrationGenerator` creates one TTS artifact per scene, concatenates via FFmpeg. `SubtitleGenerator` creates cues from same narration + measured scene durations (deterministic proportional timing, not waveform alignment).
 
