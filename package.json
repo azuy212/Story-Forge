@@ -14,8 +14,14 @@
     "dev:admin": "pnpm --filter admin-ui dev",
     "build": "pnpm --filter youtube-shorts-orchestrator build && pnpm --filter gemini-image-automation build && pnpm --filter admin-ui build",
     "test": "pnpm --filter youtube-shorts-orchestrator test",
-    "lint": "pnpm --filter youtube-shorts-orchestrator lint && pnpm --filter youtube-shorts-orchestrator lint:langgraph-json && pnpm --filter gemini-image-automation lint && pnpm lint:python",
-    "lint:python": "bash scripts/lint-python.sh"
+    "lint": "pnpm --filter youtube-shorts-orchestrator lint && pnpm --filter youtube-shorts-orchestrator lint:langgraph-json && pnpm --filter gemini-image-automation lint && pnpm lint:python && pnpm check:conventions && pnpm check:graph-docs",
+    "lint:python": "bash scripts/lint-python.sh",
+    "test:python": "bash scripts/test-python.sh",
+    "test:int": "pnpm --filter youtube-shorts-orchestrator test:int",
+    "format": "pnpm --filter youtube-shorts-orchestrator format && pnpm --filter gemini-image-automation format",
+    "format:check": "pnpm --filter youtube-shorts-orchestrator format:check && pnpm --filter gemini-image-automation format:check",
+    "check:conventions": "bash scripts/check-conventions.sh",
+    "check:graph-docs": "bash scripts/check-graph-docs.sh"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

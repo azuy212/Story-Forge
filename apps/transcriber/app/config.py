@@ -34,12 +34,19 @@ class Config:
 
         language = os.getenv("WHISPERX_LANGUAGE", "").strip() or None
 
+        # A blank value is the same as unset: `os.getenv` only substitutes the
+        # default when the variable is ABSENT, so an empty override would
+        # otherwise hand the engine an empty model name.
         return cls(
-            model=os.getenv("WHISPERX_MODEL", "large-v3").strip(),
+            model=(os.getenv("WHISPERX_MODEL") or "").strip() or "large-v3",
             device=device,
-            compute_type=os.getenv("WHISPERX_COMPUTE_TYPE", "int8").strip(),
+            compute_type=(
+                os.getenv("WHISPERX_COMPUTE_TYPE") or ""
+            ).strip()
+            or "int8",
             language=language,
-            force_transcribe=os.getenv(
-                "WHISPERX_FORCE_TRANSCRIBE", "0"
-            ).strip() in ("1", "true", "True"),
+            force_transcribe=(os.getenv("WHISPERX_FORCE_TRANSCRIBE") or "")
+            .strip()
+            .lower()
+            in ("1", "true"),
         )
