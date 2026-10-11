@@ -3,7 +3,7 @@
 ## Layout
 
 - `apps/orchestrator` — LangGraph TypeScript entrypoint (`langgraph.json` → `src/graph/index.ts:graph`). Coordinates all services over HTTP.
-- `apps/image-provider` — pnpm workspace package (Playwright + Fastify). Serves image generation via Gemini.
+- `apps/image-provider` — pnpm workspace package (Playwright + Fastify). Serves image generation via Gemini. Internal layout: `src/core/` (`gemini-client.ts`, `media-collector.ts`, `gemini-error-detector.ts`, `reference-upload.ts`, `retry.ts`, `errors.ts`, `types.ts`), `src/http/` (`app.ts`, `server.ts`, `routes/`, `error-envelope.ts`, `request-schema.ts`, `payloads.ts`), `src/cli/`, `src/storage/`, and `src/config.ts` / `src/logger.ts` / `src/index.ts` at the root. `createApp()` builds the Fastify app without lifecycle so routes are testable in-process via `app.inject()`.
 - `apps/tts` — Standalone Python 3.11 FastAPI service (ChatterBox TTS). Not a workspace package. Port 8010.
 - `apps/transcriber` — Standalone Python 3.11 FastAPI service (WhisperX forced alignment). Not a workspace package. Port 8030.
 - Orchestrator prompts are runtime files under `apps/orchestrator/prompts/`. Prompt loading resolves from CWD — run orchestrator commands via pnpm filters or from its package directory.

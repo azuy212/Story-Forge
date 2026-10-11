@@ -6,10 +6,13 @@ import { join } from 'node:path';
 import { chromium } from 'playwright';
 import {
   assertReferenceUploadCount,
-  GeminiClient,
   uploadReferenceImages,
-} from '../src/gemini-client';
-import { GenerateRequestSchema, MAX_REFERENCE_IMAGE_BYTES } from '../src/server';
+} from '../src/core/reference-upload';
+import { GeminiClient } from '../src/core/gemini-client';
+import {
+  GenerateRequestSchema,
+  MAX_REFERENCE_IMAGE_BYTES,
+} from '../src/http/request-schema';
 import { loadConfig } from '../src/config';
 import { Logger } from '../src/logger';
 

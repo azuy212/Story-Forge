@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { Command, type OptionValues } from 'commander';
 import * as clack from '@clack/prompts';
-import { loadConfig, type Config, type ConfigOverrides } from './config';
-import { Logger } from './logger';
-import { GeminiClient } from './gemini-client';
+import { loadConfig, type Config, type ConfigOverrides } from '../config';
+import { Logger } from '../logger';
+import { GeminiClient } from '../core/gemini-client';
 import { PromptReader } from './prompt-reader';
-import { startServer } from './server';
-import type { AssetType } from './types';
+import { startServer } from '../http/server';
+import type { AssetType } from '../core/types';
 
 const VERSION = '1.0.0';
 

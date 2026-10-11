@@ -5,7 +5,7 @@ import {
   isRetryableType,
   ProviderError,
   toProviderError,
-} from '../src/errors';
+} from '../src/core/errors';
 
 // Regression table for every message pattern surfaced by
 // `detectGenerationError` in gemini-client, so the classifier can never

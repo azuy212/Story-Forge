@@ -1,7 +1,7 @@
 import { loadConfig } from './config';
 import { Logger } from './logger';
-import { PromptReader } from './prompt-reader';
-import { GeminiClient } from './gemini-client';
+import { PromptReader } from './cli/prompt-reader';
+import { GeminiClient } from './core/gemini-client';
 
 async function main(): Promise<void> {
   const config = loadConfig();

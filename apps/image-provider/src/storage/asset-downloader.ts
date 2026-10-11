@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
-import type { Logger } from './logger';
-import type { AssetType, MediaAsset } from './types';
+import type { Logger } from '../logger';
+import type { AssetType, MediaAsset } from '../core/types';
 
 const IMAGE_MAGIC_BYTES: [number[], string][] = [
   [[0xff, 0xd8, 0xff], 'jpg'],
