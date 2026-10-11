@@ -57,6 +57,7 @@ describe('http app', () => {
       assert.equal(response.statusCode, 200);
       assert.deepEqual(response.json(), {
         status: 'ok',
+        service: 'gemini-image-provider',
         authenticated: false,
         browserReady: false,
       });
@@ -71,9 +72,12 @@ describe('http app', () => {
         payload: { prompt: '' },
       });
       assert.equal(response.statusCode, 400);
-      assert.equal(response.json().error, 'Validation failed');
-      assert.ok(Array.isArray(response.json().details));
-      assert.ok(response.json().details.length > 0);
+      const body = response.json();
+      assert.equal(body.error.code, 'INVALID_REQUEST');
+      assert.equal(body.error.message, 'Validation failed');
+      assert.ok(body.error.requestId);
+      assert.ok(Array.isArray(body.error.details));
+      assert.ok(body.error.details.length > 0);
     });
   });
 
@@ -88,7 +92,7 @@ describe('http app', () => {
         },
       });
       assert.equal(response.statusCode, 400);
-      const details = response.json().details;
+      const details = response.json().error.details;
       assert.ok(
         details.some((d: { field: string }) => d.field === 'referenceImages.0.base64'),
       );
@@ -109,8 +113,10 @@ describe('http app', () => {
           payload: { prompt: 'a red pixel' },
         });
         assert.equal(response.statusCode, 422);
-        assert.deepEqual(response.json(), {
+        const { requestId, ...error } = response.json().error;
+        assert.deepEqual({ error }, {
           error: {
+            code: 'content_policy',
             type: 'content_policy',
             message: 'policy blocked',
             rawMessage: 'raw policy text',
@@ -119,6 +125,7 @@ describe('http app', () => {
             retryable: false,
           },
         });
+        assert.match(requestId, /^[0-9a-f]{12}$/);
       },
     );
   });
@@ -138,6 +145,7 @@ describe('http app', () => {
         });
         assert.equal(response.statusCode, 429);
         assert.equal(response.json().error.retryable, true);
+        assert.ok(response.json().error.requestId);
       },
     );
   });

@@ -3,6 +3,10 @@ import { basename } from "node:path";
 import type { WordTimestamp } from "./subtitle-provider.js";
 import { config } from "../utils/config.js";
 import { PipelineError } from "../utils/errors.js";
+import {
+  describeServiceFailure,
+  parseServiceErrorEnvelope,
+} from "./service-error.js";
 import { sanitizeHeaders, withProviderLog } from "../utils/run-log.js";
 
 export interface AlignResult {
@@ -26,6 +30,15 @@ export interface WhisperXProvider {
 const REQUEST_TIMEOUT_MS = 600_000;
 const ALIGN_PATH = "/align";
 const BOUNDARY = `----pipeline-whisperx-${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+
+/** Envelope parsing is shared with every other provider client. */
+function safeJsonParse(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
 
 interface WhisperXWord {
   word?: unknown;
@@ -134,8 +147,15 @@ export class HttpWhisperXProvider implements WhisperXProvider {
     if (!response.ok) {
       const text = await response.text().catch(() => "");
       event.responseBody = text.slice(0, 8000);
+      const envelope = parseServiceErrorEnvelope(
+        safeJsonParse(text),
+      );
       throw new PipelineError(
-        `WhisperX alignment failed: HTTP ${response.status} ${response.statusText}`,
+        describeServiceFailure(
+          "WhisperX alignment failed",
+          envelope,
+          `HTTP ${response.status} ${response.statusText}`,
+        ),
         "WHISPERX_PROVIDER_ERROR",
       );
     }

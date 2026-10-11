@@ -50,6 +50,7 @@ export function createApp(deps: ServerDeps) {
             type: 'object',
             properties: {
               status: { type: 'string' },
+              service: { type: 'string' },
               authenticated: { type: 'boolean' },
               browserReady: { type: 'boolean' },
             },

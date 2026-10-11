@@ -10,7 +10,7 @@
 
 ## Setup And Services
 
-- Use pnpm `10.34.3` and Node.js 20+; CI tests Node 20 and 22.
+- Use pnpm `10.34.3` and Node.js 20+; CI tests Node 20 and 22 (unit + convention + graph-docs + Python 3.11 jobs).
 - `pnpm run setup:all` — installs JS deps, installs Chromium (Playwright), creates both Python venvs, installs requirements/dev tools, copies missing app `.env` files.
 - Secrets only in ignored app `.env` files. Real orchestrator LLM calls require `OPENROUTER_API_KEY`. Provider URLs default: `TTS_URL=8010`, `IMAGE_PROVIDER_URL=8020`, `TRANSCRIBER_URL=8030`.
 - `pnpm dev` starts all four services concurrently. Python commands must run from each service directory; root scripts handle this. Native processes are intentional (TTS/transcriber use PyTorch MPS on Apple Silicon).
@@ -19,7 +19,8 @@
 ## Verification
 
 - Root: `pnpm test`, `pnpm lint`, `pnpm build`.
-- `pnpm lint` = orchestrator Oxlint + LangGraph path validation + image-provider Oxlint + Ruff (both Python services).
+- `pnpm lint` = orchestrator Oxlint + LangGraph path validation + image-provider Oxlint + Ruff (both Python services) + conventions + graph-docs checks.
+- `pnpm test:python` (TTS + transcriber pytest), `pnpm test:int` (orchestrator integration), `pnpm contract:smoke` (provider HTTP contract against running services).
 - Orchestrator focused:
   - `pnpm --filter youtube-shorts-orchestrator typecheck`
   - `pnpm --filter youtube-shorts-orchestrator format:check`
@@ -73,17 +74,43 @@ ResolveProfile → ResearchAgent → ResearchQA → ScriptPlanner → ScriptWrit
 ### TTS (`apps/tts`)
 - FastAPI + Uvicorn, ChatterBox TTS (PyTorch MPS on Apple Silicon).
 - `requirements.txt`: fastapi, uvicorn, python-multipart, python-dotenv, torch, torchaudio, chatterbox-tts, soundfile, resemble-perth (git dep).
-- Dev: black, ruff.
+- Dev: black, ruff, pytest (see `apps/tts/dev-requirements.txt`); pure text-splitting helpers live in `app/text_splitting.py` so they are testable without torch.
 - Run: `cd apps/tts && venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8010`
 
 ### Transcriber (`apps/transcriber`)
 - FastAPI + Uvicorn, WhisperX forced alignment (wav2vec2 on MPS/CPU, Whisper ASR on CPU).
 - `requirements.txt`: fastapi, uvicorn[standard], python-multipart, whisperx, torch, torchaudio, numpy.
-- Dev: ruff.
+- Dev: ruff, pytest (see `apps/transcriber/dev-requirements.txt`).
 - Config via `.env`: `WHISPERX_MODEL=large-v3`, `WHISPERX_DEVICE=auto`, `WHISPERX_COMPUTE_TYPE=int8`, `WHISPERX_LANGUAGE=en`, `WHISPERX_FORCE_TRANSCRIBE=0`.
 - Run: `cd apps/transcriber && venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8030 --env-file .env`
 - POST `/align` accepts multipart `audio` (WAV) + optional `text` (known transcript). Returns word-level timestamps.
 - Forced alignment only when text + language supplied; otherwise falls back to ASR.
+
+## Provider HTTP Contracts
+
+Every service behind the orchestrator responds to failures with the same
+envelope, so a client can always recover a machine-readable code and a
+correlation id:
+
+```
+{ "error": { "code": "<STABLE_ID>", "message": "<caller-safe>", "requestId": "<12-hex>" } }
+```
+
+- `code` is the stable machine id. The image provider additionally reports
+  `type` (same value as `code`) plus `provider`, `model`, `retryable`, and
+  `rawMessage` for its existing consumers; the orchestrator reads the envelope
+  through `src/providers/service-error.ts`, which accepts `type` as the `code`
+  alias. Validation errors add a `details` array of `{field, message}`.
+- `message` never contains a file path, model internals, or raw exception text.
+- `requestId` correlates with the service-side traceback (`logging.exception`
+  logs it). TTS: one generation at a time, so a saturated engine answers 429
+  `ENGINE_BUSY`; engine failures are 503 `ENGINE_FAILURE`.
+- Health is `{ "status": ..., "service": "<id>" }` on `/health`. The TTS service
+  also answers `/` with the identical payload (deprecated alias).
+
+`bash scripts/contract-smoke.sh` asserts this contract against running
+services (skips any that are unreachable) — it is the fastest way to confirm a
+service still honors the envelope after a change.
 
 ## Safety
 

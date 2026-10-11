@@ -8,6 +8,10 @@ import type {
 import { config } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 import { PipelineError } from "../utils/errors.js";
+import {
+  describeServiceFailure,
+  readServiceError,
+} from "./service-error.js";
 import { runFfmpeg } from "./composer/ffmpeg/ffmpeg.js";
 import {
   appendRunLogEvent,
@@ -93,8 +97,15 @@ export class ChatterboxTTSProvider implements TTSProvider {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      // Surface the service's own code and correlation id: the envelope is the
+      // only trace from a TTS failure back to the service-side traceback.
+      const envelope = await readServiceError(response);
       throw new PipelineError(
-        `TTS synthesis failed: HTTP ${response.status} ${response.statusText}`,
+        describeServiceFailure(
+          "TTS synthesis failed",
+          envelope,
+          `HTTP ${response.status} ${response.statusText}`,
+        ),
         "TTS_PROVIDER_ERROR",
       );
     }

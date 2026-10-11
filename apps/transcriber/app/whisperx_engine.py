@@ -6,23 +6,16 @@ import time
 import whisperx
 
 from .config import Config
+from .errors import (
+    AlignmentError,
+    AudioDecodeError,
+    LanguageRequiredError,
+)
 
 logger = logging.getLogger("whisperx_engine")
 
 EPS = 0.05
 SAMPLE_RATE = 16000
-
-
-class AlignmentError(Exception):
-    pass
-
-
-class AudioDecodeError(Exception):
-    pass
-
-
-class LanguageRequiredError(Exception):
-    pass
 
 
 class WhisperXEngine:

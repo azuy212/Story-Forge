@@ -6,6 +6,8 @@ import type { Config } from '../../config';
 import type { AssetType, GenerationOptions, GenerationResult } from '../../core/types';
 import {
   buildErrorPayload,
+  buildValidationError,
+  newRequestId,
   PROVIDER_INFO,
   statusForProviderError,
 } from '../error-envelope';
@@ -36,17 +38,19 @@ export function createGenerateHandler(deps: GenerateRouteDeps) {
     reply: FastifyReply,
   ) {
     const { client, logger } = deps;
+    const requestId = newRequestId();
 
     const result = GenerateRequestSchema.safeParse(request.body);
 
     if (!result.success) {
-      return reply.status(400).send({
-        error: 'Validation failed',
-        details: result.error.issues.map((issue) => ({
-          field: issue.path.join('.'),
-          message: issue.message,
-        })),
-      });
+      return reply
+        .status(400)
+        .send(
+          buildValidationError(requestId, result.error.issues.map((issue) => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+          }))),
+        );
     }
 
     const { prompt, type, mode, referenceImages } = result.data;
@@ -66,7 +70,11 @@ export function createGenerateHandler(deps: GenerateRouteDeps) {
         logger.error('Failed to start browser', { error: msg });
         return reply
           .status(503)
-          .send(buildErrorPayload(new ProviderError(`Browser init failed: ${msg}`, 'server_error'), PROVIDER_INFO));
+          .send(buildErrorPayload(
+          new ProviderError(`Browser init failed: ${msg}`, 'server_error'),
+          PROVIDER_INFO,
+          requestId,
+        ));
       }
     }
 
@@ -79,13 +87,13 @@ export function createGenerateHandler(deps: GenerateRouteDeps) {
           type: error.type,
           message: error.message,
         });
-        return reply.status(statusForProviderError(error)).send(buildErrorPayload(error, PROVIDER_INFO));
+        return reply.status(statusForProviderError(error)).send(buildErrorPayload(error, PROVIDER_INFO, requestId));
       }
       const msg = error instanceof Error ? error.message : String(error);
       logger.error('Generation failed', { error: msg });
       return reply
         .status(503)
-        .send(buildErrorPayload(new ProviderError(msg, 'server_error'), PROVIDER_INFO));
+        .send(buildErrorPayload(new ProviderError(msg, 'server_error'), PROVIDER_INFO, requestId));
     }
 
     if (generation.assets.length === 0) {
@@ -95,6 +103,7 @@ export function createGenerateHandler(deps: GenerateRouteDeps) {
           buildErrorPayload(
             new ProviderError('No assets generated', 'server_error'),
             PROVIDER_INFO,
+            requestId,
           ),
         );
     }

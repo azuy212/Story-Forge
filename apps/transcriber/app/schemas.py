@@ -24,6 +24,7 @@ class AlignResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
+    service: str = "whisperx"
     alignment_model_loaded: bool
     asr_loaded: bool
     device: str

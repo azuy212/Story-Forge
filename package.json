@@ -22,7 +22,8 @@
     "format:check": "pnpm --filter youtube-shorts-orchestrator format:check && pnpm --filter gemini-image-automation format:check",
     "check:conventions": "bash scripts/check-conventions.sh",
     "check:graph-docs": "bash scripts/check-graph-docs.sh",
-    "test:all": "pnpm test && pnpm test:python && pnpm --filter gemini-image-automation test"
+    "test:all": "pnpm test && pnpm test:python && pnpm --filter gemini-image-automation test",
+    "contract:smoke": "bash scripts/contract-smoke.sh"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
