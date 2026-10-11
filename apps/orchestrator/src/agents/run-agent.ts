@@ -17,6 +17,7 @@ import {
 import { getArtifactDefByNode } from "../artifacts/registry.js";
 import { persistLlmUsage } from "../artifacts/usage.js";
 import { newInvocationId } from "../models/usage.js";
+import { config as configUtils } from "../utils/config.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
 
 import { DEFAULT_MAX_RETRIES } from "../utils/constants.js";
@@ -330,7 +331,7 @@ export async function runAgent<T>({
 
       // DEBUG: dump complete LLM request payload for inspection. Set
       // DEBUG_LLM_PAYLOAD=1 to enable (off by default to keep logs small).
-      if (process.env.DEBUG_LLM_PAYLOAD === "1") {
+      if (configUtils.debugLlmPayload()) {
         logger.debug(`${agent} LLM request payload`, {
           model: model.model,
           attempt,

@@ -37,6 +37,10 @@ export const config = {
   // as v2. This selects which one loads, so an A/B is a single env var and a
   // revert never touches the active files. Inert until explicitly set.
   promptVersion: (): string => read("PROMPT_VERSION") || "v1",
+  // DEBUG_LLM_PAYLOAD=1 dumps the full LLM request payload (messages +
+  // options) to debug logs. Off by default: the payload can contain the whole
+  // script under review.
+  debugLlmPayload: (): boolean => read("DEBUG_LLM_PAYLOAD") === "1",
   isDebug: (): boolean => read("LOG_LEVEL") === "debug",
   logFormat: (): "pretty" | "json" => {
     const value = read("LOG_FORMAT");

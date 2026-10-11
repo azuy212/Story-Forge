@@ -55,4 +55,5 @@ async function main(): Promise<void> {
   logger.info('All prompts processed');
 }
 
-main();
+// Entry point: deliberately fire-and-forget, hence the explicit void.
+void main();

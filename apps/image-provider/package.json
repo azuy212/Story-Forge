@@ -13,7 +13,7 @@
     "test:integration": "tsx --test tests/reference-upload.integration.test.ts",
     "serve": "tsx src/server.ts",
     "start": "tsx src/cli.ts",
-    "lint": "oxlint src --config ../../.oxlintrc.json --import-plugin --deny-warnings",
+    "lint": "oxlint src --config ../../.oxlintrc.json --import-plugin --deny-warnings --type-aware",
     "lint:fix": "oxlint src --config ../../.oxlintrc.json --import-plugin --fix",
     "format": "prettier --write 'src/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts'",
