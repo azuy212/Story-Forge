@@ -54,6 +54,12 @@ function serializeFacts(
     .join("\n\n");
 }
 
+/**
+ * Planner beats merged with the writer's narration for each beat. The flat
+ * narration cannot be judged per beat: check 5 reads the join between two
+ * beats and check 16 reads the closing beat that must pay a loop off, so both
+ * need the narration attributed to its beat.
+ */
 function serializeBeats(
   beats:
     | {
@@ -63,14 +69,20 @@ function serializeBeats(
         keyMessage: string;
       }[]
     | undefined,
+  writerBeats: { beatId: number; narration: string }[] | undefined,
 ): string {
   if (!beats || beats.length === 0) return "";
+  const narrationByBeat = new Map(
+    (writerBeats ?? []).map((b) => [b.beatId, b.narration]),
+  );
   return beats
     .map((b) => {
       const curiosity = b.curiosityQuestion
         ? `\nCuriosity Question: ${b.curiosityQuestion}`
         : "";
-      return `Beat ${b.beatId}\nPurpose: ${b.purpose}${curiosity}\nKey Message: ${b.keyMessage}`;
+      const narration = narrationByBeat.get(b.beatId);
+      const narrationLine = narration ? `\nNarration: ${narration}` : "";
+      return `Beat ${b.beatId}\nPurpose: ${b.purpose}${curiosity}\nKey Message: ${b.keyMessage}${narrationLine}`;
     })
     .join("\n\n");
 }
@@ -84,6 +96,42 @@ function serializeBeatWordCounts(
       (c) =>
         `Beat ${c.beatId}: ${c.words} words${c.targetWords !== undefined ? ` (target ${c.targetWords})` : ""}`,
     )
+    .join("\n");
+}
+
+function serializeBeatBoundaries(
+  boundaries: {
+    fromBeatId: number;
+    toBeatId: number;
+    previousLastSentence: string;
+    nextFirstSentence: string;
+  }[],
+): string {
+  if (!boundaries || boundaries.length === 0) return "";
+  return boundaries
+    .map(
+      (b) =>
+        `Beat ${b.fromBeatId} -> Beat ${b.toBeatId}\n  ends: ${b.previousLastSentence}\n  starts: ${b.nextFirstSentence}`,
+    )
+    .join("\n");
+}
+
+function serializeOpenLoops(
+  loops: {
+    beatId: number;
+    opensLoop?: string;
+    closesLoopFor?: number | null;
+  }[],
+): string {
+  if (!loops || loops.length === 0) return "";
+  return loops
+    .map((l) => {
+      const closes =
+        l.closesLoopFor !== null && l.closesLoopFor !== undefined
+          ? `closes loop from beat ${l.closesLoopFor}`
+          : "closes nothing";
+      return `Beat ${l.beatId}: ${l.opensLoop ? `opens "${l.opensLoop}"` : "opens no loop"} | ${closes}`;
+    })
     .join("\n");
 }
 
@@ -161,17 +209,30 @@ export async function scriptQANode(
   // Deterministic re-verification of the writer's declared retention contract
   // (ending type, ending-narration suffix, pivot existence, pivot→beat
   // containment, beat mapping, per-beat budgets). Fail-closed like the schema
-  // gates above: code must not delegate structurally checkable invariants to
-  // the LLM. A contract violation is BLOCKING — the QA retry policy would
-  // otherwise accept the best available script after one minor revision even
-  // though the declared anchors (ending, pivot) do not actually hold.
+  // gates above for BLOCKING issues: code must not delegate structurally
+  // checkable invariants to the LLM. A contract violation is BLOCKING — the QA
+  // retry policy would otherwise accept the best available script after one
+  // minor revision even though the declared anchors (ending, pivot) do not
+  // actually hold.
+  //
+  // Warn-severity issues are advisory: they are handed to the LLM reviewer as
+  // context (and are not, on their own, grounds to reject), which is what lets
+  // a heuristic check ship without vetoing drafts overnight.
   const contract = checkScriptContract(state, narration);
-  if (contract.issues.length > 0) {
+  const blockingIssues = contract.issues.filter(
+    (issue) => issue.severity === "block",
+  );
+  const warningIssues = contract.issues.filter(
+    (issue) => issue.severity === "warn",
+  );
+  if (blockingIssues.length > 0) {
     return {
       scriptQA: {
         status: "major_revision",
-        feedback: `Script QA: retention contract violation.\n${contract.issues.join("\n")}`,
-        issues: contract.issues,
+        feedback: `Script QA: retention contract violation.\n${blockingIssues
+          .map((issue) => issue.message)
+          .join("\n")}`,
+        issues: blockingIssues.map((issue) => issue.message),
       },
       diagnostics: {},
       execution: execution(AgentModel.ScriptQA),
@@ -240,7 +301,10 @@ export async function scriptQANode(
       targetWordRange,
       speakingRateWordsPerSecond: String(speakingRate),
       researchFacts: serializeFacts(research?.facts),
-      storyBeats: serializeBeats(state.storyPlan?.storyBeats),
+      storyBeats: serializeBeats(
+        state.storyPlan?.storyBeats,
+        state.content?.beats,
+      ),
       audienceTrigger: state.storyPlan?.audienceTrigger?.type ?? "",
       audienceTriggerStatement:
         state.storyPlan?.audienceTrigger?.statement ?? "",
@@ -250,7 +314,13 @@ export async function scriptQANode(
       derivedHookSentence: derivation.hookSentence,
       derivedPivotWordPosition: String(derivation.pivotWordPosition ?? -1),
       pivotBeatId: String(derivation.pivotBeatId ?? ""),
+      pivotFactId: derivation.pivotFactId ?? "",
       beatWordCounts: serializeBeatWordCounts(derivation.beatWordCounts),
+      beatBoundaries: serializeBeatBoundaries(derivation.beatBoundaries),
+      openLoops: serializeOpenLoops(derivation.openLoops),
+      contractWarnings: warningIssues
+        .map((issue) => `- ${issue.message}`)
+        .join("\n"),
       complexityReport: complexityFeedback,
       canvasGuidance: canvasGuidance.formatGuidance,
     },

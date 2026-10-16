@@ -12,6 +12,11 @@ const MOCK_PROMPT = [
   "CTA: {{cta}}",
   "Duration: {{estimatedDurationSeconds}}",
   "Facts: {{researchFacts}}",
+  "Story Beats: {{storyBeats}}",
+  "Pivot Fact ID: {{pivotFactId}}",
+  "Beat Boundaries: {{beatBoundaries}}",
+  "Open Loops: {{openLoops}}",
+  "Contract Warnings: {{contractWarnings}}",
 ].join("\n");
 
 const MOCK_GUIDELINES = "Editorial guidelines for testing.";
@@ -305,7 +310,6 @@ function choice(value: string, confidence: number) {
     probabilities: { [value]: confidence },
   };
 }
-
 function makeClassifierFactory(answers: Record<string, unknown>) {
   return jest.fn(() => ({
     provider: "typesafe",
@@ -420,5 +424,134 @@ describe("scriptQANode classifier path", () => {
     } finally {
       restore();
     }
+  });
+});
+
+const CONTRACT_BEATS = [
+  {
+    beatId: 1,
+    narration:
+      "What if a country officially wasn't real? The nation has no borders.",
+  },
+  {
+    beatId: 2,
+    narration:
+      "The nearest landmass is 2,000 km away. That distance keeps everyone out.",
+  },
+  {
+    beatId: 3,
+    narration: "Here is why it matters. That distance is the whole story.",
+  },
+];
+
+function contractState(overrides?: { pivotSentence?: string }) {
+  return {
+    project: { pillar: "Geography", topic: "Unrecognized Countries" },
+    content: {
+      ...BASE_CONTENT,
+      narration: CONTRACT_BEATS.map((b) => b.narration).join(" "),
+      beats: CONTRACT_BEATS,
+      ending: {
+        type: "open_question",
+        narration: "That distance is the whole story.",
+      },
+      retention: {
+        pivotSentence:
+          overrides?.pivotSentence ?? "That distance keeps everyone out.",
+      },
+    },
+    research: {
+      summary: "A remote island.",
+      facts: [
+        {
+          id: "fact-001",
+          fact: "It is one of the most isolated places on Earth.",
+          confidence: "high" as const,
+          sourceType: "general-knowledge" as const,
+        },
+      ],
+    },
+    storyPlan: {
+      content: {
+        title: "Title",
+        hook: "What if a country officially wasn't real?",
+      },
+      storyType: "mystery",
+      storySummary: "A country with no borders.",
+      storyBeats: [1, 2, 3].map((beatId) => ({
+        beatId,
+        purpose: "Advance the story",
+        viewerQuestion: "What happens next?",
+        curiosityQuestion: "What does it mean?",
+        keyMessage: `Key message for beat ${beatId}.`,
+        referencedFacts: ["fact-001"],
+        priority: "high",
+        targetWords: 20,
+        estimatedDurationSeconds: 14,
+        opensLoop: `Loop ${beatId}.`,
+        closesLoopFor: beatId === 1 ? null : beatId - 1,
+      })),
+      audienceTrigger: {
+        type: "curiosity",
+        statement: "The nation has no borders.",
+        factIds: ["fact-001"],
+      },
+      endingType: "open_question",
+      retention: { pivotBeatId: 2 },
+    },
+    execution: { version: "0.1.0" },
+  } as unknown as ProjectState;
+}
+
+describe("scriptQANode retention contract severity", () => {
+  it("rejects a blocking contract violation before any LLM call", async () => {
+    const { promise } = runNode(
+      contractState({ pivotSentence: "Nowhere present." }) as any,
+    );
+    const result = await promise;
+
+    expect(result.scriptQA?.status).toBe("major_revision");
+    expect(result.scriptQA?.issues).toContain(
+      "Retention contract: pivot sentence is not present in the narration",
+    );
+    expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
+  it("lets a warn-severity contract issue reach the reviewer", async () => {
+    mockGenerate.mockResolvedValue(buildResponse());
+    const { promise } = runNode(contractState() as any);
+    const result = await promise;
+
+    expect(result.scriptQA?.status).toBe("approved");
+    expect(mockGenerate).toHaveBeenCalled();
+    const userMsg = (
+      mockGenerate.mock.calls[0][0] as { role: string; content: string }[]
+    ).find((m) => m.role === "user");
+    expect(userMsg!.content).toContain("Hook payoff echo");
+    expect(userMsg!.content).toContain("Beat 2 -> Beat 3");
+  });
+
+  it("attributes narration to each beat so joins and payoffs are judgeable", async () => {
+    mockGenerate.mockResolvedValue(buildResponse());
+    const { promise } = runNode(contractState() as any);
+    await promise;
+
+    const userMsg = (
+      mockGenerate.mock.calls[0][0] as { role: string; content: string }[]
+    ).find((m) => m.role === "user");
+    // Check 5 needs the beat's sentences and check 16 the closing beat's
+    // narration; a flat concatenation cannot attribute either.
+    expect(userMsg!.content).toContain(
+      "Narration: What if a country officially wasn't real? The nation has no borders.",
+    );
+    expect(userMsg!.content).toContain(
+      "Narration: The nearest landmass is 2,000 km away. That distance keeps everyone out.",
+    );
+    expect(userMsg!.content).toContain(
+      "Narration: Here is why it matters. That distance is the whole story.",
+    );
+    // The declared ledger is quoted too, so check 16 can match openers to closes.
+    expect(userMsg!.content).toContain('opens "Loop 2."');
+    expect(userMsg!.content).toContain("closes loop from beat 1");
   });
 });

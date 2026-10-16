@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'path';
-import type { AssetType } from './types';
+import type { AssetType } from './core/types.js';
 
 dotenv.config();
 

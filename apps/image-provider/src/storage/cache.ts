@@ -1,9 +1,9 @@
 import { createHash } from 'crypto';
 import { readFile, writeFile, mkdir, stat, rename, rm, readdir } from 'fs/promises';
 import path from 'path';
-import type { Logger } from './logger';
-import type { AssetType, GenerationOptions, MediaAsset } from './types';
-import { detectMediaExt } from './asset-downloader';
+import type { Logger } from '../logger.js';
+import type { AssetType, GenerationOptions, MediaAsset } from '../core/types.js';
+import { detectMediaExt } from './asset-downloader.js';
 
 export interface CacheEntry {
   prompt: string;

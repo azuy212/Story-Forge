@@ -17,6 +17,12 @@ import {
 import { getArtifactDefByNode } from "../artifacts/registry.js";
 import { persistLlmUsage } from "../artifacts/usage.js";
 import { newInvocationId } from "../models/usage.js";
+import { config as configUtils } from "../utils/config.js";
+import {
+  LOG_TEXT_LIMIT,
+  sanitizeForLog,
+  sanitizeUnknownForLog,
+} from "../utils/log-redaction.js";
 import type { RunnableConfig } from "@langchain/core/runnables";
 
 import { DEFAULT_MAX_RETRIES } from "../utils/constants.js";
@@ -323,20 +329,23 @@ export async function runAgent<T>({
       // verbatim to the parse/schema retry feedback. Stays undefined (so no
       // stale content is attached) for timeout/transient failures.
       let rawContent: string | undefined;
+      let persistDebugOutput: string | undefined;
       const invocationId = newInvocationId();
       if (typeof model.setCallContext === "function") {
         model.setCallContext({ attempt, invocationId });
       }
 
-      // DEBUG: dump complete LLM request payload for inspection. Set
-      // DEBUG_LLM_PAYLOAD=1 to enable (off by default to keep logs small).
-      if (process.env.DEBUG_LLM_PAYLOAD === "1") {
+      // DEBUG: dump the request payload for inspection. Set DEBUG_LLM_PAYLOAD=1
+      // to enable (off by default). Even with it on, secrets are redacted and
+      // every field is capped so an opt-in dump cannot spill a key or the whole
+      // script into the log file.
+      if (configUtils.debugLlmPayload()) {
         logger.debug(`${agent} LLM request payload`, {
           model: model.model,
           attempt,
           invocationId,
-          generateOptions: opts,
-          messages: attemptMessages,
+          generateOptions: sanitizeUnknownForLog(opts),
+          messages: sanitizeUnknownForLog(attemptMessages),
         });
       }
 
@@ -351,7 +360,7 @@ export async function runAgent<T>({
           { node: agent, attempt, invocationId },
           llmResult.usage,
           attemptMessages,
-          llmResult.output,
+          persistDebugOutput ?? llmResult.output,
         );
         if (!llmResult.usage) {
           logger.warn(`${agent} response did not include usage`, {
@@ -365,6 +374,12 @@ export async function runAgent<T>({
             "Empty response from model: missing choices or content",
           );
         }
+
+        // The persisted copy of the raw output is capped: it exists for
+        // diagnosis, not as a second copy of the script.
+        persistDebugOutput = sanitizeForLog(rawContent, {
+          maxChars: LOG_TEXT_LIMIT,
+        });
 
         let parsed: unknown;
         try {

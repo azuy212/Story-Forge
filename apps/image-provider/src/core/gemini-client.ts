@@ -1,17 +1,17 @@
 import { chromium, type Page, type BrowserContext, type Locator, type Response } from 'playwright';
-import type { Config } from './config';
-import type { Logger } from './logger';
-import { retry, RetryError } from './retry';
-import { ProviderError, isRetryableType, classifyGeminiError } from './errors';
-import { AssetDownloader } from './asset-downloader';
-import { AssetCache } from './cache';
-import type {
-  AssetType,
-  GenerationOptions,
-  GenerationResult,
-  MediaAsset,
-  ReferenceImage,
-} from './types';
+import type { Config } from '../config.js';
+import type { Logger } from '../logger.js';
+import { retry, RetryError } from './retry.js';
+import { ProviderError, isRetryableType, classifyGeminiError } from './errors.js';
+import { AssetDownloader } from '../storage/asset-downloader.js';
+import { AssetCache } from '../storage/cache.js';
+import { MediaCollector } from './media-collector.js';
+import { GeminiErrorDetector } from './gemini-error-detector.js';
+import { uploadReferenceImages } from './reference-upload.js';
+import type { AssetType, GenerationOptions, GenerationResult, MediaAsset } from './types.js';
+
+// Re-exported so existing consumers of this module keep working.
+export { assertReferenceUploadCount, uploadReferenceImages } from './reference-upload.js';
 
 export class GeminiClient {
   private context: BrowserContext | null = null;
@@ -20,6 +20,8 @@ export class GeminiClient {
   private cache: AssetCache;
   private _shuttingDown = false;
   private _createModeActive = new Set<AssetType>();
+  private readonly media: MediaCollector;
+  private readonly errorDetector: GeminiErrorDetector;
 
   constructor(
     private readonly config: Config,
@@ -27,6 +29,16 @@ export class GeminiClient {
   ) {
     this.downloader = new AssetDownloader(logger);
     this.cache = new AssetCache(logger, config.cacheDir);
+    this.media = new MediaCollector({
+      getPage: () => this.page,
+      getContext: () => this.context,
+      logger,
+      config,
+    });
+    this.errorDetector = new GeminiErrorDetector({
+      getPage: () => this.page,
+      logger,
+    });
   }
 
   get shuttingDown(): boolean {
@@ -301,7 +313,9 @@ export class GeminiClient {
       }
 
       const oldSrcs =
-        assetType === 'video' ? await this.snapshotVideoSrcs() : await this.snapshotImageSrcs();
+        assetType === 'video'
+          ? await this.media.snapshotVideoSrcs()
+          : await this.media.snapshotImageSrcs();
 
       const input = await this.resolveInput();
       await input.focus().catch(() => this.focusInput());
@@ -315,10 +329,10 @@ export class GeminiClient {
 
       let buffers =
         assetType === 'video'
-          ? await this.collectVideos(responseCache, oldSrcs)
-          : await this.collectImages(responseCache, oldSrcs);
+          ? await this.media.collectVideos(responseCache, oldSrcs)
+          : await this.media.collectImages(responseCache, oldSrcs);
       if (buffers.length === 0) {
-        const errorMsg = await this.detectGenerationError();
+        const errorMsg = await this.errorDetector.detectGenerationError();
         const failure = new ProviderError(
           errorMsg || `No ${assetType} generated`,
           classifyGeminiError(errorMsg ?? ''),
@@ -332,8 +346,8 @@ export class GeminiClient {
           this.logger.info('Retrying failed generation from Gemini UI');
           buffers =
             assetType === 'video'
-              ? await this.collectVideos(responseCache, oldSrcs)
-              : await this.collectImages(responseCache, oldSrcs);
+              ? await this.media.collectVideos(responseCache, oldSrcs)
+              : await this.media.collectImages(responseCache, oldSrcs);
         }
 
         if (buffers.length > 0)
@@ -477,278 +491,6 @@ export class GeminiClient {
     return false;
   }
 
-  private async collectImages(
-    responseCache: Map<string, Buffer>,
-    oldSrcs: Set<string>,
-  ): Promise<Buffer[]> {
-    if (!this.page) throw new Error('Page closed');
-
-    this.logger.debug('Existing images on page', { count: oldSrcs.size });
-
-    await this.waitForGeneration(this.config.timeout);
-
-    const newSrcs = await this.pollForNewImages(oldSrcs);
-
-    this.logger.debug('New image sources found', { count: newSrcs.length });
-
-    const buffers: Buffer[] = [];
-    for (const src of newSrcs) {
-      const buf = await this.downloadBuffer(src, responseCache);
-      if (buf && buf.length > 2048) {
-        buffers.push(buf);
-      }
-    }
-
-    this.logger.debug('Downloaded image buffers', { count: buffers.length });
-
-    return buffers;
-  }
-
-  private async collectVideos(
-    responseCache: Map<string, Buffer>,
-    oldSrcs: Set<string>,
-  ): Promise<Buffer[]> {
-    if (!this.page) throw new Error('Page closed');
-
-    this.logger.debug('Existing videos on page', { count: oldSrcs.size });
-
-    await this.waitForGeneration(this.config.videoTimeout);
-
-    const newSrcs = await this.pollForNewVideos(oldSrcs);
-
-    this.logger.debug('New video sources found', { count: newSrcs.length });
-
-    const buffers: Buffer[] = [];
-    for (const src of newSrcs) {
-      const buf = await this.downloadBuffer(src, responseCache);
-      if (buf && buf.length > 1024) {
-        buffers.push(buf);
-      }
-    }
-
-    this.logger.debug('Downloaded video buffers', { count: buffers.length });
-
-    return buffers;
-  }
-
-  private async waitForGeneration(timeoutMs: number): Promise<void> {
-    if (!this.page) return;
-
-    const genIndicator = this.page.locator('button:has-text("Stop"), [role="progressbar"]').first();
-
-    const appeared = await genIndicator
-      .waitFor({ state: 'visible', timeout: 15000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (!appeared) {
-      this.logger.debug('Generation indicator did not appear, falling back to polling');
-      return;
-    }
-
-    const matched = await genIndicator.getAttribute('aria-label').catch(() => null);
-    this.logger.debug('Generation indicator appeared', { matched });
-
-    try {
-      await genIndicator.waitFor({ state: 'hidden', timeout: timeoutMs });
-      this.logger.debug('Generation indicator disappeared');
-    } catch {
-      this.logger.warn('Generation indicator did not disappear, proceeding');
-    }
-  }
-
-  private async snapshotImageSrcs(): Promise<Set<string>> {
-    if (!this.page) return new Set();
-    const srcs = await this.page.evaluate(() => {
-      return Array.from(document.querySelectorAll('img'))
-        .map((img) => (img as HTMLImageElement).src || '')
-        .filter(Boolean);
-    });
-    return new Set(srcs);
-  }
-
-  private async snapshotVideoSrcs(): Promise<Set<string>> {
-    if (!this.page) return new Set();
-    const srcs = await this.page.evaluate(() => {
-      const out: string[] = [];
-      for (const vid of Array.from(document.querySelectorAll('video'))) {
-        const v = vid as HTMLVideoElement;
-        if (v.currentSrc) out.push(v.currentSrc);
-        else if (v.src) out.push(v.src);
-      }
-      for (const src of Array.from(document.querySelectorAll('video source'))) {
-        const s = src as HTMLSourceElement;
-        if (s.src) out.push(s.src);
-      }
-      return out.filter(Boolean);
-    });
-    return new Set(srcs);
-  }
-
-  private async pollForNewImages(oldSrcs: Set<string>): Promise<string[]> {
-    if (!this.page) return [];
-    return this.pollForNewSources(oldSrcs, this.config.timeout, 'images');
-  }
-
-  private async pollForNewVideos(oldSrcs: Set<string>): Promise<string[]> {
-    if (!this.page) return [];
-    return this.pollForNewSources(oldSrcs, this.config.videoTimeout, 'videos');
-  }
-
-  private async pollForNewSources(
-    oldSrcs: Set<string>,
-    timeoutMs: number,
-    kind: string,
-  ): Promise<string[]> {
-    if (!this.page) return [];
-
-    const startTime = Date.now();
-    const deadline = startTime + timeoutMs;
-
-    while (Date.now() < deadline) {
-      const allSrcs = await this.collectAllMediaSrcs(kind);
-      const newSrcs = allSrcs.filter((s) => !oldSrcs.has(s));
-
-      if (newSrcs.length > 0) {
-        await new Promise((r) => setTimeout(r, 2000));
-        const allSrcs2 = await this.collectAllMediaSrcs(kind);
-        const newSrcs2 = allSrcs2.filter((s) => !oldSrcs.has(s));
-
-        if (newSrcs2.length >= newSrcs.length) {
-          return newSrcs2;
-        }
-      }
-
-      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      this.logger.debug(`Polling for ${kind}...`, {
-        elapsed: `${elapsed}s`,
-        found: newSrcs.length,
-      });
-
-      await new Promise((r) => setTimeout(r, 2000));
-    }
-
-    return [];
-  }
-
-  private async collectAllMediaSrcs(kind: string): Promise<string[]> {
-    if (!this.page) return [];
-    const selector = kind === 'images' ? 'img' : 'video, video source';
-    return this.page.evaluate((sel) => {
-      return Array.from(document.querySelectorAll(sel))
-        .map((el) => {
-          const node = el as HTMLImageElement & HTMLVideoElement & HTMLSourceElement;
-          const src = node.currentSrc || node.src || '';
-          return src;
-        })
-        .filter((s) => s && s.length > 0 && !s.startsWith('data:'));
-    }, selector);
-  }
-
-  private async downloadBuffer(src: string, cache: Map<string, Buffer>): Promise<Buffer | null> {
-    if (cache.has(src)) return cache.get(src)!;
-
-    if (src.startsWith('blob:')) {
-      return this.downloadBlob(src);
-    }
-
-    if (src.startsWith('http')) {
-      try {
-        const resp = await this.context!.request.get(src);
-        if (resp.ok()) return resp.body();
-      } catch {
-        // fallback to page-context fetch
-      }
-      return this.downloadViaPage(src);
-    }
-
-    return null;
-  }
-
-  private async downloadBlob(src: string): Promise<Buffer | null> {
-    if (!this.page) return null;
-    try {
-      const dataUrl = await this.page.evaluate(async (url: string) => {
-        const resp = await fetch(url);
-        const blob = await resp.blob();
-        return new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-      }, src);
-      return Buffer.from(dataUrl.split(',')[1], 'base64');
-    } catch (err) {
-      this.logger.debug('Blob download failed', { error: String(err) });
-      return null;
-    }
-  }
-
-  private async downloadViaPage(src: string): Promise<Buffer | null> {
-    if (!this.page) return null;
-    try {
-      const dataUrl = await this.page.evaluate(async (url: string) => {
-        const resp = await fetch(url);
-        const blob = await resp.blob();
-        return new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-      }, src);
-      return Buffer.from(dataUrl.split(',')[1], 'base64');
-    } catch {
-      return null;
-    }
-  }
-
-  private async detectGenerationError(): Promise<string | null> {
-    if (!this.page) return null;
-
-    const patterns = [
-      'image generation failed',
-      'image generation error',
-      'something went wrong',
-      'encountered an error',
-      "can't generate",
-      "couldn't generate",
-      'content policy',
-      'rate limit',
-      'try again',
-      'blocked',
-      'violation',
-      'not available',
-      'unable to generate',
-      'flagge',
-    ];
-
-    // Avoid broad :has-text selectors. They can match html/script ancestors and
-    // return Google's entire WIZ_global_data payload instead of the UI error.
-    const visibleTexts = await this.page.locator('body *:visible').evaluateAll((elements) =>
-      elements
-        .map((element) => ({
-          tag: element.tagName,
-          text: (element.textContent || '').replace(/\s+/g, ' ').trim(),
-        }))
-        .filter(
-          ({ tag, text }) =>
-            !['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(tag) && text.length > 0 && text.length <= 500,
-        ),
-    );
-
-    for (const pattern of patterns) {
-      const match = visibleTexts
-        .filter(({ text }) => text.toLowerCase().includes(pattern))
-        .sort((left, right) => left.text.length - right.text.length)[0];
-
-      if (match) return match.text;
-    }
-
-    return null;
-  }
-
   private logRetryWarnings(error: Error): void {
     const msg = error.message.toLowerCase();
     if (msg.includes('content policy') || msg.includes('flagge') || msg.includes('violation')) {
@@ -777,37 +519,5 @@ export class GeminiClient {
       this.context = null;
       this.page = null;
     }
-  }
-}
-
-/** Upload references through Gemini's Upload & tools control. */
-export async function uploadReferenceImages(
-  page: Page,
-  references: ReferenceImage[],
-): Promise<void> {
-  const plusButton = page.locator('button[aria-label="Upload & tools"]').first();
-  await plusButton.click();
-
-  const fileInput = page.locator('input[type="file"]').first();
-  await fileInput.waitFor({ state: 'attached', timeout: 15000 });
-  await fileInput.setInputFiles(
-    references.map((reference) => ({
-      name: reference.filename,
-      mimeType: reference.mime,
-      buffer: Buffer.from(reference.base64, 'base64'),
-    })),
-  );
-  const uploadedCount = await fileInput.evaluate(
-    (input) => (input as HTMLInputElement).files?.length ?? 0,
-  );
-  assertReferenceUploadCount(uploadedCount, references.length);
-  await page.keyboard.press('Escape').catch(() => {});
-}
-
-export function assertReferenceUploadCount(uploadedCount: number, expectedCount: number): void {
-  if (uploadedCount !== expectedCount) {
-    throw new Error(
-      `Gemini reference upload accepted ${uploadedCount} of ${expectedCount} image(s)`,
-    );
   }
 }

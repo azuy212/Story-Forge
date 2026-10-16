@@ -16,7 +16,7 @@
     "test:int": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns=\\.int\\.test\\.ts$",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
-    "lint": "oxlint src --config ../../.oxlintrc.json --import-plugin --deny-warnings",
+    "lint": "oxlint src --config ../../.oxlintrc.json --import-plugin --deny-warnings --type-aware",
     "format:check": "prettier --check .",
     "lint:langgraph-json": "node scripts/checkLanggraphPaths.js",
     "lint:all": "pnpm lint && pnpm lint:langgraph-json && pnpm format:check",

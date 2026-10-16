@@ -3,6 +3,16 @@ name: Integration Tests
 on:
   schedule:
     - cron: "37 14 * * *"
+  pull_request:
+    # Only the code the integration suite actually exercises: the graph and its
+    # providers/prompts. Docs and Python-service changes cannot break it, so
+    # they must not pay for a run.
+    paths:
+      - "apps/orchestrator/src/**"
+      - "apps/orchestrator/tests/**"
+      - "apps/orchestrator/prompts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
   workflow_dispatch:
 
 permissions:

@@ -3,6 +3,7 @@ import { getArtifactStore, getRunId } from "./context.js";
 import { hashObject } from "./hash.js";
 import { logger } from "../utils/logger.js";
 import { getErrorMessage } from "../utils/errors.js";
+import { sanitizeForLog } from "../utils/log-redaction.js";
 import {
   aggregateUsage,
   type LLMAggregate,
@@ -26,11 +27,18 @@ export interface LlmUsageContext {
 export type LlmUsageRecord = LLMUsage & Required<LlmUsageContext>;
 
 /**
+ * Cap applied to every persisted message/body. The artifact exists for
+ * diagnosis and caching, so it must not become a second, unbounded copy of a
+ * script or a provider payload.
+ */
+const PERSISTED_TEXT_LIMIT = 20000;
+
+/**
  * Sanitize the caller-provided chat messages down to the
  * `LLMMessageRecord` shape persisted on the usage artifact. Text content is
- * passed through verbatim; multimodal content parts (image_url blocks) are
- * collapsed to their URL so the artifact stays text-only. Anything we don't
- * recognize is JSON-stringified. Undefined entries are skipped.
+ * redacted (never a key) and capped; multimodal content parts (image_url
+ * blocks) are collapsed to their URL so the artifact stays text-only. Anything
+ * we don't recognize is JSON-stringified. Undefined entries are skipped.
  */
 function sanitizeInput(messages: unknown): LLMMessageRecord[] | undefined {
   if (!Array.isArray(messages)) return undefined;
@@ -49,7 +57,7 @@ function sanitizeInput(messages: unknown): LLMMessageRecord[] | undefined {
     const raw = (m as { content?: unknown }).content;
     let content: string;
     if (typeof raw === "string") {
-      content = raw;
+      content = sanitizeForLog(raw, { maxChars: PERSISTED_TEXT_LIMIT });
     } else if (Array.isArray(raw)) {
       content = raw
         .map((part) => {

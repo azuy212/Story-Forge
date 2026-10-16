@@ -38,6 +38,11 @@ const RetentionSchema = z.object({
     .number()
     .int("pivotBeatId must be whole number")
     .positive("pivotBeatId must be positive"),
+  // Optional so artifacts cached before the pivot-tracing contract landed
+  // still validate on resume. Cross-field validity (exists in the approved
+  // fact set, and is referenced by the pivot beat) is enforced
+  // deterministically by `checkScriptContract`.
+  pivotFactId: z.string().optional(),
 });
 
 export const StoryTypeEnum = z.enum([
@@ -62,6 +67,16 @@ const ScriptBeatSchema = z.object({
     .array(z.string())
     .min(1, "every beat must reference at least one fact"),
   priority: z.enum(["high", "medium", "low"]),
+  // Optional so artifacts cached before the open-loop ledger landed still
+  // validate on resume. The cross-beat pairing rules (every non-final beat
+  // opens one, at most two open at once, exactly one left for the ending) are
+  // enforced deterministically in `script-contract.ts`.
+  opensLoop: z.string().optional(),
+  closesLoopFor: z
+    .number()
+    .int("closesLoopFor must be a whole beatId")
+    .nullable()
+    .optional(),
   targetWords: z
     .number()
     .int("targetWords must be whole number")

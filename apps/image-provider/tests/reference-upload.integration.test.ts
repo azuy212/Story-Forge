@@ -4,14 +4,11 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import {
-  assertReferenceUploadCount,
-  GeminiClient,
-  uploadReferenceImages,
-} from '../src/gemini-client';
-import { GenerateRequestSchema, MAX_REFERENCE_IMAGE_BYTES } from '../src/server';
-import { loadConfig } from '../src/config';
-import { Logger } from '../src/logger';
+import { assertReferenceUploadCount, uploadReferenceImages } from '../src/core/reference-upload.js';
+import { GeminiClient } from '../src/core/gemini-client.js';
+import { GenerateRequestSchema, MAX_REFERENCE_IMAGE_BYTES } from '../src/http/request-schema.js';
+import { loadConfig } from '../src/config.js';
+import { Logger } from '../src/logger.js';
 
 test('uploads reference image through Upload & tools file input', async () => {
   const browser = await chromium.launch({ headless: true });

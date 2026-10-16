@@ -38,10 +38,28 @@ function formatScenes(scenes: Scene[]): string {
       assetType: s.assetType,
       visualDescription: s.visualDescription,
       narration: s.narration,
+      sceneRole: s.sceneRole,
+      visualAnchor: s.visualAnchor,
+      sourceBeatIds: s.sourceBeatIds,
+      transition: s.transition,
+      emphasis: s.emphasis,
     })),
     null,
     2,
   );
+}
+
+function formatStoryBeats(
+  beats:
+    { beatId: number; keyMessage: string; opensLoop?: string }[] | undefined,
+): string {
+  if (!beats || beats.length === 0) return "";
+  return beats
+    .map((beat) => {
+      const loop = beat.opensLoop ? ` — opens loop: ${beat.opensLoop}` : "";
+      return `Beat ${beat.beatId}: ${beat.keyMessage}${loop}`;
+    })
+    .join("\n");
 }
 
 function formatVisualPlan(
@@ -194,6 +212,9 @@ export async function promptQANode(
     variables: {
       scenes: formatScenes(scenes),
       visualPlan: formatVisualPlan(scenes, visualPlan),
+      storyBeats: formatStoryBeats(state.storyPlan?.storyBeats),
+      pivotSentence: state.content?.retention?.pivotSentence ?? "",
+      endingType: state.storyPlan?.endingType ?? "",
       audienceTrigger,
       audienceTriggerStatement,
       audienceTriggerFactIds,

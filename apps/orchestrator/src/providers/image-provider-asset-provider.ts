@@ -19,6 +19,7 @@ import {
   sanitizeHeaders,
   withProviderLog,
 } from "../utils/run-log.js";
+import { parseServiceErrorEnvelope } from "./service-error.js";
 
 const REQUEST_TIMEOUT_MS = 600_000;
 const ASSETS_DIR = resolve("generated", "assets");
@@ -30,21 +31,10 @@ function mimeTypeFor(path: string): string {
   return "image/png";
 }
 
-interface ProviderErrorBody {
-  error?: {
-    type?: ImageGenerationFailureType;
-    message?: string;
-    rawMessage?: string;
-    provider?: string;
-    model?: string;
-  };
-}
-
 /**
- * Parse a structured error body returned by the image-provider service. The
- * service (the Gemini adapter) is the only component that classifies
- * provider-specific failures; unknown/malformed bodies fall back to an
- * unclassified error so a rejection is never silently downgraded.
+ * The image provider classifies its own failures (`type`) and is the only
+ * component that may, but the envelope itself is read through the shared
+ * parser so every provider client handles one shape.
  */
 function parseProviderErrorBody(
   body: unknown,
@@ -54,32 +44,19 @@ function parseProviderErrorBody(
   message: string;
   rawMessage?: string;
 } | null {
-  if (typeof body === "object" && body !== null) {
-    const err = (body as ProviderErrorBody).error;
-    const type = err?.type;
-    const message = err?.message;
-    if (
-      (typeof type === "string" && type.length > 0) ||
-      (typeof message === "string" && message.length > 0)
-    ) {
-      // Validate the type against the closed enum: a type the orchestrator
-      // does not know must downgrade to `unknown` (fatal), never pass through
-      // as a string that silently lands in the transient-retry branch.
-      const parsedType =
-        typeof type === "string" && type.length > 0
-          ? ImageGenerationFailureTypeEnum.safeParse(type)
-          : { success: false as const };
-      return {
-        type: parsedType.success ? parsedType.data : "unknown",
-        message:
-          typeof message === "string" && message.length > 0
-            ? message
-            : `Image-provider generation failed: HTTP ${status}`,
-        rawMessage: err?.rawMessage,
-      };
-    }
-  }
-  return null;
+  const envelope = parseServiceErrorEnvelope(body);
+  if (!envelope) return null;
+
+  // Validate the type against the closed enum: a type the orchestrator does
+  // not know must downgrade to `unknown` (fatal), never pass through as a
+  // string that silently lands in the transient-retry branch.
+  const parsed = ImageGenerationFailureTypeEnum.safeParse(envelope.code);
+  const raw = envelope.details?.rawMessage;
+  return {
+    type: parsed.success ? parsed.data : "unknown",
+    message: envelope.message || `Image-provider generation failed: HTTP ${status}`,
+    rawMessage: typeof raw === "string" ? raw : undefined,
+  };
 }
 
 export class ImageProviderAssetProvider implements AssetProvider {

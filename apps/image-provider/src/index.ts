@@ -1,7 +1,7 @@
-import { loadConfig } from './config';
-import { Logger } from './logger';
-import { PromptReader } from './prompt-reader';
-import { GeminiClient } from './gemini-client';
+import { loadConfig } from './config.js';
+import { Logger } from './logger.js';
+import { PromptReader } from './cli/prompt-reader.js';
+import { GeminiClient } from './core/gemini-client.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -55,4 +55,5 @@ async function main(): Promise<void> {
   logger.info('All prompts processed');
 }
 
-main();
+// Entry point: deliberately fire-and-forget, hence the explicit void.
+void main();

@@ -56,18 +56,30 @@ function serializeBeats(
         priority: string;
         targetWords?: number;
         estimatedDurationSeconds: number;
+        opensLoop?: string;
+        closesLoopFor?: number | null;
       }[]
     | undefined,
 ): string {
   if (!beats || beats.length === 0) return "";
   return beats
-    .map(
-      (b) =>
-        `Beat ${b.beatId}\nPriority: ${b.priority.toUpperCase()}\nDuration: ${b.estimatedDurationSeconds} sec\nTarget Words: ${b.targetWords ?? ""}\nPurpose: ${b.purpose}\nViewer Question: ${b.viewerQuestion}\nCuriosity Question: ${b.curiosityQuestion ?? ""}\nKey Message: ${b.keyMessage}\nReferenced Facts: ${b.referencedFacts.join(", ")}`,
-    )
+    .map((b) => {
+      const loop = b.opensLoop ? `\nOpens Loop: ${b.opensLoop}` : "";
+      const closes = b.closesLoopFor
+        ? `\nCloses Loop For: beat ${b.closesLoopFor}`
+        : "";
+      return `Beat ${b.beatId}\nPriority: ${b.priority.toUpperCase()}\nDuration: ${b.estimatedDurationSeconds} sec\nTarget Words: ${b.targetWords ?? ""}\nPurpose: ${b.purpose}\nViewer Question: ${b.viewerQuestion}\nCuriosity Question: ${b.curiosityQuestion ?? ""}\nKey Message: ${b.keyMessage}\nReferenced Facts: ${b.referencedFacts.join(", ")}${loop}${closes}`;
+    })
     .join("\n\n");
 }
 
+/**
+ * The revision baseline has to carry what the QA gate will re-check, or a
+ * writer revising from a summary re-declares a different pivot sentence and
+ * fails a retention contract it satisfied on the previous draft. The declared
+ * pivot anchor and the per-beat split are therefore part of the baseline, not
+ * optional context.
+ */
 function serializePreviousScript(
   content: Partial<Content> | undefined,
 ): string {
@@ -75,6 +87,18 @@ function serializePreviousScript(
   const parts: string[] = [];
   if (content.script) parts.push(`Script:\n${content.script}`);
   if (content.narration) parts.push(`Narration:\n${content.narration}`);
+  if (content.beats?.length) {
+    parts.push(
+      `Beats (keep the beat count and the per-beat split unless the feedback requires otherwise):\n${content.beats
+        .map((b) => `Beat ${b.beatId}: ${b.narration}`)
+        .join("\n")}`,
+    );
+  }
+  if (content.retention?.pivotSentence) {
+    parts.push(
+      `Declared pivot sentence (must stay inside the plan's pivot beat; re-declare the exact sentence you write):\n${content.retention.pivotSentence}`,
+    );
+  }
   if (content.ending?.narration) {
     parts.push(`Ending narration:\n${content.ending.narration}`);
   }

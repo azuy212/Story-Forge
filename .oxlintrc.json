@@ -3,7 +3,13 @@
   "env": {
     "node": true
   },
-  "plugins": ["typescript", "import", "unicorn", "oxc", "promise"],
+  "plugins": [
+    "typescript",
+    "import",
+    "unicorn",
+    "oxc",
+    "promise"
+  ],
   "categories": {
     "correctness": "error",
     "suspicious": "error"
@@ -17,19 +23,47 @@
   ],
   "rules": {
     "typescript/no-explicit-any": "error",
-    "typescript/no-unused-vars": ["error", { "args": "none" }],
-    "typescript/no-use-before-define": ["error", "nofunc"],
+    "typescript/no-unused-vars": [
+      "error",
+      {
+        "args": "none"
+      }
+    ],
+    "typescript/no-use-before-define": [
+      "error",
+      "nofunc"
+    ],
     "import/no-duplicates": "error",
     "no-shadow": "off",
     "no-underscore-dangle": "off",
     "unicorn/no-array-sort": "off",
-    "unicorn/prefer-add-event-listener": "off"
+    "unicorn/prefer-add-event-listener": "off",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-unsafe-type-assertion": "off",
+    "typescript/no-unnecessary-type-assertion": "off",
+    "typescript/no-unnecessary-type-conversion": "off",
+    "typescript/consistent-return": "off",
+    "typescript/no-base-to-string": "off",
+    "typescript/no-unnecessary-type-parameters": "off",
+    "typescript/no-unnecessary-type-arguments": "off",
+    "typescript/no-redundant-type-constituents": "off"
   },
   "overrides": [
     {
-      "files": ["**/*.test.ts"],
+      "files": [
+        "**/*.test.ts"
+      ],
       "env": {
         "jest": true
+      }
+    },
+    {
+      "files": [
+        "apps/orchestrator/src/agents/**",
+        "src/agents/**"
+      ],
+      "rules": {
+        "no-console": "warn"
       }
     }
   ]

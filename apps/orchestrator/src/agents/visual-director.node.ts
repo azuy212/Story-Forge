@@ -50,6 +50,24 @@ function formatFacts(
 }
 
 /**
+ * The planner's beats (id + key message) so the director can map scenes back
+ * to story beats via `sourceBeatIds` instead of silently dropping a beat when
+ * merging scenes.
+ */
+function serializeStoryBeats(
+  beats:
+    { beatId: number; keyMessage: string; opensLoop?: string }[] | undefined,
+): string {
+  if (!beats || beats.length === 0) return "";
+  return beats
+    .map((beat) => {
+      const loop = beat.opensLoop ? ` — opens loop: ${beat.opensLoop}` : "";
+      return `Beat ${beat.beatId}: ${beat.keyMessage}${loop}`;
+    })
+    .join("\n");
+}
+
+/**
  * Fraction of `target` words found, in order, as a subsequence of `source`.
  * forward(source, concat) ~ 1 means nothing was dropped;
  * backward(source, concat) ~ 1 means nothing was added.
@@ -246,6 +264,7 @@ function normalizeOutput(
   narration: string,
   validFactIds: Set<string>,
   endingNarration?: string,
+  validBeatIds?: Set<number>,
 ): NormalizedScenes {
   const warnings: string[] = [];
 
@@ -308,7 +327,9 @@ function normalizeOutput(
   }
 
   // Drop references to fact IDs that do not exist in approved facts. A scene
-  // ending up with no references is acceptable (B-roll scenes).
+  // ending up with no references is acceptable (B-roll scenes). Scene→beat
+  // traceability gets the same treatment: an unknown beatId is dropped rather
+  // than hallucinated into the production plan.
   const filtered = scenes.map((s) => {
     const known = s.references.filter((r) => validFactIds.has(r));
     const dropped = s.references.length - known.length;
@@ -317,9 +338,20 @@ function normalizeOutput(
         `VisualDirector: dropped ${dropped} hallucinated fact reference(s) in scene ${s.sceneId}`,
       );
     }
+    const beatIds = validBeatIds
+      ? s.sourceBeatIds?.filter((id) => validBeatIds.has(id))
+      : s.sourceBeatIds;
+    const droppedBeats =
+      (s.sourceBeatIds?.length ?? 0) - (beatIds?.length ?? 0);
+    if (droppedBeats > 0) {
+      warnings.push(
+        `VisualDirector: dropped ${droppedBeats} unknown source beat reference(s) in scene ${s.sceneId}`,
+      );
+    }
     return {
       ...s,
       references: known,
+      sourceBeatIds: beatIds,
       entities: s.entities?.map((entity) => ({
         ...entity,
         requiresSourceImage:
@@ -353,6 +385,12 @@ function normalizeOutput(
   return { scenes: filtered, visualPlans, warnings };
 }
 
+/**
+ * The revision baseline must carry the continuity fields the scene rules are
+ * judged on. A revision prompted only with visual descriptions silently drops
+ * `visualAnchor`, `transition`, `emphasis`, and `sourceBeatIds`, which is
+ * exactly the anchor-identity and beat-coverage loss the rules exist to stop.
+ */
 function serializePreviousVisualPlan(
   scenes: Scene[],
   visualPlan: VisualPlanEntry[],
@@ -368,6 +406,10 @@ function serializePreviousVisualPlan(
         sceneRole: s.sceneRole,
         visualDescription: s.visualDescription,
         narration: s.narration,
+        visualAnchor: s.visualAnchor,
+        sourceBeatIds: s.sourceBeatIds,
+        transition: s.transition,
+        emphasis: s.emphasis,
         renderStyle: plan?.renderStyle,
         colorMood: plan?.colorMood,
         lighting: plan?.lighting,
@@ -400,6 +442,7 @@ export async function visualDirectorNode(
   const researchSummary = state.research?.summary;
   const approvedFacts = state.research?.facts;
   const channel = state.branding?.channel;
+  const storyPlan = state.storyPlan;
   const videoProfile: VideoProfileConfig =
     state.videoProfile ?? resolveVideoProfile({});
   const inject = (config.configurable ?? {}) as AgentInject;
@@ -512,6 +555,10 @@ export async function visualDirectorNode(
         state.storyPlan?.audienceTrigger?.statement ?? "",
       audienceTriggerFactIds:
         state.storyPlan?.audienceTrigger?.factIds?.join(", ") ?? "",
+      endingType: storyPlan?.endingType ?? "",
+      pivotSentence: state.content?.retention?.pivotSentence ?? "",
+      pivotBeatId: String(storyPlan?.retention?.pivotBeatId ?? ""),
+      storyBeats: serializeStoryBeats(storyPlan?.storyBeats),
     },
     inject,
     configurable: withTopic(config, state).configurable,
@@ -567,11 +614,15 @@ export async function visualDirectorNode(
   logger.nodeDone(label, result.telemetry.durationMs);
 
   const validFactIds = new Set(approvedFacts.map((f) => f.id));
+  const validBeatIds = new Set(
+    (state.storyPlan?.storyBeats ?? []).map((beat) => beat.beatId),
+  );
   const normalizedOutput = normalizeOutput(
     result.data ?? salvaged!,
     narration ?? "",
     validFactIds,
     ending?.narration,
+    validBeatIds.size > 0 ? validBeatIds : undefined,
   );
   const { scenes: normalized, visualPlans } = normalizedOutput;
   let { warnings } = normalizedOutput;
@@ -737,6 +788,7 @@ export async function visualDirectorNode(
     visualAnchor: s.visualAnchor,
     entities: s.entities,
     references: s.references,
+    sourceBeatIds: s.sourceBeatIds,
   }));
 
   if (warnings.length > 0) {

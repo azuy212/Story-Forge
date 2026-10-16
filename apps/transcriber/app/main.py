@@ -2,18 +2,21 @@ import logging
 import os
 import tempfile
 import time
+import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, UploadFile
+from fastapi.responses import JSONResponse
 
 from .config import Config
-from .schemas import AlignResponse, HealthResponse
-from .whisperx_engine import (
+from .errors import (
     AlignmentError,
     AudioDecodeError,
     LanguageRequiredError,
-    WhisperXEngine,
+    error_envelope,
 )
+from .schemas import AlignResponse, HealthResponse
+from .whisperx_engine import WhisperXEngine
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,6 +46,7 @@ app = FastAPI(title="WhisperX Alignment Service", lifespan=lifespan)
 def health():
     return HealthResponse(
         status="ok" if engine else "loading",
+        service="whisperx",
         alignment_model_loaded=bool(engine and engine.alignment_model_loaded),
         asr_loaded=bool(engine and engine.asr_loaded),
         device=engine.device if engine else "unknown",
@@ -53,16 +57,31 @@ def health():
     )
 
 
+def _fail(
+    status_code: int,
+    code: str,
+    message: str,
+    request_id: str,
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content=error_envelope(code, message, request_id),
+    )
+
+
 @app.post("/align", response_model=AlignResponse)
 def align(
     audio: UploadFile | None = File(default=None),
     text: str | None = Form(default=None),
 ):
+    request_id = uuid.uuid4().hex[:12]
+
     if engine is None:
-        raise HTTPException(status_code=503, detail="service not ready")
+        return _fail(503, "SERVICE_NOT_READY", "service not ready", request_id)
 
     if audio is None or not audio.filename:
-        raise HTTPException(status_code=400, detail="audio file is required")
+        logger.warning("missing audio request_id=%s", request_id)
+        return _fail(400, "AUDIO_REQUIRED", "audio file is required", request_id)
 
     text = text.strip() if text else None
     request_start = time.perf_counter()
@@ -80,24 +99,20 @@ def align(
 
         try:
             result = engine.align_audio(path, text)
-        except AudioDecodeError as error:
-            logger.warning("audio decode failed: %s", error)
-            raise HTTPException(status_code=422, detail=str(error)) from error
-        except LanguageRequiredError as error:
-            logger.warning("language required: %s", error)
-            raise HTTPException(status_code=400, detail=str(error)) from error
-        except AlignmentError as error:
-            logger.error("alignment failed: %s", error)
-            raise HTTPException(
-                status_code=500,
-                detail=f"alignment failed: {error}",
-            ) from error
-        except Exception as error:
-            logger.exception("WhisperX processing failed")
-            raise HTTPException(
-                status_code=500,
-                detail="WhisperX processing failed",
-            ) from error
+        except (AudioDecodeError, LanguageRequiredError) as error:
+            logger.warning("invalid request request_id=%s: %s", request_id, error)
+            return _fail(error.status_code, error.code, str(error), request_id)
+        except AlignmentError:
+            logger.exception("alignment failed request_id=%s", request_id)
+            return _fail(
+                AlignmentError.status_code,
+                AlignmentError.code,
+                "alignment failed",
+                request_id,
+            )
+        except Exception:
+            logger.exception("WhisperX processing failed request_id=%s", request_id)
+            return _fail(500, "INTERNAL", "alignment failed", request_id)
 
         logger.info(
             "request_complete duration=%.2fs words=%d "
