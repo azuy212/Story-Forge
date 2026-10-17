@@ -52,7 +52,9 @@ describe("parseServiceErrorEnvelope", () => {
     expect(parseServiceErrorEnvelope(null)).toBeNull();
     expect(parseServiceErrorEnvelope({})).toBeNull();
     expect(parseServiceErrorEnvelope({ error: null })).toBeNull();
-    expect(parseServiceErrorEnvelope({ detail: "plain fastapi error" })).toBeNull();
+    expect(
+      parseServiceErrorEnvelope({ detail: "plain fastapi error" }),
+    ).toBeNull();
     expect(parseServiceErrorEnvelope("a string")).toBeNull();
   });
 

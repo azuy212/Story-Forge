@@ -54,7 +54,8 @@ function parseProviderErrorBody(
   const raw = envelope.details?.rawMessage;
   return {
     type: parsed.success ? parsed.data : "unknown",
-    message: envelope.message || `Image-provider generation failed: HTTP ${status}`,
+    message:
+      envelope.message || `Image-provider generation failed: HTTP ${status}`,
     rawMessage: typeof raw === "string" ? raw : undefined,
   };
 }

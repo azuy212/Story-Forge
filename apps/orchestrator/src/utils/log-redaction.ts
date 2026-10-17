@@ -43,7 +43,10 @@ export function redactSecrets(text: string): string {
   for (const pattern of KEY_PATTERNS) {
     out = out.replace(pattern, REDACTED);
   }
-  out = out.replace(SECRET_FIELD, (_match, name: string) => `${name}${REDACTED}`);
+  out = out.replace(
+    SECRET_FIELD,
+    (_match, name: string) => `${name}${REDACTED}`,
+  );
   return out;
 }
 

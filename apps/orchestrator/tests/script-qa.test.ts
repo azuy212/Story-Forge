@@ -200,6 +200,42 @@ describe("scriptQANode", () => {
 
     expect(result.scriptQA?.status).toBe("minor_revision");
     expect(result.scriptQA?.feedback).toContain("Factual accuracy");
+    // The reviewed script is hashed and persisted for the non-convergence guard.
+    expect(result.execution?.qaArtifactHash?.ScriptQA).toBeDefined();
+  });
+
+  it("flags an unchanged script when QA re-issues a revision", async () => {
+    const content: string | undefined = JSON.stringify({
+      status: "major_revision",
+      feedback: "Beat 3 contradicts the research fact about eruption dates.",
+    });
+
+    // Round 1: revision → no flag, artifact hash persisted.
+    mockGenerate.mockResolvedValue(buildResponse({ content }));
+    const first = await runNode().promise;
+    const persistedHash = first.execution?.qaArtifactHash?.ScriptQA;
+    expect(persistedHash).toBeDefined();
+
+    // Round 2: ScriptWriter reproduced the identical script (same hash) while
+    // QA still revises (different issue wording) → flag set so the router can
+    // stop the non-converging loop early.
+    mockGenerate.mockResolvedValue(
+      buildResponse({
+        content: JSON.stringify({
+          status: "fatal",
+          feedback: "Beat 3 still contradicts the eruption research.",
+        }),
+      }),
+    );
+    const second = await runNode({
+      execution: {
+        version: "0.1.0",
+        retryCount: { ScriptQA: 1, ScriptWriter: 1 },
+        qaArtifactHash: { ScriptQA: persistedHash! },
+      },
+    } as Partial<ProjectState>).promise;
+    expect(second.scriptQA?.status).toBe("fatal");
+    expect(second.scriptQA?.artifactUnchanged).toBe(true);
   });
 
   it("passes script, narration, and research facts to model", async () => {

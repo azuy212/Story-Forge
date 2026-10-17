@@ -208,6 +208,7 @@ describe("researchQANode", () => {
         feedback: "Correct fact-001.",
         issues: ["fact-001: needs correction"],
         factsToRegenerate: 1,
+        factsToRegenerateIds: ["fact-001"],
         factVerdicts: verdicts,
       }),
     );
@@ -217,7 +218,103 @@ describe("researchQANode", () => {
 
     expect(result.researchQA?.status).toBe("minor_revision");
     expect(result.researchQA?.factsToRegenerate).toBe(1);
+    // Every other verdict is "keep": only the flagged fact ID is targeted.
+    expect(result.researchQA?.factsToRegenerateIds).toEqual(["fact-001"]);
     expect(result.research).toEqual({});
+    // The reviewed artifact hash is persisted for the non-convergence guard.
+    expect(result.execution?.qaArtifactHash?.ResearchQA).toBeDefined();
+    expect(result.researchQA?.artifactUnchanged).toBeUndefined();
+  });
+
+  it("flags unchanged artifacts on a revision over the same research", async () => {
+    const revision = (note: string) => {
+      const verdicts = FACTS.map((f) => ({
+        factId: f.id,
+        verdict: "keep",
+        reason: "ok",
+      }));
+      verdicts[0] = {
+        factId: "fact-001",
+        verdict: "revise",
+        reason: note,
+      };
+      return {
+        status: "minor_revision",
+        feedback: note,
+        issues: [`fact-001: ${note}`],
+        factsToRegenerate: 1,
+        factsToRegenerateIds: ["fact-001"],
+        factVerdicts: verdicts,
+      };
+    };
+
+    // Round 1: revision over fresh research → no flag, hash persisted.
+    mockGenerate.mockResolvedValueOnce(
+      buildResponse(revision("Needs correction")),
+    );
+    const first = await runNode().promise;
+    const persistedHash = first.execution?.qaArtifactHash?.ResearchQA;
+    expect(persistedHash).toBeDefined();
+
+    // Round 2: identical research, differently-worded feedback → same hash,
+    // flag set so the router can stop the non-converging loop early.
+    mockGenerate.mockResolvedValueOnce(
+      buildResponse(revision("Needs correction tightened")),
+    );
+    const second = await runNode({
+      execution: {
+        version: "0.1.0",
+        retryCount: { ResearchQA: 1 },
+        qaArtifactHash: { ResearchQA: persistedHash! },
+      },
+    } as Partial<ProjectState>).promise;
+    expect(second.researchQA?.status).toBe("minor_revision");
+    expect(second.researchQA?.artifactUnchanged).toBe(true);
+    expect(second.execution?.qaArtifactHash?.ResearchQA).toBe(persistedHash);
+  });
+
+  it("does not flag unchanged when the research actually changed", async () => {
+    mockGenerate.mockResolvedValueOnce(
+      buildResponse({
+        status: "minor_revision",
+        feedback: "Fix it.",
+        issues: ["fact-001: wrong"],
+        factsToRegenerate: 0,
+        factVerdicts: FACTS.map((f) => ({
+          factId: f.id,
+          verdict: "keep",
+          reason: "ok",
+        })),
+      }),
+    );
+    const result = await runNode({
+      execution: {
+        version: "0.1.0",
+        qaArtifactHash: { ResearchQA: "different-previous-hash" },
+      },
+    } as Partial<ProjectState>).promise;
+    expect(result.researchQA?.artifactUnchanged).toBeUndefined();
+  });
+
+  it("approves accurate research with a no-trigger note (advisory arc path)", async () => {
+    // The dead-leaf loop the earlier prompt revision targeted: accurate
+    // research must come back approved, with the trigger gap as feedback
+    // only — never a revision status for the model to act on.
+    mockGenerate.mockResolvedValueOnce(
+      buildResponse({
+        status: "approved",
+        feedback:
+          "Facts are accurate. Trigger material absent: planner should use a documentary-explanation arc.",
+        issues: [],
+        factsToRegenerate: 0,
+        factVerdicts: approvedResponse().factVerdicts,
+      }),
+    );
+    const result = await runNode().promise;
+    expect(result.researchQA?.status).toBe("approved");
+    // No regeneration targets: nothing was flagged.
+    expect(result.researchQA?.factsToRegenerateIds).toBeUndefined();
+    expect(result.research?.facts?.[0].verified).toBe(true);
   });
 
   it("returns fail when no facts collected", async () => {

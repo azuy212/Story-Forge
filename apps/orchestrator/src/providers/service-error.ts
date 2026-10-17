@@ -51,9 +51,7 @@ function asTrimmedString(value: unknown): string | undefined {
  * used `type` as its machine-readable failure id, and forcing a rename would
  * break its existing contract for no gain.
  */
-export function parseServiceErrorEnvelope(
-  body: unknown,
-): ServiceError | null {
+export function parseServiceErrorEnvelope(body: unknown): ServiceError | null {
   if (typeof body !== "object" || body === null) return null;
   const raw = body as RawEnvelope;
   const error = raw.error;

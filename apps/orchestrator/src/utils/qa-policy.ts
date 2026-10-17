@@ -2,6 +2,7 @@ import type { ProjectState } from "../types/index.js";
 import { logger } from "./logger.js";
 import { MINOR_REVISION_MAX, MAJOR_REVISION_MAX } from "./constants.js";
 import { appendRunLogEvent } from "./run-log.js";
+import { sanitizeForLog } from "./log-redaction.js";
 
 /**
  * Single source of truth for the QA retry + pipeline continuation policy.
@@ -17,7 +18,11 @@ import { appendRunLogEvent } from "./run-log.js";
  * `repeated` feedback (the QA node produced the same verdict/issues as the
  * previous round) never overrides severity: repeated minor is accepted,
  * repeated major/fatal fails immediately — regenerating identical input would
- * just waste a generation.
+ * just waste a generation. `unchangedArtifact` is the same principle applied
+ * to the artifact: when the producer re-submitted a hash-identical artifact
+ * while QA still rejects it, more regenerations cannot converge, so the loop
+ * stops early. QA nodes persist the artifacts' hashes; the routers only pass
+ * the resulting flag in.
  */
 
 export type QaStatus =
@@ -40,6 +45,7 @@ export interface QaDecision {
   maxRevisionAttempts: number;
   blocking: boolean;
   repeated: boolean;
+  unchangedArtifact: boolean;
 }
 
 export interface QaRetryInput {
@@ -56,6 +62,8 @@ export interface QaRetryInput {
   qaAttempts: number;
   /** True when this verdict repeats the previous QA round's feedback. */
   repeated?: boolean;
+  /** True when the reviewed artifact is hash-identical to the previous round's. */
+  unchangedArtifact?: boolean;
   /** QA node infra-retry budget (retries of the QA node's own LLM call). */
   infraMax: number;
 }
@@ -67,7 +75,11 @@ export function decideQaRetry(input: QaRetryInput): QaDecision {
     revisionAttempts,
     qaAttempts,
     repeated = false,
+    unchangedArtifact = false,
   } = input;
+  // Both signals mean "another identical round cannot change the outcome";
+  // keeping them distinct lets run logs show WHY the loop stopped.
+  const stalled = repeated || unchangedArtifact;
 
   let action: QaAction;
   let reason: string;
@@ -86,11 +98,13 @@ export function decideQaRetry(input: QaRetryInput): QaDecision {
     case "minor_revision":
       maxRevisionAttempts = MINOR_REVISION_MAX;
       blocking = false;
-      if (repeated || budgetExhausted(MINOR_REVISION_MAX)) {
+      if (stalled || budgetExhausted(MINOR_REVISION_MAX)) {
         action = "continue";
-        reason = repeated
-          ? "repeated minor feedback; accepting best available result"
-          : "minor revision budget exhausted; accepting best available result";
+        reason = unchangedArtifact
+          ? "producer reproduced an unchanged artifact; accepting best available result"
+          : repeated
+            ? "repeated minor feedback; accepting best available result"
+            : "minor revision budget exhausted; accepting best available result";
       } else {
         action = "revise";
         reason = "minor revision within budget";
@@ -101,11 +115,13 @@ export function decideQaRetry(input: QaRetryInput): QaDecision {
     case "fatal":
       maxRevisionAttempts = MAJOR_REVISION_MAX;
       blocking = true;
-      if (repeated || budgetExhausted(MAJOR_REVISION_MAX)) {
+      if (stalled || budgetExhausted(MAJOR_REVISION_MAX)) {
         action = "fail";
-        reason = repeated
-          ? "repeated blocking feedback; failing run"
-          : "revision budget exhausted; failing run";
+        reason = unchangedArtifact
+          ? "producer reproduced an unchanged artifact while QA still rejects it; non-convergence, failing run"
+          : repeated
+            ? "repeated blocking feedback; failing run"
+            : "revision budget exhausted; failing run";
       } else {
         action = "revise";
         reason = "revision within budget";
@@ -136,6 +152,7 @@ export function decideQaRetry(input: QaRetryInput): QaDecision {
     qaAttempts,
     qaInfraMax: input.infraMax,
     repeated,
+    unchangedArtifact,
     action,
     reason,
   });
@@ -150,6 +167,7 @@ export function decideQaRetry(input: QaRetryInput): QaDecision {
     qaInfraMax: input.infraMax,
     blocking,
     repeated,
+    unchangedArtifact,
     action,
     reason,
   });
@@ -163,6 +181,7 @@ export function decideQaRetry(input: QaRetryInput): QaDecision {
     maxRevisionAttempts,
     blocking,
     repeated,
+    unchangedArtifact,
   };
 }
 
@@ -207,15 +226,80 @@ export function isRunFailed(state: ProjectState): boolean {
 const isBlockingQa = (status?: string): boolean =>
   status === "fail" || status === "fatal";
 
-export function runFailureReason(state: ProjectState): string {
-  if (isBlockingQa(state.researchQA?.status)) return "research QA failed";
-  if (isBlockingQa(state.scriptQA?.status)) return "script QA failed";
-  if (isBlockingQa(state.production?.promptQA?.status)) {
-    return "prompt QA failed";
+interface QaFailureLike {
+  status?: unknown;
+  feedback?: string;
+  issues?: string[];
+  lastFeedback?: string;
+}
+
+/**
+ * One redacted, truncated line summarizing the QA feedback that killed the
+ * run. Read from the QA output already stored in state, so nothing beyond
+ * what the QA node itself produced flows into the diagnostics.
+ */
+function qaFailureDetail(
+  qa: QaFailureLike | undefined,
+  retryCount: Record<string, number> | undefined,
+  producer: string,
+): string {
+  const attempts = retryCount?.[producer];
+  const feedback =
+    qa?.feedback ??
+    qa?.lastFeedback ??
+    (qa?.issues && qa.issues.length > 0 ? qa.issues[0] : undefined);
+  const details: string[] = [];
+  if (typeof qa?.status === "string" && qa.status !== "approved") {
+    details.push(`status=${qa.status}`);
   }
-  if (state.releaseReview?.status === "fatal") return "release review failed";
+  if (typeof attempts === "number") {
+    details.push(`${producer} runs=${attempts}`);
+  }
+  if (feedback && feedback.trim()) {
+    // Redacted + capped: this string lands in run_final and diagnostics.
+    details.push(
+      `feedback: ${sanitizeForLog(feedback.trim(), { maxChars: 300 })}`,
+    );
+  }
+  return details.length > 0 ? ` (${details.join("; ")})` : "";
+}
+
+export function runFailureReason(state: ProjectState): string {
+  const retryCount = state.execution?.retryCount as
+    Record<string, number> | undefined;
+  if (isBlockingQa(state.researchQA?.status)) {
+    return (
+      "research QA failed" +
+      qaFailureDetail(state.researchQA, retryCount, "ResearchAgent")
+    );
+  }
+  if (isBlockingQa(state.scriptQA?.status)) {
+    return (
+      "script QA failed" +
+      qaFailureDetail(state.scriptQA, retryCount, "ScriptWriter")
+    );
+  }
+  if (isBlockingQa(state.production?.promptQA?.status)) {
+    return (
+      "prompt QA failed" +
+      qaFailureDetail(
+        state.production?.promptQA,
+        retryCount,
+        "ImagePromptGenerator",
+      )
+    );
+  }
+  if (state.releaseReview?.status === "fatal") {
+    return (
+      "release review failed" +
+      qaFailureDetail(state.releaseReview, retryCount, "ReleaseReview")
+    );
+  }
   if (state.releaseValidation?.status === "fatal") {
-    return "release validation failed";
+    return (
+      "release validation failed" +
+      qaFailureDetail(state.releaseValidation, retryCount, "ReleaseValidation")
+    );
   }
   if (state.publishReady?.status === "blocked") {
     const issues = state.publishReady.issues ?? [];

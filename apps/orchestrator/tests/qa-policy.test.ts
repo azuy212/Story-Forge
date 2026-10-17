@@ -92,6 +92,35 @@ describe("decideQaRetry", () => {
   it("fails closed on missing or unhandled status", () => {
     expect(decision(undefined).action).toBe("fail");
   });
+
+  it("unchanged artifact stops minor loop immediately (accepts best)", () => {
+    const d = decision("minor_revision", {
+      revisionAttempts: 1,
+      unchangedArtifact: true,
+    });
+    expect(d.action).toBe("continue");
+    expect(d.reason).toContain("unchanged artifact");
+  });
+
+  it("unchanged artifact stops major loop immediately (fails, non-convergence)", () => {
+    const d = decision("major_revision", {
+      revisionAttempts: 1,
+      unchangedArtifact: true,
+    });
+    expect(d.action).toBe("fail");
+    expect(d.blocking).toBe(true);
+    expect(d.reason).toContain("non-convergence");
+  });
+
+  it("unchanged artifact does not affect approved or retry paths", () => {
+    expect(decision("approved", { unchangedArtifact: true }).action).toBe(
+      "continue",
+    );
+    expect(
+      decision("retry", { qaAttempts: 1, infraMax: 2, unchangedArtifact: true })
+        .action,
+    ).toBe("retry");
+  });
 });
 
 describe("hashIssues", () => {
@@ -156,7 +185,28 @@ describe("runFailureReason", () => {
   it("names the failing QA node", () => {
     expect(
       runFailureReason(state({ scriptQA: { status: "fatal", issues: [] } })),
-    ).toBe("script QA failed");
+    ).toBe("script QA failed (status=fatal)");
+  });
+
+  it("appends attempts and a truncated, redacted feedback summary", () => {
+    expect(
+      runFailureReason(
+        state({
+          scriptQA: {
+            status: "fatal",
+            feedback:
+              "The API key sk-abcdefgh1234567890 leaked into the script",
+            issues: [],
+          },
+          execution: {
+            version: "test",
+            retryCount: { ScriptWriter: 3 },
+          },
+        }),
+      ),
+    ).toBe(
+      "script QA failed (status=fatal; ScriptWriter runs=3; feedback: The API key [redacted] leaked into the script)",
+    );
   });
 
   it("names a blocked publish gate with its issues", () => {

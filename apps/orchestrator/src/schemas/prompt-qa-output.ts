@@ -29,6 +29,9 @@ export const PromptQAOutputSchema = z.object({
     .array(SceneResultSchema)
     .min(1, "must have at least one scene result"),
   repeated: z.boolean().optional(),
+  // Set by the node (not the LLM) when the artifact under review is
+  // hash-identical to the previous round's while QA still issues a revision.
+  artifactUnchanged: z.boolean().optional(),
 });
 
 export type PromptQAOutput = z.input<typeof PromptQAOutputSchema>;

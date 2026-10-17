@@ -213,6 +213,7 @@ const researchRouter = (state: typeof StateAnnotation.State) => {
     revisionAttempts: retryCount(state, "ResearchAgent"),
     qaAttempts: retryCount(state, "ResearchQA"),
     repeated: state.researchQA?.repeated,
+    unchangedArtifact: state.researchQA?.artifactUnchanged,
     infraMax: RESEARCH_QA_MAX_RETRIES,
   });
   const next =
@@ -245,6 +246,7 @@ const scriptRouter = (state: typeof StateAnnotation.State) => {
     revisionAttempts: retryCount(state, "ScriptWriter"),
     qaAttempts: retryCount(state, "ScriptQA"),
     repeated: state.scriptQA?.repeated,
+    unchangedArtifact: state.scriptQA?.artifactUnchanged,
     infraMax: SCRIPT_QA_MAX_RETRIES,
   });
   const next =
@@ -298,6 +300,7 @@ const promptRouter = (state: typeof StateAnnotation.State) => {
     revisionAttempts: retryCount(state, producer),
     qaAttempts: retryCount(state, "PromptQA"),
     repeated: state.production?.promptQA?.repeated,
+    unchangedArtifact: state.production?.promptQA?.artifactUnchanged,
     infraMax: PROMPT_QA_MAX_RETRIES,
   });
   const next =

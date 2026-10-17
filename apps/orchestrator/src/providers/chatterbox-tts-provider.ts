@@ -8,10 +8,7 @@ import type {
 import { config } from "../utils/config.js";
 import { logger } from "../utils/logger.js";
 import { PipelineError } from "../utils/errors.js";
-import {
-  describeServiceFailure,
-  readServiceError,
-} from "./service-error.js";
+import { describeServiceFailure, readServiceError } from "./service-error.js";
 import { runFfmpeg } from "./composer/ffmpeg/ffmpeg.js";
 import {
   appendRunLogEvent,

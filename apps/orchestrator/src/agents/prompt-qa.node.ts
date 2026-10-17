@@ -21,6 +21,7 @@ import type {
 } from "../schemas/prompt-qa-output.js";
 import { config as configUtils } from "../utils/config.js";
 import { hashIssues } from "../utils/qa-policy.js";
+import { hashObject } from "../artifacts/hash.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
 import {
@@ -341,7 +342,25 @@ export async function promptQANode(
   const previousHash = state.execution?.qaFeedback?.[AgentModel.PromptQA];
   const repeated = isRevision && previousHash === feedbackHash;
 
-  const qaOutput: PromptQAOutput = repeated ? { ...qa, repeated: true } : qa;
+  // Non-convergence guard: hash the generation prompts under review. When a
+  // prompt regeneration round reproduces the identical prompt set while QA
+  // still issues a revision, further regeneration cannot converge; the
+  // router stops early (accept/fail) instead of burning the remaining budget.
+  const artifactHash = hashObject(
+    scenes.map((s) => ({
+      sceneId: s.sceneId,
+      generationPrompt: s.generationPrompt,
+    })),
+  );
+  const previousArtifactHash =
+    state.execution?.qaArtifactHash?.[AgentModel.PromptQA];
+  const artifactUnchanged = isRevision && previousArtifactHash === artifactHash;
+
+  const qaOutput: PromptQAOutput = repeated
+    ? { ...qa, repeated: true }
+    : artifactUnchanged
+      ? { ...qa, artifactUnchanged: true }
+      : qa;
 
   return {
     production: {
@@ -366,6 +385,10 @@ export async function promptQANode(
             qaFeedback: {
               ...state.execution?.qaFeedback,
               [AgentModel.PromptQA]: feedbackHash,
+            },
+            qaArtifactHash: {
+              ...state.execution?.qaArtifactHash,
+              [AgentModel.PromptQA]: artifactHash,
             },
           }
         : {}),

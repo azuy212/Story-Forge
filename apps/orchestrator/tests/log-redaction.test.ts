@@ -23,9 +23,9 @@ describe("redactSecrets", () => {
   });
 
   it("redacts bearer tokens", () => {
-    expect(redactSecrets("Authorization: Bearer abcdefghijklmnopqrst")).toContain(
-      "[redacted]",
-    );
+    expect(
+      redactSecrets("Authorization: Bearer abcdefghijklmnopqrst"),
+    ).toContain("[redacted]");
     expect(
       redactSecrets("Authorization: Bearer abcdefghijklmnopqrst"),
     ).not.toContain("abcdefghijklmnopqrst");
@@ -90,8 +90,8 @@ describe("sanitizeForLog / sanitizeUnknownForLog", () => {
   });
 
   it("passes strings through the redactor", () => {
-    expect(
-      sanitizeUnknownForLog("api_key=supersecretvalue123"),
-    ).not.toContain("supersecretvalue123");
+    expect(sanitizeUnknownForLog("api_key=supersecretvalue123")).not.toContain(
+      "supersecretvalue123",
+    );
   });
 });

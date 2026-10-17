@@ -29,6 +29,10 @@ export const ResearchQAOutputSchema = z.object({
   // Set by the node (not the LLM) when a verdict repeats the previous round's
   // feedback, so the router accepts/fails instead of regenerating again.
   repeated: z.boolean().optional(),
+  // Set by the node (not the LLM) when the artifact under review is
+  // hash-identical to the previous round's while QA still issues a revision.
+  // Stopping early cannot converge on more regeneration.
+  artifactUnchanged: z.boolean().optional(),
 });
 
 export type ResearchQAOutput = z.input<typeof ResearchQAOutputSchema>;

@@ -14,6 +14,7 @@ import { ResearchQAOutputSchema } from "../schemas/research-qa-output.js";
 import type { FactVerdict } from "../schemas/research-qa-output.js";
 import { config as configUtils } from "../utils/config.js";
 import { hashIssues } from "../utils/qa-policy.js";
+import { hashObject } from "../artifacts/hash.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
 import {
@@ -65,6 +66,23 @@ function regenerateFromVerdicts(factVerdicts: FactVerdict[]): {
   return { factsToRegenerate: ids.length, factsToRegenerateIds: ids };
 }
 
+/**
+ * Normalized hash of the research under review. Only the content fields the
+ * QA judged are hashed — approval later decorates facts with `verified`,
+ * reason, and classification, which must never read as an artifact change.
+ */
+function researchArtifactHash(state: ProjectState): string {
+  return hashObject({
+    summary: state.research?.summary ?? "",
+    facts: (state.research?.facts ?? []).map((f) => ({
+      id: f.id,
+      fact: f.fact,
+      confidence: f.confidence,
+      classification: f.classification,
+    })),
+  });
+}
+
 export async function researchQANode(
   state: ProjectState,
   config: RunnableConfig,
@@ -81,10 +99,12 @@ export async function researchQANode(
   const execution = (
     currentNode: string,
     qaFeedback?: Record<string, string>,
+    qaArtifactHash?: Record<string, string>,
   ) => ({
     currentNode,
     retryCount: { ...state.execution?.retryCount, ResearchQA: retryCount },
     ...(qaFeedback ? { qaFeedback } : {}),
+    ...(qaArtifactHash ? { qaArtifactHash } : {}),
   });
 
   if (!configUtils.enableResearchQA()) {
@@ -272,8 +292,10 @@ export async function researchQANode(
     };
   }
 
-  // A revision verdict (minor/major/fail) records its feedback hash so the
-  // router can detect repeated feedback and stop regenerating identical input.
+  // A revision verdict (minor/major/fail) records its feedback hash and the
+  // reviewed artifact's hash so the router can stop early on repeated
+  // feedback OR an unchanged artifact (non-convergence), instead of
+  // regenerating identical input to exhaustion.
   const isRevision =
     qa.status === "minor_revision" ||
     qa.status === "major_revision" ||
@@ -282,7 +304,16 @@ export async function researchQANode(
   const previousHash = state.execution?.qaFeedback?.[AgentModel.ResearchQA];
   const repeated = isRevision && previousHash === feedbackHash;
 
-  const qaOutput: ResearchQAOutput = repeated ? { ...qa, repeated: true } : qa;
+  const artifactHash = researchArtifactHash(state);
+  const previousArtifactHash =
+    state.execution?.qaArtifactHash?.[AgentModel.ResearchQA];
+  const artifactUnchanged = isRevision && previousArtifactHash === artifactHash;
+
+  const qaOutput: ResearchQAOutput = repeated
+    ? { ...qa, repeated: true }
+    : artifactUnchanged
+      ? { ...qa, artifactUnchanged: true }
+      : qa;
 
   return {
     research: {},
@@ -303,6 +334,12 @@ export async function researchQANode(
         ? {
             ...state.execution?.qaFeedback,
             [AgentModel.ResearchQA]: feedbackHash,
+          }
+        : undefined,
+      isRevision
+        ? {
+            ...state.execution?.qaArtifactHash,
+            [AgentModel.ResearchQA]: artifactHash,
           }
         : undefined,
     ),

@@ -279,6 +279,34 @@ describe("checkScriptContract — open-loop ledger", () => {
     ).toBe(false);
     expect(result.derivation.openLoops).toEqual([]);
   });
+
+  it("accepts a fully resolved ending without an extra open question", () => {
+    // The old QA prompt fail-deadly here: it demanded the final sentence stay
+    // unresolved even for revelation/callback/twist endings. The contract
+    // must not require an open question from a resolved ending — and for the
+    // earlier audit this only matters in code (ScriptQA's prompt now also
+    // allows it). The default fixture's ending already echoes the hook, so
+    // only the ending type changes.
+    const result = run({ endingType: "revelation" });
+    expect(result.issues).toEqual([]);
+  });
+
+  it("accepts a resolved ending on a chain loop ledger", () => {
+    // The planner's revised ledger closes every loop along a chain shaped
+    // closesLoopFor = previous beat. With a resolved ending (final beat
+    // closes 3) the whole ledger resolves and produces no warnings.
+    const planBeats = [
+      planBeat(1, { opensLoop: "Why was the wave not water?" }),
+      planBeat(2, { opensLoop: "How did nobody see it?", closesLoopFor: 1 }),
+      planBeat(3, {
+        opensLoop: "What would a slip release?",
+        closesLoopFor: 2,
+      }),
+      planBeat(4, { closesLoopFor: 3 }),
+    ];
+    const result = run({ planBeats, endingType: "revelation" });
+    expect(result.issues).toEqual([]);
+  });
 });
 
 describe("checkScriptContract — beat boundaries", () => {

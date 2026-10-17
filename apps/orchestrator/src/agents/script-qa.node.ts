@@ -24,6 +24,7 @@ import {
   validateScriptComplexity,
 } from "../utils/script-complexity.js";
 import { hashIssues } from "../utils/qa-policy.js";
+import { hashObject } from "../artifacts/hash.js";
 import { checkScriptContract } from "../utils/script-contract.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
@@ -381,7 +382,30 @@ export async function scriptQANode(
   const previousHash = state.execution?.qaFeedback?.[AgentModel.ScriptQA];
   const repeated = isRevision && previousHash === feedbackHash;
 
-  const qaOutput: ScriptQAOutput = repeated ? { ...qa, repeated: true } : qa;
+  // Non-convergence guard: when the producer re-submitted a hash-identical
+  // script while QA still issues a revision, more regenerations cannot change
+  // the outcome, so the router stops early (accept/fail) instead of burning
+  // the remaining budget. Artifacts are normalized to the narrated content —
+  // derived fields (durations, counts) are excluded.
+  const artifactHash = hashObject({
+    script: script ?? "",
+    beats: (state.content?.beats ?? []).map(
+      (b: { beatId: number; narration: string }) => ({
+        beatId: b.beatId,
+        narration: b.narration,
+      }),
+    ),
+    ending: state.content?.ending ?? null,
+  });
+  const previousArtifactHash =
+    state.execution?.qaArtifactHash?.[AgentModel.ScriptQA];
+  const artifactUnchanged = isRevision && previousArtifactHash === artifactHash;
+
+  const qaOutput: ScriptQAOutput = repeated
+    ? { ...qa, repeated: true }
+    : artifactUnchanged
+      ? { ...qa, artifactUnchanged: true }
+      : qa;
 
   return {
     scriptQA: qaOutput,
@@ -403,6 +427,10 @@ export async function scriptQANode(
             qaFeedback: {
               ...state.execution?.qaFeedback,
               [AgentModel.ScriptQA]: feedbackHash,
+            },
+            qaArtifactHash: {
+              ...state.execution?.qaArtifactHash,
+              [AgentModel.ScriptQA]: artifactHash,
             },
           }
         : {}),

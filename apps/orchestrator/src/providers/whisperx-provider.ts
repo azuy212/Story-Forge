@@ -147,9 +147,7 @@ export class HttpWhisperXProvider implements WhisperXProvider {
     if (!response.ok) {
       const text = await response.text().catch(() => "");
       event.responseBody = text.slice(0, 8000);
-      const envelope = parseServiceErrorEnvelope(
-        safeJsonParse(text),
-      );
+      const envelope = parseServiceErrorEnvelope(safeJsonParse(text));
       throw new PipelineError(
         describeServiceFailure(
           "WhisperX alignment failed",

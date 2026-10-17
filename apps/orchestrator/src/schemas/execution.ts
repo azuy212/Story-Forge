@@ -24,6 +24,10 @@ export const ExecutionSchema = z.object({
     .optional()
     .default({}),
   qaFeedback: z.record(z.string(), z.string()).optional().default({}),
+  // Per-QA-node hash (sha256) of the artifact the node reviewed. Trending
+  // unchanged artifacts across revision rounds lets the router stop early
+  // (non-convergence) instead of burning the full revision budget.
+  qaArtifactHash: z.record(z.string(), z.string()).optional().default({}),
 });
 
 export type Execution = z.input<typeof ExecutionSchema>;

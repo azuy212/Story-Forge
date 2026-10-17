@@ -117,7 +117,10 @@ function allScenesResolved(scenes: Scene[]): boolean {
     // Fail-closed: scenes that planned a generated asset must not silently
     // fall back to a raw stock source image (e.g. source-image / source-video)
     // because of provider failure or missing references.
-    if (scene.assetMode === "generated" || scene.generationMode === "generate") {
+    if (
+      scene.assetMode === "generated" ||
+      scene.generationMode === "generate"
+    ) {
       const kind = scene.assetKind ?? "";
       if (kind === "source-image" || kind === "source-video") {
         return false;

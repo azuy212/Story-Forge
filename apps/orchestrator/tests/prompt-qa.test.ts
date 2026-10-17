@@ -163,6 +163,51 @@ describe("promptQANode", () => {
     expect(result.production?.promptQA?.sceneResults![1].feedback).toContain(
       "map details",
     );
+    // Reviewed prompt set is hashed and persisted for the non-convergence guard.
+    expect(result.execution?.qaArtifactHash?.PromptQA).toBeDefined();
+  });
+
+  it("flags an unchanged prompt set when QA re-issues a revision", async () => {
+    const revisionWithFeedback = (feedback: string) =>
+      buildResponse({
+        content: JSON.stringify({
+          status: "major_revision",
+          globalFeedback: feedback,
+          revisionTarget: "prompts",
+          sceneResults: [
+            { sceneId: 1, verdict: "pass", feedback: "" },
+            {
+              sceneId: 2,
+              verdict: "revise",
+              feedback: "Anchor drifted",
+            },
+          ],
+        }),
+      });
+
+    // Round 1: revision over fresh prompts → no flag, hash persisted.
+    mockGenerate.mockResolvedValue(
+      revisionWithFeedback("Scene 2 anchor drifts from the plan"),
+    );
+    const first = await runNode().promise;
+    const persistedHash = first.execution?.qaArtifactHash?.PromptQA;
+    expect(persistedHash).toBeDefined();
+
+    // Round 2: ImagePromptGenerator reproduced the same prompts (unchanged
+    // hash) while QA still revises → flag set so the router fails fast
+    // instead of burning the remaining revision budget.
+    mockGenerate.mockResolvedValue(
+      revisionWithFeedback("Same anchor problem, reworded note"),
+    );
+    const second = await runNode({
+      execution: {
+        version: "0.1.0",
+        retryCount: { PromptQA: 1, ImagePromptGenerator: 1 },
+        qaArtifactHash: { PromptQA: persistedHash! },
+      },
+    } as Partial<ProjectState>).promise;
+    expect(second.production?.promptQA?.status).toBe("major_revision");
+    expect(second.production?.promptQA?.artifactUnchanged).toBe(true);
   });
 
   it("returns error when no scenes exist", async () => {

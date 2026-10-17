@@ -13,6 +13,9 @@ export const ScriptQAOutputSchema = z.object({
   feedback: z.string().optional(),
   issues: z.array(z.string()).optional(),
   repeated: z.boolean().optional(),
+  // Set by the node (not the LLM) when the artifact under review is
+  // hash-identical to the previous round's while QA still issues a revision.
+  artifactUnchanged: z.boolean().optional(),
 });
 
 export type ScriptQAOutput = z.input<typeof ScriptQAOutputSchema>;
