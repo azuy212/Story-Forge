@@ -99,6 +99,11 @@ function buildResponse(overrides?: {
 
 beforeEach(() => {
   mockGenerate.mockReset();
+  // The developer's .env sets CLASSIFIER_PROVIDER=typesafe and jest loads it;
+  // the typesafe pre-triage would otherwise run instead of the queued LLM mock
+  // and its own verdict decides the outcome. Tests that want the classifier
+  // path set it explicitly (withClassifierEnv below).
+  delete process.env.CLASSIFIER_PROVIDER;
 });
 
 describe("scriptQANode", () => {

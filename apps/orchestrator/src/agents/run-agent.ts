@@ -174,10 +174,10 @@ export type AgentInject = {
   createClassifier?: ClassifierFactory;
 };
 
-export type RunAgentOptions<T> = {
+export type RunAgentOptions<TParsed, TResult = TParsed> = {
   agent: AgentModel;
   promptPath: string;
-  schema: z.ZodSchema<T>;
+  schema: z.ZodSchema<TParsed>;
   variables: Record<string, string>;
   inject?: AgentInject;
   generateOptions?: GenerateOptions;
@@ -191,11 +191,35 @@ export type RunAgentOptions<T> = {
   /** When true, the artifact is written as pending and the caller must mark it complete. */
   deferComplete?: boolean;
   /** Semantic validation hook for cached artifacts. */
-  validateArtifact?: (artifact: T) => boolean;
+  validateArtifact?: (artifact: TResult) => boolean;
+  /**
+   * Version of this agent's deterministic code that transforms the model
+   * output on top of the prompt. When set, it participates in the artifact
+   * input hash, so cached artifacts never outlive the code that shaped them.
+   * Agents without such a transform simply omit it.
+   */
+  codeVersion?: number | string;
+  /**
+   * Optional content-level post-process, run after schema validation succeeds
+   * but before the response is considered usable.
+   *
+   * - Success: the returned `data` replaces the schema output everywhere —
+   *   it is what the artifact persists (with `metaExtras` merged into the
+   *   artifact meta) and what the caller receives. This is how derived
+   *   artifacts (e.g. VisualDirector narration built from unit ids) reach the
+   *   store and the state in one shape.
+   * - Failure (return a message string): treated like a schema rejection —
+   *   the message is sent back to the model as retry feedback and the attempt
+   *   is counted as failed. Use it when the caller can retry the model with
+   *   specific content feedback.
+   */
+  postProcess?: (
+    data: TParsed,
+  ) => { data: TResult; metaExtras?: Record<string, unknown> } | string;
 };
 
-export type AgentResult<T> = {
-  data: T | null;
+export type AgentResult<TData> = {
+  data: TData | null;
   telemetry: NodeTelemetry & {
     fromCache?: boolean;
     artifactRef?: {
@@ -219,10 +243,10 @@ export type AgentResult<T> = {
   rejected?: unknown;
 };
 
-function buildTelemetry(
-  result: ComputeResult<unknown>,
+function buildTelemetry<T>(
+  result: ComputeResult<T>,
   promptVersion: string,
-): AgentResult<never>["telemetry"] {
+): AgentResult<T>["telemetry"] {
   return {
     model: result.telemetry.model,
     durationMs: result.telemetry.durationMs,
@@ -237,7 +261,7 @@ function buildTelemetry(
   };
 }
 
-export async function runAgent<T>({
+export async function runAgent<TParsed, TResult = TParsed>({
   agent,
   promptPath,
   schema,
@@ -250,10 +274,12 @@ export async function runAgent<T>({
   configurable = {},
   deferComplete = false,
   validateArtifact,
-}: RunAgentOptions<T>): Promise<AgentResult<T>> {
+  postProcess,
+  codeVersion,
+}: RunAgentOptions<TParsed, TResult>): Promise<AgentResult<TResult>> {
   const def = getArtifactDefByNode(agent);
 
-  async function compute(): Promise<ComputeResult<T>> {
+  async function compute(): Promise<ComputeResult<TResult>> {
     const startedAt = Date.now();
     const createModel = inject.createModel ?? defaultCreateModel;
     const loadPrompt = inject.loadPrompt ?? defaultLoadPrompt;
@@ -400,6 +426,28 @@ export async function runAgent<T>({
           throw new LLMError(`Schema validation failed: ${issues}`);
         }
 
+        // Content-level post-process (e.g. VisualDirector unit repair + narration
+        // derivation): validated output is transformed before it counts as a
+        // usable response. A failure message is treated like a schema rejection
+        // and fed back to the model with the specific problem attached.
+        let finalData: TResult;
+        let metaExtras: Record<string, unknown> | undefined;
+        if (postProcess) {
+          const outcome = postProcess(result.data);
+          if (typeof outcome === "string") {
+            lastRejected = parsed;
+            sawRejected = true;
+            throw new LLMError(`Schema validation failed: ${outcome}`);
+          }
+          finalData = outcome.data;
+          metaExtras = outcome.metaExtras;
+        } else {
+          // No postProcess: TResult is TParsed by construction — the generic
+          // is only widened when postProcess supplies the mapping, so the same
+          // value serves both types here.
+          finalData = result.data as TParsed & TResult;
+        }
+
         const durationMs = Date.now() - startedAt;
 
         logger.debug(`${agent} model call complete`, {
@@ -409,7 +457,8 @@ export async function runAgent<T>({
         });
 
         return {
-          data: result.data,
+          data: finalData,
+          metaExtras,
           telemetry: {
             model: model.model,
             durationMs,
@@ -483,7 +532,7 @@ export async function runAgent<T>({
 
     const durationMs = Date.now() - startedAt;
     return {
-      data: null as T | null,
+      data: null,
       ...(sawRejected ? { rejected: lastRejected } : {}),
       telemetry: {
         model: model.model,
@@ -512,6 +561,10 @@ export async function runAgent<T>({
           ? (configurable.modelForAgent as (agent: string) => string)(agent)
           : undefined,
         agentVersion: AGENT_VERSION,
+        // Agents with a deterministic output transform (e.g. the
+        // VisualDirector's unit pipeline) pass codeVersion so cached
+        // storyboards never outlive the code that shaped them.
+        codeVersion,
         loadPrompt: inject.loadPrompt ?? defaultLoadPrompt,
         deferComplete,
         validate: validateArtifact,
@@ -520,7 +573,7 @@ export async function runAgent<T>({
 
   if (cacheOptions) {
     try {
-      const result = await runWithArtifactCache<T>(
+      const result = await runWithArtifactCache<TResult>(
         cacheOptions,
         compute,
         runConfig,
@@ -528,20 +581,14 @@ export async function runAgent<T>({
       if (result.error || !result.data) {
         return {
           data: null,
-          telemetry: buildTelemetry(
-            result as ComputeResult<unknown>,
-            promptVersion,
-          ),
+          telemetry: buildTelemetry(result, promptVersion),
           error: result.error ?? "Unknown LLM error",
           rejected: result.rejected,
         };
       }
       return {
         data: result.data,
-        telemetry: buildTelemetry(
-          result as ComputeResult<unknown>,
-          promptVersion,
-        ),
+        telemetry: buildTelemetry(result, promptVersion),
         error: undefined,
       };
     } catch (err) {
@@ -566,20 +613,14 @@ export async function runAgent<T>({
     if (result.error || !result.data) {
       return {
         data: null,
-        telemetry: buildTelemetry(
-          result as ComputeResult<unknown>,
-          promptVersion,
-        ),
+        telemetry: buildTelemetry(result, promptVersion),
         error: result.error ?? "Unknown LLM error",
         rejected: result.rejected,
       };
     }
     return {
       data: result.data,
-      telemetry: buildTelemetry(
-        result as ComputeResult<unknown>,
-        promptVersion,
-      ),
+      telemetry: buildTelemetry(result, promptVersion),
       error: undefined,
     };
   } catch (err) {

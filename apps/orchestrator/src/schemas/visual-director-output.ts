@@ -98,12 +98,18 @@ export const EmotionalBeatEnum = lenientEnum(EMOTIONAL_BEATS, {
 
 const SceneRoleEnum = z.enum(["narrative", "b-roll"]);
 
-const ScenePlanSchema = z.object({
+/**
+ * Interior scene shape shared by the model-facing and derived variants. The
+ * model lists `unitIds` (the narration units the scene covers) and never
+ * writes narration text — the narration is derived by joining the units, and
+ * the narrative ending check runs against narration tokens outside the model
+ * schema.
+ */
+const ScenePlanSharedSchema = z.object({
   sceneId: z
     .number()
     .int("sceneId must be whole number")
     .positive("sceneId must be positive"),
-  narration: z.string().min(1, "narration must not be empty"),
   sceneGoal: z.string().min(1, "sceneGoal must not be empty"),
   visualDescription: z.string().min(1, "visualDescription must not be empty"),
   sceneType: SceneTypeEnum,
@@ -123,11 +129,56 @@ const ScenePlanSchema = z.object({
   references: z.array(z.string()).optional(),
 });
 
-function buildScenesSchema(profile?: VideoProfileConfig) {
+/** Scene exactly as the model returns it: unit ids, no narration text. */
+const ScenePlanInputSchema = ScenePlanSharedSchema.extend({
+  unitIds: z
+    .array(
+      z
+        .number()
+        .int("unitIds must be whole numbers")
+        .min(1, "unit ids must be at least 1"),
+    )
+    .min(1, "unitIds must not be empty"),
+});
+
+/** Stored/derived scene: the narration the system joined from those units. */
+const ScenePlanSchema = ScenePlanSharedSchema.extend({
+  unitIds: z
+    .array(
+      z
+        .number()
+        .int("unitIds must be whole numbers")
+        .min(1, "unit ids must be at least 1"),
+    )
+    .min(1, "unitIds must not be empty"),
+  narration: z.string().min(1, "narration must not be empty"),
+  /**
+   * Bookkeeping from `finalizeSceneUnits` (not written by the model): every
+   * model-origin scene id this produced scene represents — a split piece
+   * shares its parent's id, a scene folded into a neighbour inherits its ids.
+   * Visual plans use it to follow the scenes they originally described.
+   */
+  modelSceneIds: z.array(z.number().int()).optional(),
+});
+
+export interface SceneCountBand {
+  minScenes: number;
+  maxScenes: number | null;
+}
+
+export function sceneCountBand(profile?: VideoProfileConfig): SceneCountBand {
   const minScenes = profile?.profile === "long" ? 25 : 4;
   const maxScenes = profile?.profile === "long" ? null : 12;
+  return { minScenes, maxScenes };
+}
+
+function buildScenesSchema<T extends z.ZodTypeAny>(
+  scene: T,
+  profile?: VideoProfileConfig,
+): z.ZodArray<T> {
+  const { minScenes, maxScenes } = sceneCountBand(profile);
   let arr = z
-    .array(ScenePlanSchema)
+    .array(scene)
     .min(minScenes, `must have at least ${minScenes} scenes`);
   if (maxScenes !== null) {
     arr = arr.max(maxScenes, `must have at most ${maxScenes} scenes`);
@@ -135,9 +186,23 @@ function buildScenesSchema(profile?: VideoProfileConfig) {
   return arr;
 }
 
+/**
+ * The model-facing schema: scenes carry `unitIds` only. Narration is derived
+ * afterward by `finalizeSceneUnits` inside the node's postProcess hook.
+ */
+export function visualDirectorUnitOutputSchema(profile?: VideoProfileConfig) {
+  return z.object({
+    scenes: buildScenesSchema(ScenePlanInputSchema, profile),
+    visualPlans: z
+      .array(VisualPlanEntrySchema)
+      .min(1, "must have at least one visual plan entry"),
+  });
+}
+
+/** The derived/stored schema — narration present alongside `unitIds`. */
 export function visualDirectorOutputSchema(profile?: VideoProfileConfig) {
   return z.object({
-    scenes: buildScenesSchema(profile),
+    scenes: buildScenesSchema(ScenePlanSchema, profile),
     visualPlans: z
       .array(VisualPlanEntrySchema)
       .min(1, "must have at least one visual plan entry"),
@@ -145,6 +210,10 @@ export function visualDirectorOutputSchema(profile?: VideoProfileConfig) {
 }
 
 export const VisualDirectorOutputSchema = visualDirectorOutputSchema();
+
+export type VisualDirectorUnitOutput = z.output<
+  ReturnType<typeof visualDirectorUnitOutputSchema>
+>;
 
 /**
  * Relaxed schema used only to recover a storyboard the strict schema rejected.
@@ -155,13 +224,14 @@ export const VisualDirectorOutputSchema = visualDirectorOutputSchema();
  * nothing left to steer, and a short-but-complete storyboard is a usable
  * "best available result" whereas no storyboard ends the run.
  *
- * Everything else stays strict — narration, visual description and the visual
- * plan entries are still required, so a recovered storyboard is structurally
- * sound. Only the count preference is given up.
+ * Model shape (unit ids, no narration) — the caller derives narration through
+ * the same `finalizeSceneUnits` path used for cleanly validated responses.
  */
 export function visualDirectorSalvageSchema() {
   return z.object({
-    scenes: z.array(ScenePlanSchema).min(1, "must have at least one scene"),
+    scenes: z
+      .array(ScenePlanInputSchema)
+      .min(1, "must have at least one scene"),
     visualPlans: z
       .array(VisualPlanEntrySchema)
       .min(1, "must have at least one visual plan entry"),

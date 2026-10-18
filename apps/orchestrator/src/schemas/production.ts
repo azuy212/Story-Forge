@@ -214,6 +214,12 @@ export const SceneSchema = z.object({
   endSecond: z.number().optional(),
   durationSeconds: z.number().positive().optional(),
   narration: z.string().optional(),
+  /**
+   * Narration-unit ids (1-based) the scene covers, produced by the
+   * VisualDirector's unit-based segmentation. The narration string is derived
+   * by joining those units; unitIds travel alongside it for traceability.
+   */
+  unitIds: z.array(z.number().int().positive()).optional(),
   sceneGoal: z.string().optional(),
   visualDescription: z.string().optional(),
   sceneType: SceneTypeEnum.optional(),

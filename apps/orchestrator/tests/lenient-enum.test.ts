@@ -104,6 +104,7 @@ describe("storyboard enum leniency", () => {
     const parsed = schema.safeParse({
       scenes: Array.from({ length: 4 }, (_, i) => ({
         sceneId: i + 1,
+        unitIds: [i + 1],
         narration: `Line ${i + 1}.`,
         sceneGoal: "Goal",
         visualDescription: "A view",

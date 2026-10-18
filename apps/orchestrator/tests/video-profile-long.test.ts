@@ -37,6 +37,7 @@ function makeBeat(id: number) {
 function makeScene(id: number) {
   return {
     sceneId: id,
+    unitIds: [id],
     narration: "Scene narration text.",
     sceneGoal: "Goal",
     visualDescription: "Visual",

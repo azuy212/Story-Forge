@@ -5,6 +5,7 @@ import { loadConfig, type Config, type ConfigOverrides } from '../config.js';
 import { Logger } from '../logger.js';
 import { GeminiClient } from '../core/gemini-client.js';
 import { PromptReader } from './prompt-reader.js';
+import { runBatchGeneration } from './batch.js';
 import { startServer } from '../http/server.js';
 import type { AssetType } from '../core/types.js';
 
@@ -181,6 +182,59 @@ program
 
     logger.info('Loaded prompts', { count: prompts.length });
     await runGeneration(config, logger, prompts, config.generationType);
+  });
+
+program
+  .command('batch')
+  .description(
+    'Generate assets for a list of prompts through the same /generate flow the orchestrator invokes (validation, cache, error envelope)',
+  )
+  .argument('[prompt...]', 'prompt text (multiple words are joined into one prompt)')
+  .option('-f, --prompts-file <file>', 'file with prompts, one per line (comments with #)')
+  .option('-t, --type <type>', 'asset type to generate: image or video (default image)')
+  .action(async (promptArgs: string[], opts: OptionValues) => {
+    const optsAll = { ...program.opts(), ...opts };
+    const logger = new Logger(loadConfig().logLevel);
+    const assetType = parseAssetType(optsAll.type as string | undefined, logger);
+
+    let prompts: string[] = [];
+
+    if (typeof optsAll.promptsFile === 'string') {
+      const config = loadConfig(buildOverrides(optsAll, { promptsFile: optsAll.promptsFile }));
+      try {
+        prompts = await new PromptReader(config.promptsFile).read();
+      } catch (error) {
+        logger.error('Failed to read prompts file', {
+          path: config.promptsFile,
+          error: String(error),
+        });
+        process.exit(1);
+      }
+    }
+
+    if (promptArgs.length > 0) {
+      prompts = prompts.concat(promptArgs.join(' '));
+    }
+
+    if (prompts.length === 0) {
+      logger.error('No prompts to process — pass prompts or use --prompts-file');
+      process.exit(1);
+    }
+
+    const config = loadConfig(
+      buildOverrides(optsAll, {
+        promptsFile: typeof optsAll.promptsFile === 'string' ? optsAll.promptsFile : undefined,
+        generationType: assetType,
+      }),
+    );
+
+    logger.info('Loaded prompts', { count: prompts.length });
+
+    const summary = await runBatchGeneration(config, logger, prompts, assetType);
+
+    if (summary.some((item) => !item.ok)) {
+      process.exitCode = 1;
+    }
   });
 
 program

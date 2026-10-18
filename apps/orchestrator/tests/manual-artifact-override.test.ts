@@ -95,6 +95,7 @@ function scriptQaOptions(extra: Record<string, unknown> = {}) {
 function makeScene(id: number) {
   return {
     sceneId: id,
+    unitIds: [id],
     narration: "Scene narration text.",
     sceneGoal: "Goal",
     visualDescription: "Visual",

@@ -17,21 +17,25 @@ import { runAgent, type AgentInject } from "./run-agent.js";
 import { withTopic } from "../artifacts/context.js";
 import { PromptPaths } from "../models/prompt-paths.js";
 import {
-  visualDirectorOutputSchema,
+  sceneCountBand,
   visualDirectorSalvageSchema,
+  visualDirectorUnitOutputSchema,
 } from "../schemas/visual-director-output.js";
 import type {
   VisualDirectorOutput,
+  VisualDirectorUnitOutput,
   VisualPlanEntry,
 } from "../schemas/visual-director-output.js";
 import { logger } from "../utils/logger.js";
 import { nodeLabel } from "../utils/node-labels.js";
 import { MINOR_REVISION_MAX } from "../utils/constants.js";
 import {
-  endsWithTokens,
-  tokenizeText,
-  wordCount,
-} from "../utils/narration-contract.js";
+  buildNarrationUnits,
+  finalizeSceneUnits,
+  formatUnits,
+  UNIT_PIPELINE_VERSION,
+} from "../utils/scene-units.js";
+import { endsWithTokens, wordCount } from "../utils/narration-contract.js";
 
 function formatFacts(
   facts: {
@@ -68,28 +72,22 @@ function serializeStoryBeats(
 }
 
 /**
- * Fraction of `target` words found, in order, as a subsequence of `source`.
- * forward(source, concat) ~ 1 means nothing was dropped;
- * backward(source, concat) ~ 1 means nothing was added.
+ * Re-validate a schema-rejected payload against the relaxed salvage schema.
+ *
+ * Returns undefined when there is nothing to recover or the payload is not a
+ * structurally sound storyboard. Never throws: recovery is best-effort, so the
+ * caller still has its normal failure paths available. The recovered scenes
+ * still speak in unit ids — the caller runs them through the same
+ * `finalizeSceneUnits` repair/derive path used for cleanly validated responses.
  */
-function subsequenceCoverage(source: string[], target: string[]): number {
-  if (target.length === 0) return 1;
-  let index = 0;
-  let matched = 0;
-  for (const word of target) {
-    while (index < source.length) {
-      if (source[index] === word) {
-        matched++;
-        index++;
-        break;
-      }
-      index++;
-    }
-  }
-  return matched / target.length;
+function salvageRejectedOutput(
+  rejected: unknown,
+): VisualDirectorUnitOutput | undefined {
+  if (rejected == null) return undefined;
+  const parsed = visualDirectorSalvageSchema().safeParse(rejected);
+  if (!parsed.success) return undefined;
+  return parsed.data;
 }
-
-const COVERAGE_ACCEPT = 0.98;
 
 function isRecoverableOutputError(error: string | undefined): boolean {
   return (
@@ -97,112 +95,6 @@ function isRecoverableOutputError(error: string | undefined): boolean {
     error?.startsWith("Invalid JSON") === true ||
     error?.startsWith("Empty response") === true
   );
-}
-
-/**
- * Re-validate a schema-rejected payload against the relaxed salvage schema.
- *
- * Returns undefined when there is nothing to recover or the payload is not a
- * structurally sound storyboard. Never throws: recovery is best-effort, so the
- * caller still has its normal failure paths available.
- */
-function salvageRejectedOutput(
-  rejected: unknown,
-): VisualDirectorOutput | undefined {
-  if (rejected == null) return undefined;
-  const parsed = visualDirectorSalvageSchema().safeParse(rejected);
-  if (!parsed.success) return undefined;
-  return parsed.data;
-}
-
-/**
- * Whitespace-word count of the shortest tail of `words` that carries the whole
- * declared ending as a token suffix, or 0 when no tail does.
- *
- * The re-segmentation slices on whitespace words while the ending contract
- * compares tokens, so the boundary has to be found by walking candidate tails
- * rather than assumed to be word-for-word equal to the ending.
- */
-function endingTailWordCount(words: string[], ending: string): number {
-  const suffix = tokenizeText(ending);
-  if (suffix.length === 0) return 0;
-  const carriesSuffix = (tokens: string[]): boolean =>
-    tokens.length >= suffix.length &&
-    suffix.every(
-      (word, i) => tokens[tokens.length - suffix.length + i] === word,
-    );
-  // A tail can never need fewer whitespace words than the ending has tokens,
-  // so start there instead of at 1.
-  for (let k = suffix.length; k <= words.length; k++) {
-    if (carriesSuffix(tokenizeText(words.slice(words.length - k).join("")))) {
-      return k;
-    }
-  }
-  return 0;
-}
-
-/**
- * Split the narration into `n` contiguous pieces whose word counts follow
- * `proportions`. The pieces cover the narration exactly (nothing dropped,
- * nothing added) — this is the deterministic repair for an LLM that
- * paraphrased, dropped, or padded words.
- *
- * `reservedTailWords` pins the final piece so it always spans the declared
- * ending. Proportional sizing alone lets a model that under-reports its last
- * scene clip that scene mid-ending, which then fails the ending contract on an
- * otherwise complete storyboard — a failure no revision can fix, because every
- * re-split clips the same way.
- */
-function splitNarrationProportional(
-  narration: string,
-  proportions: number[],
-  reservedTailWords = 0,
-): string[] {
-  const total = proportions.reduce((a, b) => a + b, 0);
-  if (total <= 0) return Array.from({ length: proportions.length }, () => "");
-  const words = narration.match(/\S+\s*/g) ?? [];
-  if (words.length === 0)
-    return Array.from({ length: proportions.length }, () => "");
-
-  const targets = Array.from({ length: proportions.length }, () => 0);
-  let acc = 0;
-  for (let i = 0; i < proportions.length; i++) {
-    acc += proportions[i];
-    targets[i] = (acc / total) * words.length;
-  }
-
-  // bounds[i] is where piece i starts; bounds[n] is the exclusive end.
-  const bounds: number[] = [0];
-  for (let i = 0; i < proportions.length; i++) {
-    const isLast = i === proportions.length - 1;
-    const end = isLast
-      ? words.length
-      : Math.min(words.length, Math.max(bounds[i] + 1, Math.round(targets[i])));
-    bounds.push(end);
-  }
-
-  if (reservedTailWords > 0 && proportions.length > 1) {
-    const lastStart = bounds.length - 2;
-    // Every piece keeps at least one word, so the reservation can never push
-    // the final cut before the piece before it.
-    const cut = Math.max(lastStart, words.length - reservedTailWords);
-    // Move the final cut earlier so the last piece spans the whole ending. The
-    // words it gains come off the tails of the preceding pieces, so each of
-    // those boundaries has to step back in turn — clamping only the last one
-    // would strand the reservation against a neighbour that is already one
-    // word long.
-    for (let i = lastStart - 1; i >= 1; i--) {
-      bounds[i] = Math.min(
-        bounds[i],
-        Math.max(bounds[i - 1] + 1, cut - (lastStart - i)),
-      );
-    }
-    bounds[lastStart] = Math.max(bounds[lastStart - 1] + 1, cut);
-  }
-
-  return bounds
-    .slice(0, -1)
-    .map((start, i) => words.slice(start, bounds[i + 1]).join(""));
 }
 
 /**
@@ -254,77 +146,45 @@ interface NormalizedScenes {
 
 /**
  * Reindex sceneIds to 1..N, dedupe references, drop hallucinated fact IDs
- * (safe repair: a scene just cites less), and repair narration coverage by
- * re-segmenting the original narration in code when the LLM deviated. When an
- * ending is declared, the re-segmentation reserves it so the final scene keeps
- * the whole ending.
+ * (safe repair: a scene just cites less), and reindex visual plans to match.
+ *
+ * Unit coverage itself (scene boundaries, word caps, order, narration
+ * derivation) was already validated and repaired by `finalizeSceneUnits` in
+ * the post-process hook, so the narration here is final. What remains is
+ * bookkeeping the post-process cannot do: scene ids must be renumbered onto
+ * the repaired scene order, and visual plans must follow the scenes they
+ * originally described through merges, splits, and drops.
  */
 function normalizeOutput(
   data: VisualDirectorOutput,
-  narration: string,
   validFactIds: Set<string>,
-  endingNarration?: string,
   validBeatIds?: Set<number>,
 ): NormalizedScenes {
   const warnings: string[] = [];
 
-  // Reindex sceneIds to 1..N, keeping a map of old id -> new id so visual
-  // plans (keyed by the LLM's original ids) can be renumbered to match.
+  // `modelSceneIds` carries every model-origin scene id a final scene
+  // represents (split pieces share their parent's id; a scene folded into a
+  // neighbouring one inherits its id). Maps old id -> new id so visual plans
+  // (keyed by the LLM's original ids) can be renumbered to match.
   const oldToNew = new Map<number, number>();
+  /** Old model scene ids behind each renumbered scene, in origin order. */
+  const originsByNew = new Map<number, number[]>();
   const reindexed = data.scenes.map((s, i) => {
-    oldToNew.set(s.sceneId, i + 1);
+    const originIds =
+      s.modelSceneIds && s.modelSceneIds.length > 0
+        ? s.modelSceneIds
+        : [s.sceneId];
+    originsByNew.set(i + 1, originIds);
+    for (const oldId of originIds) {
+      if (!oldToNew.has(oldId)) oldToNew.set(oldId, i + 1);
+    }
     return {
       ...s,
       sceneId: i + 1,
       references: Array.from(new Set(s.references ?? [])),
     };
   });
-
-  const originalTokens = tokenizeText(narration);
-  const concatTokens = tokenizeText(
-    reindexed.map((s) => s.narration).join(" "),
-  );
-  const forward = subsequenceCoverage(originalTokens, concatTokens);
-  const backward = subsequenceCoverage(concatTokens, originalTokens);
-
-  let scenes = reindexed;
-  // Whitespace-word span the declared ending occupies at the tail of the
-  // narration, or 0 when the narration does not end with it. ScriptQA's
-  // contract says it must, so 0 means there is nothing safe to reserve and the
-  // ending check below reports the mismatch honestly.
-  const endingTailWords = endingNarration
-    ? endingTailWordCount(narration.match(/\S+\s*/g) ?? [], endingNarration)
-    : 0;
-  // The ending contract needs the WHOLE ending inside the final scene. A model
-  // that spreads it across the last two scenes misses that bar while covering
-  // the narration perfectly, so coverage alone cannot be the repair trigger.
-  const endingSpansFinalScene =
-    endingTailWords === 0 ||
-    endsWithTokens(reindexed.at(-1)?.narration ?? "", endingNarration ?? "");
-  const endingRepaired = endingTailWords > 0 && !endingSpansFinalScene;
-
-  if (
-    forward < COVERAGE_ACCEPT ||
-    backward < COVERAGE_ACCEPT ||
-    endingRepaired
-  ) {
-    // The LLM paraphrased, dropped, or padded narration — or cut the ending
-    // across two scenes. Repair deterministically: re-split the original
-    // narration proportionally to the LLM's segment sizes. Re-splitting the
-    // original invents nothing, it only moves where the existing words are cut.
-    const proportions = reindexed.map((s) => wordCount(s.narration));
-    const repaired = splitNarrationProportional(
-      narration,
-      proportions,
-      endingTailWords,
-    );
-    scenes = reindexed.map((s, i) => ({ ...s, narration: repaired[i] }));
-    warnings.push(
-      `VisualDirector: narration re-segmented in code (coverage forward=${(forward * 100).toFixed(1)}%, backward=${(backward * 100).toFixed(1)}%${
-        endingRepaired ? ", ending reserved for the final scene" : ""
-      })`,
-    );
-  }
+  const scenes = reindexed;
 
   // Drop references to fact IDs that do not exist in approved facts. A scene
   // ending up with no references is acceptable (B-roll scenes). Scene→beat
@@ -360,13 +220,17 @@ function normalizeOutput(
     };
   });
 
-  // Reindex visual plans against the renumbered scenes; drop extras.
-  const newToOld = new Map<number, number>();
-  for (const [oldId, newId] of oldToNew) newToOld.set(newId, oldId);
+  // Reindex visual plans against the renumbered scenes; drop extras. Split
+  // pieces of one model scene share that scene's plan (the pieces inherit its
+  // visual direction); for a merged scene the WINNING scene's plan runs the
+  // visual direction — foldSceneInto puts the winner's model scene id first
+  // in modelSceneIds, so the first origin is the winner.
   const planByOldId = new Map(data.visualPlans.map((p) => [p.sceneId, p]));
   const visualPlans = filtered.flatMap((s) => {
-    const oldId = newToOld.get(s.sceneId) ?? s.sceneId;
-    const plan = planByOldId.get(oldId);
+    const originIds = originsByNew.get(s.sceneId) ?? [];
+    const plan = originIds
+      .map((oldId) => planByOldId.get(oldId))
+      .find((candidate) => candidate !== undefined);
     if (!plan) return [];
     return [{ ...plan, sceneId: s.sceneId }];
   });
@@ -439,6 +303,7 @@ export async function visualDirectorNode(
 }> {
   const { title, narration } = state.content ?? {};
   const ending = state.content?.ending;
+  const content = state.content;
   const researchSummary = state.research?.summary;
   const approvedFacts = state.research?.facts;
   const channel = state.branding?.channel;
@@ -523,57 +388,115 @@ export async function visualDirectorNode(
   // ~75 words / 6s figure in older prompts was internally inconsistent.
   const maxSceneWords = Math.floor(speakingRate * 6);
 
+  // Pre-segment the narration into units the model groups by id. The model
+  // never sees narration it could reword — scenes only reference unit ids, so
+  // the derived narration cannot drift from the narration itself.
+  const units = buildNarrationUnits(narration ?? "", maxSceneWords);
+  const band = sceneCountBand(videoProfile);
+
   const label = nodeLabel(AgentModel.VisualDirector);
   logger.nodeStart(label);
   logger.nodePhase(label, "planning visual direction");
 
-  const result = await runAgent<VisualDirectorOutput>({
-    agent: AgentModel.VisualDirector,
-    promptPath: PromptPaths.VisualDirector,
-    schema: visualDirectorOutputSchema(videoProfile),
-    variables: {
-      title: title ?? "",
-      narration: narration ?? "",
-      endingNarration: ending?.narration ?? "",
-      endingVisualDirection: ending?.visualDirection ?? "",
-      estimatedDurationSeconds: String(targetDurationSec),
-      researchSummary: researchSummary ?? "",
-      approvedFacts: formatFacts(approvedFacts),
-      channel: channel ?? "",
-      qaFeedback,
-      previousVisualPlan,
-      formatLabel,
-      canvasGuidance: canvasGuidance.canvasGuidance,
-      aspectGuidance: canvasGuidance.aspectGuidance,
-      targetDurationSeconds: String(targetDurationSec),
-      speakingRateWordsPerSecond: String(speakingRate),
-      maxSceneWords: String(maxSceneWords),
-      sceneCountRange,
-      targetSceneCount: String(targetSceneCount),
-      audienceTrigger: state.storyPlan?.audienceTrigger?.type ?? "",
-      audienceTriggerStatement:
-        state.storyPlan?.audienceTrigger?.statement ?? "",
-      audienceTriggerFactIds:
-        state.storyPlan?.audienceTrigger?.factIds?.join(", ") ?? "",
-      endingType: storyPlan?.endingType ?? "",
-      pivotSentence: state.content?.retention?.pivotSentence ?? "",
-      pivotBeatId: String(storyPlan?.retention?.pivotBeatId ?? ""),
-      storyBeats: serializeStoryBeats(storyPlan?.storyBeats),
+  // Repair warnings and unit telemetry produced inside the harness post-process.
+  // `compute` (and with it `postProcess`) runs strictly within the awaited
+  // `runAgent` call below, so these closure stores are fully populated before
+  // the node reads them.
+  const unitWarnings: string[] = [];
+
+  /**
+   * Validate the model's unit grouping, repair what is repairable
+   * deterministically, and derive scene narrations. A returned string is the
+   * specific problem fed back to the model through the harness retry loop —
+   * the model is only re-asked when repair is impossible.
+   */
+  const finalizeSceneOutput = (
+    raw: VisualDirectorUnitOutput,
+    bandOverride?: { minScenes: number; maxScenes: number | null },
+    recovering = false,
+  ):
+    | { data: VisualDirectorOutput; metaExtras: Record<string, unknown> }
+    | string => {
+    const finalized = finalizeSceneUnits(raw.scenes, units, {
+      maxSceneWords,
+      // No `??` on maxScenes: an explicit `null` (unbounded salvage band) must
+      // override the profile band, and `null ?? band` would coalesce back.
+      minScenes: bandOverride ? bandOverride.minScenes : band.minScenes,
+      maxScenes: bandOverride ? bandOverride.maxScenes : band.maxScenes,
+      endingNarration: ending?.narration,
+      pivotSentence: content?.retention?.pivotSentence,
+      recovering,
+    });
+    if (finalized.issues.length > 0) {
+      return `scene units: ${finalized.issues.join("; ")}`;
+    }
+    unitWarnings.push(...finalized.warnings);
+    return {
+      data: { ...raw, scenes: finalized.scenes } as VisualDirectorOutput,
+      metaExtras: {
+        unitCount: finalized.unitCount,
+        repairRan: finalized.repairRan,
+      },
+    };
+  };
+
+  const result = await runAgent<VisualDirectorUnitOutput, VisualDirectorOutput>(
+    {
+      agent: AgentModel.VisualDirector,
+      promptPath: PromptPaths.VisualDirector,
+      // The model speaks unit ids (no narration field); the post-process derives
+      // the narration the next stage of this node consumes.
+      schema: visualDirectorUnitOutputSchema(videoProfile),
+      postProcess: (data) => finalizeSceneOutput(data),
+      // The unit pipeline (splitter + deterministic repair) shapes the stored
+      // storyboard; bumping it must invalidate cached artifacts.
+      codeVersion: UNIT_PIPELINE_VERSION,
+      variables: {
+        title: title ?? "",
+        narration: narration ?? "",
+        narrationUnits: formatUnits(units),
+        endingNarration: ending?.narration ?? "",
+        endingVisualDirection: ending?.visualDirection ?? "",
+        estimatedDurationSeconds: String(targetDurationSec),
+        researchSummary: researchSummary ?? "",
+        approvedFacts: formatFacts(approvedFacts),
+        channel: channel ?? "",
+        qaFeedback,
+        previousVisualPlan,
+        formatLabel,
+        canvasGuidance: canvasGuidance.canvasGuidance,
+        aspectGuidance: canvasGuidance.aspectGuidance,
+        targetDurationSeconds: String(targetDurationSec),
+        speakingRateWordsPerSecond: String(speakingRate),
+        maxSceneWords: String(maxSceneWords),
+        sceneCountRange,
+        targetSceneCount: String(targetSceneCount),
+        audienceTrigger: state.storyPlan?.audienceTrigger?.type ?? "",
+        audienceTriggerStatement:
+          state.storyPlan?.audienceTrigger?.statement ?? "",
+        audienceTriggerFactIds:
+          state.storyPlan?.audienceTrigger?.factIds?.join(", ") ?? "",
+        endingType: storyPlan?.endingType ?? "",
+        pivotSentence: state.content?.retention?.pivotSentence ?? "",
+        pivotBeatId: String(storyPlan?.retention?.pivotBeatId ?? ""),
+        storyBeats: serializeStoryBeats(storyPlan?.storyBeats),
+      },
+      inject,
+      configurable: withTopic(config, state).configurable,
+      generateOptions: {
+        temperature: 0.5,
+        responseFormat: { type: "json_object" },
+      },
     },
-    inject,
-    configurable: withTopic(config, state).configurable,
-    generateOptions: {
-      temperature: 0.5,
-      responseFormat: { type: "json_object" },
-    },
-  });
+  );
 
   // A rejected payload can still be a structurally sound storyboard that only
   // missed the strict scene-count band. Recover it before giving up so the
   // router has a real "best available result" to accept once its minor
   // revision budget is spent — without this, an exhausted budget means no
   // scenes at all and the run ends.
-  const salvaged = salvageRejectedOutput(result.rejected);
+  const salvaged =
+    result.data == null ? salvageRejectedOutput(result.rejected) : undefined;
 
   if ((result.error || !result.data) && !salvaged) {
     const directorReview = isRecoverableOutputError(result.error)
@@ -603,12 +526,56 @@ export async function visualDirectorNode(
   }
 
   const recovered = result.data == null;
-  if (salvaged) {
+  let sceneOutput: VisualDirectorOutput;
+  if (result.data) {
+    sceneOutput = result.data;
+  } else if (salvaged) {
     logger.nodeRecovered(
       label,
       `${result.error} — accepted the rejected payload after re-validating it ` +
         `against the relaxed salvage schema`,
     );
+    // The salvage schema relaxes only the scene-count band. The unit contract
+    // (coverage, caps, order, narration derivation) still runs through the
+    // same finalize path — a unit failure there is a content failure, not a
+    // band problem, so nothing further is recoverable by relaxing again.
+    // Recovered repairs may skip (not veto): a protected scene simply blocks
+    // its ending absorb and the ending contract is warning-downgraded below.
+    const outcome = finalizeSceneOutput(
+      salvaged,
+      {
+        minScenes: 1,
+        maxScenes: null,
+      },
+      true,
+    );
+    if (typeof outcome === "string") {
+      const feedback = `Previous VisualDirector output was rejected: ${result.error}. Salvage re-validation failed: ${outcome}`;
+      logger.nodeFailed(label, feedback);
+      return {
+        production: {
+          scenes: [],
+          directorReview: { status: "minor_revision", feedback },
+        },
+        diagnostics: {
+          errors: [`${AgentModel.VisualDirector}: ${feedback}`],
+          warnings: unitWarnings,
+          telemetry: { [AgentModel.VisualDirector]: result.telemetry },
+        },
+        execution: {
+          currentNode: AgentModel.VisualDirector,
+          retryCount: {
+            ...state.execution?.retryCount,
+            VisualDirector: retryCount,
+          },
+        },
+      };
+    }
+    sceneOutput = outcome.data;
+  } else {
+    // Unreachable: the failure branch above returned when neither a validated
+    // payload nor a salvage candidate exists.
+    sceneOutput = { scenes: [], visualPlans: [] };
   }
 
   logger.nodeDone(label, result.telemetry.durationMs);
@@ -618,14 +585,13 @@ export async function visualDirectorNode(
     (state.storyPlan?.storyBeats ?? []).map((beat) => beat.beatId),
   );
   const normalizedOutput = normalizeOutput(
-    result.data ?? salvaged!,
-    narration ?? "",
+    sceneOutput,
     validFactIds,
-    ending?.narration,
     validBeatIds.size > 0 ? validBeatIds : undefined,
   );
   const { scenes: normalized, visualPlans } = normalizedOutput;
   let { warnings } = normalizedOutput;
+  warnings.push(...unitWarnings);
 
   // Hard structural failure: visual plan coverage is not repairable in code.
   // Surface a minor_revision so the router retries VisualDirector with
@@ -774,6 +740,7 @@ export async function visualDirectorNode(
     endSecond: timed[i].endSecond,
     durationSeconds: timed[i].durationSeconds,
     narration: timed[i].narration,
+    unitIds: s.unitIds,
     sceneGoal: s.sceneGoal.trim(),
     visualDescription: s.visualDescription.trim(),
     sceneType: s.sceneType,

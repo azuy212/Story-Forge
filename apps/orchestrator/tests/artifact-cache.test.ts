@@ -41,6 +41,7 @@ function makeConfig(extra: Record<string, unknown> = {}): RunnableConfig {
 function computeResult(
   data: unknown,
   overrides: Partial<ComputeResult<unknown>["telemetry"]> = {},
+  metaExtras?: Record<string, unknown>,
 ): ComputeResult<unknown> {
   return {
     data,
@@ -56,6 +57,7 @@ function computeResult(
       fromCache: false,
       ...overrides,
     },
+    ...(metaExtras ? { metaExtras } : {}),
   };
 }
 
@@ -92,6 +94,57 @@ describe("runWithArtifactCache", () => {
     expect(result.telemetry.fromCache).toBe(false);
     expect(result.telemetry.artifactRef?.version).toBe(1);
     expect(result.data).toEqual({ title: "T" });
+  });
+
+  it("merges compute metaExtras into the saved artifact meta", async () => {
+    const compute = jest
+      .fn<() => Promise<ComputeResult<unknown>>>()
+      .mockResolvedValue(
+        computeResult({ title: "T" }, {}, { unitCount: 13, repairRan: true }),
+      );
+
+    await runWithArtifactCache(
+      {
+        type: "script",
+        agent: "ScriptWriter",
+        promptPath: "prompts/script.md",
+        variables: { title: "T" },
+        loadPrompt: loadPromptMock,
+      },
+      compute,
+      makeConfig(),
+    );
+
+    const record = await store.latest<Record<string, unknown>>(
+      "run-cache",
+      "script",
+    );
+    expect(record).toBeDefined();
+    // The saved artifact meta carries postProcess provenance (e.g. the
+    // VisualDirector's unitCount / repairRan).
+    expect(record?.meta.unitCount).toBe(13);
+    expect(record?.meta.repairRan).toBe(true);
+  });
+
+  it("recomputes when the code version changes, hits cache when it matches", async () => {
+    const compute = jest
+      .fn<() => Promise<ComputeResult<unknown>>>()
+      .mockResolvedValue(computeResult({ title: "T" }));
+    const options = (codeVersion: number) => ({
+      type: "script" as const,
+      agent: "ScriptWriter",
+      promptPath: "prompts/script.md",
+      variables: { title: "T" },
+      codeVersion,
+      loadPrompt: loadPromptMock,
+    });
+
+    await runWithArtifactCache(options(2), compute, makeConfig());
+    expect(compute).toHaveBeenCalledTimes(1);
+    await runWithArtifactCache(options(2), compute, makeConfig());
+    expect(compute).toHaveBeenCalledTimes(1);
+    await runWithArtifactCache(options(3), compute, makeConfig());
+    expect(compute).toHaveBeenCalledTimes(2);
   });
 
   it("returns fromCache true and skips compute on a hash-identical hit", async () => {

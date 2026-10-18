@@ -8,6 +8,7 @@ import {
   ImageGenerationProviderError,
   normalizeImageGenerationError,
 } from "../src/providers/image-generation-error.js";
+import { buildNarrationUnits } from "../src/utils/scene-units.js";
 
 const mockGenerate = jest.fn<(...args: any[]) => Promise<any>>();
 
@@ -53,13 +54,19 @@ const mockLoadPrompt = jest
     return Promise.resolve(MOCK_AGENT_PROMPT);
   });
 
+/**
+ * Each beat stays inside the VisualDirector's per-scene word budget
+ * (~15 words = 6 seconds of speech at the pinned 160 wpm), because the
+ * unit-based segmentation forbids a scene from covering more words than the
+ * cap. Two sentences per beat keeps the narration divisible into scenes.
+ */
 const SCENE_NARRATIONS = [
-  "What if a country officially was not real? This land appears on every map. Yet it has no borders.",
-  "The nation has no formal territory. It has no legal standing in the international community.",
-  "It is one of the most isolated places on Earth. Open ocean surrounds it for thousands of miles.",
-  "No one lives here permanently. The few visitors who come each year need special approval to come ashore.",
-  "Its ecosystem is unique. It has plant and animal species found nowhere else in the world.",
-  "Access requires special permission. Even then, the journey across the open sea takes several days.",
+  "This land appears on every map. Yet it has no borders. Who counts it?",
+  "The nation has no formal territory. No border posts exist.",
+  "It is one of the most isolated places on Earth. The ocean keeps people away.",
+  "No one lives here permanently. The rare visitors need official approval. Land stays empty.",
+  "Its wildlife is unique. Its species exist nowhere else.",
+  "Access requires special permission. Even the crossing takes days.",
 ];
 
 const STORY_BEATS = [
@@ -208,7 +215,44 @@ const EMOTIONAL_BEATS = [
   "reflection",
 ] as const;
 
+/**
+ * Flat narration assembled from the beats, and the narration units the
+ * VisualDirector code builds from it (cap = 6 seconds of speech at 160 wpm).
+ */
+function flatNarration(narrations: string[]): string {
+  return narrations.join(" ");
+}
+
+function narrationUnitsOf(narrations: string[]) {
+  const caps = Math.floor((160 / 60) * 6);
+  return buildNarrationUnits(flatNarration(narrations), caps);
+}
+
+/**
+ * Group the flat narration's units into the per-scene id lists the
+ * VisualDirector's model-facing output uses: scene i covers the units that
+ * belong to `narrations[i]`.
+ */
+function unitGroupsFor(narrations: string[]): number[][] {
+  const units = narrationUnitsOf(narrations);
+  const groups: number[][] = [];
+  let cursor = 0;
+  for (const text of narrations) {
+    const total = text.replace(/\s+/g, " ").trim().length;
+    const ids: number[] = [];
+    let consumed = 0;
+    while (cursor < units.length && consumed < total) {
+      const unit = units[cursor++]!;
+      ids.push(unit.id);
+      consumed += unit.text.length + (ids.length > 1 ? 1 : 0);
+    }
+    groups.push(ids);
+  }
+  return groups;
+}
+
 function makeScenes(narration: string[], durations: number[]) {
+  const groups = unitGroupsFor(narration);
   const ends = [0];
   for (const d of durations) ends.push(ends.at(-1)! + d);
   return Array.from({ length: durations.length }, (_, i) => ({
@@ -217,6 +261,7 @@ function makeScenes(narration: string[], durations: number[]) {
     endSecond: ends[i + 1],
     durationSeconds: durations[i],
     narration: narration[i],
+    unitIds: groups[i],
     sceneGoal: "Hook",
     visualDescription: "Aerial view of remote island",
     sceneType: "landscape" as const,
@@ -251,26 +296,6 @@ function makeAssets(
     assetType: s.assetType,
     generationPrompt: prompt,
   }));
-}
-
-/**
- * Split `text` into exactly `count` contiguous chunks covering every word, so
- * a re-segmented storyboard still reproduces the narration verbatim.
- */
-function splitNarrationEvenly(text: string, count: number): string[] {
-  const words = text.match(/\S+\s*/g) ?? [];
-  const chunks: string[] = [];
-  let start = 0;
-  for (let i = 0; i < count; i++) {
-    const isLast = i === count - 1;
-    const target = Math.round(((i + 1) / count) * words.length);
-    const end = isLast
-      ? words.length
-      : Math.min(words.length, Math.max(start + 1, target));
-    chunks.push(words.slice(start, end).join(""));
-    start = end;
-  }
-  return chunks;
 }
 
 function makePromptQAResponse(
@@ -323,7 +348,14 @@ function queueHappyPathMocks(
   options: {
     scriptWriterRuns?: number;
     scriptQA?: Record<string, unknown>[];
-    promptQA?: "approved" | "minor_revision" | "major_revision";
+    scriptQA?: Record<string, unknown>[];
+    /** A QA status shorthand, or a full custom PromptQA payload object. */
+    promptQA?:
+      | "approved"
+      | "minor_revision"
+      | "major_revision"
+      | Record<string, unknown>
+      | null;
     skipPromptQA?: boolean;
     /**
      * Replace the VisualDirector payload (and everything derived from it).
@@ -393,44 +425,15 @@ function queueHappyPathMocks(
     output: JSON.stringify({
       content: {
         script: `Script body v${i + 1}.`,
-        beats: [
-          {
-            beatId: 1,
-            narration:
-              "What if a country officially was not real? This land appears on every map. Yet it has no borders.",
-          },
-          {
-            beatId: 2,
-            narration:
-              "The nation has no formal territory. It has no legal standing in the international community.",
-          },
-          {
-            beatId: 3,
-            narration:
-              "It is one of the most isolated places on Earth. Open ocean surrounds it for thousands of miles.",
-          },
-          {
-            beatId: 4,
-            narration:
-              "No one lives here permanently. The few visitors who come each year need special approval to come ashore.",
-          },
-          {
-            beatId: 5,
-            narration:
-              "Its ecosystem is unique. It has plant and animal species found nowhere else in the world.",
-          },
-          {
-            beatId: 6,
-            narration:
-              "Access requires special permission. Even then, the journey across the open sea takes several days.",
-          },
-        ],
+        beats: SCENE_NARRATIONS.map((narration, index) => ({
+          beatId: index + 1,
+          narration,
+        })),
         retention: { pivotSentence: "Yet it has no borders." },
         estimatedDurationSeconds: 50,
         ending: {
           type: "open_question",
-          narration:
-            "Access requires special permission. Even then, the journey across the open sea takes several days.",
+          narration: SCENE_NARRATIONS[SCENE_NARRATIONS.length - 1],
           visualDirection: "Hold on empty horizon.",
         },
       },
@@ -499,10 +502,16 @@ function queueHappyPathMocks(
 
   // 9. PromptQA (skipped when the test serves the artifact manually)
   if (!skipPromptQA) {
-    mockGenerate.mockResolvedValueOnce({
-      output: JSON.stringify(makePromptQAResponse(promptQA, SCENES)),
-      usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
-    });
+    const promptQAPayload =
+      typeof promptQA === "string"
+        ? makePromptQAResponse(promptQA, SCENES)
+        : promptQA;
+    if (promptQAPayload) {
+      mockGenerate.mockResolvedValueOnce({
+        output: JSON.stringify(promptQAPayload),
+        usage: { promptTokens: 8, completionTokens: 4, totalTokens: 12 },
+      });
+    }
   }
 
   mockGenerate.mockResolvedValueOnce({
@@ -605,6 +614,16 @@ const TTS_PROVIDER = {
     }),
 };
 
+/**
+ * The pace warning the release validation emits for the fixture narration
+ * against the mocked 6×7000 ms scene audio (concat mock) at 160 wpm.
+ */
+function narrationPaceWarning(): string {
+  const words = SCENE_NARRATIONS.join(" ").split(/\s+/).filter(Boolean).length;
+  const wps = words / 42;
+  return `Narration pace ${wps.toFixed(2)} wps outside 2.5-2.9 (target 2.67 wps from 160 wpm)`;
+}
+
 const AUDIO_CONCATENATOR = {
   concat: (inputs: Array<{ durationMs?: number }>) =>
     Promise.resolve({
@@ -643,6 +662,11 @@ beforeEach(() => {
   delete process.env.DURATION_TOLERANCE_SEC;
   delete process.env.WORDS_PER_MINUTE;
   delete process.env.NARRATION_TARGET_WPM;
+  // The local .env enables the TypeSafe QA classifier; its confidence sits
+  // right at the trust floor, so gates would sometimes skip the queued LLM
+  // mocks and make call-count assertions flaky. Force the deterministic LLM
+  // QA path for these tests.
+  delete process.env.CLASSIFIER_PROVIDER;
   // Tests that assert `assetType: "video"` exercise the full video path; the
   // asset-generator normalizes video → image when this flag is unset, which
   // is the safe default for production but breaks the happy-path assertions.
@@ -705,44 +729,15 @@ describe("Graph", () => {
         output: JSON.stringify({
           content: {
             script: "Script text.",
-            beats: [
-              {
-                beatId: 1,
-                narration:
-                  "What if a country officially was not real? This land appears on every map. Yet it has no borders.",
-              },
-              {
-                beatId: 2,
-                narration:
-                  "The nation has no formal territory. It has no legal standing in the international community.",
-              },
-              {
-                beatId: 3,
-                narration:
-                  "It is one of the most isolated places on Earth. Open ocean surrounds it for thousands of miles.",
-              },
-              {
-                beatId: 4,
-                narration:
-                  "No one lives here permanently. The few visitors who come each year need special approval to come ashore.",
-              },
-              {
-                beatId: 5,
-                narration:
-                  "Its ecosystem is unique. It has plant and animal species found nowhere else in the world.",
-              },
-              {
-                beatId: 6,
-                narration:
-                  "Access requires special permission. Even then, the journey across the open sea takes several days.",
-              },
-            ],
+            beats: SCENE_NARRATIONS.map((narration, index) => ({
+              beatId: index + 1,
+              narration,
+            })),
             retention: { pivotSentence: "Yet it has no borders." },
             estimatedDurationSeconds: 42,
             ending: {
               type: "open_question",
-              narration:
-                "Access requires special permission. Even then, the journey across the open sea takes several days.",
+              narration: SCENE_NARRATIONS[SCENE_NARRATIONS.length - 1],
               visualDirection: "Hold on empty horizon.",
             },
           },
@@ -1660,7 +1655,7 @@ describe("Graph", () => {
     expect(result.diagnostics?.errors).toHaveLength(0);
     expect(result.diagnostics?.warnings).toEqual(
       expect.arrayContaining([
-        "Narration pace 2.40 wps outside 2.5-2.9 (target 2.67 wps from 160 wpm)",
+        narrationPaceWarning(),
         "AssetGenerator: Scene 1 video-typed scene rendered as a still image (no AI video provider wired)",
         "AssetGenerator: Scene 3 video-typed scene rendered as a still image (no AI video provider wired)",
         "AssetGenerator: Scene 5 video-typed scene rendered as a still image (no AI video provider wired)",
@@ -1754,7 +1749,7 @@ describe("Graph", () => {
     expect(result.diagnostics?.errors).toHaveLength(0);
     expect(result.diagnostics?.warnings).toEqual(
       expect.arrayContaining([
-        "Narration pace 2.40 wps outside 2.5-2.9 (target 2.67 wps from 160 wpm)",
+        narrationPaceWarning(),
         "AssetGenerator: Scene 1 video-typed scene rendered as a still image (no AI video provider wired)",
         "AssetGenerator: Scene 3 video-typed scene rendered as a still image (no AI video provider wired)",
         "AssetGenerator: Scene 5 video-typed scene rendered as a still image (no AI video provider wired)",
@@ -2428,17 +2423,19 @@ describe("Graph", () => {
    * now recovers it and the run continues.
    */
   it("recovers a VisualDirector payload rejected only for its scene count", async () => {
-    // 13 scenes: over the short-profile maximum of 12, so the strict schema
-    // rejects all three LLM attempts. Coverage stays exact because the
-    // narration is split evenly rather than truncated.
-    const narrations = splitNarrationEvenly(SCENE_NARRATIONS.join(" "), 13);
-    const overlongScenes = makeScenes(
-      narrations,
-      Array.from({ length: 13 }, () => 4),
-    ).map((s, i) => ({
-      ...s,
+    // 13 units (one sentence per unit) -> 13 one-unit scenes: over the
+    // short-profile schema maximum of 12, so the strict schema rejects all
+    // three LLM attempts. Coverage stays exact because every unit is listed.
+    const units = narrationUnitsOf(SCENE_NARRATIONS);
+    const overlongScenes = units.map((unit, i) => ({
+      ...makeScenes([SCENE_NARRATIONS[0]], [4])[0],
+      sceneId: i + 1,
+      unitIds: [unit.id],
+      narration: unit.text,
       // Stay inside the eight approved facts so no reference is dropped.
       references: [`fact-${String((i % 8) + 1).padStart(3, "0")}`],
+      startSecond: undefined,
+      endSecond: undefined,
     }));
 
     queueHappyPathMocks({
@@ -2446,6 +2443,19 @@ describe("Graph", () => {
         scenes: overlongScenes,
         visualPlans: makeVisualPlans(overlongScenes),
         attempts: 3,
+      },
+      // The recovered storyboard keeps one scene per unit: on a recovered
+      // run the protected (high-emphasis) scene before the ending is no
+      // longer absorbed into the final scene, so PromptQA must approve
+      // against all 13 scene ids.
+      promptQA: {
+        status: "approved",
+        globalFeedback: "",
+        sceneResults: narrationUnitsOf(SCENE_NARRATIONS).map((unit) => ({
+          sceneId: unit.id,
+          verdict: "pass",
+          feedback: "",
+        })),
       },
     });
 
@@ -2462,7 +2472,11 @@ describe("Graph", () => {
     );
 
     // The recovered storyboard is usable, so the graph left VisualDirector.
-    expect(result.production?.scenes).toHaveLength(13);
+    // The relaxed band only lowers the count floor: all 13 scenes survive —
+    // the ending-contract absorb does not fold the protected second-to-last
+    // scene into the final one, and the unmet ending is warning-downgraded.
+    const expectedRecoveredScenes = narrationUnitsOf(SCENE_NARRATIONS).length;
+    expect(result.production?.scenes).toHaveLength(expectedRecoveredScenes);
     // Flagged as a revision, not approved, so downstream QA knows it was repaired.
     expect(result.production?.directorReview?.status).toBe("minor_revision");
     // The gated branches ran — before the fix these never started.
@@ -2592,44 +2606,15 @@ describe("Graph", () => {
         output: JSON.stringify({
           content: {
             script: "Script.",
-            beats: [
-              {
-                beatId: 1,
-                narration:
-                  "What if a country officially was not real? This land appears on every map. Yet it has no borders.",
-              },
-              {
-                beatId: 2,
-                narration:
-                  "The nation has no formal territory. It has no legal standing in the international community.",
-              },
-              {
-                beatId: 3,
-                narration:
-                  "It is one of the most isolated places on Earth. Open ocean surrounds it for thousands of miles.",
-              },
-              {
-                beatId: 4,
-                narration:
-                  "No one lives here permanently. The few visitors who come each year need special approval to come ashore.",
-              },
-              {
-                beatId: 5,
-                narration:
-                  "Its ecosystem is unique. It has plant and animal species found nowhere else in the world.",
-              },
-              {
-                beatId: 6,
-                narration:
-                  "Access requires special permission. Even then, the journey across the open sea takes several days.",
-              },
-            ],
+            beats: SCENE_NARRATIONS.map((narration, index) => ({
+              beatId: index + 1,
+              narration,
+            })),
             retention: { pivotSentence: "Yet it has no borders." },
             estimatedDurationSeconds: 48,
             ending: {
               type: "open_question",
-              narration:
-                "Access requires special permission. Even then, the journey across the open sea takes several days.",
+              narration: SCENE_NARRATIONS[SCENE_NARRATIONS.length - 1],
               visualDirection: "Hold on empty horizon.",
             },
           },

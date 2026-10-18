@@ -30,6 +30,13 @@ export interface CacheOptions<T> {
   responseFormat?: { type: "json_object" } | { type: "text" };
   model?: string;
   agentVersion?: string;
+  /**
+   * Version of the deterministic code that transforms the model output on top
+   * of the prompt (e.g. the VisualDirector unit splitter). Included in the
+   * input hash only when set, so cache semantics are unchanged for agents
+   * without such a transform.
+   */
+  codeVersion?: number | string;
   loadPrompt?: typeof defaultLoadPrompt;
   deferComplete?: boolean;
   validate?: (artifact: T) => boolean;
@@ -273,6 +280,11 @@ export interface ComputeResult<T> {
    * cache never persists it (a rejected payload is not a valid artifact).
    */
   rejected?: unknown;
+  /**
+   * Extra meta fields computed by the compute step itself (e.g. the
+   * VisualDirector unit telemetry) merged into the artifact meta on save.
+   */
+  metaExtras?: Record<string, unknown>;
   telemetry: {
     model: string;
     durationMs: number;
@@ -341,6 +353,9 @@ export async function runWithArtifactCache<T>(
     responseFormat: options.responseFormat,
     model: options.model,
     agentVersion: options.agentVersion,
+    ...(options.codeVersion !== undefined
+      ? { codeVersion: options.codeVersion }
+      : {}),
   };
   const inputHash = hashObject(key);
 
@@ -405,6 +420,7 @@ export async function runWithArtifactCache<T>(
     completionTokens: result.telemetry.completionTokens,
     totalTokens: result.telemetry.totalTokens,
     retries: result.telemetry.retries,
+    ...result.metaExtras,
   };
 
   const status = options.deferComplete ? "pending" : "complete";
@@ -467,7 +483,12 @@ export interface CacheNodeOptions<T> {
 
 export async function cacheNodeResult<T>(
   options: CacheNodeOptions<T>,
-  compute: () => Promise<{ data: T | null; error?: string }>,
+  compute: () => Promise<{
+    data: T | null;
+    error?: string;
+    /** Extra meta fields computed alongside the data, merged into artifact meta. */
+    metaExtras?: Record<string, unknown>;
+  }>,
   config?: RunnableConfig,
 ): Promise<NodeCacheResult<T>> {
   const store = getArtifactStore(config);
@@ -546,6 +567,7 @@ export async function cacheNodeResult<T>(
     node: options.node,
     producerVersion: `${options.node}@${options.producerVersion ?? "1"}`,
     model: "provider",
+    ...result.metaExtras,
   };
 
   const status = options.deferComplete ? "pending" : "complete";

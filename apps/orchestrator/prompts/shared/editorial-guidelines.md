@@ -5,15 +5,9 @@ Apply these rules to all content for "Universe Decoded."
 ## Hook First
 
 - Every video must begin with a curiosity/shock hook — a genuinely interesting fact from the story, delivered before any context. This is not clickbait; it stays factual and documentary in tone.
-- Never begin a video with:
-  - a date ("Boston, January 15, 1919...")
-  - a location ("In the city of Boston...")
-  - "In [year]..."
-  - "Scientists discovered..."
-  - "Today we're going to..."
-  - generic historical context
-  - "Have you ever wondered...", "What if I told you...", or any "you won't believe" phrasing
-- Date and location belong after the hook, as context.
+- The first sentence must carry the surprise by itself. A date, place, or name may open it when the surprising outcome is in the same sentence ("In 1753, physicist Georg Richmann was reportedly killed by a glowing ball.").
+- Never begin a video with setting alone or filler: a bare date or place ("Boston, January 15, 1919..."), "Scientists discovered...", "Today we're going to...", generic historical context, "Have you ever wondered...", "What if I told you...", or any "you won't believe" phrasing.
+- Test: if a viewer heard only the first sentence, would they know something surprising happened? If not, move the setting to a later beat.
 - Follow the structure: Hook → context → escalation → explanation → consequence → memorable ending.
 - The ending must visibly complete the hook's promise (question → answer, belief → correction, threat → outcome) or honestly leave a labeled open question.
 

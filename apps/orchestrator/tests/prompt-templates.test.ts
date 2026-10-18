@@ -120,6 +120,7 @@ const BASELINE_PLACEHOLDERS: Record<string, string[]> = {
     "formatLabel",
     "maxSceneWords",
     "narration",
+    "narrationUnits",
     "pivotBeatId",
     "pivotSentence",
     "previousVisualPlan",
@@ -296,6 +297,8 @@ function valueFor(name: string): string {
       "A 25-foot wave crashed through Boston. The terrifying part is that it was not water. That wave rolled through the streets seconds later and nobody had time to react.",
     narration:
       "A 25-foot wave crashed through Boston. The terrifying part is that it was not water.",
+    narrationUnits:
+      "[1] A 25-foot wave crashed through Boston.\n[2] The terrifying part is that it was not water.",
     storyBeatsRef: "",
     cta: "",
     /**

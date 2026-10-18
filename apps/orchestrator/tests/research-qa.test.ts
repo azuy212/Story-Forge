@@ -127,6 +127,10 @@ function approvedResponse() {
 
 beforeEach(() => {
   mockGenerate.mockReset();
+  // The developer's .env sets CLASSIFIER_PROVIDER=typesafe and jest loads it;
+  // tests that want the classifier path set it explicitly (withClassifierEnv
+  // below), so strip the ambient value to keep queued LLM mocks authoritative.
+  delete process.env.CLASSIFIER_PROVIDER;
 });
 
 describe("researchQANode", () => {
