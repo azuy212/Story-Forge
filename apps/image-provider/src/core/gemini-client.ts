@@ -322,7 +322,12 @@ export class GeminiClient {
       await input.fill('');
       await this.page.keyboard.press('ControlOrMeta+A').catch(() => {});
       await this.page.keyboard.press('Backspace').catch(() => {});
-      await this.page.keyboard.type(prompt, { delay: 15 });
+      // Insert the prompt as text, not as keystrokes: in Gemini's composer
+      // Enter submits, so `keyboard.type()` sends a multi-line prompt as
+      // several messages and only the first line reaches the model. It is also
+      // an order of magnitude faster for the ~2 kB prompts the story pipeline
+      // composes.
+      await this.page.keyboard.insertText(prompt);
 
       const submitted = await this.submitPrompt(input);
       if (!submitted) throw new Error('Could not submit prompt');
