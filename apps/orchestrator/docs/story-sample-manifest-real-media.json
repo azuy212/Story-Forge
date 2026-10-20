@@ -1,0 +1,1483 @@
+{
+  "version": 1,
+  "jobId": "real-llm-probe-c",
+  "createdAt": "2026-10-20T07:14:00.449Z",
+  "updatedAt": "2026-10-20T09:22:07.508Z",
+  "input": {
+    "topic": "Christopher Columbus's first voyage across the Atlantic",
+    "targetDurationSec": 45,
+    "language": "en",
+    "style": "stickman-history",
+    "jobId": "real-llm-probe-c",
+    "outputDir": "/tmp/opencode/story-real4c"
+  },
+  "config": {
+    "topic": "Christopher Columbus's first voyage across the Atlantic",
+    "targetDurationSec": 45,
+    "language": "en",
+    "style": "stickman-history",
+    "jobId": "real-llm-probe-c",
+    "outputDir": "/tmp/opencode/story-real4c",
+    "wpm": 150,
+    "imageConcurrency": 1,
+    "sceneMinSec": 3,
+    "sceneTargetMinSec": 6,
+    "sceneTargetMaxSec": 12,
+    "sceneSoftMaxSec": 15,
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "sceneGapMs": 200,
+    "imageMinWidth": 1000,
+    "imageMinHeight": 540,
+    "imageMinAspect": 1.6,
+    "imageMaxAspect": 1.9,
+    "ttsMaxChars": 450,
+    "subtitleMaxCharsPerLine": 42,
+    "subtitleMinDurationMs": 800,
+    "crf": 19,
+    "preset": "medium"
+  },
+  "stages": {
+    "S1_input": {
+      "status": "done",
+      "fingerprint": "4ea61ead076e76b4ed1df9b65ddb5360ca9f9224d3f5c4517679ef7d849ab0e7",
+      "startedAt": "2026-10-20T07:14:00.453Z",
+      "finishedAt": "2026-10-20T07:14:00.457Z",
+      "durationMs": 4,
+      "metrics": {
+        "wordBudget": 113,
+        "style": "stickman-history",
+        "stylePath": "/home/ali/projects/practice/Story-Forge-stickman/apps/orchestrator/prompts/story/style/stickman-history.json",
+        "grounded": false,
+        "unverified": true
+      }
+    },
+    "S2_story": {
+      "status": "done",
+      "fingerprint": "94a977c02a80aa439e7b71a765c50484d30c20fd721e661b168ad2c239a6401e",
+      "startedAt": "2026-10-20T07:14:00.459Z",
+      "finishedAt": "2026-10-20T07:14:19.576Z",
+      "durationMs": 19117
+    },
+    "S3_scenes": {
+      "status": "done",
+      "fingerprint": "472b5c54651697d46a8bd35a993609cf0fa84013a6ac610a8a5451074722600d",
+      "startedAt": "2026-10-20T07:14:19.580Z",
+      "finishedAt": "2026-10-20T07:14:25.017Z",
+      "durationMs": 5437,
+      "metrics": {
+        "method": "model",
+        "sceneCount": 6,
+        "sentenceCount": 11,
+        "estimatedDurationSec": 46.4,
+        "groupingIssues": []
+      }
+    },
+    "S4_visual_plan": {
+      "status": "done",
+      "fingerprint": "7a2ea456ddd089491a211b9151076363f1cc4c8a00031aadae42713114ba8bb2",
+      "startedAt": "2026-10-20T07:14:25.023Z",
+      "finishedAt": "2026-10-20T07:14:45.352Z",
+      "durationMs": 20329,
+      "metrics": {
+        "charactersFingerprint": "e9648f0acb033e233b43c1bed462bbc93da35c38c725ce2060d90781bd396f03",
+        "characterCount": 4
+      }
+    },
+    "S6_audio": {
+      "status": "done",
+      "fingerprint": "71d29f8c5a8d9e5361f4ea2351d8fcd2ef70a4b9380e391a3b303a49b458aa48",
+      "startedAt": "2026-10-20T09:21:29.999Z",
+      "finishedAt": "2026-10-20T09:21:30.261Z",
+      "durationMs": 262,
+      "metrics": {
+        "chunks": 6,
+        "durationSec": 40.36,
+        "voice": "narrator",
+        "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=none"
+      }
+    },
+    "S7_align": {
+      "status": "done",
+      "fingerprint": "e8ec93f0ef0b39b53abefaf93263c5444e6cf08e6ce85bcb4789e69459b8b815",
+      "startedAt": "2026-10-20T09:21:30.642Z",
+      "finishedAt": "2026-10-20T09:21:30.713Z",
+      "durationMs": 71,
+      "metrics": {
+        "chunkFingerprints": {
+          "1": "139b0470147d350299970bee2a299551e3e22c940c94a9d236f05fd270c27b81",
+          "2": "a016ff05ef0a70fc3f73e6768bcfcfdf2610ffc446f28b15f9a69d24d2ed0659",
+          "3": "5a52597b540ac3dbf4c71bc4c07e400d2392faa4ea442e60798f003a9e621fda",
+          "4": "248fb1a39cbdc2ed5805e066f971913b74fe2a773f977fa38efe602545e22a95",
+          "5": "924d11bd7764c9461c61f7d772d241d8bdc22a43ef85953e1fd0c5d13eaaf080",
+          "6": "588df526489fe1c0cb8c8105ee8220b0ec160ac82b918aecab2a50ed6e53bc5f"
+        },
+        "totalFrames": 1211,
+        "videoDurationSec": 40.367,
+        "audioDurationSec": 40.36,
+        "cues": 11,
+        "overallMatchRatio": 1
+      }
+    },
+    "S5_images": {
+      "status": "done",
+      "fingerprint": "e1722267c8fa9994734e89868cdd480bd38a0708a71d7d900bf11478fe6a2b78",
+      "startedAt": "2026-10-20T09:21:29.886Z",
+      "finishedAt": "2026-10-20T09:21:29.891Z",
+      "durationMs": 5,
+      "metrics": {
+        "generated": 0,
+        "reused": 6,
+        "failed": 0
+      }
+    },
+    "S8_render": {
+      "status": "done",
+      "fingerprint": "0e927560e5237fad4e635fb125be64fb41b9a2dec520d37cb5ecdbabce0ae590",
+      "startedAt": "2026-10-20T09:21:30.859Z",
+      "finishedAt": "2026-10-20T09:22:07.506Z",
+      "durationMs": 36647
+    }
+  },
+  "groundingSource": "model-knowledge",
+  "unverified": true,
+  "scenes": [
+    {
+      "sceneId": 1,
+      "sentenceIds": ["s1", "s2"],
+      "narration": "The sailors had stared at empty ocean for more than five weeks. Some of them wanted to turn back.",
+      "wordCount": 19,
+      "visualPurpose": "Show weary sailors crowded on a wooden ship's deck, gazing at an endless empty horizon of ocean, with some turned away and looking back the other way to show their doubt about continuing.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 1,
+        "action": "A cluster of weary sailors stands crowded at the rail of a wooden ship, most gazing ahead at the endless empty ocean, while two or three turn their backs on the horizon and look over their shoulders toward the way they came.",
+        "characters": [
+          {
+            "id": "the_crew",
+            "pose": "shoulders slumped, several leaning on the rail, some arms folded, a few heads turned sharply back over their shoulders, one with a hand shading his eyes against the glare",
+            "expression": "weary and doubtful, brows drawn, mouths turned down, eyes fixed on the empty sea or the way back"
+          }
+        ],
+        "setting": "the open deck of a small wooden sailing ship in the middle of a vast empty ocean, bright daylight, no land anywhere, a flat endless horizon of grey-blue water",
+        "props": [
+          "a wooden ship's rail",
+          "coiled rope",
+          "a tall mast with slack sails",
+          "a small wooden bucket"
+        ],
+        "lighting": "pale hazy midday light, muted and washed-out, flat and tired mood",
+        "composition": "wide 16:9 horizontal framing, camera at deck height behind the crew, group clustered on the left and centre, the long empty horizon running across the middle of the frame, calm open water across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: A cluster of weary sailors stands crowded at the rail of a wooden ship, most gazing ahead at the endless empty ocean, while two or three turn their backs on the horizon and look over their shoulders toward the way they came.\n\nCharacters:\n- The sailors: A group of adult sailors in plain, worn wool tunics and knee breeches, some wearing knitted caps, some with beards and some clean-shaven, drawn as a cluster of similar simple stick figures. Pose: shoulders slumped, several leaning on the rail, some arms folded, a few heads turned sharply back over their shoulders, one with a hand shading his eyes against the glare. Expression: weary and doubtful, brows drawn, mouths turned down, eyes fixed on the empty sea or the way back.\n\nSetting: the open deck of a small wooden sailing ship in the middle of a vast empty ocean, bright daylight, no land anywhere, a flat endless horizon of grey-blue water\n\nKey props: a wooden ship's rail, coiled rope, a tall mast with slack sails, a small wooden bucket\n\nLighting: pale hazy midday light, muted and washed-out, flat and tired mood\n\nComposition: wide 16:9 horizontal framing, camera at deck height behind the crew, group clustered on the left and centre, the long empty horizon running across the middle of the frame, calm open water across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "ac0a74dfb8e4cedfda4817a6714582aa922896e50581c9f678de541d7c73ee2e",
+      "audio": {
+        "path": "/tmp/opencode/story-real4c/real-llm-probe-c/audio/chunks/scene-001.wav",
+        "durationSec": 6.44,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-real4c/real-llm-probe-c/audio/parts/scene-001-part01.wav",
+            "durationSec": 6.44,
+            "text": "The sailors had stared at empty ocean for more than five weeks. Some of them wanted to turn back.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=none"
+          }
+        ],
+        "meanVolumeDb": -26.4,
+        "wordsPerMinute": 177
+      },
+      "timing": {
+        "start": 0,
+        "end": 6.633,
+        "startFrame": 0,
+        "endFrame": 199,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "The",
+            "start": 0.1,
+            "end": 0.201
+          },
+          {
+            "word": "sailors",
+            "start": 0.261,
+            "end": 0.702
+          },
+          {
+            "word": "had",
+            "start": 0.762,
+            "end": 0.883
+          },
+          {
+            "word": "stared",
+            "start": 0.983,
+            "end": 1.344
+          },
+          {
+            "word": "at",
+            "start": 1.384,
+            "end": 1.444
+          },
+          {
+            "word": "empty",
+            "start": 1.565,
+            "end": 1.826
+          },
+          {
+            "word": "ocean",
+            "start": 1.986,
+            "end": 2.267
+          },
+          {
+            "word": "for",
+            "start": 2.327,
+            "end": 2.468
+          },
+          {
+            "word": "more",
+            "start": 2.528,
+            "end": 2.668
+          },
+          {
+            "word": "than",
+            "start": 2.708,
+            "end": 2.849
+          },
+          {
+            "word": "five",
+            "start": 2.969,
+            "end": 3.35
+          },
+          {
+            "word": "weeks.",
+            "start": 3.451,
+            "end": 3.792
+          },
+          {
+            "word": "Some",
+            "start": 4.675,
+            "end": 4.835
+          },
+          {
+            "word": "of",
+            "start": 4.895,
+            "end": 4.935
+          },
+          {
+            "word": "them",
+            "start": 4.975,
+            "end": 5.096
+          },
+          {
+            "word": "wanted",
+            "start": 5.136,
+            "end": 5.397
+          },
+          {
+            "word": "to",
+            "start": 5.437,
+            "end": 5.517
+          },
+          {
+            "word": "turn",
+            "start": 5.577,
+            "end": 5.818
+          },
+          {
+            "word": "back.",
+            "start": 5.878,
+            "end": 6.139
+          }
+        ]
+      },
+      "image": {
+        "path": "/tmp/opencode/story-real4c/real-llm-probe-c/images/scene-001.png",
+        "prompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: A cluster of weary sailors stands crowded at the rail of a wooden ship, most gazing ahead at the endless empty ocean, while two or three turn their backs on the horizon and look over their shoulders toward the way they came.\n\nCharacters:\n- The sailors: A group of adult sailors in plain, worn wool tunics and knee breeches, some wearing knitted caps, some with beards and some clean-shaven, drawn as a cluster of similar simple stick figures. Pose: shoulders slumped, several leaning on the rail, some arms folded, a few heads turned sharply back over their shoulders, one with a hand shading his eyes against the glare. Expression: weary and doubtful, brows drawn, mouths turned down, eyes fixed on the empty sea or the way back.\n\nSetting: the open deck of a small wooden sailing ship in the middle of a vast empty ocean, bright daylight, no land anywhere, a flat endless horizon of grey-blue water\n\nKey props: a wooden ship's rail, coiled rope, a tall mast with slack sails, a small wooden bucket\n\nLighting: pale hazy midday light, muted and washed-out, flat and tired mood\n\nComposition: wide 16:9 horizontal framing, camera at deck height behind the crew, group clustered on the left and centre, the long empty horizon running across the middle of the frame, calm open water across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "fixture-lavfi",
+        "attempts": 1,
+        "promptHash": "ebdca1c82a6556cfaac3a48acbc0a5beb70812496a3dac4c1e5233500a0761b3",
+        "byteSize": 15004,
+        "width": 1920,
+        "height": 1080,
+        "aspect": 1.778,
+        "luminanceVariance": 2803.95,
+        "generatedAt": "2026-10-20T09:16:45.552Z"
+      }
+    },
+    {
+      "sceneId": 2,
+      "sentenceIds": ["s3", "s4"],
+      "narration": "Then, people say, a lookout named Rodrigo shouted that he saw land. It was the night of October eleventh, fourteen ninety-two.",
+      "wordCount": 21,
+      "visualPurpose": "Show a lookout on a ship's mast in the dark night, arm raised and pointing toward a faint dim shape of land on the horizon under the moonlight.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 2,
+        "action": "A young lookout high on a ship's mast leans out and thrusts one arm toward the horizon, where a faint dark shape of land rises under the moon. His eyes are fixed on the distant shore.",
+        "characters": [
+          {
+            "id": "rodrigo",
+            "pose": "clinging to the mast's crosstree with one hand, the other arm stretched straight out and pointing toward the horizon, body leaning forward over the void",
+            "expression": "wide-eyed and startled, brows raised, mouth open in a shout"
+          }
+        ],
+        "setting": "the high crow's nest of a small wooden sailing ship at night, open dark sea stretching to a faint horizon, a low hazy shape of land far away, moonlit clouds overhead",
+        "props": [
+          "a tall wooden mast with rigging ropes",
+          "a small railed lookout platform",
+          "a pale full moon behind thin clouds",
+          "a faint dim silhouette of distant land on the horizon"
+        ],
+        "lighting": "cool silver moonlight on the sea and sails against deep indigo night sky, with a faint pale glow on the distant land",
+        "composition": "wide 16:9 horizontal framing, medium-low camera from below the mast looking up and out, Rodrigo on the left third with his pointing arm reaching across toward the faint land on the right, moon upper right, calm dark water across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: A young lookout high on a ship's mast leans out and thrusts one arm toward the horizon, where a faint dark shape of land rises under the moon. His eyes are fixed on the distant shore.\n\nCharacters:\n- Rodrigo: A young man in his late teens with short tousled brown hair, a plain loose white linen shirt, brown knee breeches, bare feet, and a simple red sash tied at the waist. Pose: clinging to the mast's crosstree with one hand, the other arm stretched straight out and pointing toward the horizon, body leaning forward over the void. Expression: wide-eyed and startled, brows raised, mouth open in a shout.\n\nSetting: the high crow's nest of a small wooden sailing ship at night, open dark sea stretching to a faint horizon, a low hazy shape of land far away, moonlit clouds overhead\n\nKey props: a tall wooden mast with rigging ropes, a small railed lookout platform, a pale full moon behind thin clouds, a faint dim silhouette of distant land on the horizon\n\nLighting: cool silver moonlight on the sea and sails against deep indigo night sky, with a faint pale glow on the distant land\n\nComposition: wide 16:9 horizontal framing, medium-low camera from below the mast looking up and out, Rodrigo on the left third with his pointing arm reaching across toward the faint land on the right, moon upper right, calm dark water across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "805b56906a3cadec767c228c8ca93a25d269622da785d0cfabc9209019673b4f",
+      "audio": {
+        "path": "/tmp/opencode/story-real4c/real-llm-probe-c/audio/chunks/scene-002.wav",
+        "durationSec": 8.08,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-real4c/real-llm-probe-c/audio/parts/scene-002-part01.wav",
+            "durationSec": 8.08,
+            "text": "Then, people say, a lookout named Rodrigo shouted that he saw land. It was the night of October eleventh, fourteen ninety-two.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=none"
+          }
+        ],
+        "meanVolumeDb": -25.2,
+        "wordsPerMinute": 155.9
+      },
+      "timing": {
+        "start": 6.633,
+        "end": 14.933,
+        "startFrame": 199,
+        "endFrame": 448,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "Then,",
+            "start": 6.713,
+            "end": 6.974
+          },
+          {
+            "word": "people",
+            "start": 7.094,
+            "end": 7.395
+          },
+          {
+            "word": "say,",
+            "start": 7.435,
+            "end": 7.676
+          },
+          {
+            "word": "a",
+            "start": 8.036,
+            "end": 8.077
+          },
+          {
+            "word": "lookout",
+            "start": 8.137,
+            "end": 8.478
+          },
+          {
+            "word": "named",
+            "start": 8.538,
+            "end": 8.738
+          },
+          {
+            "word": "Rodrigo",
+            "start": 8.778,
+            "end": 9.42
+          },
+          {
+            "word": "shouted",
+            "start": 9.52,
+            "end": 9.921
+          },
+          {
+            "word": "that",
+            "start": 9.981,
+            "end": 10.102
+          },
+          {
+            "word": "he",
+            "start": 10.142,
+            "end": 10.222
+          },
+          {
+            "word": "saw",
+            "start": 10.282,
+            "end": 10.503
+          },
+          {
+            "word": "land.",
+            "start": 10.563,
+            "end": 10.944
+          },
+          {
+            "word": "It",
+            "start": 11.385,
+            "end": 11.445
+          },
+          {
+            "word": "was",
+            "start": 11.485,
+            "end": 11.605
+          },
+          {
+            "word": "the",
+            "start": 11.645,
+            "end": 11.746
+          },
+          {
+            "word": "night",
+            "start": 11.806,
+            "end": 12.026
+          },
+          {
+            "word": "of",
+            "start": 12.046,
+            "end": 12.127
+          },
+          {
+            "word": "October",
+            "start": 12.207,
+            "end": 12.668
+          },
+          {
+            "word": "eleventh,",
+            "start": 12.728,
+            "end": 13.129
+          },
+          {
+            "word": "fourteen",
+            "start": 13.229,
+            "end": 13.711
+          },
+          {
+            "word": "ninety-two.",
+            "start": 13.771,
+            "end": 14.332
+          }
+        ]
+      },
+      "image": {
+        "path": "/tmp/opencode/story-real4c/real-llm-probe-c/images/scene-002.png",
+        "prompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: A young lookout high on a ship's mast leans out and thrusts one arm toward the horizon, where a faint dark shape of land rises under the moon. His eyes are fixed on the distant shore.\n\nCharacters:\n- Rodrigo: A young man in his late teens with short tousled brown hair, a plain loose white linen shirt, brown knee breeches, bare feet, and a simple red sash tied at the waist. Pose: clinging to the mast's crosstree with one hand, the other arm stretched straight out and pointing toward the horizon, body leaning forward over the void. Expression: wide-eyed and startled, brows raised, mouth open in a shout.\n\nSetting: the high crow's nest of a small wooden sailing ship at night, open dark sea stretching to a faint horizon, a low hazy shape of land far away, moonlit clouds overhead\n\nKey props: a tall wooden mast with rigging ropes, a small railed lookout platform, a pale full moon behind thin clouds, a faint dim silhouette of distant land on the horizon\n\nLighting: cool silver moonlight on the sea and sails against deep indigo night sky, with a faint pale glow on the distant land\n\nComposition: wide 16:9 horizontal framing, medium-low camera from below the mast looking up and out, Rodrigo on the left third with his pointing arm reaching across toward the faint land on the right, moon upper right, calm dark water across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "fixture-lavfi",
+        "attempts": 1,
+        "promptHash": "1f1f14629b87db3b3072d491eaf81db78fba4b4fbaae2ef3a3b77a1111537f59",
+        "byteSize": 15974,
+        "width": 1920,
+        "height": 1080,
+        "aspect": 1.778,
+        "luminanceVariance": 3669.32,
+        "generatedAt": "2026-10-20T09:16:45.946Z"
+      }
+    },
+    {
+      "sceneId": 3,
+      "sentenceIds": ["s5", "s6"],
+      "narration": "Columbus was certain he had reached Asia, the land of spices and silk. He was wrong about that.",
+      "wordCount": 18,
+      "visualPurpose": "Show Columbus in a captain's cabin bent over a map, confidently pointing to a spot labeled with a distant coast, while a sense of mistake is suggested by a globe or chart showing the true distance to Asia being far off.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 3,
+        "action": "Columbus leans over a wooden table in his cabin, one finger pressed confidently on a spot of an unlabeled chart, while a small globe beside the chart shows a far larger ocean between him and the coast he is pointing to.",
+        "characters": [
+          {
+            "id": "columbus",
+            "pose": "bent forward over the table, one hand flat on the chart, index finger pointing firmly at a spot near the edge, the other hand resting on the globe",
+            "expression": "certain and proud, chin lifted, brows raised, mouth set in a confident half-smile"
+          }
+        ],
+        "setting": "a small wooden captain's cabin aboard a sailing ship at night, a low beamed ceiling, a window showing dark sea behind",
+        "props": [
+          "a wooden table covered with a large chart of abstract marks and curved lines, no words",
+          "a small globe with a wide blue ocean showing a long gap of water",
+          "brass dividers and a compass rose on the chart",
+          "a hanging oil lantern"
+        ],
+        "lighting": "warm amber lantern glow inside the cabin, deep shadows along the beams and walls",
+        "composition": "wide 16:9 horizontal framing, camera at table height from the side, Columbus on the left third with his pointing hand as the focal point, globe on the right third, chart spread across the middle, lower part of the frame kept calm and dark",
+        "metaphor": false
+      },
+      "imagePrompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: Columbus leans over a wooden table in his cabin, one finger pressed confidently on a spot of an unlabeled chart, while a small globe beside the chart shows a far larger ocean between him and the coast he is pointing to.\n\nCharacters:\n- Columbus: A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat. Pose: bent forward over the table, one hand flat on the chart, index finger pointing firmly at a spot near the edge, the other hand resting on the globe. Expression: certain and proud, chin lifted, brows raised, mouth set in a confident half-smile.\n\nSetting: a small wooden captain's cabin aboard a sailing ship at night, a low beamed ceiling, a window showing dark sea behind\n\nKey props: a wooden table covered with a large chart of abstract marks and curved lines, no words, a small globe with a wide blue ocean showing a long gap of water, brass dividers and a compass rose on the chart, a hanging oil lantern\n\nLighting: warm amber lantern glow inside the cabin, deep shadows along the beams and walls\n\nComposition: wide 16:9 horizontal framing, camera at table height from the side, Columbus on the left third with his pointing hand as the focal point, globe on the right third, chart spread across the middle, lower part of the frame kept calm and dark\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "ca71a6bba941b671a95c7fd573aadf6eb0a06efd8c9c2a9d8e9a67a1886ff94d",
+      "audio": {
+        "path": "/tmp/opencode/story-real4c/real-llm-probe-c/audio/chunks/scene-003.wav",
+        "durationSec": 6.44,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-real4c/real-llm-probe-c/audio/parts/scene-003-part01.wav",
+            "durationSec": 6.44,
+            "text": "Columbus was certain he had reached Asia, the land of spices and silk. He was wrong about that.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=none"
+          }
+        ],
+        "meanVolumeDb": -25.6,
+        "wordsPerMinute": 167.7
+      },
+      "timing": {
+        "start": 14.933,
+        "end": 21.567,
+        "startFrame": 448,
+        "endFrame": 647,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "Columbus",
+            "start": 15.033,
+            "end": 15.515
+          },
+          {
+            "word": "was",
+            "start": 15.555,
+            "end": 15.695
+          },
+          {
+            "word": "certain",
+            "start": 15.776,
+            "end": 16.157
+          },
+          {
+            "word": "he",
+            "start": 16.197,
+            "end": 16.277
+          },
+          {
+            "word": "had",
+            "start": 16.317,
+            "end": 16.418
+          },
+          {
+            "word": "reached",
+            "start": 16.478,
+            "end": 16.759
+          },
+          {
+            "word": "Asia,",
+            "start": 16.939,
+            "end": 17.24
+          },
+          {
+            "word": "the",
+            "start": 17.541,
+            "end": 17.641
+          },
+          {
+            "word": "land",
+            "start": 17.702,
+            "end": 17.962
+          },
+          {
+            "word": "of",
+            "start": 17.982,
+            "end": 18.043
+          },
+          {
+            "word": "spices",
+            "start": 18.163,
+            "end": 18.705
+          },
+          {
+            "word": "and",
+            "start": 18.785,
+            "end": 18.885
+          },
+          {
+            "word": "silk.",
+            "start": 19.006,
+            "end": 19.347
+          },
+          {
+            "word": "He",
+            "start": 20.029,
+            "end": 20.129
+          },
+          {
+            "word": "was",
+            "start": 20.149,
+            "end": 20.27
+          },
+          {
+            "word": "wrong",
+            "start": 20.33,
+            "end": 20.571
+          },
+          {
+            "word": "about",
+            "start": 20.611,
+            "end": 20.851
+          },
+          {
+            "word": "that.",
+            "start": 20.892,
+            "end": 21.092
+          }
+        ]
+      },
+      "image": {
+        "path": "/tmp/opencode/story-real4c/real-llm-probe-c/images/scene-003.png",
+        "prompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: Columbus leans over a wooden table in his cabin, one finger pressed confidently on a spot of an unlabeled chart, while a small globe beside the chart shows a far larger ocean between him and the coast he is pointing to.\n\nCharacters:\n- Columbus: A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat. Pose: bent forward over the table, one hand flat on the chart, index finger pointing firmly at a spot near the edge, the other hand resting on the globe. Expression: certain and proud, chin lifted, brows raised, mouth set in a confident half-smile.\n\nSetting: a small wooden captain's cabin aboard a sailing ship at night, a low beamed ceiling, a window showing dark sea behind\n\nKey props: a wooden table covered with a large chart of abstract marks and curved lines, no words, a small globe with a wide blue ocean showing a long gap of water, brass dividers and a compass rose on the chart, a hanging oil lantern\n\nLighting: warm amber lantern glow inside the cabin, deep shadows along the beams and walls\n\nComposition: wide 16:9 horizontal framing, camera at table height from the side, Columbus on the left third with his pointing hand as the focal point, globe on the right third, chart spread across the middle, lower part of the frame kept calm and dark\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "fixture-lavfi",
+        "attempts": 1,
+        "promptHash": "ded6a7c3ebb1843231512f44207bac8e1899217ef89b77e19b1b658634f2f37c",
+        "byteSize": 15161,
+        "width": 1920,
+        "height": 1080,
+        "aspect": 1.778,
+        "luminanceVariance": 3494.17,
+        "generatedAt": "2026-10-20T09:16:46.271Z"
+      }
+    },
+    {
+      "sceneId": 4,
+      "sentenceIds": ["s7", "s8"],
+      "narration": "But the island was real, and people already lived there. They were the Ta\u00edno, and they came down to the sand to meet the strangers.",
+      "wordCount": 25,
+      "visualPurpose": "Show a green tropical island beach where a group of Ta\u00edno people, with their canoes pulled up on the sand, walk down calmly to greet the strangers arriving from the ship in small boats.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 4,
+        "action": "A group of Ta\u00edno islanders walks calmly down a sunlit sandy beach toward small boats that have just reached the shore, carrying the strangers from the ship. Their open hands and upright posture show a peaceful welcome.",
+        "characters": [
+          {
+            "id": "the_taino",
+            "pose": "a line of islanders stepping down the sand together, arms relaxed at their sides or one hand raised in greeting",
+            "expression": "calm and welcoming, eyes open, mouths gently curved in a small smile"
+          },
+          {
+            "id": "the_crew",
+            "pose": "sailors climbing out of two small wooden boats onto the shallows, some still holding oars",
+            "expression": "cautious and curious, brows slightly raised, looking toward the islanders"
+          }
+        ],
+        "setting": "a green tropical island beach at midday, with tall palm trees and dense green foliage behind the sand, clear turquoise shallow water, and a few wooden canoes pulled up on the sand",
+        "props": [
+          "two small wooden rowboats on the shallows",
+          "wooden canoes resting on the sand",
+          "a few palm trees",
+          "oars resting in the boats"
+        ],
+        "lighting": "bright warm midday sunlight with soft shadows, a calm, hopeful atmosphere",
+        "composition": "wide 16:9 horizontal framing, mid-distance camera at beach level, the islanders walking down from the right third toward the boats on the left, palm trees arching across the upper frame, plain sand and calm water across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: A group of Ta\u00edno islanders walks calmly down a sunlit sandy beach toward small boats that have just reached the shore, carrying the strangers from the ship. Their open hands and upright posture show a peaceful welcome.\n\nCharacters:\n- The Ta\u00edno: A group of Ta\u00edno islanders with long straight black hair, dark-brown skin, wearing simple short cotton loincloths, some with woven armbands, drawn as a cluster of similar simple stick figures. Pose: a line of islanders stepping down the sand together, arms relaxed at their sides or one hand raised in greeting. Expression: calm and welcoming, eyes open, mouths gently curved in a small smile.\n- The sailors: A group of adult sailors in plain, worn wool tunics and knee breeches, some wearing knitted caps, some with beards and some clean-shaven, drawn as a cluster of similar simple stick figures. Pose: sailors climbing out of two small wooden boats onto the shallows, some still holding oars. Expression: cautious and curious, brows slightly raised, looking toward the islanders.\n\nSetting: a green tropical island beach at midday, with tall palm trees and dense green foliage behind the sand, clear turquoise shallow water, and a few wooden canoes pulled up on the sand\n\nKey props: two small wooden rowboats on the shallows, wooden canoes resting on the sand, a few palm trees, oars resting in the boats\n\nLighting: bright warm midday sunlight with soft shadows, a calm, hopeful atmosphere\n\nComposition: wide 16:9 horizontal framing, mid-distance camera at beach level, the islanders walking down from the right third toward the boats on the left, palm trees arching across the upper frame, plain sand and calm water across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "6f51c801ce2e22c623e67f264300628d7d7c79f64e7f5cee14d5573d2576a8e1",
+      "audio": {
+        "path": "/tmp/opencode/story-real4c/real-llm-probe-c/audio/chunks/scene-004.wav",
+        "durationSec": 7.92,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-real4c/real-llm-probe-c/audio/parts/scene-004-part01.wav",
+            "durationSec": 7.92,
+            "text": "But the island was real, and people already lived there. They were the Ta\u00edno, and they came down to the sand to meet the strangers.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=none"
+          }
+        ],
+        "meanVolumeDb": -25.2,
+        "wordsPerMinute": 189.4
+      },
+      "timing": {
+        "start": 21.567,
+        "end": 29.667,
+        "startFrame": 647,
+        "endFrame": 890,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "But",
+            "start": 21.647,
+            "end": 21.747
+          },
+          {
+            "word": "the",
+            "start": 21.788,
+            "end": 21.888
+          },
+          {
+            "word": "island",
+            "start": 22.028,
+            "end": 22.269
+          },
+          {
+            "word": "was",
+            "start": 22.309,
+            "end": 22.429
+          },
+          {
+            "word": "real,",
+            "start": 22.509,
+            "end": 22.79
+          },
+          {
+            "word": "and",
+            "start": 23.051,
+            "end": 23.131
+          },
+          {
+            "word": "people",
+            "start": 23.191,
+            "end": 23.492
+          },
+          {
+            "word": "already",
+            "start": 23.712,
+            "end": 24.093
+          },
+          {
+            "word": "lived",
+            "start": 24.154,
+            "end": 24.374
+          },
+          {
+            "word": "there.",
+            "start": 24.394,
+            "end": 24.615
+          },
+          {
+            "word": "They",
+            "start": 25.296,
+            "end": 25.417
+          },
+          {
+            "word": "were",
+            "start": 25.437,
+            "end": 25.557
+          },
+          {
+            "word": "the",
+            "start": 25.597,
+            "end": 25.657
+          },
+          {
+            "word": "Ta\u00edno,",
+            "start": 25.717,
+            "end": 26.259
+          },
+          {
+            "word": "and",
+            "start": 26.72,
+            "end": 26.8
+          },
+          {
+            "word": "they",
+            "start": 26.84,
+            "end": 26.941
+          },
+          {
+            "word": "came",
+            "start": 26.981,
+            "end": 27.221
+          },
+          {
+            "word": "down",
+            "start": 27.281,
+            "end": 27.522
+          },
+          {
+            "word": "to",
+            "start": 27.582,
+            "end": 27.682
+          },
+          {
+            "word": "the",
+            "start": 27.702,
+            "end": 27.783
+          },
+          {
+            "word": "sand",
+            "start": 27.843,
+            "end": 28.184
+          },
+          {
+            "word": "to",
+            "start": 28.244,
+            "end": 28.344
+          },
+          {
+            "word": "meet",
+            "start": 28.384,
+            "end": 28.565
+          },
+          {
+            "word": "the",
+            "start": 28.605,
+            "end": 28.685
+          },
+          {
+            "word": "strangers.",
+            "start": 28.725,
+            "end": 29.246
+          }
+        ]
+      },
+      "image": {
+        "path": "/tmp/opencode/story-real4c/real-llm-probe-c/images/scene-004.png",
+        "prompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: A group of Ta\u00edno islanders walks calmly down a sunlit sandy beach toward small boats that have just reached the shore, carrying the strangers from the ship. Their open hands and upright posture show a peaceful welcome.\n\nCharacters:\n- The Ta\u00edno: A group of Ta\u00edno islanders with long straight black hair, dark-brown skin, wearing simple short cotton loincloths, some with woven armbands, drawn as a cluster of similar simple stick figures. Pose: a line of islanders stepping down the sand together, arms relaxed at their sides or one hand raised in greeting. Expression: calm and welcoming, eyes open, mouths gently curved in a small smile.\n- The sailors: A group of adult sailors in plain, worn wool tunics and knee breeches, some wearing knitted caps, some with beards and some clean-shaven, drawn as a cluster of similar simple stick figures. Pose: sailors climbing out of two small wooden boats onto the shallows, some still holding oars. Expression: cautious and curious, brows slightly raised, looking toward the islanders.\n\nSetting: a green tropical island beach at midday, with tall palm trees and dense green foliage behind the sand, clear turquoise shallow water, and a few wooden canoes pulled up on the sand\n\nKey props: two small wooden rowboats on the shallows, wooden canoes resting on the sand, a few palm trees, oars resting in the boats\n\nLighting: bright warm midday sunlight with soft shadows, a calm, hopeful atmosphere\n\nComposition: wide 16:9 horizontal framing, mid-distance camera at beach level, the islanders walking down from the right third toward the boats on the left, palm trees arching across the upper frame, plain sand and calm water across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "fixture-lavfi",
+        "attempts": 1,
+        "promptHash": "9a1e0f6e97b2f308bf1c1cc3aa807183da659be80fa7c94cb88bcaef27ed6501",
+        "byteSize": 16516,
+        "width": 1920,
+        "height": 1080,
+        "aspect": 1.778,
+        "luminanceVariance": 2700.04,
+        "generatedAt": "2026-10-20T09:16:46.585Z"
+      }
+    },
+    {
+      "sceneId": 5,
+      "sentenceIds": ["s9", "s10"],
+      "narration": "Columbus named the island and raised a flag. Then the ships sailed on among the islands.",
+      "wordCount": 16,
+      "visualPurpose": "Show Columbus on the sandy shore planting a flag into the ground while his crew stands around him, with ships visible sailing away among many small islands in the blue water behind them.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 5,
+        "action": "Columbus stands on the sandy shore, driving a flag pole into the ground while his crew gathers around him. Behind them, ships sail away across blue water dotted with small islands.",
+        "characters": [
+          {
+            "id": "columbus",
+            "pose": "kneeling on one knee at the sand, both hands pushing a flag pole firmly into the ground, body leaning forward",
+            "expression": "proud and resolute, brows raised slightly, mouth set in a firm line"
+          },
+          {
+            "id": "the_crew",
+            "pose": "a loose cluster of sailors standing behind Columbus, some with arms folded, some pointing toward the sea",
+            "expression": "relieved and tired, shoulders slack, faces turned toward the flag"
+          }
+        ],
+        "setting": "a white sandy beach on a small tropical island in the late morning, clear sky, calm turquoise water, the ships' wooden hulls and sails visible offshore",
+        "props": [
+          "a tall wooden flag pole with a plain red cross banner",
+          "a wide-brimmed black hat in the sand",
+          "two wooden sailing ships with white sails far in the water",
+          "several small green islands scattered across the blue sea"
+        ],
+        "lighting": "bright warm midday sunlight, soft shadows on the sand, clear open sky",
+        "composition": "wide 16:9 horizontal framing, medium-wide camera at sand level, Columbus planting the flag on the left third with the crew grouped to his right, ships and small islands receding across the middle distance on the right, sand and calm water kept uncluttered across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: Columbus stands on the sandy shore, driving a flag pole into the ground while his crew gathers around him. Behind them, ships sail away across blue water dotted with small islands.\n\nCharacters:\n- Columbus: A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat. Pose: kneeling on one knee at the sand, both hands pushing a flag pole firmly into the ground, body leaning forward. Expression: proud and resolute, brows raised slightly, mouth set in a firm line.\n- The sailors: A group of adult sailors in plain, worn wool tunics and knee breeches, some wearing knitted caps, some with beards and some clean-shaven, drawn as a cluster of similar simple stick figures. Pose: a loose cluster of sailors standing behind Columbus, some with arms folded, some pointing toward the sea. Expression: relieved and tired, shoulders slack, faces turned toward the flag.\n\nSetting: a white sandy beach on a small tropical island in the late morning, clear sky, calm turquoise water, the ships' wooden hulls and sails visible offshore\n\nKey props: a tall wooden flag pole with a plain red cross banner, a wide-brimmed black hat in the sand, two wooden sailing ships with white sails far in the water, several small green islands scattered across the blue sea\n\nLighting: bright warm midday sunlight, soft shadows on the sand, clear open sky\n\nComposition: wide 16:9 horizontal framing, medium-wide camera at sand level, Columbus planting the flag on the left third with the crew grouped to his right, ships and small islands receding across the middle distance on the right, sand and calm water kept uncluttered across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "909739e07b4b299ebe137d2a6207ccc397f1d31cc359644764a02e96d9cf1c7f",
+      "audio": {
+        "path": "/tmp/opencode/story-real4c/real-llm-probe-c/audio/chunks/scene-005.wav",
+        "durationSec": 5.08,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-real4c/real-llm-probe-c/audio/parts/scene-005-part01.wav",
+            "durationSec": 5.08,
+            "text": "Columbus named the island and raised a flag. Then the ships sailed on among the islands.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=none"
+          }
+        ],
+        "meanVolumeDb": -25.9,
+        "wordsPerMinute": 189
+      },
+      "timing": {
+        "start": 29.667,
+        "end": 34.967,
+        "startFrame": 890,
+        "endFrame": 1049,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "Columbus",
+            "start": 29.767,
+            "end": 30.169
+          },
+          {
+            "word": "named",
+            "start": 30.209,
+            "end": 30.41
+          },
+          {
+            "word": "the",
+            "start": 30.43,
+            "end": 30.51
+          },
+          {
+            "word": "island",
+            "start": 30.631,
+            "end": 30.892
+          },
+          {
+            "word": "and",
+            "start": 31.052,
+            "end": 31.153
+          },
+          {
+            "word": "raised",
+            "start": 31.193,
+            "end": 31.494
+          },
+          {
+            "word": "a",
+            "start": 31.534,
+            "end": 31.575
+          },
+          {
+            "word": "flag.",
+            "start": 31.635,
+            "end": 32.036
+          },
+          {
+            "word": "Then",
+            "start": 32.578,
+            "end": 32.719
+          },
+          {
+            "word": "the",
+            "start": 32.759,
+            "end": 32.839
+          },
+          {
+            "word": "ships",
+            "start": 32.86,
+            "end": 33.08
+          },
+          {
+            "word": "sailed",
+            "start": 33.141,
+            "end": 33.422
+          },
+          {
+            "word": "on",
+            "start": 33.542,
+            "end": 33.623
+          },
+          {
+            "word": "among",
+            "start": 33.663,
+            "end": 33.884
+          },
+          {
+            "word": "the",
+            "start": 33.924,
+            "end": 34.004
+          },
+          {
+            "word": "islands.",
+            "start": 34.125,
+            "end": 34.406
+          }
+        ]
+      },
+      "image": {
+        "path": "/tmp/opencode/story-real4c/real-llm-probe-c/images/scene-005.png",
+        "prompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: Columbus stands on the sandy shore, driving a flag pole into the ground while his crew gathers around him. Behind them, ships sail away across blue water dotted with small islands.\n\nCharacters:\n- Columbus: A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat. Pose: kneeling on one knee at the sand, both hands pushing a flag pole firmly into the ground, body leaning forward. Expression: proud and resolute, brows raised slightly, mouth set in a firm line.\n- The sailors: A group of adult sailors in plain, worn wool tunics and knee breeches, some wearing knitted caps, some with beards and some clean-shaven, drawn as a cluster of similar simple stick figures. Pose: a loose cluster of sailors standing behind Columbus, some with arms folded, some pointing toward the sea. Expression: relieved and tired, shoulders slack, faces turned toward the flag.\n\nSetting: a white sandy beach on a small tropical island in the late morning, clear sky, calm turquoise water, the ships' wooden hulls and sails visible offshore\n\nKey props: a tall wooden flag pole with a plain red cross banner, a wide-brimmed black hat in the sand, two wooden sailing ships with white sails far in the water, several small green islands scattered across the blue sea\n\nLighting: bright warm midday sunlight, soft shadows on the sand, clear open sky\n\nComposition: wide 16:9 horizontal framing, medium-wide camera at sand level, Columbus planting the flag on the left third with the crew grouped to his right, ships and small islands receding across the middle distance on the right, sand and calm water kept uncluttered across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "fixture-lavfi",
+        "attempts": 1,
+        "promptHash": "a62297fe1f3c9f5e3beef5bd2ff0be04a2336d5056da60655836c04473421a32",
+        "byteSize": 15129,
+        "width": 1920,
+        "height": 1080,
+        "aspect": 1.778,
+        "luminanceVariance": 3781.45,
+        "generatedAt": "2026-10-20T09:16:46.893Z"
+      }
+    },
+    {
+      "sceneId": 6,
+      "sentenceIds": ["s11"],
+      "narration": "When they finally saw Spain again, the sailors had a story no one in Europe had heard.",
+      "wordCount": 17,
+      "visualPurpose": "Show the returning sailors arriving at a Spanish harbor, with a crowd of people on the dock listening eagerly to them, as if the sailors are sharing an unknown tale from across the sea.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 6,
+        "action": "Columbus strides down the gangplank onto a Spanish harbor dock, one hand raised mid-gesture as he speaks, while the crew follows behind him. A crowd on the quay leans forward, eager and attentive, as if hearing a tale from across the sea.",
+        "characters": [
+          {
+            "id": "columbus",
+            "pose": "stepping off the gangplank, one hand raised in an open gesture, head turned toward the crowd",
+            "expression": "animated and proud, eyebrows lifted, mouth open mid-sentence"
+          },
+          {
+            "id": "the_crew",
+            "pose": "a cluster of sailors behind the captain, some carrying bundles, some leaning in to listen",
+            "expression": "weary but pleased, a few grinning, others nodding"
+          }
+        ],
+        "setting": "a stone quay in a Spanish harbor at midday, a wooden ship moored at the edge, tall masts behind, townspeople gathered on the dock in the background, bright sky with a few clouds",
+        "props": [
+          "a wooden gangplank",
+          "a moored wooden sailing ship",
+          "coils of rope on the quay",
+          "wooden crates",
+          "a plain flag on a mast showing an abstract red mark"
+        ],
+        "lighting": "warm clear afternoon sunlight on the stone quay, soft shadows under the crowd",
+        "composition": "wide 16:9 horizontal framing, medium-wide camera at quay level, Columbus on the left third at the foot of the gangplank, the crew following on the center, the crowd leaning in on the right, calm stone and water across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: Columbus strides down the gangplank onto a Spanish harbor dock, one hand raised mid-gesture as he speaks, while the crew follows behind him. A crowd on the quay leans forward, eager and attentive, as if hearing a tale from across the sea.\n\nCharacters:\n- Columbus: A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat. Pose: stepping off the gangplank, one hand raised in an open gesture, head turned toward the crowd. Expression: animated and proud, eyebrows lifted, mouth open mid-sentence.\n- The sailors: A group of adult sailors in plain, worn wool tunics and knee breeches, some wearing knitted caps, some with beards and some clean-shaven, drawn as a cluster of similar simple stick figures. Pose: a cluster of sailors behind the captain, some carrying bundles, some leaning in to listen. Expression: weary but pleased, a few grinning, others nodding.\n\nSetting: a stone quay in a Spanish harbor at midday, a wooden ship moored at the edge, tall masts behind, townspeople gathered on the dock in the background, bright sky with a few clouds\n\nKey props: a wooden gangplank, a moored wooden sailing ship, coils of rope on the quay, wooden crates, a plain flag on a mast showing an abstract red mark\n\nLighting: warm clear afternoon sunlight on the stone quay, soft shadows under the crowd\n\nComposition: wide 16:9 horizontal framing, medium-wide camera at quay level, Columbus on the left third at the foot of the gangplank, the crew following on the center, the crowd leaning in on the right, calm stone and water across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "f83db8aaf6297ca585a0176d2b1ba940e2ee2bae964aaf29f1b9f803937a538c",
+      "audio": {
+        "path": "/tmp/opencode/story-real4c/real-llm-probe-c/audio/chunks/scene-006.wav",
+        "durationSec": 5.4,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-real4c/real-llm-probe-c/audio/parts/scene-006-part01.wav",
+            "durationSec": 5.4,
+            "text": "When they finally saw Spain again, the sailors had a story no one in Europe had heard.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=none"
+          }
+        ],
+        "meanVolumeDb": -24.7,
+        "wordsPerMinute": 188.9
+      },
+      "timing": {
+        "start": 34.967,
+        "end": 40.367,
+        "startFrame": 1049,
+        "endFrame": 1211,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "When",
+            "start": 35.027,
+            "end": 35.168
+          },
+          {
+            "word": "they",
+            "start": 35.188,
+            "end": 35.328
+          },
+          {
+            "word": "finally",
+            "start": 35.429,
+            "end": 35.81
+          },
+          {
+            "word": "saw",
+            "start": 35.89,
+            "end": 36.151
+          },
+          {
+            "word": "Spain",
+            "start": 36.232,
+            "end": 36.573
+          },
+          {
+            "word": "again,",
+            "start": 36.613,
+            "end": 36.874
+          },
+          {
+            "word": "the",
+            "start": 36.894,
+            "end": 37.516
+          },
+          {
+            "word": "sailors",
+            "start": 37.577,
+            "end": 37.998
+          },
+          {
+            "word": "had",
+            "start": 38.038,
+            "end": 38.199
+          },
+          {
+            "word": "a",
+            "start": 38.239,
+            "end": 38.259
+          },
+          {
+            "word": "story",
+            "start": 38.339,
+            "end": 38.681
+          },
+          {
+            "word": "no",
+            "start": 38.781,
+            "end": 38.922
+          },
+          {
+            "word": "one",
+            "start": 39.002,
+            "end": 39.102
+          },
+          {
+            "word": "in",
+            "start": 39.142,
+            "end": 39.223
+          },
+          {
+            "word": "Europe",
+            "start": 39.343,
+            "end": 39.584
+          },
+          {
+            "word": "had",
+            "start": 39.624,
+            "end": 39.745
+          },
+          {
+            "word": "heard.",
+            "start": 39.805,
+            "end": 40.126
+          }
+        ]
+      },
+      "image": {
+        "path": "/tmp/opencode/story-real4c/real-llm-probe-c/images/scene-006.png",
+        "prompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: Columbus strides down the gangplank onto a Spanish harbor dock, one hand raised mid-gesture as he speaks, while the crew follows behind him. A crowd on the quay leans forward, eager and attentive, as if hearing a tale from across the sea.\n\nCharacters:\n- Columbus: A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat. Pose: stepping off the gangplank, one hand raised in an open gesture, head turned toward the crowd. Expression: animated and proud, eyebrows lifted, mouth open mid-sentence.\n- The sailors: A group of adult sailors in plain, worn wool tunics and knee breeches, some wearing knitted caps, some with beards and some clean-shaven, drawn as a cluster of similar simple stick figures. Pose: a cluster of sailors behind the captain, some carrying bundles, some leaning in to listen. Expression: weary but pleased, a few grinning, others nodding.\n\nSetting: a stone quay in a Spanish harbor at midday, a wooden ship moored at the edge, tall masts behind, townspeople gathered on the dock in the background, bright sky with a few clouds\n\nKey props: a wooden gangplank, a moored wooden sailing ship, coils of rope on the quay, wooden crates, a plain flag on a mast showing an abstract red mark\n\nLighting: warm clear afternoon sunlight on the stone quay, soft shadows under the crowd\n\nComposition: wide 16:9 horizontal framing, medium-wide camera at quay level, Columbus on the left third at the foot of the gangplank, the crew following on the center, the crowd leaning in on the right, calm stone and water across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "fixture-lavfi",
+        "attempts": 1,
+        "promptHash": "531942c719f06873c5f2f0d4ac9a727d9f4a4753afc822e88559d32a39cb724c",
+        "byteSize": 15569,
+        "width": 1920,
+        "height": 1080,
+        "aspect": 1.778,
+        "luminanceVariance": 3829.46,
+        "generatedAt": "2026-10-20T09:16:47.198Z"
+      }
+    }
+  ],
+  "warnings": ["Approximate reading grade is 5.1; target is grade 4 or lower."],
+  "errors": [],
+  "story": {
+    "title": "The Night Someone Shouted Land",
+    "story": "The sailors had stared at empty ocean for more than five weeks. Some of them wanted to turn back. Then, people say, a lookout named Rodrigo shouted that he saw land. It was the night of October eleventh, fourteen ninety-two. Columbus was certain he had reached Asia, the land of spices and silk. He was wrong about that. But the island was real, and people already lived there. They were the Ta\u00edno, and they came down to the sand to meet the strangers. Columbus named the island and raised a flag. Then the ships sailed on among the islands. When they finally saw Spain again, the sailors had a story no one in Europe had heard.",
+    "wordCount": 116,
+    "lint": {
+      "passed": true,
+      "attempts": 1,
+      "sentenceCount": 11,
+      "wordCount": 116,
+      "averageSentenceWords": 10.5,
+      "maximumSentenceWords": 17,
+      "readingGrade": 5.1,
+      "wordBudgetTarget": 113,
+      "wordBudgetVariance": 0.027,
+      "issues": [],
+      "warnings": [
+        "Approximate reading grade is 5.1; target is grade 4 or lower."
+      ]
+    }
+  },
+  "claims": [
+    {
+      "claim": "The sailors had been at sea for more than five weeks before land was sighted.",
+      "status": "established",
+      "hedgeInNarration": false
+    },
+    {
+      "claim": "Some of the sailors wanted to turn back before land was sighted.",
+      "status": "established",
+      "hedgeInNarration": false
+    },
+    {
+      "claim": "A lookout named Rodrigo de Triana is credited with first sighting land.",
+      "status": "legend",
+      "hedgeInNarration": true
+    },
+    {
+      "claim": "Land was sighted on the night of October 11, 1492.",
+      "status": "established",
+      "hedgeInNarration": false
+    },
+    {
+      "claim": "Columbus believed he had reached Asia.",
+      "status": "established",
+      "hedgeInNarration": false
+    },
+    {
+      "claim": "The island was inhabited by the Ta\u00edno people, who met the Europeans on the beach.",
+      "status": "established",
+      "hedgeInNarration": false
+    },
+    {
+      "claim": "Columbus named the island and raised a flag there.",
+      "status": "established",
+      "hedgeInNarration": false
+    },
+    {
+      "claim": "The expedition returned to Spain and brought news of the lands to Europe.",
+      "status": "established",
+      "hedgeInNarration": false
+    }
+  ],
+  "verification": {
+    "attempts": 1,
+    "issues": [
+      {
+        "kind": "invented_motive",
+        "description": "The story says 'Columbus was certain he had reached Asia.' The ledger only supports that he 'believed' he had reached Asia. 'Certain' describes his inner state more strongly than the ledger does.",
+        "severity": "advisory"
+      }
+    ],
+    "blocking": [],
+    "notes": [
+      "The story says 'Columbus was certain he had reached Asia.' The ledger only supports that he 'believed' he had reached Asia. 'Certain' describes his inner state more strongly than the ledger does."
+    ]
+  },
+  "characters": [
+    {
+      "id": "columbus",
+      "name": "Columbus",
+      "role": "the captain",
+      "visualDescription": "A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat."
+    },
+    {
+      "id": "rodrigo",
+      "name": "Rodrigo",
+      "role": "the lookout",
+      "visualDescription": "A young man in his late teens with short tousled brown hair, a plain loose white linen shirt, brown knee breeches, bare feet, and a simple red sash tied at the waist."
+    },
+    {
+      "id": "the_crew",
+      "name": "The sailors",
+      "role": "the ship's crew, a group of weary sailors",
+      "visualDescription": "A group of adult sailors in plain, worn wool tunics and knee breeches, some wearing knitted caps, some with beards and some clean-shaven, drawn as a cluster of similar simple stick figures."
+    },
+    {
+      "id": "the_taino",
+      "name": "The Ta\u00edno",
+      "role": "the island people who come down to the sand",
+      "visualDescription": "A group of Ta\u00edno islanders with long straight black hair, dark-brown skin, wearing simple short cotton loincloths, some with woven armbands, drawn as a cluster of similar simple stick figures."
+    }
+  ],
+  "audio": {
+    "masterPath": "/tmp/opencode/story-real4c/real-llm-probe-c/audio/narration.wav",
+    "durationSec": 40.36,
+    "gapMs": 200,
+    "sampleRate": 48000
+  },
+  "transcriptPath": "/tmp/opencode/story-real4c/real-llm-probe-c/transcript.json",
+  "subtitles": {
+    "ass": "/tmp/opencode/story-real4c/real-llm-probe-c/subtitles.ass",
+    "srt": "/tmp/opencode/story-real4c/real-llm-probe-c/subtitles.srt",
+    "cueCount": 11,
+    "overallMatchRatio": 1
+  },
+  "render": {
+    "finalVideo": "/tmp/opencode/story-real4c/real-llm-probe-c/final.mp4",
+    "ffprobe": {
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "duration": 40.36,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "pixFmt": "yuv420p"
+    },
+    "validations": {
+      "passed": true,
+      "checks": [
+        {
+          "name": "video_stream",
+          "passed": true,
+          "detail": "h264 1920x1080 yuv420p",
+          "severity": "gate"
+        },
+        {
+          "name": "video_codec",
+          "passed": true,
+          "detail": "expected h264, got h264",
+          "severity": "gate"
+        },
+        {
+          "name": "pixel_format",
+          "passed": true,
+          "detail": "expected yuv420p, got yuv420p",
+          "severity": "gate"
+        },
+        {
+          "name": "resolution",
+          "passed": true,
+          "detail": "expected 1920x1080, got 1920x1080",
+          "severity": "gate"
+        },
+        {
+          "name": "frame_rate",
+          "passed": true,
+          "detail": "expected 30 fps, got 30",
+          "severity": "gate"
+        },
+        {
+          "name": "audio_stream",
+          "passed": true,
+          "detail": "aac",
+          "severity": "gate"
+        },
+        {
+          "name": "audio_codec",
+          "passed": true,
+          "detail": "expected aac, got aac",
+          "severity": "gate"
+        },
+        {
+          "name": "duration_matches_audio",
+          "passed": true,
+          "detail": "video 40.360s vs audio 40.360s",
+          "severity": "gate"
+        },
+        {
+          "name": "no_black_frames",
+          "passed": true,
+          "detail": "no interval longer than 0.35s (0 dark interval(s) seen)",
+          "severity": "gate"
+        },
+        {
+          "name": "no_long_silence",
+          "passed": true,
+          "detail": "no silence longer than 1s at -50 dB",
+          "severity": "gate"
+        },
+        {
+          "name": "scene_1_shows_source",
+          "passed": true,
+          "detail": "correlation 1.000 with its own source (floor 0.35); closest other scene 2 at 0.756 (margin 0.244, needs >= 0.02)",
+          "severity": "warning"
+        },
+        {
+          "name": "scene_1_subtitles_visible",
+          "passed": true,
+          "detail": "subtitle band difference 8.96% (>= 0.50%)",
+          "severity": "gate"
+        },
+        {
+          "name": "scene_2_shows_source",
+          "passed": true,
+          "detail": "correlation 1.000 with its own source (floor 0.35); closest other scene 3 at 0.788 (margin 0.212, needs >= 0.02)",
+          "severity": "warning"
+        },
+        {
+          "name": "scene_2_subtitles_visible",
+          "passed": true,
+          "detail": "subtitle band difference 9.74% (>= 0.50%)",
+          "severity": "gate"
+        },
+        {
+          "name": "scene_3_shows_source",
+          "passed": true,
+          "detail": "correlation 1.000 with its own source (floor 0.35); closest other scene 2 at 0.788 (margin 0.212, needs >= 0.02)",
+          "severity": "warning"
+        },
+        {
+          "name": "scene_3_subtitles_visible",
+          "passed": true,
+          "detail": "subtitle band difference 9.97% (>= 0.50%)",
+          "severity": "gate"
+        },
+        {
+          "name": "scene_4_shows_source",
+          "passed": true,
+          "detail": "correlation 1.000 with its own source (floor 0.35); closest other scene 3 at 0.742 (margin 0.258, needs >= 0.02)",
+          "severity": "warning"
+        },
+        {
+          "name": "scene_4_subtitles_visible",
+          "passed": true,
+          "detail": "subtitle band difference 7.81% (>= 0.50%)",
+          "severity": "gate"
+        },
+        {
+          "name": "scene_5_shows_source",
+          "passed": true,
+          "detail": "correlation 1.000 with its own source (floor 0.35); closest other scene 6 at 0.782 (margin 0.218, needs >= 0.02)",
+          "severity": "warning"
+        },
+        {
+          "name": "scene_5_subtitles_visible",
+          "passed": true,
+          "detail": "subtitle band difference 6.56% (>= 0.50%)",
+          "severity": "gate"
+        },
+        {
+          "name": "scene_6_shows_source",
+          "passed": true,
+          "detail": "correlation 1.000 with its own source (floor 0.35); closest other scene 5 at 0.782 (margin 0.218, needs >= 0.02)",
+          "severity": "warning"
+        },
+        {
+          "name": "scene_6_subtitles_visible",
+          "passed": true,
+          "detail": "subtitle band difference 12.29% (>= 0.50%)",
+          "severity": "gate"
+        }
+      ]
+    }
+  }
+}
