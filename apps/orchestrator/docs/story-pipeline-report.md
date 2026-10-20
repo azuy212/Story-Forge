@@ -605,7 +605,12 @@ What the real run still does **not** prove:
    faces and detailed clothing, not the style profile's "simple stick figures".
    All six scenes share one look and each depicts its prompt, but the style
    itself is a deviation that needs a decision: accept the cartoon look, or
-   tighten the style constraints and re-test.
+   tighten the style constraints and re-test. Two things are already in place
+   for the retest: the character registry is now gated to short, one-or-two-cue
+   silhouettes (a costume list was competing with the style preamble), and the
+   face stays "eyebrows and a mouth only" rather than dropping the face, which
+   would delete the storytelling signal. The preamble itself is unchanged until
+   a real image run can compare the two versions.
 2. **Listening.** Nobody has heard the MP4 in this environment. The free ASR
    pass now proves the script words were spoken (coverage 1.00 on all six
    chunks), but it says nothing about pacing, emphasis or whether the voice is
