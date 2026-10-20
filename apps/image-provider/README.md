@@ -61,6 +61,13 @@ pnpm cli login
 pnpm cli server --port 3000
 ```
 
+**Run it without a visible browser** (the saved profile already holds the
+session; `--headless` is a program flag, so it goes before the subcommand):
+
+```bash
+pnpm cli --headless server --port 3000
+```
+
 ### HTTP API
 
 `POST /generate` with a JSON body:
@@ -215,17 +222,27 @@ src/
 Key design decisions:
 
 - **Persistent browser profile** — sign into Gemini once; session survives restarts.
-- **Create-mode selection** — image/video requests toggle the matching option
-  (`Create image` / `Create video`) in Gemini's "+" menu before submitting.
+- **Images surface for images** — image requests use Gemini's dedicated
+  `gemini.google.com/images` composer (reached through the sidebar route,
+  because a direct `/images` load redirects to `/app`), and fall back to the
+  `Create image` item in the "+" menu when that surface is not served. Video
+  still uses the menu. Prompts for the Images composer are flattened to one
+  line: it answers a multi-block prompt with a generic error instead of
+  generating.
 - Reference images are uploaded through the same menu before the prompt is sent.
 - **No arbitrary sleep() calls** — all waits use locators, DOM mutation observers, or network events.
 - **Network response interception** — captures image and video binaries as they load, avoiding re-downloads.
 - **Blob URL support** — if Gemini serves assets as blob: URLs, fetches them via page context.
-- **Exact-match caching** — cache keys hash the exact prompt, asset type, mode,
-  and reference image contents; validation rejects mismatched metadata.
+- **Versioned cache keys** — cache keys hash a manual version, the exact prompt,
+  asset type, mode, and reference image contents; bump the version whenever a
+  change alters the image a prompt produces without changing the prompt text.
+  Validation rejects mismatched metadata.
 - **Lazy browser startup** — the server only launches the browser when a request misses the cache.
-- **Error detection** — scans for content policy, rate limit, quota, and generation failure messages.
-- **Quota fast-fail** — a disabled `Create image` menu entry reports
+- **Error detection** — scans for content policy, rate limit, quota, and
+  generation failure messages, ignoring sidebar chrome: past-conversation
+  titles such as "Rate Limit Reached" are not evidence about the current run.
+- **Quota fast-fail** — a spent allowance (the disabled `Create image` entry, or
+  the Images surface's "…as soon as your limit resets") reports
   `quota_exhausted` (HTTP 429, non-retryable) instead of waiting out the
   generation timeout; rerun after the quota refills.
 - **Graceful shutdown** — SIGINT/SIGTERM closes browser cleanly.

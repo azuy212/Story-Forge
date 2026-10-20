@@ -590,6 +590,23 @@ refill generates only those. At 2 m 07 s for six images, a 19-scene episode is
 about 7 minutes of generation — the daily allowance, not the clock, is the
 binding constraint. Treat ~14 as the number to confirm on the next refill.
 
+**The Images surface is the live path.** Gemini now serves image creation at
+`gemini.google.com/images`, and for accounts on that UI the "+" menu's
+"Create image" entry stays disabled at all times — it is not a quota signal, so
+the provider no longer treats it as one. Image requests enter the surface
+through its sidebar route (a direct `/images` load redirects to `/app`) and
+fall back to the menu. Two surface behaviours cost a day of probing and are now
+handled: a prompt delivered as several editor blocks comes back as "I seem to
+be encountering an error" (the same text flattened to one line generates
+normally), and a finished generation navigates to its conversation, so the
+composer has to be re-entered rather than assumed. The surface states a spent
+allowance as "I can create more images as soon as your limit resets. Check your
+usage in Settings.", which now classifies as `quota_exhausted`; the failure
+scan also ignores the sidebar, whose past-conversation titles ("Rate Limit
+Reached", "Failed Image Generation") otherwise look like the current run's
+failure. With the port in place, six A/B prompts were regenerated headless in
+about 50 s each.
+
 **Publishing cadence.** The allowance, not the render, sets the schedule. A
 19-scene episode needs 19 successful generations, so it cannot finish in one
 free-tier day: it takes two runs (14 + 5), which is what `quota_exhausted` and
