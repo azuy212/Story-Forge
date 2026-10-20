@@ -24,7 +24,8 @@
     "resume": "node scripts/resume.mjs",
     "run-next": "node scripts/run-next.mjs",
     "seed-run": "node scripts/seed-run.mjs",
-    "qa-eval": "node scripts/qa-eval.mjs"
+    "qa-eval": "node scripts/qa-eval.mjs",
+    "story": "node scripts/story-video.mjs"
   },
   "dependencies": {
     "@langchain/core": "^1.2.3",
