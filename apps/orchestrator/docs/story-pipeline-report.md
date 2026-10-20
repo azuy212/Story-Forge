@@ -24,7 +24,7 @@ New story module (all new code lives here — nothing in `src/graph/**` or any
 agent node was touched):
 
 ```
-apps/orchestrator/src/story/          (6234 lines, 22 files)
+apps/orchestrator/src/story/          (6966 lines, 23 files)
   index.ts          public entry point (re-exports only)
   run.ts            S1–S8 orchestrator, resume, review gate
   runner.ts         stage runner (fingerprint + atomic resume)
@@ -33,6 +33,7 @@ apps/orchestrator/src/story/          (6234 lines, 22 files)
   input.ts          input validation + deterministic job id
   paths.ts          jobs/<jobId>/ layout (anchored to the package root)
   manifest.ts       fingerprinted stages, resume lifecycle, warnings
+  resume.ts         frozen-config resume: stored config wins, changed flags fail
   atomic.ts         atomic JSON/text writes
   types.ts          Zod schemas + data contracts
   sentences.ts      script-aware sentence segmentation + grouping rules
@@ -88,6 +89,7 @@ apps/orchestrator/tests/story-columbus-golden.test.ts  5   (19-scene real fixtur
 apps/orchestrator/tests/story-ffmpeg-args.test.ts     13
 apps/orchestrator/tests/story-render.test.ts          10   (frame margin, severity, real FFmpeg failure, black threshold)
 apps/orchestrator/tests/story-manifest.test.ts        12
+apps/orchestrator/tests/story-resume.test.ts           9   (stored config wins; changed flags refused; zero calls)
 apps/orchestrator/tests/story-config.test.ts          19   (incl. bundled fonts)
 apps/orchestrator/tests/story-prompts.test.ts          8
 apps/orchestrator/tests/story-shared-edits.test.ts    15
@@ -136,23 +138,24 @@ Chatterbox suite.
 
 The brief's 15 areas, mapped to the suites that now cover them:
 
-| #   | Area                                                               | Covered by                                                                                                                                                                     | Verdict |
-| --- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
-| 1   | Input validation (empty topic, bad duration, bad language)         | `story-config.test.ts` (validation + `assertStoryInput`)                                                                                                                       | covered |
-| 2   | Schema validation: story, claims, scenes, slots                    | `story-schemas.test.ts` (19 cases: missing fields, bad enums, blank slots, ids)                                                                                                | covered |
-| 3   | Segmenter: abbreviations, numbers, quotes, ellipses, Urdu          | `story-sentences.test.ts` (abbreviations, initials, decimals, quotes, `…`, `۔؟۔` `।`, `。！？`)                                                                                | covered |
-| 4   | Grouping: gaps, duplicates, reordering, empty scenes, fallback     | `story-sentences.test.ts` — explicit cases + randomised corruptions; `fallbackGrouping` property test                                                                          | covered |
-| 5   | Property: concatenated narration always equals the story           | `story-sentences.test.ts` — 300 random partitions across 3 seeds, plus exact reassembly                                                                                        | covered |
-| 6   | Reading-level lint: simple passes, hard words/long sentences fail  | `story-lint.test.ts` (hard-word exemption requires an in-sentence explanation)                                                                                                 | covered |
-| 7   | Prompt composition + lint: registry verbatim, stray CJK, dup words | `story-prompt.test.ts`, `story-prompts.test.ts`, **`story-columbus-golden.test.ts`** (real 19-scene fixture)                                                                   | covered |
-| 8   | Image-to-scene mapping + validation (corrupt, blank, duplicate)    | `story-images.test.ts` (real lavfi fixtures through the production ffprobe path; duplicate + reuse)                                                                            | covered |
-| 9   | TTS validation (empty, truncated, wrong duration)                  | `story-audio.test.ts` (real WAVs; zero-duration, undecodable, implausible band, >450-char split)                                                                               | covered |
-| 10  | Alignment: numerals, diacritics, punctuation, ASR noise, gate      | `story-alignment.test.ts` (decimal, year, diacritics, dropped/extra words, proportional fallback)                                                                              | covered |
-| 11  | Scene timing: contiguous, positive, first at 0, ends at audio      | `story-timing.test.ts`                                                                                                                                                         | covered |
-| 12  | Subtitles: line length, min duration, no overlap, script text      | `story-subtitles.test.ts`                                                                                                                                                      | covered |
-| 13  | FFmpeg argument construction + failure handling                    | `story-ffmpeg-args.test.ts` (array form, quoting, one-pass filter graph); **`story-render.test.ts`** (real FFmpeg failure in a job path with spaces and a quote)               | covered |
-| 14  | Manifest: stages, fingerprints, warnings, artifacts                | `story-manifest.test.ts`                                                                                                                                                       | covered |
-| 15  | Resume: fail mid-stage → earlier artifacts reused; invalidation    | `story-manifest.test.ts`; `story-images.test.ts` / `story-audio.test.ts` (per-scene reuse + prompt change); **smoke pass 4** (kill during S5, resume, only 2 of 4 regenerated) | covered |
+| #   | Area                                                                  | Covered by                                                                                                                                                                                     | Verdict |
+| --- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 1   | Input validation (empty topic, bad duration, bad language)            | `story-config.test.ts` (validation + `assertStoryInput`)                                                                                                                                       | covered |
+| 2   | Schema validation: story, claims, scenes, slots                       | `story-schemas.test.ts` (19 cases: missing fields, bad enums, blank slots, ids)                                                                                                                | covered |
+| 3   | Segmenter: abbreviations, numbers, quotes, ellipses, Urdu             | `story-sentences.test.ts` (abbreviations, initials, decimals, quotes, `…`, `۔؟۔` `।`, `。！？`)                                                                                                | covered |
+| 4   | Grouping: gaps, duplicates, reordering, empty scenes, fallback        | `story-sentences.test.ts` — explicit cases + randomised corruptions; `fallbackGrouping` property test                                                                                          | covered |
+| 5   | Property: concatenated narration always equals the story              | `story-sentences.test.ts` — 300 random partitions across 3 seeds, plus exact reassembly                                                                                                        | covered |
+| 6   | Reading-level lint: simple passes, hard words/long sentences fail     | `story-lint.test.ts` (hard-word exemption requires an in-sentence explanation)                                                                                                                 | covered |
+| 7   | Prompt composition + lint: registry verbatim, stray CJK, dup words    | `story-prompt.test.ts`, `story-prompts.test.ts`, **`story-columbus-golden.test.ts`** (real 19-scene fixture)                                                                                   | covered |
+| 8   | Image-to-scene mapping + validation (corrupt, blank, duplicate)       | `story-images.test.ts` (real lavfi fixtures through the production ffprobe path; duplicate + reuse)                                                                                            | covered |
+| 9   | TTS validation (empty, truncated, wrong duration)                     | `story-audio.test.ts` (real WAVs; zero-duration, undecodable, implausible band, >450-char split)                                                                                               | covered |
+| 10  | Alignment: numerals, diacritics, punctuation, ASR noise, gate         | `story-alignment.test.ts` (decimal, year, diacritics, dropped/extra words, proportional fallback)                                                                                              | covered |
+| 11  | Scene timing: contiguous, positive, first at 0, ends at audio         | `story-timing.test.ts`                                                                                                                                                                         | covered |
+| 12  | Subtitles: line length, min duration, no overlap, script text         | `story-subtitles.test.ts`                                                                                                                                                                      | covered |
+| 13  | FFmpeg argument construction + failure handling                       | `story-ffmpeg-args.test.ts` (array form, quoting, one-pass filter graph); **`story-render.test.ts`** (real FFmpeg failure in a job path with spaces and a quote)                               | covered |
+| 14  | Manifest: stages, fingerprints, warnings, artifacts                   | `story-manifest.test.ts`                                                                                                                                                                       | covered |
+| 15  | Resume: fail mid-stage → earlier artifacts reused; invalidation       | `story-manifest.test.ts`; `story-images.test.ts` / `story-audio.test.ts` (per-scene reuse + prompt change); **smoke pass 4** (kill during S5, resume, only 2 of 4 regenerated)                 | covered |
+| 16  | Resume: config is frozen — a changed flag fails instead of re-running | `story-resume.test.ts` (stored duration wins on a dry run; `--duration` conflict throws `STORY_CONFIG_CONFLICT` with zero agent calls and an untouched manifest; execution-only flags allowed) | covered |
 
 Remaining honest gaps in the matrix:
 
@@ -587,6 +590,17 @@ refill generates only those. At 2 m 07 s for six images, a 19-scene episode is
 about 7 minutes of generation — the daily allowance, not the clock, is the
 binding constraint. Treat ~14 as the number to confirm on the next refill.
 
+**Publishing cadence.** The allowance, not the render, sets the schedule. A
+19-scene episode needs 19 successful generations, so it cannot finish in one
+free-tier day: it takes two runs (14 + 5), which is what `quota_exhausted` and
+the resume path are for. Two days per episode leaves room for at most three a
+week, and realistically **one to two** once retries, thumbnail drafts and any
+style re-test share the same allowance. That is a production limit, not a
+pipeline limit: a paid image path (Gemini API key or OpenRouter image models)
+removes the ceiling at cents per episode and is the prerequisite for a
+weekly-or-faster series. Confirm the refill number on the next reset before
+committing to a schedule.
+
 Reaching that point uncovered a real provider bug, fixed separately in
 `fix(image-provider): insert multi-line prompts without submitting at newlines`.
 The client typed the prompt with `keyboard.type()`, and Enter submits in
@@ -611,12 +625,16 @@ What the real run still does **not** prove:
    face stays "eyebrows and a mouth only" rather than dropping the face, which
    would delete the storytelling signal. The preamble itself is unchanged until
    a real image run can compare the two versions.
-2. **Listening.** Nobody has heard the MP4 in this environment. The free ASR
-   pass now proves the script words were spoken (coverage 1.00 on all six
-   chunks), but it says nothing about pacing, emphasis or whether the voice is
-   pleasant; the listening test is the reviewer's.
+2. **Listening — done.** The channel owner listened to the 40.36 s
+   `final.mp4` on 2026-10-20 and judged the narration acceptable. That is a
+   human sign-off, not a measurement: the free ASR pass proves the script words
+   were spoken (coverage 1.00 on all six chunks) but says nothing about pacing
+   or emphasis, so a listen stays on the checklist for each future episode.
 3. **Refusal handling** (the single softening retry) is still only unit-tested:
-   none of these six prompts was refused.
+   none of these six prompts was refused. Unit coverage is acceptable until the
+   Gemini quota resets, but the real refusal path — a swords/mutiny scene the
+   model declines, then the softened retry — has not run end to end and must
+   before a violent-topic episode ships.
 
 ### 6.4 Writer limits moved from feedback to the prompt
 
@@ -748,9 +766,11 @@ a gate. `STORY_ASR_VERIFY=false` skips the pass entirely. Reused chunks are
 verified in place when verification is switched on later, and `asrChecked`
 stops a resume from re-checking the same audio forever.
 
-The threshold sits between the two real measurements available (1.00 and 0.79)
-and is deliberately advisory: calibrate it against more runs before treating
-it as evidence of anything. The numeral canonicalisation is English-specific;
+The threshold sits between the two real measurements available — six chunks at
+1.00, one deliberately dropped clause at 0.79 (n = 7) — and is deliberately
+advisory. Calibrate it against the next few real narrations before treating a
+coverage number as evidence of a bad synthesis; the retry means a false
+positive costs one wasted TTS call, not a failed run. The numeral canonicalisation is English-specific;
 another language would need its own number-word rules before the coverage
 number means what it says.
 

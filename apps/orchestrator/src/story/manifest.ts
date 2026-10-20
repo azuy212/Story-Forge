@@ -16,7 +16,8 @@ export function stageFingerprint(value: unknown): string {
   return hashObject(value);
 }
 
-function toInput(config: ResolvedStoryConfig): StoryJobInput {
+/** The manifest's `input` block, derived from (and only from) the config. */
+export function toStoryInput(config: ResolvedStoryConfig): StoryJobInput {
   return {
     topic: config.topic,
     targetDurationSec: config.targetDurationSec,
@@ -33,7 +34,7 @@ export function createManifest(
   jobId: string,
 ): StoryManifest {
   const now = new Date().toISOString();
-  const input = { ...toInput(config), jobId };
+  const input = { ...toStoryInput(config), jobId };
   return {
     version: MANIFEST_VERSION,
     jobId,
@@ -52,9 +53,11 @@ export function createManifest(
 
 /**
  * Load an existing manifest for the job, or create a fresh one. An existing
- * manifest keeps its per-scene artifacts and stage records so a resume only
- * reruns work whose fingerprint changed (brief section 8). A manifest whose
- * `version` is unknown is ignored rather than silently reinterpreted.
+ * manifest keeps its per-scene artifacts, stage records AND stored config so a
+ * resume only reruns work whose fingerprint changed (brief section 8), and a
+ * new flag can never quietly invalidate them — see `reconcileResumeConfig`.
+ * A manifest whose `version` is unknown is ignored rather than silently
+ * reinterpreted.
  */
 export async function loadOrCreateManifest(
   manifestPath: string,
@@ -63,11 +66,16 @@ export async function loadOrCreateManifest(
 ): Promise<{ manifest: StoryManifest; resumed: boolean }> {
   const existing = await readJsonFile<StoryManifest>(manifestPath);
   if (existing && existing.version === MANIFEST_VERSION) {
+    // The stored config/input are the run's identity: they are what the
+    // fingerprints were computed from. They are reconciled (never overwritten)
+    // by `runStoryJob` before any stage runs.
     const manifest: StoryManifest = {
       ...existing,
       jobId,
-      input: { ...toInput(config), jobId },
-      config: { ...config, jobId },
+      input: existing.input
+        ? { ...existing.input, jobId }
+        : { ...toStoryInput(config), jobId },
+      config: { ...(existing.config ?? config), jobId },
       stages: existing.stages ?? {},
       scenes: existing.scenes ?? [],
       warnings: existing.warnings ?? [],

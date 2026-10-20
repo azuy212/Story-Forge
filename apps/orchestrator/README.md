@@ -711,6 +711,7 @@ tests/
   story-prompt.test.ts              — prompt composition, lint, style profiles
   story-ffmpeg-args.test.ts         — concat list, render args, filter graph
   story-manifest.test.ts            — fingerprints, resume, atomic writes
+  story-resume.test.ts              — frozen-config resume: stored values win, changed flags fail
   story-config.test.ts              — config precedence, input validation, paths
   story-prompts.test.ts             — prompt files render with the agent variables
   story-shared-edits.test.ts        — one regression per shared-code change
@@ -859,6 +860,22 @@ pnpm --filter youtube-shorts-orchestrator story "The mutiny on the Bounty" --job
 # force a rerun from the narration stage onwards, reusing images and chunks
 pnpm --filter youtube-shorts-orchestrator story "The mutiny on the Bounty" --job-id my-job --from S6_audio --json
 ```
+
+A resume **replays the configuration stored in the manifest**. Flags such as
+`--duration`, `--wpm`, `--style`, `--language`, `--fps` or `--resolution` are
+part of the stage fingerprints, so passing one that disagrees with the manifest
+is refused with `STORY_CONFIG_CONFLICT` (and nothing is called or written)
+instead of quietly invalidating the fingerprints and re-running paid stages:
+
+```
+$ story "…" --job-id my-job --duration 150
+Story job failed: Refusing to resume job my-job with changed flags:
+--duration (manifest: 45, requested: 150). …
+```
+
+Rerun with the stored value, or start a genuinely different run with a new
+`--job-id`. `--image-concurrency` and `--out-dir` are the exceptions: they change
+how the job runs, not what it produces, so they may change on resume.
 
 ### Tests and End-to-End Smoke
 

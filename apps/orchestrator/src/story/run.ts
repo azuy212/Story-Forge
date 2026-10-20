@@ -36,10 +36,12 @@ import {
   loadOrCreateManifest,
   saveManifest,
   stageFingerprint,
+  toStoryInput,
   updateStageMetrics,
 } from "./manifest.js";
 import { jobDir, jobPaths, styleProfilePath } from "./paths.js";
 import { composeImagePrompt, lintImagePrompt } from "./prompt.js";
+import { reconcileResumeConfig } from "./resume.js";
 import { runRenderStage } from "./render.js";
 import { runStage, type StoryRunContext } from "./runner.js";
 import {
@@ -184,10 +186,28 @@ function requireManifestStory(manifest: StoryManifest): {
 export async function runStoryJob(
   options: StoryJobOptions,
 ): Promise<StoryJobResult> {
-  const storyConfig = resolveStoryConfig(options);
-  const jobId = deriveJobId(storyConfig);
-  const config: ResolvedStoryConfig = { ...storyConfig, jobId };
+  const resolved = resolveStoryConfig(options);
+  const jobId = deriveJobId(resolved);
+  const requested: ResolvedStoryConfig = { ...resolved, jobId };
   const paths = jobPaths(jobDir(jobId, options.outputDir));
+
+  // Read the manifest BEFORE validating or resolving anything that shapes a
+  // fingerprint: a resumed job replays its stored config, and an explicit flag
+  // that disagrees with it is an error, not a silent invalidation.
+  const { manifest, resumed } = await loadOrCreateManifest(
+    paths.manifest,
+    requested,
+    jobId,
+  );
+  const config: ResolvedStoryConfig = resumed
+    ? reconcileResumeConfig({
+        stored: manifest.config,
+        requested,
+        overrides: options,
+      })
+    : requested;
+  manifest.config = { ...config };
+  manifest.input = { ...toStoryInput(config), jobId };
 
   assertStoryInput(config);
   const style = await loadStyleProfile(styleProfilePath(config.style));
@@ -197,14 +217,20 @@ export async function runStoryJob(
   await ensureDir(paths.audioChunksDir);
   await ensureDir(paths.renderDir);
 
-  const { manifest, resumed } = await loadOrCreateManifest(
-    paths.manifest,
-    config,
-    jobId,
-  );
   logger.info(
     `${resumed ? "Resuming" : "Starting"} story job ${jobId} (${paths.dir})`,
   );
+  if (resumed) {
+    logger.info("Resume uses the configuration stored in the manifest", {
+      targetDurationSec: config.targetDurationSec,
+      language: config.language,
+      style: config.style,
+      wpm: config.wpm,
+      imageConcurrency: config.imageConcurrency,
+      sceneGapMs: config.sceneGapMs,
+      asrVerify: config.asrVerify,
+    });
+  }
 
   const ctx: StoryContext = {
     manifest,
