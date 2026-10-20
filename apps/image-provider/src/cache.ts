@@ -24,6 +24,20 @@ interface CacheMetadata {
   referenceHash?: string;
 }
 
+/**
+ * Cache-key version.
+ *
+ * Bump this whenever a change alters the image a prompt produces without
+ * changing the prompt text: a delivery fix, a model swap, a UI default. The
+ * version is part of the key, so old entries stop matching instead of being
+ * served as if they came from the new pipeline.
+ *
+ * v2: prompts are now inserted with `keyboard.insertText()`. Before that fix
+ * Gemini received only the first line of a multi-line prompt, so v1 entries
+ * may hold images generated from a truncated prompt.
+ */
+const CACHE_KEY_VERSION = 'v2';
+
 export class AssetCache {
   constructor(
     private readonly logger: Logger,
@@ -37,9 +51,17 @@ export class AssetCache {
       (options.mode ?? 'text_to_image') === 'text_to_image' &&
       (options.referenceImages?.length ?? 0) === 0
     ) {
-      return createHash('sha256').update(prompt).update('\0').update(assetType).digest('hex');
+      return createHash('sha256')
+        .update(CACHE_KEY_VERSION)
+        .update('\0')
+        .update(prompt)
+        .update('\0')
+        .update(assetType)
+        .digest('hex');
     }
     return createHash('sha256')
+      .update(CACHE_KEY_VERSION)
+      .update('\0')
       .update(prompt)
       .update('\0')
       .update(assetType)

@@ -221,8 +221,11 @@ Key design decisions:
 - **No arbitrary sleep() calls** — all waits use locators, DOM mutation observers, or network events.
 - **Network response interception** — captures image and video binaries as they load, avoiding re-downloads.
 - **Blob URL support** — if Gemini serves assets as blob: URLs, fetches them via page context.
-- **Exact-match caching** — cache keys hash the exact prompt, asset type, mode,
-  and reference image contents; validation rejects mismatched metadata.
+- **Versioned cache keys** — cache keys hash a manual `CACHE_KEY_VERSION`, the
+  exact prompt, asset type, mode, and reference image contents; bump the
+  version whenever a change alters the image a prompt produces without changing
+  the prompt text (v2 invalidates entries made before multi-line prompts were
+  delivered in full). Validation rejects mismatched metadata.
 - **Lazy browser startup** — the server only launches the browser when a request misses the cache.
 - **Error detection** — scans for content policy, rate limit, and generation failure messages.
 - **Graceful shutdown** — SIGINT/SIGTERM closes browser cleanly.
