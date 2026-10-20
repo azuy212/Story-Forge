@@ -33,6 +33,10 @@ generated/
 output/
 runs/
 .langgraph_api/
+# Story-Forge stickman pipeline artifacts. Anchored to the orchestrator package
+# so any future source directory named `jobs` elsewhere in the repo is not
+# silently ignored.
+/apps/orchestrator/jobs/
 # Local/private app: runtime registry state (data/registry.json), dist, and
 # node_modules must never be tracked. Not a workspace package.
 apps/control-plane/

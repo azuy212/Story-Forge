@@ -9,6 +9,22 @@ function parsePublishAt(value: string): string | undefined {
     : new Date(parsed).toISOString();
 }
 
+/** Parse a positive finite number, falling back when unset or malformed. */
+function readPositiveNumber(name: string, fallback: number): number {
+  const raw = read(name);
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/** Parse a non-negative finite number, falling back when unset or malformed. */
+function readNonNegativeNumber(name: string, fallback: number): number {
+  const raw = read(name);
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
 export const config = {
   defaultModel: (): string => read("DEFAULT_MODEL") ?? "openai/gpt-4o-mini",
   openrouterApiKey: (): string => {
@@ -287,6 +303,66 @@ export const config = {
     const value = Number(read("SUBTITLE_OUTLINE") ?? "2");
     return Number.isFinite(value) && value >= 0 ? value : 2;
   },
+  // --- Story-Forge stickman storytelling pipeline -------------------------
+  // A separate production mode behind its own entry point
+  // (scripts/story-video.mjs). Every key is STORY_-prefixed so it can never
+  // collide with, or be inherited from, the Shorts pipeline's variables —
+  // e.g. NARRATION_GENERATION_MODE is deliberately NOT consulted here.
+  storyModel: (): string | undefined => read("STORY_LLM_MODEL") || undefined,
+  storyTargetDurationSec: (): number =>
+    readPositiveNumber("STORY_TARGET_DURATION_SEC", 150),
+  storyLanguage: (): string => read("STORY_LANGUAGE")?.trim() || "en",
+  storyTone: (): string | undefined => read("STORY_TONE") || undefined,
+  storyStyle: (): string => read("STORY_STYLE")?.trim() || "stickman-history",
+  storyTtsWpm: (): number => readPositiveNumber("STORY_TTS_WPM", 150),
+  // Gemini web automation is captcha/session sensitive, so the story pipeline
+  // defaults to one in-flight image request; raise it deliberately.
+  storyImageConcurrency: (): number =>
+    Math.max(1, Math.floor(readPositiveNumber("STORY_IMAGE_CONCURRENCY", 1))),
+  storySceneMinSec: (): number => readPositiveNumber("STORY_SCENE_MIN_SEC", 3),
+  storySceneTargetMinSec: (): number =>
+    readPositiveNumber("STORY_SCENE_TARGET_MIN_SEC", 6),
+  storySceneTargetMaxSec: (): number =>
+    readPositiveNumber("STORY_SCENE_TARGET_MAX_SEC", 12),
+  storySceneSoftMaxSec: (): number =>
+    readPositiveNumber("STORY_SCENE_SOFT_MAX_SEC", 15),
+  storyResolution: (): string =>
+    read("STORY_RESOLUTION")?.trim() || "1920x1080",
+  storyFps: (): number =>
+    Math.max(1, Math.floor(readPositiveNumber("STORY_FPS", 30))),
+  storySceneGapMs: (): number =>
+    Math.max(0, Math.floor(readNonNegativeNumber("STORY_SCENE_GAP_MS", 200))),
+  // Provider output is variable; these are the acceptance gate for a single
+  // scene still. DP4: a 1000x540 floor is reachable when the provider returns
+  // ~1024x559, and 1080p is reached by a Lanczos cover-crop upscale at render.
+  storyImageMinWidth: (): number =>
+    Math.floor(readPositiveNumber("STORY_IMAGE_MIN_WIDTH", 1000)),
+  storyImageMinHeight: (): number =>
+    Math.floor(readPositiveNumber("STORY_IMAGE_MIN_HEIGHT", 540)),
+  storyImageMinAspect: (): number =>
+    readPositiveNumber("STORY_IMAGE_MIN_ASPECT", 1.6),
+  storyImageMaxAspect: (): number =>
+    readPositiveNumber("STORY_IMAGE_MAX_ASPECT", 1.9),
+  storyTtsMaxChars: (): number =>
+    Math.floor(readPositiveNumber("STORY_TTS_MAX_CHARS", 450)),
+  // A fixed voice reference for every chunk: local per-chunk synthesis can
+  // otherwise drift in voice between chunks.
+  storyVoice: (): string => read("STORY_VOICE")?.trim() || "narrator",
+  // Optional: generate one character sheet and pass it as a reference image to
+  // every scene call (helps character consistency more than prompt text when
+  // the image provider accepts references). Off by default.
+  storyReferenceSheet: (): boolean => read("STORY_REFERENCE_SHEET") === "true",
+  storySubtitleMaxCharsPerLine: (): number =>
+    Math.floor(readPositiveNumber("STORY_SUBTITLE_MAX_CHARS_PER_LINE", 42)),
+  storySubtitleMinDurationMs: (): number =>
+    readPositiveNumber("STORY_SUBTITLE_MIN_DURATION_MS", 800),
+  storyCrf: (): number => Math.floor(readPositiveNumber("STORY_CRF", 19)),
+  storyPreset: (): string => read("STORY_PRESET")?.trim() || "medium",
+  storyJobsDir: (): string => read("STORY_JOBS_DIR")?.trim() || "jobs",
+  storyPromptsPath: (): string | undefined =>
+    read("STORY_PROMPTS_PATH")?.trim() || undefined,
+  storyReviewStoryTimeoutMs: (): number =>
+    readPositiveNumber("STORY_REVIEW_STORY_TIMEOUT_MS", 0),
   // --- Run diagnostic log file ---
   runLogFileEnabled: (): boolean => read("ORCHESTRATOR_LOG_FILE") !== "false",
   runLogMaxLineBytes: (): number => {
