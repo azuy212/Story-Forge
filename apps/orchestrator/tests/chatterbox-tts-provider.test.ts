@@ -465,4 +465,66 @@ describe("ChatterboxTTSProvider", () => {
       PipelineError,
     );
   });
+
+  // Regression guard for the additive story-pipeline option: the story
+  // pipeline measures each scene's real duration, so it asks for the raw WAV
+  // and owns pacing itself. The default path must keep normalizing.
+  it("returns the raw audio when the caller passes skipWpmNormalization", async () => {
+    const wav = makeWavBytes(24000, 32, 57840, 3);
+    fetchSpy
+      .mockResolvedValueOnce(
+        makeJsonResponse(200, {
+          status: "success",
+          file: "raw.wav",
+          url: "/audio/raw.wav",
+        }),
+      )
+      .mockResolvedValueOnce(makeBinaryResponse(200, wav));
+
+    const prevTargetWpm = process.env.NARRATION_TARGET_WPM;
+    process.env.NARRATION_TARGET_WPM = "160";
+    mockReadFile.mockClear();
+    mockRename.mockClear();
+    try {
+      const result = await provider.synthesize({
+        text: "Hello world",
+        skipWpmNormalization: true,
+      });
+      expect(result.durationMs).toBe(57840);
+      expect(mockReadFile).not.toHaveBeenCalled();
+      expect(mockRename).not.toHaveBeenCalled();
+    } finally {
+      if (prevTargetWpm === undefined) delete process.env.NARRATION_TARGET_WPM;
+      else process.env.NARRATION_TARGET_WPM = prevTargetWpm;
+    }
+  });
+
+  it("still normalizes by default when NARRATION_TARGET_WPM is set", async () => {
+    const wav = makeWavBytes(24000, 32, 57840, 3);
+    fetchSpy
+      .mockResolvedValueOnce(
+        makeJsonResponse(200, {
+          status: "success",
+          file: "speed.wav",
+          url: "/audio/speed.wav",
+        }),
+      )
+      .mockResolvedValueOnce(makeBinaryResponse(200, wav));
+
+    const prevTargetWpm = process.env.NARRATION_TARGET_WPM;
+    process.env.NARRATION_TARGET_WPM = "160";
+    mockReadFile.mockClear();
+    mockRename.mockClear();
+    try {
+      const result = await provider.synthesize({ text: "Hello world" });
+      // The normalized file replaces the raw one, so the reported duration is
+      // the re-read duration, not the provider's raw duration.
+      expect(result.durationMs).toBe(2000);
+      expect(mockReadFile).toHaveBeenCalled();
+      expect(mockRename).toHaveBeenCalled();
+    } finally {
+      if (prevTargetWpm === undefined) delete process.env.NARRATION_TARGET_WPM;
+      else process.env.NARRATION_TARGET_WPM = prevTargetWpm;
+    }
+  });
 });
