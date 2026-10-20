@@ -880,12 +880,11 @@ missing stills) and prints the real `ffprobe` output plus the S8 validation
 report.
 
 Real manifests from those runs are checked in at
-`docs/story-sample-manifest-real-media.json` (real OpenRouter story, real
-Chatterbox narration, real WhisperX alignment and a real render, with fixture
-images because the Gemini automation needs a headed login — the primary
-example), `docs/story-sample-manifest-real-llm.json` (S1–S4 only) and
-`docs/story-sample-manifest.json` (complete job with fake LLM/image providers
-but real FFmpeg, used by the smoke check), and
+`docs/story-sample-manifest-real-media.json` (every stage real: OpenRouter
+story, Gemini images, Chatterbox narration, WhisperX alignment, FFmpeg render —
+the primary example), `docs/story-sample-manifest-real-llm.json` (S1–S4 only)
+and `docs/story-sample-manifest.json` (complete job with fake LLM/image
+providers but real FFmpeg, used by the smoke check), and
 `docs/story-pipeline-report.md` records the verification results, the bugs the
 tests and the real runs caught, and the known limitations.
 

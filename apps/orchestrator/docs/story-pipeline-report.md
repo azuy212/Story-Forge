@@ -156,9 +156,9 @@ The brief's 15 areas, mapped to the suites that now cover them:
 
 Remaining honest gaps in the matrix:
 
-- **Nothing in the matrix is now unmapped**, but areas 8 and 9 are tested with
-  locally generated media, not with a real Gemini response or a real Chatterbox
-  chunk. That is a provider-fidelity gap, not a code-path gap (§6).
+- **Nothing in the matrix is now unmapped.** Areas 8 and 9 are still _tested_
+  with locally generated media so the suite runs offline, but §6.5 runs both
+  against the real providers (six Gemini images, six Chatterbox chunks).
 - The 19-scene golden fixture is a **reconstruction** of the original real
   visual plan: the original JSON was never in this repository. It reproduces
   the three documented failures (stray CJK in scene 3, the `StyleConstraints`
@@ -554,7 +554,7 @@ Manifest: `docs/story-sample-manifest-real-llm.json`.
 | **An undecodable TTS chunk surfaced as a raw ffprobe error.**                     | `story-audio.test.ts` empty-file case returned `FFprobe failed…` instead of the documented code                                         | The part probe is wrapped and rethrown as `STORY_TTS_INVALID`                                                                                                                                                        |
 | **The schemas accepted a story with no claims ledger and whitespace-only slots.** | `story-schemas.test.ts`                                                                                                                 | `claims` is required; the four required slot strings are `.trim().min(1)` so the agent harness retries at the right layer                                                                                            |
 
-### 6.3 What can and cannot run here
+### 6.3 What runs here (and what still does not)
 
 The local half of the media pipeline was installed and run for real after the
 review:
@@ -565,28 +565,39 @@ review:
 - **Transcriber:** WhisperX 3.8.6 on PyTorch 2.8 (CPU) with the wav2vec2
   alignment model, served on port 8030. Forced alignment of all six chunks took
   12 s.
-- **Render:** the real FFmpeg single-pass render produced a 40.36 s 1080p H.264
-  - AAC file in 48 s.
+- **Render:** the real FFmpeg single-pass render produced a 40.36 s 1080p
+  H.264/AAC file (30 s for the all-real run, 48 s for the earlier fixture run).
 
-Still impossible in this environment:
+**Images — real Gemini, once the browser profile was available.** The image
+provider was started on 8020 with the profile copied from the main worktree and
+reported `{"status":"ok","service":"gemini-image-provider","authenticated":true,"browserReady":true}`.
+Six real images were then generated for the six scenes in **2 m 07 s**
+(1024×572 and 1024×559, one attempt each, no refusals), so every stage of this
+run is real: OpenRouter, Gemini, Chatterbox, WhisperX and FFmpeg.
 
-- **Images.** `apps/image-provider` has no `browser-profile/` and no Gemini
-  session; `IMAGE_PROVIDER_URL` (port 8020) is not listening. Authentication is
-  a headed Google login that cannot be automated from here. S5 therefore ran
-  with a **fixture image provider** that draws one flat, deterministic panel per
-  scene (labelled `fixture-lavfi` in the manifest). Everything downstream of it
-  — validation, cut timing, render, subtitles — is real.
+Reaching that point uncovered a real provider bug, fixed separately in
+`fix(image-provider): insert multi-line prompts without submitting at newlines`.
+The client typed the prompt with `keyboard.type()`, and Enter submits in
+Gemini's composer, so a multi-line prompt was sent one paragraph per message and
+only the first line reached the model. The evidence was unambiguous: a
+2047-character story prompt produced a generic woodland illustration, and a
+direct probe showed the chat bubble containing only
+"A hand-drawn digital illustration in a simple children's storybook style."
+Replacing the keystrokes with `keyboard.insertText()` sends the prompt once; the
+same prompt then produced the intended lookout-at-the-mast image. The old path
+was also very slow (2 kB ≈ 8 minutes of keystrokes); insertion is immediate.
 
-So the following remain **unverified against real providers**:
+What the real run still does **not** prove:
 
-1. Real Gemini output size, text artifacts, refusals / the single softening
-   retry, and character consistency across scenes.
-2. How a real stickman illustration scores in the frame-vs-source comparison
-   (fixture panels are easier to tell apart than real line art; this is exactly
-   why the check is a warning, not a gate).
-3. Whether the video _sounds_ right — nobody has listened to the MP4 in this
-   environment. The alignment numbers and cue text are checked; the listening
-   test is the reviewer's.
+1. **Stickman style.** Gemini draws a consistent children's-book cartoon with
+   faces and detailed clothing, not the style profile's "simple stick figures".
+   All six scenes share one look and each depicts its prompt, but the style
+   itself is a deviation that needs a decision: accept the cartoon look, or
+   tighten the style constraints and re-test.
+2. **Listening.** Nobody has heard the MP4 in this environment. The alignment
+   numbers and cue text are checked; the listening test is the reviewer's.
+3. **Refusal handling** (the single softening retry) is still only unit-tested:
+   none of these six prompts was refused.
 
 ### 6.4 Writer limits moved from feedback to the prompt
 
@@ -615,10 +626,10 @@ The first draft's violations, if a rewrite does happen, are now recorded in
 `manifest.warnings` (previously they were only logged), so future tuning has the
 actual numbers instead of a guess.
 
-### 6.5 Real media run: S6, S7, S8 on the real story
+### 6.5 Real media run: S5–S8 on the real story
 
-S5 used fixture panels (see §6.3); S6–S8 are real. The job resumed from the
-existing S1–S4 manifest, so no LLM call was repeated.
+Every stage is a real provider call. The job resumed from the existing S1–S4
+manifest, so no LLM call was repeated.
 
 ```
 $ # services
@@ -634,6 +645,27 @@ $ pnpm --filter youtube-shorts-orchestrator story \
 
 Narration audio complete (3m 26s)
 Alignment and subtitles complete (12s)
+
+$ USE_REAL_PROVIDERS=true pnpm --filter youtube-shorts-orchestrator story \
+    ... --stages S5_images --from S5_images
+Scene images complete (2m 07s)
+
+$ pnpm --filter youtube-shorts-orchestrator story \
+    ... --stages S8_render --from S8_render
+Render and validation complete (30s)
+```
+
+**Images — real Gemini**
+
+```
+scene  size        aspect  attempts  luminance variance
+1      1024×572    1.79    1         3310
+2      1024×559    1.83    1         1874
+3      1024×572    1.79    1         1500
+4      1024×572    1.79    1         5376
+5      1024×572    1.79    1         2806
+6      1024×572    1.79    1         2829
+6 generated, 0 reused, 0 failed, 0 duplicate pairs
 ```
 
 **Audio — real Chatterbox, six scene chunks**
@@ -679,14 +711,15 @@ an accented word, _Taíno_). The cue text is the script's, e.g.:
 **Render — real single pass, real validation**
 
 ```
-format: duration=40.360000 size=1212730 bit_rate=240382
+format: duration=40.360000 size=3484175 bit_rate=690619
 video:  h264 1920x1080 yuv420p 30/1 nb_frames=1210
 audio:  aac 48000 Hz
-validation passed: 18 checks (16 gate + 2 warning scene checks per sampled scene)
-duration_matches_audio: video 40.367 s vs audio 40.360 s
+validation passed: 18 checks (12 gate + 6 warning scene checks)
+duration_matches_audio: video 40.360 s vs audio 40.360 s
 no_black_frames: no interval longer than 0.35 s (0 dark intervals seen)
 no_long_silence:  no silence longer than 1 s at -50 dB
-frame check:      own 1.000 vs closest other 0.651–0.788 (margin 0.212–0.349)
+frame check:      own 1.000 vs closest other 0.154–0.366 (margin 0.634–0.846)
+subtitle band:    2.53%–6.33% difference (gate >= 0.50%)
 ```
 
 The job was killed once mid-S8 by a harness restart. On resume, S8 reran (its
@@ -694,8 +727,9 @@ status was `running`) and S1–S7 were all reused, which is the documented crash
 behaviour; the stale `render/final.tmp.mp4` was overwritten and only the
 validated file was renamed to `final.mp4`.
 
-Manifest: `docs/story-sample-manifest-real-media.json` (S1–S4 real OpenRouter,
-S5 fixture images, S6–S8 real).
+Manifest: `docs/story-sample-manifest-real-media.json` — every stage real
+(OpenRouter story, Gemini images, Chatterbox narration, WhisperX alignment,
+FFmpeg render).
 
 ## 7. Known limitations and deliberate choices
 
@@ -722,6 +756,17 @@ S5 fixture images, S6–S8 real).
 7. **Prompt versioning.** Story prompts are pinned to v1 independently of
    `PROMPT_VERSION`; changing a prompt changes the stage fingerprint and
    regenerates only the affected artifacts.
+8. **Style fidelity.** The style profile asks for "simple stick figures", but
+   Gemini's current image model returns a detailed children's-book cartoon with
+   faces and clothing (§6.5). It is consistent across scenes and follows each
+   scene's action, but it is not stickman art. This is the largest open product
+   decision, not a code defect.
+9. **Resolution.** The provider returns 1024×559–572 stills regardless of the
+   1920×1080 request in the prompt; the render upscales them, so frames are
+   slightly soft. The `>= 1000×540` gate is what the provider can actually meet.
+10. **Provider cache is keyed by prompt.** A cached image is returned even after
+    a prompt-level fix, so verifying a prompt change requires clearing
+    `apps/image-provider/cache/` (this bit during the Gemini rerun in §6.3).
 
 ## 8. Reproduce
 
