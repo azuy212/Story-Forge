@@ -1,0 +1,474 @@
+{
+  "jobId": "golden-columbus-19",
+  "note": "Regression fixture built from a real 19-scene Columbus visual plan. Scene 3 carries a stray CJK character, scene 13 leaks the StyleConstraints field name into a slot, and the narration uses three unexplained hard words (mutiny, Genoese, uncharted).",
+  "story": "Columbus stood on the deck of a small wooden ship. The crew had not seen land for many days. They were tired, hungry, and very afraid. Some sailors began to talk about a mutiny, and their voices grew loud. Genoa was his home, and Genoese ships were his life. He wanted to reach Asia by sailing west across the ocean. Most scholars thought the sea was too wide for such a voyage. He asked the king and queen of Spain for ships and money. They refused him at first, then changed their minds. In August of fourteen ninety-two, three ships left the harbour. The voyage was long, and the wind fell still for days. The sailors watched an uncharted sea stretch to the horizon. Columbus kept two logs, one for the crew and one for himself. A small bird flew past the ship and the crew took hope. On the twelfth of October, a sailor called out that he saw land. They reached an island where people already lived. Columbus named the island San Salvador and claimed it for Spain. He sailed on to other islands, still sure he had reached Asia. He never found the gold cities he promised, but the world he opened changed everything.",
+  "claims": [
+    {
+      "claim": "Columbus was born in Genoa and sailed for Spain.",
+      "status": "established",
+      "hedgeInNarration": false
+    },
+    {
+      "claim": "The voyage left Spain in August 1492 with three ships.",
+      "status": "established",
+      "hedgeInNarration": false
+    },
+    {
+      "claim": "The crew came close to mutiny during the long crossing.",
+      "status": "disputed",
+      "hedgeInNarration": false
+    },
+    {
+      "claim": "Columbus promised gold cities and never found them.",
+      "status": "disputed",
+      "hedgeInNarration": false
+    }
+  ],
+  "characters": [
+    {
+      "id": "columbus",
+      "name": "Columbus",
+      "role": "the captain",
+      "visualDescription": "stickman in a long dark-red captain's coat, flat black cap, rolled chart under one arm"
+    },
+    {
+      "id": "the_crew",
+      "name": "The crew",
+      "role": "the sailors",
+      "visualDescription": "three stickmen in rough linen shirts with rope belts and bare feet"
+    },
+    {
+      "id": "the_monarchs",
+      "name": "The monarchs",
+      "role": "the king and queen of Spain",
+      "visualDescription": "a king in a crimson cloak with a gold chain, and a queen in a deep-blue gown with a small crown"
+    },
+    {
+      "id": "islanders",
+      "name": "The islanders",
+      "role": "the people already living on the island",
+      "visualDescription": "stickmen in simple woven tunics with shell necklaces, standing calmly"
+    }
+  ],
+  "scenes": [
+    {
+      "sceneId": 1,
+      "narration": "Columbus stood on the deck of a small wooden ship.",
+      "slots": {
+        "sceneId": 1,
+        "action": "Columbus stands at the helm of a small wooden ship, one hand on the wheel.",
+        "characters": [
+          {
+            "id": "columbus",
+            "pose": "standing upright at the helm",
+            "expression": "calm, eyes forward"
+          }
+        ],
+        "setting": "the deck of a small wooden sailing ship on open water",
+        "props": ["a wooden wheel", "coiled rope", "a tall mast"],
+        "lighting": "warm morning sunlight across the deck",
+        "composition": "wide horizontal framing from behind the helm, captain on the left third, open sea to the right",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 2,
+      "narration": "The crew had not seen land for many days.",
+      "slots": {
+        "sceneId": 2,
+        "action": "Three sailors lean on the rail and stare at an empty horizon.",
+        "characters": [
+          {
+            "id": "the_crew",
+            "pose": "leaning on the rail, shoulders low",
+            "expression": "tired, mouths flat"
+          }
+        ],
+        "setting": "the side of the ship with nothing but water beyond",
+        "props": ["a wooden rail", "a frayed rope"],
+        "lighting": "flat grey afternoon light",
+        "composition": "wide side view, sailors small in the left half, empty sea filling the right",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 3,
+      "narration": "They were tired, hungry, and very afraid.",
+      "slots": {
+        "sceneId": 3,
+        "action": "The sailors sit in a huddle on the deck with an empty bowl between them.",
+        "characters": [
+          {
+            "id": "the_crew",
+            "pose": "sitting with knees drawn up",
+            "expression": "worried eyebrows, downturned mouths"
+          }
+        ],
+        "setting": "the crowded deck at dusk, sails slack overhead",
+        "props": ["an empty wooden bowl", "a torn sail"],
+        "lighting": "dim blue evening light with one warm lamp",
+        "composition": "wide horizontal framing from the bow, the sailors grouped left, calm deck boards across the lower third 背景",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 4,
+      "narration": "Some sailors began to talk about a mutiny, and their voices grew loud.",
+      "slots": {
+        "sceneId": 4,
+        "action": "Two sailors argue face to face while a third grips the rail and listens.",
+        "characters": [
+          {
+            "id": "the_crew",
+            "pose": "one pointing, one with fists at his sides",
+            "expression": "angry eyebrows, open mouths"
+          },
+          {
+            "id": "columbus",
+            "pose": "standing apart with arms folded",
+            "expression": "steady, jaw set"
+          }
+        ],
+        "setting": "the narrow deck between the mast and the cabin door",
+        "props": ["a lantern swinging from a hook", "a coil of rope"],
+        "lighting": "lantern light in the gathering dark",
+        "composition": "wide side view, the argument on the right, the captain isolated on the left",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 5,
+      "narration": "Genoa was his home, and Genoese ships were his life.",
+      "slots": {
+        "sceneId": 5,
+        "action": "Columbus stands on a stone quay beside a moored ship, looking back at the harbour town.",
+        "characters": [
+          {
+            "id": "columbus",
+            "pose": "standing with a chart under one arm",
+            "expression": "thoughtful, eyebrows slightly raised"
+          }
+        ],
+        "setting": "a stone harbour quay with narrow houses climbing behind it",
+        "props": ["a rolled chart", "stone bollards", "a moored ship"],
+        "lighting": "soft early light with long shadows",
+        "composition": "wide horizontal framing from the water, town behind the captain on the right",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 6,
+      "narration": "He wanted to reach Asia by sailing west across the ocean.",
+      "slots": {
+        "sceneId": 6,
+        "action": "Columbus unrolls a chart on a table and traces a line west with one finger.",
+        "characters": [
+          {
+            "id": "columbus",
+            "pose": "leaning over the table, finger on the chart",
+            "expression": "focused, eyebrows lowered"
+          }
+        ],
+        "setting": "a small map room with a shuttered window",
+        "props": [
+          "a chart with abstract coastline marks",
+          "a brass compass",
+          "a candle"
+        ],
+        "lighting": "one candle and a thin bar of daylight",
+        "composition": "wide horizontal framing across the table, chart across the lower half, captain on the left",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 7,
+      "narration": "Most scholars thought the sea was too wide for such a voyage.",
+      "slots": {
+        "sceneId": 7,
+        "action": "Three scholars in long robes stand around a globe and shake their heads.",
+        "characters": [],
+        "setting": "a stone hall with shelves of rolled maps",
+        "props": ["a large globe", "rolled maps", "a wooden lectern"],
+        "lighting": "cool daylight from a high window",
+        "composition": "wide horizontal framing, globe at the centre, scholars spread across the frame",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 8,
+      "narration": "He asked the king and queen of Spain for ships and money.",
+      "slots": {
+        "sceneId": 8,
+        "action": "Columbus kneels before two seated monarchs and offers a rolled chart.",
+        "characters": [
+          {
+            "id": "columbus",
+            "pose": "kneeling, one arm extended",
+            "expression": "hopeful eyebrows, small smile"
+          },
+          {
+            "id": "the_monarchs",
+            "pose": "seated side by side on thrones",
+            "expression": "neutral, the king with one raised eyebrow"
+          }
+        ],
+        "setting": "a royal hall with stone arches and hanging tapestries",
+        "props": [
+          "a rolled chart with abstract line marks",
+          "two tall thrones"
+        ],
+        "lighting": "warm light from tall windows",
+        "composition": "wide side view, monarchs on the right third, captain in the midground",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 9,
+      "narration": "They refused him at first, then changed their minds.",
+      "slots": {
+        "sceneId": 9,
+        "action": "A court official turns Columbus away at a closed door, while behind it the queen raises one hand.",
+        "characters": [
+          {
+            "id": "columbus",
+            "pose": "standing with the chart held against his chest",
+            "expression": "disappointed, eyebrows raised"
+          },
+          {
+            "id": "the_monarchs",
+            "pose": "the queen half turned in her chair",
+            "expression": "thoughtful"
+          }
+        ],
+        "setting": "a corridor outside the royal chamber",
+        "props": ["a heavy wooden door", "a rolled chart"],
+        "lighting": "dim corridor light with a bright seam under the door",
+        "composition": "wide horizontal framing, the closed door in the centre, figures on either side",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 10,
+      "narration": "In August of fourteen ninety-two, three ships left the harbour.",
+      "slots": {
+        "sceneId": 10,
+        "action": "Three ships under full sail move out of a busy harbour toward open water.",
+        "characters": [],
+        "setting": "a wide harbour mouth with a stone tower on the cliff",
+        "props": ["three sailing ships", "a stone tower", "small rowing boats"],
+        "lighting": "bright morning sun on the water",
+        "composition": "wide landscape, ships crossing left to right, tower small on the right edge",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 11,
+      "narration": "The voyage was long, and the wind fell still for days.",
+      "slots": {
+        "sceneId": 11,
+        "action": "The ship sits motionless on a glassy sea, sails hanging loose.",
+        "characters": [
+          {
+            "id": "the_crew",
+            "pose": "slumped in the shade of the mast",
+            "expression": "bored and hot"
+          }
+        ],
+        "setting": "a flat calm ocean with no land in sight",
+        "props": ["loose sails", "a bucket on the deck"],
+        "lighting": "hard white midday sun",
+        "composition": "wide horizontal framing, ship small in the centre, huge empty sky above",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 12,
+      "narration": "The sailors watched an uncharted sea stretch to the horizon.",
+      "slots": {
+        "sceneId": 12,
+        "action": "Sailors line the rail and look out at an endless plain of water.",
+        "characters": [
+          {
+            "id": "the_crew",
+            "pose": "shoulders against the rail, heads turned outward",
+            "expression": "uneasy, eyes wide"
+          }
+        ],
+        "setting": "the ship's rail with open ocean beyond",
+        "props": ["a wooden rail", "a hanging lantern"],
+        "lighting": "cool overcast light",
+        "composition": "wide low angle over the rail, water filling two thirds of the frame",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 13,
+      "narration": "Columbus kept two logs, one for the crew and one for himself.",
+      "slots": {
+        "sceneId": 13,
+        "action": "StyleConstraints: a sailor writes in a heavy logbook while Columbus watches from the rail",
+        "characters": [
+          {
+            "id": "columbus",
+            "pose": "standing at the rail, half turned",
+            "expression": "guarded, one eyebrow raised"
+          },
+          {
+            "id": "the_crew",
+            "pose": "seated at a small table with a quill",
+            "expression": "concentrating"
+          }
+        ],
+        "setting": "the captain's cabin with a small stern window",
+        "props": [
+          "two open logbooks",
+          "a quill and ink pot",
+          "a swinging lamp"
+        ],
+        "lighting": "warm lamp light with blue dusk at the window",
+        "composition": "wide horizontal framing across the table, one logbook in shadow, one in light",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 14,
+      "narration": "A small bird flew past the ship and the crew took hope.",
+      "slots": {
+        "sceneId": 14,
+        "action": "A small bird lands on the yardarm while sailors point up and smile.",
+        "characters": [
+          {
+            "id": "the_crew",
+            "pose": "one pointing upward, others looking up",
+            "expression": "surprised smiles"
+          }
+        ],
+        "setting": "the deck under the rigging in the early morning",
+        "props": ["rigging ropes", "a small bird", "a wooden bucket"],
+        "lighting": "pale gold dawn light",
+        "composition": "wide horizontal framing, bird high on the left, sailors low on the right",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 15,
+      "narration": "On the twelfth of October, a sailor called out that he saw land.",
+      "slots": {
+        "sceneId": 15,
+        "action": "A sailor leans far over the bow with one arm stretched toward a dark line on the horizon.",
+        "characters": [
+          {
+            "id": "the_crew",
+            "pose": "leaning over the bow, arm raised",
+            "expression": "mouth open, eyebrows high"
+          },
+          {
+            "id": "columbus",
+            "pose": "running toward the bow",
+            "expression": "wide eyes"
+          }
+        ],
+        "setting": "the bow of the ship at first light",
+        "props": ["the bowsprit", "a coil of rope"],
+        "lighting": "grey-blue pre-dawn light with a thin bright horizon",
+        "composition": "wide horizontal framing from behind the sailors, dark land a narrow band on the right",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 16,
+      "narration": "They reached an island where people already lived.",
+      "slots": {
+        "sceneId": 16,
+        "action": "Sailors step from a small boat onto a beach where a group of islanders stands waiting.",
+        "characters": [
+          {
+            "id": "the_crew",
+            "pose": "standing in the shallows beside the boat",
+            "expression": "uncertain, eyebrows raised"
+          },
+          {
+            "id": "islanders",
+            "pose": "standing calmly in a loose group",
+            "expression": "curious, neutral"
+          }
+        ],
+        "setting": "a pale sand beach with palms and low green hills behind",
+        "props": ["a wooden rowing boat", "palm trees", "fishing nets"],
+        "lighting": "bright tropical morning light",
+        "composition": "wide horizontal framing, islanders on the right third, sailors entering from the left",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 17,
+      "narration": "Columbus named the island San Salvador and claimed it for Spain.",
+      "slots": {
+        "sceneId": 17,
+        "action": "Columbus plants a banner in the sand while the crew and islanders watch.",
+        "characters": [
+          {
+            "id": "columbus",
+            "pose": "standing straight, both hands on the banner pole",
+            "expression": "solemn"
+          },
+          {
+            "id": "the_crew",
+            "pose": "standing in a line behind him",
+            "expression": "quiet"
+          },
+          {
+            "id": "islanders",
+            "pose": "watching from a few steps away",
+            "expression": "still, watchful"
+          }
+        ],
+        "setting": "the same beach, seen from a little further back",
+        "props": ["a plain banner", "a wooden cross", "palm trees"],
+        "lighting": "bright midday light",
+        "composition": "wide horizontal framing, banner at the centre, both groups balanced left and right",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 18,
+      "narration": "He sailed on to other islands, still sure he had reached Asia.",
+      "slots": {
+        "sceneId": 18,
+        "action": "Columbus stands at the bow of the ship with a chart, looking toward a green island on the horizon.",
+        "characters": [
+          {
+            "id": "columbus",
+            "pose": "standing at the bow with the chart open",
+            "expression": "confident, chin lifted"
+          }
+        ],
+        "setting": "the bow of the ship with a chain of green islands ahead",
+        "props": ["an open chart with abstract marks", "the bowsprit"],
+        "lighting": "warm late afternoon light",
+        "composition": "wide horizontal framing, islands small along the right horizon, captain on the left",
+        "metaphor": false
+      }
+    },
+    {
+      "sceneId": 19,
+      "narration": "He never found the gold cities he promised, but the world he opened changed everything.",
+      "slots": {
+        "sceneId": 19,
+        "action": "An older Columbus sits alone on a stone step with an unrolled chart across his knees, a busy harbour behind him.",
+        "characters": [
+          {
+            "id": "columbus",
+            "pose": "seated, shoulders rounded, chart on his knees",
+            "expression": "tired, eyes down"
+          }
+        ],
+        "setting": "a harbour town at dusk with ships and masts behind him",
+        "props": ["an unrolled chart", "a stone step", "distant masts"],
+        "lighting": "warm fading light with long blue shadows",
+        "composition": "wide horizontal framing, the seated figure small in the left third, harbour depth behind",
+        "metaphor": false
+      }
+    }
+  ]
+}
