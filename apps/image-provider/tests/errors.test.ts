@@ -55,6 +55,10 @@ describe('classifyGeminiError', () => {
       "You've reached your limit for today",
       'Daily limit reached, try again tomorrow',
       'Out of generations for now',
+      // Verbatim from the Images surface: it states the limit as an assurance,
+      // which read as "not a limit" until it was added here.
+      'I can create more images as soon as your limit resets. Check your usage in Settings.',
+      'as soon as your limit resets',
     ]) {
       assert.equal(classifyGeminiError(message), 'quota_exhausted', message);
       assert.equal(isRetryableType('quota_exhausted'), false, message);
@@ -73,6 +77,7 @@ describe('classifyGeminiError', () => {
     for (const message of [
       'Image generation failed, please try again',
       'Something went wrong while generating',
+      'I seem to be encountering an error. Can I try something else for you?',
     ]) {
       assert.equal(classifyGeminiError(message), 'server_error', message);
       assert.equal(isRetryableType(classifyGeminiError(message)), true);

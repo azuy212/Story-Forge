@@ -89,6 +89,10 @@ const CLASSIFIER: ReadonlyArray<{ type: ProviderErrorType; patterns: string[] }>
       'limit for this',
       'out of generations',
       'try again tomorrow',
+      // The Images surface phrases it as an assurance rather than a limit.
+      'limit resets',
+      'create more images',
+      'usage in settings',
     ],
   },
   {
@@ -119,6 +123,7 @@ const CLASSIFIER: ReadonlyArray<{ type: ProviderErrorType; patterns: string[] }>
       'failed to generate',
       'something went wrong',
       'encountered an error',
+      'encountering an error',
       'not available',
       'unavailable',
     ],

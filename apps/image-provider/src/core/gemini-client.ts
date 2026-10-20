@@ -7,11 +7,21 @@ import { AssetDownloader } from '../storage/asset-downloader.js';
 import { AssetCache } from '../storage/cache.js';
 import { MediaCollector } from './media-collector.js';
 import { GeminiErrorDetector } from './gemini-error-detector.js';
+import { normalizeImagesPrompt } from './prompt-text.js';
 import { uploadReferenceImages } from './reference-upload.js';
 import type { AssetType, GenerationOptions, GenerationResult, MediaAsset } from './types.js';
 
 // Re-exported so existing consumers of this module keep working.
 export { assertReferenceUploadCount, uploadReferenceImages } from './reference-upload.js';
+
+/**
+ * The Images surface's composer. Gemini moved image creation off the tools menu
+ * onto `gemini.google.com/images`, reached through the sidebar entry; for
+ * accounts on that UI the menu's "Create image" item is permanently disabled,
+ * which is why a disabled entry alone must not be read as a spent quota.
+ */
+const IMAGES_COMPOSER = '[data-placeholder="Describe your image"]';
+const IMAGES_PAGE_TIMEOUT_MS = 20000;
 
 export class GeminiClient {
   private context: BrowserContext | null = null;
@@ -89,23 +99,48 @@ export class GeminiClient {
 
     this.logger.info('Waiting for manual sign-in in the opened browser...');
 
-    await this.page.waitForFunction(
-      () => {
-        const sel = '[contenteditable="true"], textarea, [role="textbox"]';
-        return document.querySelectorAll(sel).length > 0;
-      },
-      { timeout: this.config.authenticationTimeout },
-    );
+    // Poll instead of waiting on one selector: a signed-out page and a
+    // signed-in page both render a composer, so the composer cannot be the
+    // signal. `isAuthenticated` is account-aware and this loop only exits once
+    // it agrees the session is usable.
+    const deadline = Date.now() + this.config.authenticationTimeout;
+    while (Date.now() < deadline) {
+      if (await this.isAuthenticated()) {
+        this.logger.info('Authentication confirmed');
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
 
-    this.logger.info('Authentication confirmed');
+    throw new ProviderError(
+      'Timed out waiting for Gemini sign-in',
+      'authentication',
+      'no Google account chip appeared',
+    );
   }
 
+  /**
+   * A signed-out Gemini still renders an anonymous composer, so "there is a
+   * textbox" is not an authentication check. That mattered twice: `login`
+   * returned immediately instead of waiting for one, and the disabled
+   * "Create image" entry of an anonymous session was reported as a spent
+   * quota. Signed-in sessions carry the Google account chip; signed-out ones
+   * show a sign-in prompt and no chip.
+   */
   private async isAuthenticated(): Promise<boolean> {
     if (!this.page) return false;
     try {
       return await this.page.evaluate(() => {
-        const sel = '[contenteditable="true"], textarea, [role="textbox"]';
-        return document.querySelectorAll(sel).length > 0;
+        if (document.querySelector('[aria-label*="Google Account"]')) return true;
+        if (document.querySelector('a[href*="accounts.google.com/ServiceLogin"]')) {
+          return false;
+        }
+        if (/sign in to save activity/i.test(document.body.innerText)) return false;
+        // No explicit marker either way (Google changed the chrome): keep the
+        // old behaviour rather than blocking every run on an unknown selector.
+        return (
+          document.querySelector('[contenteditable="true"], textarea, [role="textbox"]') !== null
+        );
       });
     } catch {
       return false;
@@ -318,11 +353,25 @@ export class GeminiClient {
           : await this.media.snapshotImageSrcs();
 
       const input = await this.resolveInput();
-      await input.focus().catch(() => this.focusInput());
-      await input.fill('');
+      // Clear and type through the keyboard only. `Locator.fill()` resets a
+      // contenteditable's text without moving the editor's internal selection,
+      // and on the Images composer that left `insertText` with nowhere to go:
+      // the prompt was never submitted and the run polled an empty page.
+      await input.click().catch(() => this.focusInput());
       await this.page.keyboard.press('ControlOrMeta+A').catch(() => {});
       await this.page.keyboard.press('Backspace').catch(() => {});
-      await this.page.keyboard.type(prompt, { delay: 15 });
+      // Insert the prompt as text, not as keystrokes: Gemini's composer submits
+      // on Enter, so `keyboard.type()` sends a multi-line prompt as several
+      // messages and only the first line reaches the model. It is also an
+      // order of magnitude faster for the ~2 kB prompts the story pipeline
+      // composes.
+      //
+      // The Images surface additionally rejects a prompt shaped as several
+      // editor blocks ("I seem to be encountering an error"), so flatten line
+      // breaks there. The chat composer keeps its paragraphs.
+      const placeholder = await input.getAttribute('data-placeholder').catch(() => null);
+      const text = placeholder === 'Describe your image' ? normalizeImagesPrompt(prompt) : prompt;
+      await this.page.keyboard.insertText(text);
 
       const submitted = await this.submitPrompt(input);
       if (!submitted) throw new Error('Could not submit prompt');
@@ -332,7 +381,14 @@ export class GeminiClient {
           ? await this.media.collectVideos(responseCache, oldSrcs)
           : await this.media.collectImages(responseCache, oldSrcs);
       if (buffers.length === 0) {
-        const errorMsg = await this.errorDetector.detectGenerationError();
+        // The UI renders its failure text a beat after the spinner stops, so a
+        // single read races the message and reports a bare "nothing generated".
+        let errorMsg = await this.errorDetector.detectGenerationError();
+        const deadline = Date.now() + 10000;
+        while (!errorMsg && Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 1000));
+          errorMsg = await this.errorDetector.detectGenerationError();
+        }
         const failure = new ProviderError(
           errorMsg || `No ${assetType} generated`,
           classifyGeminiError(errorMsg ?? ''),
@@ -394,6 +450,20 @@ export class GeminiClient {
   private async selectCreateMode(assetType: AssetType): Promise<void> {
     if (!this.page) throw new Error('Page closed');
 
+    // Image creation moved to the dedicated Images surface, which has its own
+    // composer ("Describe your image") and no tools-menu entry. Use it when it
+    // renders; the menu path below stays as the fallback for accounts or
+    // locales where that surface is not served.
+    //
+    // Checked before the cached-mode shortcut: a finished generation navigates
+    // to its conversation, so the composer that was live for the previous
+    // request is gone even though the mode flag still says "image".
+    if (assetType === 'image' && (await this.enterImagesPage())) {
+      this._createModeActive.add(assetType);
+      this.logger.debug('Using the Gemini Images composer');
+      return;
+    }
+
     if (this._createModeActive.has(assetType)) {
       this.logger.debug('Create mode already active (cached)', { assetType });
       return;
@@ -432,8 +502,15 @@ export class GeminiClient {
       // only the missing scenes are generated.
       if (await this.isDisabled(item)) {
         await this.page.keyboard.press('Escape').catch(() => {});
+        if (!(await this.isAuthenticated())) {
+          throw new ProviderError(
+            'Gemini is signed out; sign in before generating images',
+            'authentication',
+            'sign-in prompt visible in the browser',
+          );
+        }
         throw new ProviderError(
-          `Gemini ${label} is disabled; the account image quota looks exhausted`,
+          `Gemini ${label} is disabled and the Images page did not load; the account allowance may be spent or Gemini's UI changed`,
           'quota_exhausted',
           'menu item reported aria-disabled=true',
         );
@@ -459,6 +536,47 @@ export class GeminiClient {
     );
   }
 
+  /**
+   * Enter the Images surface and report whether its composer is ready.
+   *
+   * `/images` is a client-side route — a direct load redirects to `/app` — so
+   * entering it means clicking the sidebar entry and waiting for the composer.
+   * When the surface is not served to this account the click is a no-op (or a
+   * redirect) and the caller falls back to the tools menu.
+   */
+  private async enterImagesPage(): Promise<boolean> {
+    if (!this.page) return false;
+    const composer = this.page.locator(IMAGES_COMPOSER).first();
+
+    if (await composer.isVisible().catch(() => false)) return true;
+
+    const entries = this.page.locator('a[href="/images"]');
+    // The sidebar hydrates after the chat shell; clicking before it is mounted
+    // (or before the SPA has attached its router) leaves the page on /app.
+    await entries
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {});
+
+    const count = await entries.count();
+    for (let i = 0; i < count; i += 1) {
+      const entry = entries.nth(i);
+      if (!(await entry.isVisible().catch(() => false))) continue;
+      await entry.click({ timeout: 5000 }).catch(() => {});
+      break;
+    }
+
+    const ready = await composer
+      .waitFor({ state: 'visible', timeout: IMAGES_PAGE_TIMEOUT_MS })
+      .then(() => true)
+      .catch(() => false);
+
+    if (!ready) {
+      this.logger.warn('Gemini Images page did not render; falling back to the tools menu');
+    }
+    return ready;
+  }
+
   /** Playwright's isDisabled() ignores aria-disabled on menu items. */
   private async isDisabled(locator: Locator): Promise<boolean> {
     return locator
@@ -475,6 +593,11 @@ export class GeminiClient {
 
   private async resolveInput(): Promise<Locator> {
     if (!this.page) throw new Error('Page closed');
+
+    // The Images composer first: the generic selector can land on the hidden
+    // Quill clipboard on that surface.
+    const imagesComposer = this.page.locator(IMAGES_COMPOSER).first();
+    if (await imagesComposer.isVisible().catch(() => false)) return imagesComposer;
 
     const sel = ['[contenteditable="true"]', 'textarea', '[role="textbox"]'].join(', ');
 
@@ -500,15 +623,24 @@ export class GeminiClient {
 
     if (cleared) return true;
 
-    const labeled = this.page
-      .locator('button[aria-label]')
-      .filter({ hasText: /\b(Send|Submit|Generate|Create)\b/i })
-      .last();
-    const labeledEnabled = await labeled.isEnabled().catch(() => false);
-    if (labeledEnabled) {
-      await labeled.click();
+    // Match on aria-label, not inner text: the submit controls are icon-only.
+    const sendPattern = /(send|submit|generate|create)/i;
+    const buttons = this.page.locator('button[aria-label]');
+    const count = await buttons.count();
+    for (let i = count - 1; i >= 0; i -= 1) {
+      const button = buttons.nth(i);
+      const label = (await button.getAttribute('aria-label').catch(() => null)) ?? '';
+      if (!sendPattern.test(label)) continue;
+      if (!(await button.isVisible().catch(() => false))) continue;
+      if (!(await button.isEnabled().catch(() => false))) continue;
+      await button.click();
       return true;
     }
+
+    // The generic icon fallback clicks the last button on the page, which on
+    // the Images surface is the microphone. Only use it on the chat surface.
+    const placeholder = await input.getAttribute('data-placeholder').catch(() => null);
+    if (placeholder === 'Describe your image') return false;
 
     const iconBtn = this.page.locator('button').filter({ hasNotText: /\S/ }).last();
     const iconEnabled = await iconBtn.isEnabled().catch(() => false);

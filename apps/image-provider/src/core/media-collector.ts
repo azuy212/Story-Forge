@@ -190,13 +190,25 @@ export class MediaCollector {
     if (!page) return [];
     const selector = kind === 'images' ? 'img' : 'video, video source';
     return page.evaluate((sel) => {
-      return Array.from(document.querySelectorAll(sel))
-        .map((el) => {
-          const node = el as HTMLImageElement & HTMLVideoElement & HTMLSourceElement;
-          const src = node.currentSrc || node.src || '';
-          return src;
-        })
-        .filter((s) => s && s.length > 0 && !s.startsWith('data:'));
+      return (
+        Array.from(document.querySelectorAll(sel))
+          // Chrome icons and avatars are smaller than any generated image; a
+          // 32px avatar arriving late must not end the poll before the result
+          // exists.
+          .filter((el) => {
+            if (sel !== 'img') return true;
+            const img = el as HTMLImageElement;
+            return (
+              (img.naturalWidth || img.width) >= 100 && (img.naturalHeight || img.height) >= 100
+            );
+          })
+          .map((el) => {
+            const node = el as HTMLImageElement & HTMLVideoElement & HTMLSourceElement;
+            const src = node.currentSrc || node.src || '';
+            return src;
+          })
+          .filter((s) => s && s.length > 0 && !s.startsWith('data:'))
+      );
     }, selector);
   }
 
