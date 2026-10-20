@@ -218,7 +218,8 @@ describe("runImageStage", () => {
           normalizeImageGenerationError({
             provider: "fake",
             type: "quota_exhausted",
-            message: "Gemini Create image is disabled; the account image quota looks exhausted",
+            message:
+              "Gemini Create image is disabled; the account image quota looks exhausted",
             originalPrompt: prompt,
             sceneId,
           }),
@@ -245,9 +246,9 @@ describe("runImageStage", () => {
     expect(result.quotaExhausted).toBe(true);
     expect(result.failed).toHaveLength(1);
     expect(scenes[0].status.image).toBe("failed");
-    expect(scenes.slice(1).every((entry) => entry.status.image === "pending")).toBe(
-      true,
-    );
+    expect(
+      scenes.slice(1).every((entry) => entry.status.image === "pending"),
+    ).toBe(true);
     expect(scenes[0].warnings.join(" ")).toContain("quota");
   });
 

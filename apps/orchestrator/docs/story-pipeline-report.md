@@ -564,7 +564,9 @@ review:
   generated in 3 m 26 s on CPU.
 - **Transcriber:** WhisperX 3.8.6 on PyTorch 2.8 (CPU) with the wav2vec2
   alignment model, served on port 8030. Forced alignment of all six chunks took
-  12 s; the free ASR verification pass (§ below) adds ~15 s per chunk on CPU.
+  12 s; the free ASR verification pass (§ below) adds ~30 s per chunk on CPU
+  when it has to transcribe from scratch (3 m 00 s for six already-synthesized
+  chunks in the latest S6 rerun).
 - **Render:** the real FFmpeg single-pass render produced a 40.36 s 1080p
   H.264/AAC file (30 s for the all-real run, 48 s for the earlier fixture run).
 
@@ -645,8 +647,12 @@ $ pnpm --filter youtube-shorts-orchestrator story \
     --duration 45 --job-id real-llm-probe-c --out-dir /tmp/opencode/story-real4c \
     --stages S6_audio,S7_align
 
-Narration audio complete (3m 26s)
-Alignment and subtitles complete (1m 34s; includes the free ASR pass)
+Narration audio complete (3m 26s; includes the free ASR pass)
+Alignment and subtitles complete (1m 34s)
+
+$ # enabling verification on an existing job re-checks the chunks in place
+$ pnpm --filter youtube-shorts-orchestrator story ... --from S6_audio
+Narration audio complete (3m 00s for six chunks; no re-synthesis needed)
 
 $ USE_REAL_PROVIDERS=true pnpm --filter youtube-shorts-orchestrator story \
     ... --stages S5_images --from S5_images
@@ -712,14 +718,26 @@ an accented word, _Taíno_). The cue text is the script's, e.g.:
 
 **Narration fidelity — one free ASR pass per chunk.** Forced alignment matches
 the text it is given, so `matchRatio = 1` cannot prove the TTS actually said
-every word. S7 therefore sends each chunk to the transcriber _again_, without
-the script, and compares the free transcript to the narration
-(`narrationFidelity`, same token matcher). All six real chunks measure
-`coverage = 1.000` once spoken and written numbers are canonicalised ("October
-eleventh" vs "October 11", "fourteen ninety-two" vs "1492"); a deliberately
-dropped clause lands at 0.79. Coverage below `ASR_COVERAGE_WARN = 0.85` is a
-warning, never a gate, and `STORY_ASR_VERIFY=false` skips the extra pass (it
-doubles transcriber calls — 15 s per chunk on this CPU).
+every word. S6 therefore sends each finished chunk to the transcriber _again_,
+without the script, and compares the free transcript to the narration
+(`narrationFidelity`, same token matcher) while the TTS call is still the
+freshest thing in the stage — that placement is what makes the retry below
+possible. All six real chunks measure `coverage = 1.000` once spoken and
+written numbers are canonicalised ("October eleventh" vs "October 11",
+"fourteen ninety-two" vs "1492"); a deliberately dropped clause lands at 0.79.
+
+A chunk below `ASR_COVERAGE_WARN = 0.85` is synthesized once more (same text,
+same voice) and re-measured before anything is recorded; only a chunk that is
+still below the line after that retry keeps a warning, and the warning is never
+a gate. `STORY_ASR_VERIFY=false` skips the pass entirely. Reused chunks are
+verified in place when verification is switched on later, and `asrChecked`
+stops a resume from re-checking the same audio forever.
+
+The threshold sits between the two real measurements available (1.00 and 0.79)
+and is deliberately advisory: calibrate it against more runs before treating
+it as evidence of anything. The numeral canonicalisation is English-specific;
+another language would need its own number-word rules before the coverage
+number means what it says.
 
 **Render — real single pass, real validation**
 
@@ -777,15 +795,18 @@ FFmpeg render).
 9. **Resolution.** The provider returns 1024×559–572 stills regardless of the
    1920×1080 request in the prompt; the render upscales them, so frames are
    slightly soft. The `>= 1000×540` gate is what the provider can actually meet.
-10. **Provider cache is keyed by prompt.** A cached image is returned even after
-    a prompt-level fix, so verifying a prompt change requires clearing
-    `apps/image-provider/cache/` (this bit during the Gemini rerun in §6.3).
+10. **The provider cache is versioned, not cleared by hand.** Cache keys hash a
+    manual `CACHE_KEY_VERSION` (currently `v2`) plus the prompt, so a delivery
+    or model fix that leaves the prompt text unchanged still misses stale
+    entries. `v2` invalidates everything generated before multi-line prompts
+    were inserted in full.
 11. **Narration verification is advisory.** The free ASR pass proves the words
     were spoken, not that the performance is good: pace, emphasis and
     mispronunciation of names are still listening-test territory. Number
-    handling is heuristic (two two-digit groups read as a year), and a number
-    run the heuristic misreads can consume coverage headroom but cannot fail the
-    run.
+    handling is heuristic (two two-digit groups read as a year) and
+    English-specific, so a number run the heuristic misreads can consume
+    coverage headroom — it cannot fail the run. A low-coverage chunk gets one
+    automatic re-synthesis before the check gives up.
 
 ## 8. Reproduce
 

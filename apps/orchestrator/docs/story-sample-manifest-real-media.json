@@ -2,7 +2,7 @@
   "version": 1,
   "jobId": "real-llm-probe-c",
   "createdAt": "2026-10-20T07:14:00.449Z",
-  "updatedAt": "2026-10-20T11:23:45.485Z",
+  "updatedAt": "2026-10-20T12:18:46.198Z",
   "input": {
     "topic": "Christopher Columbus's first voyage across the Atlantic",
     "targetDurationSec": 45,
@@ -43,9 +43,9 @@
     "S1_input": {
       "status": "done",
       "fingerprint": "d4b531e4d6dd2afc0d989afa82ff806865e071f0366e61d5ab3644c3fe807c0f",
-      "startedAt": "2026-10-20T11:22:11.621Z",
-      "finishedAt": "2026-10-20T11:22:11.656Z",
-      "durationMs": 35,
+      "startedAt": "2026-10-20T12:15:14.151Z",
+      "finishedAt": "2026-10-20T12:15:14.158Z",
+      "durationMs": 7,
       "metrics": {
         "wordBudget": 113,
         "style": "stickman-history",
@@ -88,23 +88,23 @@
     },
     "S6_audio": {
       "status": "done",
-      "fingerprint": "71d29f8c5a8d9e5361f4ea2351d8fcd2ef70a4b9380e391a3b303a49b458aa48",
-      "startedAt": "2026-10-20T09:21:29.999Z",
-      "finishedAt": "2026-10-20T09:21:30.261Z",
-      "durationMs": 262,
+      "fingerprint": "a915322ddcff684aac2f42e2bcdd13907ca31a62087b56d182877fca4f4e9beb",
+      "startedAt": "2026-10-20T12:15:14.167Z",
+      "finishedAt": "2026-10-20T12:18:15.014Z",
+      "durationMs": 180847,
       "metrics": {
         "chunks": 6,
         "durationSec": 40.36,
         "voice": "narrator",
-        "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=none"
+        "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
       }
     },
     "S7_align": {
       "status": "done",
-      "fingerprint": "b8e6bb5f3115c34e681a7ae7b6e2c59d429cba26e6fa7db510fc9e9e6ae67b03",
-      "startedAt": "2026-10-20T11:22:11.658Z",
-      "finishedAt": "2026-10-20T11:23:45.479Z",
-      "durationMs": 93821,
+      "fingerprint": "e8ec93f0ef0b39b53abefaf93263c5444e6cf08e6ce85bcb4789e69459b8b815",
+      "startedAt": "2026-10-20T12:18:15.068Z",
+      "finishedAt": "2026-10-20T12:18:15.072Z",
+      "durationMs": 4,
       "metrics": {
         "chunkFingerprints": {
           "1": "139b0470147d350299970bee2a299551e3e22c940c94a9d236f05fd270c27b81",
@@ -124,21 +124,21 @@
     "S5_images": {
       "status": "done",
       "fingerprint": "e1722267c8fa9994734e89868cdd480bd38a0708a71d7d900bf11478fe6a2b78",
-      "startedAt": "2026-10-20T10:16:53.682Z",
-      "finishedAt": "2026-10-20T10:19:01.578Z",
-      "durationMs": 127896,
+      "startedAt": "2026-10-20T10:15:12.097Z",
+      "finishedAt": "2026-10-20T10:15:12.105Z",
+      "durationMs": 8,
       "metrics": {
-        "generated": 6,
-        "reused": 0,
+        "generated": 0,
+        "reused": 6,
         "failed": 0
       }
     },
     "S8_render": {
       "status": "done",
       "fingerprint": "0e927560e5237fad4e635fb125be64fb41b9a2dec520d37cb5ecdbabce0ae590",
-      "startedAt": "2026-10-20T10:20:07.714Z",
-      "finishedAt": "2026-10-20T10:20:38.610Z",
-      "durationMs": 30896
+      "startedAt": "2026-10-20T12:18:15.080Z",
+      "finishedAt": "2026-10-20T12:18:46.196Z",
+      "durationMs": 31116
     }
   },
   "groundingSource": "model-knowledge",
@@ -190,11 +190,13 @@
             "path": "audio/parts/scene-001-part01.wav",
             "durationSec": 6.44,
             "text": "The sailors had stared at empty ocean for more than five weeks. Some of them wanted to turn back.",
-            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=none"
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
           }
         ],
         "meanVolumeDb": -26.4,
-        "wordsPerMinute": 177
+        "wordsPerMinute": 177,
+        "asrCoverage": 1,
+        "asrChecked": true
       },
       "timing": {
         "start": 0,
@@ -302,21 +304,20 @@
             "start": 5.878,
             "end": 6.139
           }
-        ],
-        "asrCoverage": 1
+        ]
       },
       "image": {
         "path": "images/scene-001.png",
         "prompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: A cluster of weary sailors stands crowded at the rail of a wooden ship, most gazing ahead at the endless empty ocean, while two or three turn their backs on the horizon and look over their shoulders toward the way they came.\n\nCharacters:\n- The sailors: A group of adult sailors in plain, worn wool tunics and knee breeches, some wearing knitted caps, some with beards and some clean-shaven, drawn as a cluster of similar simple stick figures. Pose: shoulders slumped, several leaning on the rail, some arms folded, a few heads turned sharply back over their shoulders, one with a hand shading his eyes against the glare. Expression: weary and doubtful, brows drawn, mouths turned down, eyes fixed on the empty sea or the way back.\n\nSetting: the open deck of a small wooden sailing ship in the middle of a vast empty ocean, bright daylight, no land anywhere, a flat endless horizon of grey-blue water\n\nKey props: a wooden ship's rail, coiled rope, a tall mast with slack sails, a small wooden bucket\n\nLighting: pale hazy midday light, muted and washed-out, flat and tired mood\n\nComposition: wide 16:9 horizontal framing, camera at deck height behind the crew, group clustered on the left and centre, the long empty horizon running across the middle of the frame, calm open water across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
-        "provider": "image-provider",
+        "provider": "fixture-lavfi",
         "attempts": 1,
         "promptHash": "ebdca1c82a6556cfaac3a48acbc0a5beb70812496a3dac4c1e5233500a0761b3",
-        "byteSize": 134435,
-        "width": 1024,
-        "height": 572,
-        "aspect": 1.79,
-        "luminanceVariance": 3310.24,
-        "generatedAt": "2026-10-20T10:17:14.578Z"
+        "byteSize": 15004,
+        "width": 1920,
+        "height": 1080,
+        "aspect": 1.778,
+        "luminanceVariance": 2803.95,
+        "generatedAt": "2026-10-20T09:16:45.552Z"
       }
     },
     {
@@ -365,11 +366,13 @@
             "path": "audio/parts/scene-002-part01.wav",
             "durationSec": 8.08,
             "text": "Then, people say, a lookout named Rodrigo shouted that he saw land. It was the night of October eleventh, fourteen ninety-two.",
-            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=none"
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
           }
         ],
         "meanVolumeDb": -25.2,
-        "wordsPerMinute": 155.9
+        "wordsPerMinute": 155.9,
+        "asrCoverage": 1,
+        "asrChecked": true
       },
       "timing": {
         "start": 6.633,
@@ -487,21 +490,20 @@
             "start": 13.771,
             "end": 14.332
           }
-        ],
-        "asrCoverage": 1
+        ]
       },
       "image": {
         "path": "images/scene-002.png",
         "prompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: A young lookout high on a ship's mast leans out and thrusts one arm toward the horizon, where a faint dark shape of land rises under the moon. His eyes are fixed on the distant shore.\n\nCharacters:\n- Rodrigo: A young man in his late teens with short tousled brown hair, a plain loose white linen shirt, brown knee breeches, bare feet, and a simple red sash tied at the waist. Pose: clinging to the mast's crosstree with one hand, the other arm stretched straight out and pointing toward the horizon, body leaning forward over the void. Expression: wide-eyed and startled, brows raised, mouth open in a shout.\n\nSetting: the high crow's nest of a small wooden sailing ship at night, open dark sea stretching to a faint horizon, a low hazy shape of land far away, moonlit clouds overhead\n\nKey props: a tall wooden mast with rigging ropes, a small railed lookout platform, a pale full moon behind thin clouds, a faint dim silhouette of distant land on the horizon\n\nLighting: cool silver moonlight on the sea and sails against deep indigo night sky, with a faint pale glow on the distant land\n\nComposition: wide 16:9 horizontal framing, medium-low camera from below the mast looking up and out, Rodrigo on the left third with his pointing arm reaching across toward the faint land on the right, moon upper right, calm dark water across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
-        "provider": "image-provider",
+        "provider": "fixture-lavfi",
         "attempts": 1,
         "promptHash": "1f1f14629b87db3b3072d491eaf81db78fba4b4fbaae2ef3a3b77a1111537f59",
-        "byteSize": 86411,
-        "width": 1024,
-        "height": 572,
-        "aspect": 1.79,
-        "luminanceVariance": 1435.94,
-        "generatedAt": "2026-10-20T10:17:35.556Z"
+        "byteSize": 15974,
+        "width": 1920,
+        "height": 1080,
+        "aspect": 1.778,
+        "luminanceVariance": 3669.32,
+        "generatedAt": "2026-10-20T09:16:45.946Z"
       }
     },
     {
@@ -550,11 +552,13 @@
             "path": "audio/parts/scene-003-part01.wav",
             "durationSec": 6.44,
             "text": "Columbus was certain he had reached Asia, the land of spices and silk. He was wrong about that.",
-            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=none"
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
           }
         ],
         "meanVolumeDb": -25.6,
-        "wordsPerMinute": 167.7
+        "wordsPerMinute": 167.7,
+        "asrCoverage": 1,
+        "asrChecked": true
       },
       "timing": {
         "start": 14.933,
@@ -657,21 +661,20 @@
             "start": 20.892,
             "end": 21.092
           }
-        ],
-        "asrCoverage": 1
+        ]
       },
       "image": {
         "path": "images/scene-003.png",
         "prompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: Columbus leans over a wooden table in his cabin, one finger pressed confidently on a spot of an unlabeled chart, while a small globe beside the chart shows a far larger ocean between him and the coast he is pointing to.\n\nCharacters:\n- Columbus: A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat. Pose: bent forward over the table, one hand flat on the chart, index finger pointing firmly at a spot near the edge, the other hand resting on the globe. Expression: certain and proud, chin lifted, brows raised, mouth set in a confident half-smile.\n\nSetting: a small wooden captain's cabin aboard a sailing ship at night, a low beamed ceiling, a window showing dark sea behind\n\nKey props: a wooden table covered with a large chart of abstract marks and curved lines, no words, a small globe with a wide blue ocean showing a long gap of water, brass dividers and a compass rose on the chart, a hanging oil lantern\n\nLighting: warm amber lantern glow inside the cabin, deep shadows along the beams and walls\n\nComposition: wide 16:9 horizontal framing, camera at table height from the side, Columbus on the left third with his pointing hand as the focal point, globe on the right third, chart spread across the middle, lower part of the frame kept calm and dark\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
-        "provider": "image-provider",
+        "provider": "fixture-lavfi",
         "attempts": 1,
         "promptHash": "ded6a7c3ebb1843231512f44207bac8e1899217ef89b77e19b1b658634f2f37c",
-        "byteSize": 120237,
-        "width": 1024,
-        "height": 572,
-        "aspect": 1.79,
-        "luminanceVariance": 1850.32,
-        "generatedAt": "2026-10-20T10:17:56.808Z"
+        "byteSize": 15161,
+        "width": 1920,
+        "height": 1080,
+        "aspect": 1.778,
+        "luminanceVariance": 3494.17,
+        "generatedAt": "2026-10-20T09:16:46.271Z"
       }
     },
     {
@@ -725,11 +728,13 @@
             "path": "audio/parts/scene-004-part01.wav",
             "durationSec": 7.92,
             "text": "But the island was real, and people already lived there. They were the Ta\u00edno, and they came down to the sand to meet the strangers.",
-            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=none"
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
           }
         ],
         "meanVolumeDb": -25.2,
-        "wordsPerMinute": 189.4
+        "wordsPerMinute": 189.4,
+        "asrCoverage": 1,
+        "asrChecked": true
       },
       "timing": {
         "start": 21.567,
@@ -867,21 +872,20 @@
             "start": 28.725,
             "end": 29.246
           }
-        ],
-        "asrCoverage": 1
+        ]
       },
       "image": {
         "path": "images/scene-004.png",
         "prompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: A group of Ta\u00edno islanders walks calmly down a sunlit sandy beach toward small boats that have just reached the shore, carrying the strangers from the ship. Their open hands and upright posture show a peaceful welcome.\n\nCharacters:\n- The Ta\u00edno: A group of Ta\u00edno islanders with long straight black hair, dark-brown skin, wearing simple short cotton loincloths, some with woven armbands, drawn as a cluster of similar simple stick figures. Pose: a line of islanders stepping down the sand together, arms relaxed at their sides or one hand raised in greeting. Expression: calm and welcoming, eyes open, mouths gently curved in a small smile.\n- The sailors: A group of adult sailors in plain, worn wool tunics and knee breeches, some wearing knitted caps, some with beards and some clean-shaven, drawn as a cluster of similar simple stick figures. Pose: sailors climbing out of two small wooden boats onto the shallows, some still holding oars. Expression: cautious and curious, brows slightly raised, looking toward the islanders.\n\nSetting: a green tropical island beach at midday, with tall palm trees and dense green foliage behind the sand, clear turquoise shallow water, and a few wooden canoes pulled up on the sand\n\nKey props: two small wooden rowboats on the shallows, wooden canoes resting on the sand, a few palm trees, oars resting in the boats\n\nLighting: bright warm midday sunlight with soft shadows, a calm, hopeful atmosphere\n\nComposition: wide 16:9 horizontal framing, mid-distance camera at beach level, the islanders walking down from the right third toward the boats on the left, palm trees arching across the upper frame, plain sand and calm water across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
-        "provider": "image-provider",
+        "provider": "fixture-lavfi",
         "attempts": 1,
         "promptHash": "9a1e0f6e97b2f308bf1c1cc3aa807183da659be80fa7c94cb88bcaef27ed6501",
-        "byteSize": 157651,
-        "width": 1024,
-        "height": 572,
-        "aspect": 1.79,
-        "luminanceVariance": 2458.61,
-        "generatedAt": "2026-10-20T10:18:20.271Z"
+        "byteSize": 16516,
+        "width": 1920,
+        "height": 1080,
+        "aspect": 1.778,
+        "luminanceVariance": 2700.04,
+        "generatedAt": "2026-10-20T09:16:46.585Z"
       }
     },
     {
@@ -935,11 +939,13 @@
             "path": "audio/parts/scene-005-part01.wav",
             "durationSec": 5.08,
             "text": "Columbus named the island and raised a flag. Then the ships sailed on among the islands.",
-            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=none"
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
           }
         ],
         "meanVolumeDb": -25.9,
-        "wordsPerMinute": 189
+        "wordsPerMinute": 189,
+        "asrCoverage": 1,
+        "asrChecked": true
       },
       "timing": {
         "start": 29.667,
@@ -1032,21 +1038,20 @@
             "start": 34.125,
             "end": 34.406
           }
-        ],
-        "asrCoverage": 1
+        ]
       },
       "image": {
         "path": "images/scene-005.png",
         "prompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: Columbus stands on the sandy shore, driving a flag pole into the ground while his crew gathers around him. Behind them, ships sail away across blue water dotted with small islands.\n\nCharacters:\n- Columbus: A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat. Pose: kneeling on one knee at the sand, both hands pushing a flag pole firmly into the ground, body leaning forward. Expression: proud and resolute, brows raised slightly, mouth set in a firm line.\n- The sailors: A group of adult sailors in plain, worn wool tunics and knee breeches, some wearing knitted caps, some with beards and some clean-shaven, drawn as a cluster of similar simple stick figures. Pose: a loose cluster of sailors standing behind Columbus, some with arms folded, some pointing toward the sea. Expression: relieved and tired, shoulders slack, faces turned toward the flag.\n\nSetting: a white sandy beach on a small tropical island in the late morning, clear sky, calm turquoise water, the ships' wooden hulls and sails visible offshore\n\nKey props: a tall wooden flag pole with a plain red cross banner, a wide-brimmed black hat in the sand, two wooden sailing ships with white sails far in the water, several small green islands scattered across the blue sea\n\nLighting: bright warm midday sunlight, soft shadows on the sand, clear open sky\n\nComposition: wide 16:9 horizontal framing, medium-wide camera at sand level, Columbus planting the flag on the left third with the crew grouped to his right, ships and small islands receding across the middle distance on the right, sand and calm water kept uncluttered across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
-        "provider": "image-provider",
+        "provider": "fixture-lavfi",
         "attempts": 1,
         "promptHash": "a62297fe1f3c9f5e3beef5bd2ff0be04a2336d5056da60655836c04473421a32",
-        "byteSize": 128469,
-        "width": 1024,
-        "height": 572,
-        "aspect": 1.79,
-        "luminanceVariance": 2987.98,
-        "generatedAt": "2026-10-20T10:18:40.790Z"
+        "byteSize": 15129,
+        "width": 1920,
+        "height": 1080,
+        "aspect": 1.778,
+        "luminanceVariance": 3781.45,
+        "generatedAt": "2026-10-20T09:16:46.893Z"
       }
     },
     {
@@ -1101,11 +1106,13 @@
             "path": "audio/parts/scene-006-part01.wav",
             "durationSec": 5.4,
             "text": "When they finally saw Spain again, the sailors had a story no one in Europe had heard.",
-            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=none"
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
           }
         ],
         "meanVolumeDb": -24.7,
-        "wordsPerMinute": 188.9
+        "wordsPerMinute": 188.9,
+        "asrCoverage": 1,
+        "asrChecked": true
       },
       "timing": {
         "start": 34.967,
@@ -1203,21 +1210,20 @@
             "start": 39.805,
             "end": 40.126
           }
-        ],
-        "asrCoverage": 1
+        ]
       },
       "image": {
         "path": "images/scene-006.png",
         "prompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: Columbus strides down the gangplank onto a Spanish harbor dock, one hand raised mid-gesture as he speaks, while the crew follows behind him. A crowd on the quay leans forward, eager and attentive, as if hearing a tale from across the sea.\n\nCharacters:\n- Columbus: A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat. Pose: stepping off the gangplank, one hand raised in an open gesture, head turned toward the crowd. Expression: animated and proud, eyebrows lifted, mouth open mid-sentence.\n- The sailors: A group of adult sailors in plain, worn wool tunics and knee breeches, some wearing knitted caps, some with beards and some clean-shaven, drawn as a cluster of similar simple stick figures. Pose: a cluster of sailors behind the captain, some carrying bundles, some leaning in to listen. Expression: weary but pleased, a few grinning, others nodding.\n\nSetting: a stone quay in a Spanish harbor at midday, a wooden ship moored at the edge, tall masts behind, townspeople gathered on the dock in the background, bright sky with a few clouds\n\nKey props: a wooden gangplank, a moored wooden sailing ship, coils of rope on the quay, wooden crates, a plain flag on a mast showing an abstract red mark\n\nLighting: warm clear afternoon sunlight on the stone quay, soft shadows under the crowd\n\nComposition: wide 16:9 horizontal framing, medium-wide camera at quay level, Columbus on the left third at the foot of the gangplank, the crew following on the center, the crowd leaning in on the right, calm stone and water across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
-        "provider": "image-provider",
+        "provider": "fixture-lavfi",
         "attempts": 1,
         "promptHash": "531942c719f06873c5f2f0d4ac9a727d9f4a4753afc822e88559d32a39cb724c",
-        "byteSize": 180959,
-        "width": 1024,
-        "height": 572,
-        "aspect": 1.79,
-        "luminanceVariance": 2525.9,
-        "generatedAt": "2026-10-20T10:19:01.576Z"
+        "byteSize": 15569,
+        "width": 1920,
+        "height": 1080,
+        "aspect": 1.778,
+        "luminanceVariance": 3829.46,
+        "generatedAt": "2026-10-20T09:16:47.198Z"
       }
     }
   ],
@@ -1415,73 +1421,73 @@
         {
           "name": "scene_1_shows_source",
           "passed": true,
-          "detail": "correlation 1.000 with its own source (floor 0.35); closest other scene 6 at 0.353 (margin 0.647, needs >= 0.02)",
+          "detail": "correlation 0.966 with its own source (floor 0.35); closest other scene 6 at 0.349 (margin 0.617, needs >= 0.02)",
           "severity": "warning"
         },
         {
           "name": "scene_1_subtitles_visible",
           "passed": true,
-          "detail": "subtitle band difference 2.53% (>= 0.50%)",
+          "detail": "subtitle band difference 4.92% (>= 0.50%)",
           "severity": "gate"
         },
         {
           "name": "scene_2_shows_source",
           "passed": true,
-          "detail": "correlation 1.000 with its own source (floor 0.35); closest other scene 1 at 0.213 (margin 0.787, needs >= 0.02)",
+          "detail": "correlation 0.876 with its own source (floor 0.35); closest other scene 3 at 0.226 (margin 0.651, needs >= 0.02)",
           "severity": "warning"
         },
         {
           "name": "scene_2_subtitles_visible",
           "passed": true,
-          "detail": "subtitle band difference 4.17% (>= 0.50%)",
+          "detail": "subtitle band difference 6.12% (>= 0.50%)",
           "severity": "gate"
         },
         {
           "name": "scene_3_shows_source",
           "passed": true,
-          "detail": "correlation 1.000 with its own source (floor 0.35); closest other scene 2 at 0.154 (margin 0.846, needs >= 0.02)",
+          "detail": "correlation 0.944 with its own source (floor 0.35); closest other scene 2 at 0.144 (margin 0.799, needs >= 0.02)",
           "severity": "warning"
         },
         {
           "name": "scene_3_subtitles_visible",
           "passed": true,
-          "detail": "subtitle band difference 5.47% (>= 0.50%)",
+          "detail": "subtitle band difference 5.57% (>= 0.50%)",
           "severity": "gate"
         },
         {
           "name": "scene_4_shows_source",
           "passed": true,
-          "detail": "correlation 1.000 with its own source (floor 0.35); closest other scene 5 at 0.366 (margin 0.634, needs >= 0.02)",
+          "detail": "correlation 0.990 with its own source (floor 0.35); closest other scene 5 at 0.370 (margin 0.620, needs >= 0.02)",
           "severity": "warning"
         },
         {
           "name": "scene_4_subtitles_visible",
           "passed": true,
-          "detail": "subtitle band difference 6.17% (>= 0.50%)",
+          "detail": "subtitle band difference 4.40% (>= 0.50%)",
           "severity": "gate"
         },
         {
           "name": "scene_5_shows_source",
           "passed": true,
-          "detail": "correlation 1.000 with its own source (floor 0.35); closest other scene 4 at 0.366 (margin 0.634, needs >= 0.02)",
+          "detail": "correlation 0.978 with its own source (floor 0.35); closest other scene 4 at 0.376 (margin 0.601, needs >= 0.02)",
           "severity": "warning"
         },
         {
           "name": "scene_5_subtitles_visible",
           "passed": true,
-          "detail": "subtitle band difference 6.33% (>= 0.50%)",
+          "detail": "subtitle band difference 4.30% (>= 0.50%)",
           "severity": "gate"
         },
         {
           "name": "scene_6_shows_source",
           "passed": true,
-          "detail": "correlation 1.000 with its own source (floor 0.35); closest other scene 1 at 0.353 (margin 0.647, needs >= 0.02)",
+          "detail": "correlation 0.972 with its own source (floor 0.35); closest other scene 5 at 0.327 (margin 0.644, needs >= 0.02)",
           "severity": "warning"
         },
         {
           "name": "scene_6_subtitles_visible",
           "passed": true,
-          "detail": "subtitle band difference 5.94% (>= 0.50%)",
+          "detail": "subtitle band difference 6.46% (>= 0.50%)",
           "severity": "gate"
         }
       ]
