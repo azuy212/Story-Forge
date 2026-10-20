@@ -5,6 +5,7 @@
 export type ProviderErrorType =
   | 'content_policy'
   | 'invalid_prompt'
+  | 'quota_exhausted'
   | 'rate_limit'
   | 'timeout'
   | 'server_error'
@@ -18,7 +19,11 @@ export type ProviderErrorType =
  * Reserved for requests that are malformed at the provider boundary.
  */
 
-/** Types that may recover from a same-prompt retry. */
+/**
+ * Types that may recover from a same-prompt retry. `quota_exhausted` is
+ * deliberately absent: the account's image allowance only refills on a longer
+ * clock, so retrying inside the request burns minutes and still fails.
+ */
 const RETRYABLE_TYPES: ReadonlySet<ProviderErrorType> = new Set<ProviderErrorType>([
   'rate_limit',
   'timeout',
@@ -70,8 +75,25 @@ const CLASSIFIER: ReadonlyArray<{ type: ProviderErrorType; patterns: string[] }>
     ],
   },
   {
+    // Checked before rate_limit: "quota" must never be downgraded to a
+    // retryable rate limit, because a spent daily allowance cannot recover
+    // within the request's retry budget.
+    type: 'quota_exhausted',
+    patterns: [
+      'quota',
+      'reached your limit',
+      'reached the limit',
+      'daily limit',
+      'generation limit',
+      'limit for today',
+      'limit for this',
+      'out of generations',
+      'try again tomorrow',
+    ],
+  },
+  {
     type: 'rate_limit',
-    patterns: ['rate limit', 'rate-limited', 'too many requests', 'quota'],
+    patterns: ['rate limit', 'rate-limited', 'too many requests'],
   },
   {
     type: 'timeout',

@@ -224,7 +224,10 @@ Key design decisions:
 - **Exact-match caching** — cache keys hash the exact prompt, asset type, mode,
   and reference image contents; validation rejects mismatched metadata.
 - **Lazy browser startup** — the server only launches the browser when a request misses the cache.
-- **Error detection** — scans for content policy, rate limit, and generation failure messages.
+- **Error detection** — scans for content policy, rate limit, quota, and generation failure messages.
+- **Quota fast-fail** — a disabled `Create image` menu entry reports
+  `quota_exhausted` (HTTP 429, non-retryable) instead of waiting out the
+  generation timeout; rerun after the quota refills.
 - **Graceful shutdown** — SIGINT/SIGTERM closes browser cleanly.
 - **Retry with backoff** — exponential backoff + jitter for transient failures.
 

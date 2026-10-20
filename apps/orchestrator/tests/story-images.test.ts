@@ -4,6 +4,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AssetProvider } from "../src/providers/asset-provider.js";
+import {
+  ImageGenerationProviderError,
+  normalizeImageGenerationError,
+} from "../src/providers/image-generation-error.js";
 import { resolveStoryConfig } from "../src/story/config.js";
 import { runImageStage, validateSceneImage } from "../src/story/images.js";
 import { jobPaths } from "../src/story/paths.js";
@@ -202,6 +206,49 @@ describe("runImageStage", () => {
     expect(scenes[1].image?.path).toBe(join(paths.imagesDir, "scene-002.png"));
     expect(scenes[0].image?.width).toBe(1920);
     expect(scenes[0].image?.provider).toBe("fake");
+  });
+
+  it("stops the batch on an exhausted quota and leaves the rest resumable", async () => {
+    setup();
+    let calls = 0;
+    const provider: AssetProvider = {
+      async generateImage({ sceneId, prompt }) {
+        calls += 1;
+        throw new ImageGenerationProviderError(
+          normalizeImageGenerationError({
+            provider: "fake",
+            type: "quota_exhausted",
+            message: "Gemini Create image is disabled; the account image quota looks exhausted",
+            originalPrompt: prompt,
+            sceneId,
+          }),
+        );
+      },
+      async generateVideo() {
+        throw new Error("not used");
+      },
+    };
+    const scenes = [scene(1), scene(2), scene(3), scene(4)];
+
+    const result = await runImageStage({
+      scenes,
+      paths,
+      config,
+      assetProvider: provider,
+      runId: "test-run",
+      workDir: paths.renderDir,
+    });
+
+    // Fail fast: the remaining scenes are never attempted, so an exhausted
+    // quota cannot burn a generation timeout per scene.
+    expect(calls).toBe(1);
+    expect(result.quotaExhausted).toBe(true);
+    expect(result.failed).toHaveLength(1);
+    expect(scenes[0].status.image).toBe("failed");
+    expect(scenes.slice(1).every((entry) => entry.status.image === "pending")).toBe(
+      true,
+    );
+    expect(scenes[0].warnings.join(" ")).toContain("quota");
   });
 
   it("fails the second scene when the provider returns identical bytes", async () => {

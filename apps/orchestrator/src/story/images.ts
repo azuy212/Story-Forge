@@ -162,6 +162,12 @@ export interface ImageStageResult {
   generated: number;
   reused: number;
   failed: string[];
+  /**
+   * Set when the provider reported a spent image quota. The run stops at once
+   * instead of waiting out the remaining scenes, and a rerun after the refill
+   * generates only the scenes still missing an image.
+   */
+  quotaExhausted?: boolean;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -205,6 +211,7 @@ export async function runImageStage(
 
   const worker = async (): Promise<void> => {
     for (;;) {
+      if (result.quotaExhausted) return;
       const scene = queue.shift();
       if (!scene) return;
       await processScene(scene);
@@ -299,6 +306,12 @@ export async function runImageStage(
       const message = (err as Error)?.message ?? String(err);
       scene.warnings.push(`image generation failed: ${message}`);
       result.failed.push(`scene ${scene.sceneId}: ${message}`);
+      if (
+        isImageGenerationProviderError(err) &&
+        err.info.type === "quota_exhausted"
+      ) {
+        result.quotaExhausted = true;
+      }
       return;
     }
 

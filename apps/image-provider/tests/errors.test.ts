@@ -47,11 +47,24 @@ describe('classifyGeminiError', () => {
     }
   });
 
+  it('classifies quota exhaustion as a distinct, non-retryable failure', () => {
+    // A spent allowance cannot recover inside the request's retry budget:
+    // retrying only burns time before the same failure.
+    for (const message of [
+      'Your quota is exhausted',
+      "You've reached your limit for today",
+      'Daily limit reached, try again tomorrow',
+      'Out of generations for now',
+    ]) {
+      assert.equal(classifyGeminiError(message), 'quota_exhausted', message);
+      assert.equal(isRetryableType('quota_exhausted'), false, message);
+    }
+  });
+
   it('classifies rate limits, timeouts, and server errors as retryable', () => {
     const messages = [
       'You have reached your rate limit, try again later',
       'Too many requests, please slow down',
-      'Your quota is exhausted',
     ];
     for (const message of messages) {
       assert.equal(classifyGeminiError(message), 'rate_limit', message);

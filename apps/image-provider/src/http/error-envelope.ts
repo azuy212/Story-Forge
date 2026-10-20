@@ -6,6 +6,7 @@ import type { ProviderErrorType } from '../core/errors.js';
 export const ERROR_STATUS: Record<ProviderErrorType, number> = {
   content_policy: 422,
   invalid_prompt: 422,
+  quota_exhausted: 429,
   rate_limit: 429,
   timeout: 504,
   server_error: 503,

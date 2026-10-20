@@ -970,6 +970,20 @@ async function stageImages(
     });
 
     if (outcome.failed.length > 0) {
+      if (outcome.quotaExhausted) {
+        const missing = ctx.manifest.scenes.filter(
+          (scene) => scene.status.image !== "done",
+        ).length;
+        addWarning(
+          ctx.manifest,
+          `image provider quota exhausted; ${missing} scene(s) still need an image`,
+        );
+        throw new PipelineError(
+          `Image provider quota is exhausted; ${missing} scene(s) still need an image.` +
+            ` Rerun after the quota resets to generate only the missing scenes: ${outcome.failed.join("; ")}`,
+          "STORY_IMAGES_QUOTA",
+        );
+      }
       throw new PipelineError(
         `Image generation failed for ${outcome.failed.length} scene(s); rerun to retry only those scenes: ${outcome.failed.join("; ")}`,
         "STORY_IMAGES_FAILED",

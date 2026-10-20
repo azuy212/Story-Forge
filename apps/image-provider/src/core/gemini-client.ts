@@ -424,6 +424,21 @@ export class GeminiClient {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       await plusBtn.click();
       await item.waitFor({ state: 'visible', timeout: 5000 });
+
+      // A spent quota disables the menu entry rather than failing the request,
+      // so the old path sat through three generation timeouts (~9 minutes per
+      // image) before reporting a generic error. Surface it immediately as a
+      // distinct, non-retryable status: the caller reruns after the refill and
+      // only the missing scenes are generated.
+      if (await this.isDisabled(item)) {
+        await this.page.keyboard.press('Escape').catch(() => {});
+        throw new ProviderError(
+          `Gemini ${label} is disabled; the account image quota looks exhausted`,
+          'quota_exhausted',
+          'menu item reported aria-disabled=true',
+        );
+      }
+
       await item.click();
       await this.page.keyboard.press('Escape').catch(() => {});
 
@@ -442,6 +457,20 @@ export class GeminiClient {
       'server_error',
       `composer placeholder did not become "${expectedPlaceholder}" after retries`,
     );
+  }
+
+  /** Playwright's isDisabled() ignores aria-disabled on menu items. */
+  private async isDisabled(locator: Locator): Promise<boolean> {
+    return locator
+      .evaluate((element) => {
+        const node = element as HTMLElement;
+        return (
+          node.getAttribute('aria-disabled') === 'true' ||
+          node.hasAttribute('disabled') ||
+          node.getAttribute('data-disabled') === 'true'
+        );
+      })
+      .catch(() => false);
   }
 
   private async resolveInput(): Promise<Locator> {
