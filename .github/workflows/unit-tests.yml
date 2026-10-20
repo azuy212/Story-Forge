@@ -29,6 +29,12 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Set up Python (lint:python)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Ruff
+        run: python -m pip install ruff
       - name: Build all packages
         run: pnpm build
       - name: Lint
