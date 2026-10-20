@@ -75,6 +75,39 @@ export function normalizeToken(token: string): string {
     .replace(/^['-]+|['-]+$/g, "");
 }
 
+const ORDINAL_IRREGULAR: Record<string, number> = {
+  first: 1,
+  second: 2,
+  third: 3,
+  fifth: 5,
+  eighth: 8,
+  ninth: 9,
+  twelfth: 12,
+};
+
+/** Scale words that numberValue handles in-loop but ordinals must map alone. */
+const SCALE_ORDINAL: Record<string, number> = { hundred: 100, thousand: 1000 };
+
+/**
+ * Cardinal value of an ordinal ("eleventh" → 11). Speech says ordinals where
+ * the script may use digits ("October eleventh" vs "October 11"), so the
+ * matcher needs them.
+ */
+function ordinalValue(word: string): number | undefined {
+  const irregular = ORDINAL_IRREGULAR[word];
+  if (irregular !== undefined) return irregular;
+  if (word.endsWith("ieth")) {
+    return NUMBER_WORDS[`${word.slice(0, -4)}y`];
+  }
+  for (const suffix of ["st", "nd", "rd", "th"]) {
+    if (!word.endsWith(suffix)) continue;
+    const base = word.slice(0, -suffix.length);
+    const value = NUMBER_WORDS[base] ?? SCALE_ORDINAL[base];
+    if (value !== undefined) return value;
+  }
+  return undefined;
+}
+
 /**
  * Canonical numeric value of a token, or undefined when it is not a number.
  * Handles digits with separators ("1,492", "1492") and number words including
@@ -106,7 +139,7 @@ export function numberValue(token: string): number | undefined {
   let current = 0;
   let sawWord = false;
   for (const part of parts) {
-    const value = NUMBER_WORDS[part];
+    const value = NUMBER_WORDS[part] ?? ordinalValue(part);
     if (value !== undefined) {
       current += value;
       sawWord = true;
@@ -406,6 +439,122 @@ export function alignScene(options: {
     total: tokens.length,
     matchRatio,
     method: "aligned",
+  };
+}
+
+export interface NarrationFidelity {
+  /** Fraction of script tokens the free ASR pass heard, 0..1. */
+  coverage: number;
+  /** Script tokens the ASR pass did not match, in script order. */
+  missing: string[];
+}
+
+interface FidelityKey {
+  key: string;
+  /** Indexes into the original token list this key covers. */
+  tokenIndexes: number[];
+}
+
+const RUN_BREAK = /[.,;:!?…]["'”’)\]]*$/;
+
+/**
+ * A comma ends a numeric run. Without this, a date such as "October eleventh,
+ * fourteen ninety-two" collapses day and year into one bogus number.
+ */
+function endsRun(token: string): boolean {
+  return RUN_BREAK.test(token);
+}
+
+/**
+ * Collapse each maximal run of numeric tokens into one comparable key.
+ * Spoken and transcribed numbers disagree in shape — the script says
+ * "fourteen ninety-two", the ASR writes "1492" — so comparing them token by
+ * token would report a false miss on every date. Two two-digit groups are
+ * read as a year; any other run is read as a compound number.
+ */
+function fidelityKeys(tokens: string[]): FidelityKey[] {
+  const keys: FidelityKey[] = [];
+  let index = 0;
+  while (index < tokens.length) {
+    if (numberValue(tokens[index]) === undefined) {
+      keys.push({
+        key: normalizeToken(tokens[index]),
+        tokenIndexes: [index],
+      });
+      index += 1;
+      continue;
+    }
+    const start = index;
+    index += 1;
+    while (
+      index < tokens.length &&
+      numberValue(tokens[index]) !== undefined &&
+      !endsRun(tokens[index - 1])
+    ) {
+      index += 1;
+    }
+    keys.push({
+      key: `#${canonicalNumberRun(tokens.slice(start, index))}`,
+      tokenIndexes: Array.from(
+        { length: index - start },
+        (_, offset) => start + offset,
+      ),
+    });
+  }
+  return keys;
+}
+
+function canonicalNumberRun(run: string[]): string {
+  if (run.length === 2) {
+    const first = numberValue(run[0]) ?? 0;
+    const second = numberValue(run[1]) ?? 0;
+    if (first >= 10 && first <= 99 && second >= 10 && second <= 99) {
+      return String(first * 100 + second);
+    }
+  }
+  const compound = numberValue(run.join(" "));
+  if (compound !== undefined) return String(compound);
+  return run.map((token) => numberValue(token)).join("-");
+}
+
+/**
+ * Compare a chunk's free ASR transcript against the script it was synthesised
+ * from. Forced alignment cannot detect TTS skipping or garbling words — it
+ * matches the supplied text by construction — so this second, unconstrained
+ * pass is the only evidence that every script word was actually spoken.
+ */
+export function narrationFidelity(
+  scriptText: string,
+  asrWords: AsrWord[],
+): NarrationFidelity {
+  const scriptTokens = tokenizeScript(scriptText);
+  if (scriptTokens.length === 0) return { coverage: 1, missing: [] };
+
+  const reference = fidelityKeys(scriptTokens);
+  const hypothesis = fidelityKeys(asrWords.map((word) => word.word));
+  const partner = lcsAlignment(
+    reference.map((entry) => entry.key),
+    hypothesis.map((entry) => {
+      const indexes = entry.tokenIndexes;
+      return {
+        word: entry.key,
+        start: asrWords[indexes[0]]?.start ?? 0,
+        end: asrWords[indexes[indexes.length - 1]]?.end ?? 0,
+      };
+    }),
+  );
+
+  const matched = new Set<number>();
+  partner.forEach((asrIndex, refIndex) => {
+    if (asrIndex < 0) return;
+    for (const tokenIndex of reference[refIndex].tokenIndexes) {
+      matched.add(tokenIndex);
+    }
+  });
+
+  return {
+    coverage: Math.round((matched.size / scriptTokens.length) * 1000) / 1000,
+    missing: scriptTokens.filter((_, index) => !matched.has(index)),
   };
 }
 

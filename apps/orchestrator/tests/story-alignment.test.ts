@@ -2,6 +2,7 @@ import { describe, it, expect } from "@jest/globals";
 import {
   SCENE_ALIGNMENT_GATE,
   alignScene,
+  narrationFidelity,
   numberValue,
   normalizeToken,
   proportionalAlignment,
@@ -71,6 +72,15 @@ describe("story normalizeToken / numberValue", () => {
     expect(numberValue("hundred")).toBe(100);
     expect(numberValue("four hundred")).toBe(400);
     expect(numberValue("one thousand")).toBe(1000);
+  });
+
+  it("reads ordinals the way narration speaks them", () => {
+    expect(numberValue("eleventh")).toBe(11);
+    expect(numberValue("twenty-first")).toBe(21);
+    expect(numberValue("third")).toBe(3);
+    expect(numberValue("twelfth")).toBe(12);
+    expect(numberValue("twentieth")).toBe(20);
+    expect(numberValue("hundredth")).toBe(100);
   });
 
   it("returns undefined for non-numbers", () => {
@@ -227,5 +237,80 @@ describe("story proportionalAlignment", () => {
       words[0].end - words[0].start,
     );
     expect(words[1].end).toBeCloseTo(11, 10);
+  });
+});
+
+describe("story narrationFidelity", () => {
+  it("reports full coverage when every script word was heard", () => {
+    const fidelity = narrationFidelity(
+      "The sailors stared at the empty ocean.",
+      asr(["The", "sailors", "stared", "at", "the", "empty", "ocean"]),
+    );
+    expect(fidelity.coverage).toBe(1);
+    expect(fidelity.missing).toEqual([]);
+  });
+
+  it("names the script words a free ASR pass never heard", () => {
+    const fidelity = narrationFidelity(
+      "The crew had not seen land for many days now.",
+      asr(["The", "crew", "not", "seen", "land", "for", "many", "days", "now"]),
+    );
+    expect(fidelity.coverage).toBeCloseTo(0.9, 10);
+    expect(fidelity.missing).toEqual(["had"]);
+  });
+
+  it("matches a spoken year against its digit form", () => {
+    const fidelity = narrationFidelity(
+      "It was fourteen ninety-two when it began.",
+      asr(["It", "was", "1492", "when", "it", "began"]),
+    );
+    expect(fidelity.coverage).toBe(1);
+    expect(fidelity.missing).toEqual([]);
+  });
+
+  it("flags a repeated word in place of the script's ending", () => {
+    const fidelity = narrationFidelity(
+      "We saw land and we cheered.",
+      asr(["We", "saw", "land", "and", "saw", "land"]),
+    );
+    expect(fidelity.coverage).toBeLessThan(1);
+    expect(fidelity.missing.some((word) => word.startsWith("cheered"))).toBe(
+      true,
+    );
+  });
+
+  it("reads a spoken date with a comma as two numbers", () => {
+    const fidelity = narrationFidelity(
+      "It was the night of October eleventh, fourteen ninety-two.",
+      asr(["It", "was", "the", "night", "of", "October", "11,", "1492"]),
+    );
+    expect(fidelity.coverage).toBe(1);
+    expect(fidelity.missing).toEqual([]);
+  });
+
+  it("flags a dropped clause below the warning threshold", () => {
+    // 3 of 16 tokens missing -> 0.81, under the 0.85 warning line.
+    const fidelity = narrationFidelity(
+      "We saw land and we cheered while the whole crew ran to the rail.",
+      asr([
+        "We",
+        "saw",
+        "land",
+        "and",
+        "the",
+        "whole",
+        "crew",
+        "ran",
+        "to",
+        "the",
+        "rail",
+      ]),
+    );
+    expect(fidelity.coverage).toBeLessThan(0.85);
+    expect(fidelity.missing).toEqual(["we", "cheered", "while"]);
+  });
+
+  it("treats an empty script as fully covered", () => {
+    expect(narrationFidelity("   ", [])).toEqual({ coverage: 1, missing: [] });
   });
 });

@@ -2,7 +2,7 @@
   "version": 1,
   "jobId": "real-llm-probe-c",
   "createdAt": "2026-10-20T07:14:00.449Z",
-  "updatedAt": "2026-10-20T10:20:38.612Z",
+  "updatedAt": "2026-10-20T11:23:45.485Z",
   "input": {
     "topic": "Christopher Columbus's first voyage across the Atlantic",
     "targetDurationSec": 45,
@@ -33,6 +33,7 @@
     "imageMinAspect": 1.6,
     "imageMaxAspect": 1.9,
     "ttsMaxChars": 450,
+    "asrVerify": true,
     "subtitleMaxCharsPerLine": 42,
     "subtitleMinDurationMs": 800,
     "crf": 19,
@@ -41,10 +42,10 @@
   "stages": {
     "S1_input": {
       "status": "done",
-      "fingerprint": "4ea61ead076e76b4ed1df9b65ddb5360ca9f9224d3f5c4517679ef7d849ab0e7",
-      "startedAt": "2026-10-20T07:14:00.453Z",
-      "finishedAt": "2026-10-20T07:14:00.457Z",
-      "durationMs": 4,
+      "fingerprint": "d4b531e4d6dd2afc0d989afa82ff806865e071f0366e61d5ab3644c3fe807c0f",
+      "startedAt": "2026-10-20T11:22:11.621Z",
+      "finishedAt": "2026-10-20T11:22:11.656Z",
+      "durationMs": 35,
       "metrics": {
         "wordBudget": 113,
         "style": "stickman-history",
@@ -100,10 +101,10 @@
     },
     "S7_align": {
       "status": "done",
-      "fingerprint": "e8ec93f0ef0b39b53abefaf93263c5444e6cf08e6ce85bcb4789e69459b8b815",
-      "startedAt": "2026-10-20T09:21:30.642Z",
-      "finishedAt": "2026-10-20T09:21:30.713Z",
-      "durationMs": 71,
+      "fingerprint": "b8e6bb5f3115c34e681a7ae7b6e2c59d429cba26e6fa7db510fc9e9e6ae67b03",
+      "startedAt": "2026-10-20T11:22:11.658Z",
+      "finishedAt": "2026-10-20T11:23:45.479Z",
+      "durationMs": 93821,
       "metrics": {
         "chunkFingerprints": {
           "1": "139b0470147d350299970bee2a299551e3e22c940c94a9d236f05fd270c27b81",
@@ -301,7 +302,8 @@
             "start": 5.878,
             "end": 6.139
           }
-        ]
+        ],
+        "asrCoverage": 1
       },
       "image": {
         "path": "images/scene-001.png",
@@ -485,7 +487,8 @@
             "start": 13.771,
             "end": 14.332
           }
-        ]
+        ],
+        "asrCoverage": 1
       },
       "image": {
         "path": "images/scene-002.png",
@@ -654,7 +657,8 @@
             "start": 20.892,
             "end": 21.092
           }
-        ]
+        ],
+        "asrCoverage": 1
       },
       "image": {
         "path": "images/scene-003.png",
@@ -863,7 +867,8 @@
             "start": 28.725,
             "end": 29.246
           }
-        ]
+        ],
+        "asrCoverage": 1
       },
       "image": {
         "path": "images/scene-004.png",
@@ -1027,7 +1032,8 @@
             "start": 34.125,
             "end": 34.406
           }
-        ]
+        ],
+        "asrCoverage": 1
       },
       "image": {
         "path": "images/scene-005.png",
@@ -1197,7 +1203,8 @@
             "start": 39.805,
             "end": 40.126
           }
-        ]
+        ],
+        "asrCoverage": 1
       },
       "image": {
         "path": "images/scene-006.png",

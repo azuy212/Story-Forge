@@ -363,11 +363,17 @@ async function ffprobeDurationSec(path) {
 }
 
 /** Deterministic "forced alignment": the script's own tokens, evenly spread. */
+const lastNarration = new Map();
 const fakeTranscriber = {
   async align(audioUrl, narration) {
     counts.align += 1;
     const durationSec = await ffprobeDurationSec(audioUrl);
-    const tokens = tokenizeScript(narration ?? "");
+    // The free ASR pass sends no script; replay the forced-alignment text for
+    // the same chunk so the fake behaves like a perfect transcriber.
+    if (narration !== undefined) lastNarration.set(audioUrl, narration);
+    const tokens = tokenizeScript(
+      narration ?? lastNarration.get(audioUrl) ?? "",
+    );
     const count = Math.max(1, tokens.length);
     const slice = durationSec / count;
     const round3 = (value) => Math.round(value * 1000) / 1000;
@@ -536,6 +542,14 @@ async function main() {
     assert.equal(manifest.subtitles.overallMatchRatio, 1);
     for (const scene of manifest.scenes)
       assert.equal(scene.transcript.method, "aligned");
+  });
+  await check("free ASR verified every narration chunk", () => {
+    for (const scene of manifest.scenes)
+      assert.equal(scene.transcript.asrCoverage, 1);
+    assert.equal(
+      manifest.warnings.some((warning) => warning.includes("free ASR")),
+      false,
+    );
   });
   await check("no voice outliers were flagged", () => {
     const flagged = manifest.warnings.filter((warning) =>

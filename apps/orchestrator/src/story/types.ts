@@ -206,6 +206,13 @@ export interface SceneTranscript {
   matchRatio: number;
   method: "aligned" | "proportional";
   words: SceneWordTimestamp[];
+  /**
+   * Fraction of script words a free (unconstrained) ASR pass heard, 0..1.
+   * Absent when verification is disabled or the chunk predates the check.
+   */
+  asrCoverage?: number;
+  /** Script words the free ASR pass did not hear (first few, for the log). */
+  asrMissing?: string[];
 }
 
 export interface StoryScene {
@@ -257,6 +264,8 @@ export interface ResolvedStoryConfig extends StoryJobInput {
   imageMinAspect: number;
   imageMaxAspect: number;
   ttsMaxChars: number;
+  /** Free ASR verification of each narration chunk (advisory). */
+  asrVerify: boolean;
   subtitleMaxCharsPerLine: number;
   subtitleMinDurationMs: number;
   crf: number;

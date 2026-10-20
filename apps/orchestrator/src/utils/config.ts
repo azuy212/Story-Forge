@@ -352,6 +352,11 @@ export const config = {
   // every scene call (helps character consistency more than prompt text when
   // the image provider accepts references). Off by default.
   storyReferenceSheet: (): boolean => read("STORY_REFERENCE_SHEET") === "true",
+  // Verify each narration chunk with a free ASR pass (WhisperX without the
+  // script) so skipped or garbled TTS words are visible. On by default; the
+  // transcript is advisory, not a hard gate. Doubles transcriber calls, so
+  // STORY_ASR_VERIFY=false skips it for fast local iterations.
+  storyAsrVerify: (): boolean => read("STORY_ASR_VERIFY") !== "false",
   storySubtitleMaxCharsPerLine: (): number =>
     Math.floor(readPositiveNumber("STORY_SUBTITLE_MAX_CHARS_PER_LINE", 42)),
   storySubtitleMinDurationMs: (): number =>

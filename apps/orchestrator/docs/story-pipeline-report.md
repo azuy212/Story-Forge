@@ -564,7 +564,7 @@ review:
   generated in 3 m 26 s on CPU.
 - **Transcriber:** WhisperX 3.8.6 on PyTorch 2.8 (CPU) with the wav2vec2
   alignment model, served on port 8030. Forced alignment of all six chunks took
-  12 s.
+  12 s; the free ASR verification pass (§ below) adds ~15 s per chunk on CPU.
 - **Render:** the real FFmpeg single-pass render produced a 40.36 s 1080p
   H.264/AAC file (30 s for the all-real run, 48 s for the earlier fixture run).
 
@@ -594,8 +594,10 @@ What the real run still does **not** prove:
    All six scenes share one look and each depicts its prompt, but the style
    itself is a deviation that needs a decision: accept the cartoon look, or
    tighten the style constraints and re-test.
-2. **Listening.** Nobody has heard the MP4 in this environment. The alignment
-   numbers and cue text are checked; the listening test is the reviewer's.
+2. **Listening.** Nobody has heard the MP4 in this environment. The free ASR
+   pass now proves the script words were spoken (coverage 1.00 on all six
+   chunks), but it says nothing about pacing, emphasis or whether the voice is
+   pleasant; the listening test is the reviewer's.
 3. **Refusal handling** (the single softening retry) is still only unit-tested:
    none of these six prompts was refused.
 
@@ -644,7 +646,7 @@ $ pnpm --filter youtube-shorts-orchestrator story \
     --stages S6_audio,S7_align
 
 Narration audio complete (3m 26s)
-Alignment and subtitles complete (12s)
+Alignment and subtitles complete (1m 34s; includes the free ASR pass)
 
 $ USE_REAL_PROVIDERS=true pnpm --filter youtube-shorts-orchestrator story \
     ... --stages S5_images --from S5_images
@@ -708,6 +710,17 @@ an accented word, _Taíno_). The cue text is the script's, e.g.:
 11 00:00:35,027 --> 00:00:40,126  When they finally saw Spain again, the / sailors had a story no one in Europe had heard.
 ```
 
+**Narration fidelity — one free ASR pass per chunk.** Forced alignment matches
+the text it is given, so `matchRatio = 1` cannot prove the TTS actually said
+every word. S7 therefore sends each chunk to the transcriber _again_, without
+the script, and compares the free transcript to the narration
+(`narrationFidelity`, same token matcher). All six real chunks measure
+`coverage = 1.000` once spoken and written numbers are canonicalised ("October
+eleventh" vs "October 11", "fourteen ninety-two" vs "1492"); a deliberately
+dropped clause lands at 0.79. Coverage below `ASR_COVERAGE_WARN = 0.85` is a
+warning, never a gate, and `STORY_ASR_VERIFY=false` skips the extra pass (it
+doubles transcriber calls — 15 s per chunk on this CPU).
+
 **Render — real single pass, real validation**
 
 ```
@@ -767,6 +780,12 @@ FFmpeg render).
 10. **Provider cache is keyed by prompt.** A cached image is returned even after
     a prompt-level fix, so verifying a prompt change requires clearing
     `apps/image-provider/cache/` (this bit during the Gemini rerun in §6.3).
+11. **Narration verification is advisory.** The free ASR pass proves the words
+    were spoken, not that the performance is good: pace, emphasis and
+    mispronunciation of names are still listening-test territory. Number
+    handling is heuristic (two two-digit groups read as a year), and a number
+    run the heuristic misreads can consume coverage headroom but cannot fail the
+    run.
 
 ## 8. Reproduce
 

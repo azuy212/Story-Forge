@@ -93,6 +93,7 @@ export function resolveStoryConfig(
     imageMinAspect: config.storyImageMinAspect(),
     imageMaxAspect: config.storyImageMaxAspect(),
     ttsMaxChars: config.storyTtsMaxChars(),
+    asrVerify: config.storyAsrVerify(),
     subtitleMaxCharsPerLine: config.storySubtitleMaxCharsPerLine(),
     subtitleMinDurationMs: config.storySubtitleMinDurationMs(),
     crf: config.storyCrf(),

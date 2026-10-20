@@ -17,6 +17,7 @@ import {
 } from "../providers/whisperx-provider.js";
 import {
   alignScene,
+  narrationFidelity,
   OVERALL_ALIGNMENT_GATE,
   toWordTimestamps,
 } from "./alignment.js";
@@ -120,6 +121,11 @@ export interface StoryJobResult {
 const SLOT_CONCURRENCY = 2;
 /** Automated story rewrites on lint/verification failure (brief S2). */
 const STORY_ATTEMPTS = 2;
+/**
+ * Free ASR coverage below this fraction means the TTS chunk is missing (or
+ * badly garbling) script words. Advisory: it never fails the job.
+ */
+const ASR_COVERAGE_WARN = 0.85;
 
 interface StoryContext extends StoryRunContext {
   config: ResolvedStoryConfig;
@@ -1119,6 +1125,7 @@ async function stageAlign(
     fps: ctx.config.fps,
     maxCharsPerLine: ctx.config.subtitleMaxCharsPerLine,
     minDurationMs: ctx.config.subtitleMinDurationMs,
+    asrVerify: ctx.config.asrVerify,
   });
 
   const computed = await runStage(ctx, "S7_align", fingerprint, async () => {
@@ -1147,7 +1154,9 @@ async function stageAlign(
       if (
         scene.status.transcript === "done" &&
         scene.transcript &&
-        stored === chunkFingerprint
+        stored === chunkFingerprint &&
+        // Enabling verification must backfill scenes aligned before it existed.
+        (!ctx.config.asrVerify || scene.transcript.asrCoverage !== undefined)
       ) {
         continue;
       }
@@ -1180,6 +1189,43 @@ async function stageAlign(
         ),
       };
       scene.status.transcript = "done";
+
+      // Forced alignment matches the text it is given, so it cannot notice a
+      // TTS skip. One unconstrained ASR pass per chunk is the only evidence
+      // that every script word was actually spoken.
+      if (ctx.config.asrVerify) {
+        try {
+          const free = await transcriber.align(chunkPath, undefined, {
+            runId: ctx.manifest.jobId,
+            sceneId: scene.sceneId,
+          });
+          const fidelity = narrationFidelity(
+            scene.narration,
+            free.wordTimestamps.map((word) => ({
+              word: word.word,
+              start: word.start,
+              end: word.end,
+            })),
+          );
+          scene.transcript.asrCoverage = fidelity.coverage;
+          if (fidelity.missing.length > 0) {
+            scene.transcript.asrMissing = fidelity.missing.slice(0, 12);
+          }
+          if (fidelity.coverage < ASR_COVERAGE_WARN) {
+            const missing = fidelity.missing.slice(0, 8).join(", ");
+            addWarning(
+              ctx.manifest,
+              `scene ${scene.sceneId}: free ASR heard ${(fidelity.coverage * 100).toFixed(0)}% of the script` +
+                (missing ? ` (missing: ${missing})` : ""),
+            );
+          }
+        } catch (err) {
+          addWarning(
+            ctx.manifest,
+            `scene ${scene.sceneId}: free ASR verification failed (${(err as Error)?.message ?? String(err)})`,
+          );
+        }
+      }
 
       updateStageMetrics(ctx.manifest, "S7_align", {
         chunkFingerprints: {
