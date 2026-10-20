@@ -21,6 +21,11 @@ const LABELS: Record<string, string> = {
   [AgentModel.ReleaseReview]: "Release review",
   [AgentModel.Publisher]: "Publishing",
   [AgentModel.ResolveProfile]: "Resolve profile",
+  [AgentModel.StoryAuthor]: "Story",
+  [AgentModel.StoryVerifier]: "Story verification",
+  [AgentModel.StoryScenePlanner]: "Story scenes",
+  [AgentModel.StoryCharacterDesigner]: "Characters",
+  [AgentModel.StoryVisualPlanner]: "Scene visuals",
   PublishReady: "Publish readiness",
 };
 

@@ -27,6 +27,13 @@ export function promptPathsFor(version: string): Record<string, string> {
     MetadataGenerator: promptPath("metadata-generator"),
     ThumbnailGenerator: promptPath("thumbnail-generator"),
     ThumbnailQA: promptPath("thumbnail-qa"),
+    // Story pipeline prompts live under their own `story-*` prefixes so they
+    // version independently of the Shorts pipeline's agents.
+    StoryAuthor: promptPath("story-story"),
+    StoryVerifier: promptPath("story-verify"),
+    StoryScenePlanner: promptPath("story-scenes"),
+    StoryCharacterDesigner: promptPath("story-characters"),
+    StoryVisualPlanner: promptPath("story-slots"),
   };
   return paths;
 }

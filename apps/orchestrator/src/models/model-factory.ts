@@ -35,12 +35,30 @@ const AGENT_ROLES: Record<AgentModel, string> = {
   // ResolveProfile is non-LLM (deterministic) — see resolve-profile.node.ts.
   // Listed here for type completeness; never resolves to a real model.
   [AgentModel.ResolveProfile]: "SYSTEM",
+  // Story pipeline roles reuse the editorial/QA tiers; STORY_LLM_MODEL is a
+  // single story-scoped override that sits between the per-agent/role model
+  // and the global default.
+  [AgentModel.StoryAuthor]: "PREMIUM",
+  [AgentModel.StoryVerifier]: "QA",
+  [AgentModel.StoryScenePlanner]: "EDITORIAL",
+  [AgentModel.StoryCharacterDesigner]: "EDITORIAL",
+  [AgentModel.StoryVisualPlanner]: "EDITORIAL",
 };
+
+/** Agents belonging to the isolated story pipeline. */
+const STORY_AGENTS: ReadonlySet<AgentModel> = new Set([
+  AgentModel.StoryAuthor,
+  AgentModel.StoryVerifier,
+  AgentModel.StoryScenePlanner,
+  AgentModel.StoryCharacterDesigner,
+  AgentModel.StoryVisualPlanner,
+]);
 
 function resolveModel(agent: AgentModel): string {
   return (
     config.modelForAgent(agent) ??
     config.modelForRole(AGENT_ROLES[agent]) ??
+    (STORY_AGENTS.has(agent) ? config.storyModel() : undefined) ??
     // Read lazily so env changes after module load take effect.
     config.defaultModel()
   );
