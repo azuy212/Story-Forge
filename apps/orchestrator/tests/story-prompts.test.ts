@@ -76,7 +76,13 @@ const DECLARED_VARIABLES: Record<string, string[]> = {
     "sentences",
     "wpm",
   ],
-  "story-characters/v1.md": ["language", "story"],
+  "story-characters/v1.md": [
+    "feedback",
+    "language",
+    "maxCues",
+    "maxWords",
+    "story",
+  ],
   "story-slots/v1.md": [
     "characters",
     "language",

@@ -185,6 +185,17 @@ export interface SceneAudioChunkRecord {
   pieces: SceneAudioPieceRecord[];
   meanVolumeDb?: number;
   wordsPerMinute?: number;
+  /**
+   * Fraction of script words a free (unconstrained) ASR pass heard, 0..1.
+   * Absent when verification is disabled or the chunk predates the check.
+   */
+  asrCoverage?: number;
+  /** Script words the free ASR pass did not hear (first few, for the log). */
+  asrMissing?: string[];
+  /** Set when low coverage triggered the single automatic re-synthesis. */
+  resynthesized?: boolean;
+  /** True once the free-ASR check ran; stops resume from re-checking forever. */
+  asrChecked?: boolean;
 }
 
 export interface SceneTiming {
@@ -206,13 +217,6 @@ export interface SceneTranscript {
   matchRatio: number;
   method: "aligned" | "proportional";
   words: SceneWordTimestamp[];
-  /**
-   * Fraction of script words a free (unconstrained) ASR pass heard, 0..1.
-   * Absent when verification is disabled or the chunk predates the check.
-   */
-  asrCoverage?: number;
-  /** Script words the free ASR pass did not hear (first few, for the log). */
-  asrMissing?: string[];
 }
 
 export interface StoryScene {

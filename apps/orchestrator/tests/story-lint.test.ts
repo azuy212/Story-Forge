@@ -2,8 +2,10 @@ import { describe, it, expect } from "@jest/globals";
 import {
   STORY_COMPLEXITY_THRESHOLDS,
   WORD_BUDGET_TOLERANCE,
+  characterCues,
   findHardWordIssues,
   formatLintViolations,
+  lintCharacterRegistry,
   lintStory,
   storyStyleLimits,
 } from "../src/story/lint.js";
@@ -223,5 +225,57 @@ describe("story lintStory complexity integration", () => {
     const tolerance = Math.round(113 * WORD_BUDGET_TOLERANCE);
     expect(limits.minWords).toBe(113 - tolerance);
     expect(limits.maxWords).toBe(113 + tolerance);
+  });
+});
+
+describe("story lintCharacterRegistry", () => {
+  const character = (id: string, visualDescription: string) => ({
+    id,
+    visualDescription,
+  });
+
+  it("accepts a one-cue description", () => {
+    expect(
+      lintCharacterRegistry([
+        character(
+          "columbus",
+          "A tall stick figure in a wide-brimmed black hat.",
+        ),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("accepts two cues", () => {
+    expect(
+      lintCharacterRegistry([
+        character("rodrigo", "A stick figure with a red sash and a knit cap."),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("rejects a costume list and names the cues", () => {
+    const issues = lintCharacterRegistry([
+      character(
+        "columbus",
+        "A tall man in a dark red knee-length coat over a black doublet, dark hose and a wide-brimmed black hat.",
+      ),
+    ]);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toContain('character "columbus"');
+    expect(issues[0]).toContain("coat, doublet, hose, hat");
+  });
+
+  it("rejects a description over the word cap", () => {
+    const issues = lintCharacterRegistry([
+      character(
+        "sailor",
+        "A young sailor with a red sash who stands beside the rail and looks out over the water.",
+      ),
+    ]);
+    expect(issues[0]).toMatch(/words \(max 16\)/);
+  });
+
+  it("is case-insensitive and counts plurals once", () => {
+    expect(characterCues("Boots, boots, and a HAT.")).toEqual(["boots", "hat"]);
   });
 });

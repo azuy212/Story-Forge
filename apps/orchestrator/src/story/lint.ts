@@ -191,3 +191,56 @@ export function lintStory(
 export function formatLintViolations(report: StoryLintReport): string {
   return report.issues.map((issue) => `- ${issue}`).join("\n");
 }
+
+// ---------------------------------------------------------------------------
+// Character registry lint (S4)
+// ---------------------------------------------------------------------------
+
+/**
+ * One silhouette cue per character is what keeps a stick figure recognisable
+ * at 1080p; a costume list is what makes the image model draw a costume.
+ * The style preamble loses that argument on its own, so the registry is gated.
+ */
+export const CHARACTER_MAX_WORDS = 16;
+export const CHARACTER_MAX_CUES = 2;
+
+const COSTUME_CUE =
+  /\b(hat|cap|hood|helmet|coat|cloak|cape|doublet|tunic|shirt|blouse|robe|dress|gown|skirt|breeches|trousers|pants|hose|stockings|boots|shoes|sandals|sash|belt|bandana|scarf|gloves|armour|armor|armband|necklace|crown|veil|apron|uniform|jacket|vest|waistcoat|kilt|poncho|headband|earring)s?\b/gi;
+
+/** Distinct clothing cues named in a description, lowercased and singular. */
+export function characterCues(description: string): string[] {
+  const seen = new Set<string>();
+  for (const match of description.matchAll(COSTUME_CUE)) {
+    const word = match[1].toLowerCase();
+    seen.add(word);
+  }
+  return [...seen];
+}
+
+/**
+ * Gate the character registry before it is injected verbatim into every scene
+ * prompt. Returns one message per offending character.
+ */
+export function lintCharacterRegistry(
+  characters: { id: string; visualDescription: string }[],
+): string[] {
+  const issues: string[] = [];
+  for (const character of characters) {
+    const description = character.visualDescription.trim();
+    const words = countWords(description);
+    const cues = characterCues(description);
+    const problems: string[] = [];
+    if (words > CHARACTER_MAX_WORDS) {
+      problems.push(`${words} words (max ${CHARACTER_MAX_WORDS})`);
+    }
+    if (cues.length > CHARACTER_MAX_CUES) {
+      problems.push(
+        `${cues.length} clothing cues (${cues.join(", ")}; max ${CHARACTER_MAX_CUES})`,
+      );
+    }
+    if (problems.length > 0) {
+      issues.push(`character "${character.id}": ${problems.join("; ")}`);
+    }
+  }
+  return issues;
+}

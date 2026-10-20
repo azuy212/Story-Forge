@@ -113,15 +113,13 @@ const CHARACTERS = [
     id: "columbus",
     name: "Columbus",
     role: "the captain",
-    visualDescription:
-      "A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat.",
+    visualDescription: "A tall stick figure in a wide-brimmed black hat.",
   },
   {
     id: "the_crew",
     name: "The crew",
     role: "the tired sailors",
-    visualDescription:
-      "Six lean weathered sailors in rough linen shirts, loose dark trousers and cloth caps, drawn at chest height.",
+    visualDescription: "A cluster of weary stick figures in knitted caps.",
   },
 ];
 
@@ -330,6 +328,14 @@ const fakeTtsProvider = {
     await mkdir(dir, { recursive: true });
     const out = resolve(dir, options.filename ?? "part.wav");
     const durationSec = fakeDurationSec(options.text);
+    const sceneKey = options.filename?.match(/scene-(\d{3})/)?.[1];
+    if (sceneKey) {
+      const previous = narrationByScene.get(sceneKey);
+      narrationByScene.set(
+        sceneKey,
+        previous ? `${previous} ${options.text}` : options.text,
+      );
+    }
     await exec("ffmpeg", [
       "-v",
       "error",
@@ -363,17 +369,30 @@ async function ffprobeDurationSec(path) {
 }
 
 /** Deterministic "forced alignment": the script's own tokens, evenly spread. */
-const lastNarration = new Map();
+const narrationByScene = new Map();
+let simulatedSkipPending = true;
 const fakeTranscriber = {
   async align(audioUrl, narration) {
     counts.align += 1;
     const durationSec = await ffprobeDurationSec(audioUrl);
-    // The free ASR pass sends no script; replay the forced-alignment text for
-    // the same chunk so the fake behaves like a perfect transcriber.
-    if (narration !== undefined) lastNarration.set(audioUrl, narration);
-    const tokens = tokenizeScript(
-      narration ?? lastNarration.get(audioUrl) ?? "",
-    );
+    // The free ASR pass sends no script; the fake TTS recorded the text it
+    // spoke into this chunk, so the fake can behave like a perfect
+    // transcriber. One free pass deliberately drops the second half once, to
+    // exercise the automatic re-synthesis.
+    const sceneKey = audioUrl.match(/scene-(\d{3})/)?.[1];
+    const text =
+      narration ??
+      (sceneKey ? narrationByScene.get(sceneKey) : undefined) ??
+      "";
+    const tokens = tokenizeScript(text);
+    if (
+      narration === undefined &&
+      simulatedSkipPending &&
+      audioUrl.includes("scene-002.wav")
+    ) {
+      simulatedSkipPending = false;
+      tokens.splice(Math.ceil(tokens.length / 2));
+    }
     const count = Math.max(1, tokens.length);
     const slice = durationSec / count;
     const round3 = (value) => Math.round(value * 1000) / 1000;
@@ -545,11 +564,15 @@ async function main() {
   });
   await check("free ASR verified every narration chunk", () => {
     for (const scene of manifest.scenes)
-      assert.equal(scene.transcript.asrCoverage, 1);
+      assert.equal(scene.audio.asrCoverage, 1);
     assert.equal(
       manifest.warnings.some((warning) => warning.includes("free ASR")),
       false,
     );
+  });
+  await check("a low-coverage chunk was re-synthesized once", () => {
+    assert.equal(manifest.scenes[1].audio.resynthesized, true);
+    assert.equal(manifest.scenes[1].audio.asrCoverage, 1);
   });
   await check("no voice outliers were flagged", () => {
     const flagged = manifest.warnings.filter((warning) =>

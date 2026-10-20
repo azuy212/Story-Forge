@@ -7,6 +7,8 @@ import {
   runFfmpegWithRetry,
 } from "../providers/composer/ffmpeg/ffmpeg.js";
 import type { TTSProvider } from "../providers/tts-provider.js";
+import type { WhisperXProvider } from "../providers/whisperx-provider.js";
+import { narrationFidelity, type NarrationFidelity } from "./alignment.js";
 import { countWords, splitSentences } from "./sentences.js";
 import {
   buildNarrationConcatArgs,
@@ -96,9 +98,38 @@ export interface AudioStageOptions {
   paths: JobPaths;
   config: ResolvedStoryConfig;
   ttsProvider: TTSProvider;
+  /** Used for the free-ASR fidelity check and its single re-synthesis. */
+  transcriber?: WhisperXProvider;
   voice: string;
   runId: string;
   dryRun?: boolean;
+}
+
+/**
+ * Free ASR coverage below this fraction means the chunk is missing script
+ * words. One automatic re-synthesis runs before the warning is recorded.
+ */
+export const ASR_COVERAGE_WARN = 0.85;
+
+async function measureCoverage(
+  transcriber: WhisperXProvider,
+  chunkPath: string,
+  narration: string,
+  runId: string,
+  sceneId: number,
+): Promise<NarrationFidelity> {
+  const result = await transcriber.align(chunkPath, undefined, {
+    runId,
+    sceneId,
+  });
+  return narrationFidelity(
+    narration,
+    result.wordTimestamps.map((word) => ({
+      word: word.word,
+      start: word.start,
+      end: word.end,
+    })),
+  );
 }
 
 function providerFingerprint(provider: TTSProvider): string {
@@ -120,7 +151,8 @@ function plausibleDuration(
 export async function runAudioStage(
   options: AudioStageOptions,
 ): Promise<AudioStageResult> {
-  const { scenes, paths, config, ttsProvider, voice, runId } = options;
+  const { scenes, paths, config, ttsProvider, transcriber, voice, runId } =
+    options;
   if (storyTtsMode() !== "scene") {
     throw new PipelineError(
       "Story mode only supports per-scene narration chunks",
@@ -135,14 +167,20 @@ export async function runAudioStage(
     const chunkPath = sceneChunkPath(paths, scene.sceneId);
     const words = countWords(scene.narration);
 
-    // Reuse a chunk whose pieces still match text + provider identity.
+    // Reuse a chunk whose pieces still match text + provider identity, unless
+    // verification is on and this chunk has never been checked: then it is
+    // verified in place below instead of being synthesized again.
+    let reusable: SceneAudioChunkRecord | undefined;
     if (
       scene.status.audio === "done" &&
       scene.audio &&
       scene.audio.pieces.length > 0 &&
       scene.audio.pieces.every(
         (piece) => piece.providerFingerprint === fingerprint,
-      )
+      ) &&
+      (!config.asrVerify ||
+        transcriber === undefined ||
+        scene.audio.asrChecked === true)
     ) {
       const piecesText = scene.audio.pieces
         .map((piece) => piece.text)
@@ -162,6 +200,17 @@ export async function runAudioStage(
           // regenerate below
         }
       }
+    } else if (
+      scene.status.audio === "done" &&
+      scene.audio &&
+      scene.audio.pieces.length > 0 &&
+      scene.audio.pieces.every(
+        (piece) => piece.providerFingerprint === fingerprint,
+      ) &&
+      scene.audio.pieces.map((piece) => piece.text).join(" ") ===
+        scene.narration.trim()
+    ) {
+      reusable = scene.audio;
     }
 
     if (options.dryRun) continue;
@@ -173,91 +222,134 @@ export async function runAudioStage(
       continue;
     }
 
-    const pieces: SceneAudioChunkRecord["pieces"] = [];
-    for (let index = 0; index < texts.length; index++) {
-      const text = texts[index];
-      const partPath = scenePartPath(paths, scene.sceneId, index + 1);
-      const existing = scene.audio?.pieces[index];
-      let durationSec =
-        existing && existing.text === text ? existing.durationSec : undefined;
+    const synthesizeChunk = async (force: boolean) => {
+      const pieces: SceneAudioChunkRecord["pieces"] = [];
+      for (let index = 0; index < texts.length; index++) {
+        const text = texts[index];
+        const partPath = scenePartPath(paths, scene.sceneId, index + 1);
+        const existing = force ? undefined : scene.audio?.pieces[index];
+        let durationSec =
+          existing && existing.text === text ? existing.durationSec : undefined;
 
-      if (durationSec !== undefined) {
-        try {
-          const info = await stat(partPath);
-          if (info.size === 0) durationSec = undefined;
-        } catch {
-          durationSec = undefined;
+        if (durationSec !== undefined) {
+          try {
+            const info = await stat(partPath);
+            if (info.size === 0) durationSec = undefined;
+          } catch {
+            durationSec = undefined;
+          }
         }
-      }
 
-      if (durationSec === undefined) {
-        const filename = `scene-${String(scene.sceneId).padStart(3, "0")}-part${String(index + 1).padStart(2, "0")}.wav`;
-        const result = await ttsProvider.synthesize({
+        if (durationSec === undefined) {
+          const filename = `scene-${String(scene.sceneId).padStart(3, "0")}-part${String(index + 1).padStart(2, "0")}.wav`;
+          const result = await ttsProvider.synthesize({
+            text,
+            voice,
+            filename,
+            runId,
+            // Story mode measures true durations: never tempo-normalize.
+            skipWpmNormalization: true,
+          });
+          if (resolve(result.audioUrl) !== partPath) {
+            await copyFile(result.audioUrl, partPath);
+          }
+          let probed;
+          try {
+            probed = await probe(partPath);
+          } catch {
+            throw new PipelineError(
+              `Scene ${scene.sceneId} part ${index + 1} is not decodable audio`,
+              "STORY_TTS_INVALID",
+            );
+          }
+          durationSec =
+            probed.duration > 0 ? probed.duration : result.durationMs / 1000;
+          if (!(durationSec > 0)) {
+            throw new PipelineError(
+              `Scene ${scene.sceneId} part ${index + 1} synthesized with zero duration`,
+              "STORY_TTS_INVALID",
+            );
+          }
+        }
+
+        pieces.push({
+          path: partPath,
+          durationSec: Math.round(durationSec * 1000) / 1000,
           text,
-          voice,
-          filename,
-          runId,
-          // Story mode measures true durations: never tempo-normalize.
-          skipWpmNormalization: true,
+          providerFingerprint: fingerprint,
         });
-        if (resolve(result.audioUrl) !== partPath) {
-          await copyFile(result.audioUrl, partPath);
-        }
-        let probed;
-        try {
-          probed = await probe(partPath);
-        } catch {
-          throw new PipelineError(
-            `Scene ${scene.sceneId} part ${index + 1} is not decodable audio`,
-            "STORY_TTS_INVALID",
-          );
-        }
-        durationSec =
-          probed.duration > 0 ? probed.duration : result.durationMs / 1000;
-        if (!(durationSec > 0)) {
-          throw new PipelineError(
-            `Scene ${scene.sceneId} part ${index + 1} synthesized with zero duration`,
-            "STORY_TTS_INVALID",
-          );
-        }
       }
 
-      pieces.push({
-        path: partPath,
-        durationSec: Math.round(durationSec * 1000) / 1000,
-        text,
-        providerFingerprint: fingerprint,
-      });
+      // Join the pieces into the scene chunk with no extra gap.
+      if (pieces.length === 1) {
+        await copyFile(pieces[0].path, chunkPath);
+      } else {
+        await runFfmpegWithRetry(
+          buildNarrationConcatArgs({
+            chunkPaths: pieces.map((piece) => piece.path),
+            gapMs: 0,
+            outputPath: chunkPath,
+          }),
+          `join narration pieces for scene ${scene.sceneId}`,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          { runId },
+        );
+      }
+
+      const probeResult = await probe(chunkPath);
+      if (!probeResult.hasAudio || probeResult.duration <= 0) {
+        throw new PipelineError(
+          `Scene ${scene.sceneId} narration chunk has no usable audio`,
+          "STORY_TTS_INVALID",
+        );
+      }
+      return { pieces, durationSec: probeResult.duration };
+    };
+
+    let built = reusable
+      ? { pieces: reusable.pieces, durationSec: reusable.durationSec }
+      : await synthesizeChunk(false);
+    let coverage: NarrationFidelity | undefined;
+    let resynthesized = reusable?.resynthesized === true;
+    let asrChecked = reusable?.asrChecked === true;
+    if (transcriber && config.asrVerify) {
+      try {
+        coverage = await measureCoverage(
+          transcriber,
+          chunkPath,
+          scene.narration,
+          runId,
+          scene.sceneId,
+        );
+        asrChecked = true;
+        if (coverage.coverage < ASR_COVERAGE_WARN) {
+          logger.warn(
+            `Scene ${scene.sceneId} narration is missing script words (coverage ${coverage.coverage.toFixed(2)}); re-synthesizing once`,
+            { missing: coverage.missing.slice(0, 8) },
+          );
+          built = await synthesizeChunk(true);
+          resynthesized = true;
+          coverage = await measureCoverage(
+            transcriber,
+            chunkPath,
+            scene.narration,
+            runId,
+            scene.sceneId,
+          );
+        }
+      } catch (err) {
+        // Attempted: do not re-verify (or re-synthesize) on every resume.
+        asrChecked = true;
+        scene.warnings.push(
+          `free ASR verification failed: ${(err as Error)?.message ?? String(err)}`,
+        );
+      }
     }
 
-    // Join the pieces into the scene chunk with no extra gap.
-    if (pieces.length === 1) {
-      await copyFile(pieces[0].path, chunkPath);
-    } else {
-      await runFfmpegWithRetry(
-        buildNarrationConcatArgs({
-          chunkPaths: pieces.map((piece) => piece.path),
-          gapMs: 0,
-          outputPath: chunkPath,
-        }),
-        `join narration pieces for scene ${scene.sceneId}`,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { runId },
-      );
-    }
-
-    const chunkProbe = await probe(chunkPath);
-    if (!chunkProbe.hasAudio || chunkProbe.duration <= 0) {
-      throw new PipelineError(
-        `Scene ${scene.sceneId} narration chunk has no usable audio`,
-        "STORY_TTS_INVALID",
-      );
-    }
-
-    const durationSec = chunkProbe.duration;
+    const { pieces, durationSec } = built;
     const expectedPiecesDuration = pieces.reduce(
       (sum, piece) => sum + piece.durationSec,
       0,
@@ -275,19 +367,36 @@ export async function runAudioStage(
     }
 
     const loudness = await measureLoudness(chunkPath);
-    scene.audio = {
+    const audio: SceneAudioChunkRecord = {
       path: chunkPath,
       durationSec: Math.round(durationSec * 1000) / 1000,
       pieces,
       meanVolumeDb: loudness.meanDb,
       wordsPerMinute:
         durationSec > 0 ? Math.round((words / durationSec) * 60 * 10) / 10 : 0,
+      asrCoverage: coverage?.coverage,
+      asrMissing:
+        coverage && coverage.missing.length > 0
+          ? coverage.missing.slice(0, 12)
+          : undefined,
+      resynthesized: resynthesized ? true : undefined,
+      asrChecked: asrChecked ? true : undefined,
     };
+    scene.audio = audio;
     scene.status.audio = "done";
+
+    if (coverage && coverage.coverage < ASR_COVERAGE_WARN) {
+      const missing = coverage.missing.slice(0, 8).join(", ");
+      scene.warnings.push(
+        `free ASR heard ${(coverage.coverage * 100).toFixed(0)}% of the script` +
+          ` after one re-synthesis` +
+          (missing ? ` (missing: ${missing})` : ""),
+      );
+    }
     chunkResults.push({
       sceneId: scene.sceneId,
       path: chunkPath,
-      durationSec: scene.audio.durationSec,
+      durationSec: audio.durationSec,
     });
   }
 

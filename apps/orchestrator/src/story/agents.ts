@@ -1,7 +1,12 @@
 import { runAgent, type AgentInject } from "../agents/run-agent.js";
 import { AgentModel } from "../models/agent-model.js";
 import { promptPathsFor } from "../models/prompt-paths.js";
-import { storyStyleLimits, type StoryStyleLimits } from "./lint.js";
+import {
+  CHARACTER_MAX_CUES,
+  CHARACTER_MAX_WORDS,
+  storyStyleLimits,
+  type StoryStyleLimits,
+} from "./lint.js";
 import {
   CharacterRegistrySchema,
   SceneGroupingSchema,
@@ -76,6 +81,7 @@ export interface PlanScenesInput {
 export interface DesignCharactersInput {
   story: string;
   language: string;
+  feedback?: string;
 }
 
 export interface PlanSceneVisualsInput {
@@ -269,6 +275,9 @@ export function createStoryAgents(
         variables: {
           story: input.story,
           language: input.language,
+          feedback: input.feedback ?? "(none)",
+          maxWords: String(CHARACTER_MAX_WORDS),
+          maxCues: String(CHARACTER_MAX_CUES),
         },
       });
       return {
