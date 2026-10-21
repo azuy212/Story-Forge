@@ -1,0 +1,18 @@
+A hand-drawn digital illustration in a simple children's storybook style.
+
+Scene: A cluster of weary sailors stands on a wooden ship's deck, most gazing forward at the empty ocean, while two turn their backs to look toward the stern, showing doubt about going on.
+
+Characters:
+- The sailors: A cluster of similar stick figures standing close together on a deck. Pose: a group of about five stick figures slumped against the rail, shoulders drooping, several facing the bow with arms hanging, two others turned away with bodies angled toward the stern. Expression: tired and doubtful, brows drawn low, mouths flat or turned down.
+
+Setting: the deck of a small wooden sailing ship far out at sea, empty endless ocean on every side, no land anywhere, hazy daytime sky
+
+Key props: a wooden ship's rail, coiled rope on the deck, a single mast with slack sail, empty open water stretching to a flat horizon
+
+Lighting: pale, flat midday light with a washed-out grey-blue sky and muted sea
+
+Composition: wide 16:9 horizontal framing, medium-wide camera at deck level, sailors grouped left of center, the flat horizon running across the upper middle, the open sea in the lower frame kept empty and calm for subtitles
+
+Style constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.
+
+Wide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.

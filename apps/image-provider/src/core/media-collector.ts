@@ -24,6 +24,41 @@ export interface MediaCollectorDeps {
 const MIN_IMAGE_BYTES = 2048;
 const MIN_VIDEO_BYTES = 1024;
 
+/**
+ * Chrome icons and avatars are smaller than any generated image. A 32px
+ * account avatar that finishes loading after submission used to count as "a
+ * new result" and end the poll before the real image existed, so candidates
+ * carry their rendered size and the filter is a pure function.
+ */
+export const MIN_RESULT_IMAGE_PX = 100;
+
+export interface MediaCandidate {
+  src: string;
+  width: number;
+  height: number;
+}
+
+function plausibleSrc(src: string): boolean {
+  return src.length > 0 && !src.startsWith('data:');
+}
+
+/** Source URLs from image candidates that are large enough to be a result. */
+export function resultImageSrcs(candidates: readonly MediaCandidate[]): string[] {
+  return candidates
+    .filter(
+      (candidate) =>
+        candidate.width >= MIN_RESULT_IMAGE_PX &&
+        candidate.height >= MIN_RESULT_IMAGE_PX &&
+        plausibleSrc(candidate.src),
+    )
+    .map((candidate) => candidate.src);
+}
+
+/** Source URLs from video candidates (no size floor; posters are small). */
+export function videoSrcs(candidates: readonly MediaCandidate[]): string[] {
+  return candidates.map((candidate) => candidate.src).filter(plausibleSrc);
+}
+
 export class MediaCollector {
   constructor(private readonly deps: MediaCollectorDeps) {}
 
@@ -189,27 +224,18 @@ export class MediaCollector {
     const page = this.deps.getPage();
     if (!page) return [];
     const selector = kind === 'images' ? 'img' : 'video, video source';
-    return page.evaluate((sel) => {
-      return (
-        Array.from(document.querySelectorAll(sel))
-          // Chrome icons and avatars are smaller than any generated image; a
-          // 32px avatar arriving late must not end the poll before the result
-          // exists.
-          .filter((el) => {
-            if (sel !== 'img') return true;
-            const img = el as HTMLImageElement;
-            return (
-              (img.naturalWidth || img.width) >= 100 && (img.naturalHeight || img.height) >= 100
-            );
-          })
-          .map((el) => {
-            const node = el as HTMLImageElement & HTMLVideoElement & HTMLSourceElement;
-            const src = node.currentSrc || node.src || '';
-            return src;
-          })
-          .filter((s) => s && s.length > 0 && !s.startsWith('data:'))
-      );
+    const candidates = await page.evaluate((sel): MediaCandidate[] => {
+      return Array.from(document.querySelectorAll(sel)).map((el) => {
+        const node = el as HTMLImageElement & HTMLVideoElement & HTMLSourceElement;
+        return {
+          src: node.currentSrc || node.src || '',
+          width: (node as HTMLImageElement).naturalWidth || (node as HTMLImageElement).width || 0,
+          height:
+            (node as HTMLImageElement).naturalHeight || (node as HTMLImageElement).height || 0,
+        };
+      });
     }, selector);
+    return kind === 'images' ? resultImageSrcs(candidates) : videoSrcs(candidates);
   }
 
   private async downloadBuffer(src: string, cache: Map<string, Buffer>): Promise<Buffer | null> {

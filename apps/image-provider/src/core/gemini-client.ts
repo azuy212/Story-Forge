@@ -8,6 +8,7 @@ import { AssetCache } from '../storage/cache.js';
 import { MediaCollector } from './media-collector.js';
 import { GeminiErrorDetector } from './gemini-error-detector.js';
 import { normalizeImagesPrompt } from './prompt-text.js';
+import { chooseCreateMode } from './create-mode.js';
 import { uploadReferenceImages } from './reference-upload.js';
 import type { AssetType, GenerationOptions, GenerationResult, MediaAsset } from './types.js';
 
@@ -455,16 +456,24 @@ export class GeminiClient {
     // renders; the menu path below stays as the fallback for accounts or
     // locales where that surface is not served.
     //
-    // Checked before the cached-mode shortcut: a finished generation navigates
-    // to its conversation, so the composer that was live for the previous
-    // request is gone even though the mode flag still says "image".
-    if (assetType === 'image' && (await this.enterImagesPage())) {
+    // The surface is probed on every request, before the cached-mode shortcut:
+    // a finished generation navigates to its conversation, so the composer
+    // that was live for the previous request is gone even though the mode flag
+    // still says "image". `chooseCreateMode` holds that ordering rule.
+    const imagesSurfaceReady = assetType === 'image' ? await this.enterImagesPage() : false;
+    const action = chooseCreateMode(
+      assetType,
+      this._createModeActive.has(assetType),
+      imagesSurfaceReady,
+    );
+
+    if (action === 'images') {
       this._createModeActive.add(assetType);
       this.logger.debug('Using the Gemini Images composer');
       return;
     }
 
-    if (this._createModeActive.has(assetType)) {
+    if (action === 'cached') {
       this.logger.debug('Create mode already active (cached)', { assetType });
       return;
     }
