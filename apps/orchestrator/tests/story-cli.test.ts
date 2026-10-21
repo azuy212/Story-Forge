@@ -43,6 +43,16 @@ describe("story-video CLI", () => {
     expect(assignedKeys()).not.toContain("targetDurationSec");
   });
 
+  it("accepts --regenerate-prompts as a job option distinct from --from", () => {
+    expect(SCRIPT).toContain('"--regenerate-prompts"');
+    expect(SCRIPT).toContain(
+      "overrides.regeneratePrompts = options.regeneratePrompts",
+    );
+    // It is a job option, not a config override, so the unknown-key guard
+    // must exempt it explicitly.
+    expect(SCRIPT).toContain('key !== "regeneratePrompts"');
+  });
+
   it("rejects an unknown override key instead of ignoring it", () => {
     // The guard has to exist, otherwise a future flag can go dead silently.
     expect(SCRIPT).toContain("unknownOverrides");

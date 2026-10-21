@@ -756,9 +756,17 @@ manifest: /…/jobs/the-mutiny-…/manifest.json
 | `--scene-gap-ms <ms>`              | `200`                    | silence held between scenes (never after the last one)        |
 | `--stages <list>`                  | all                      | run only these stages                                         |
 | `--from <stage>`                   | —                        | force this stage and every later stage to rerun               |
+| `--regenerate-prompts`             | `false`                  | discard stored scene prompts and re-plan them in S4 only      |
 | `--dry-run`                        | `false`                  | validate the input, print the plan, make no paid call         |
 | `--review-story`                   | `false`                  | print the story and wait for approval (`y`) before continuing |
 | `--json`                           | `false`                  | print the result summary as JSON                              |
+
+`--regenerate-prompts` and `--from S4_visual_plan` are not the same thing.
+Both re-plan prompts, but `--from S4_visual_plan` also forces S5-S8, so every
+image, narration chunk, alignment and the render are rebuilt. With
+`--regenerate-prompts`, only the prompts are discarded and re-planned; S5-S8
+still decide from their own fingerprints, so an image or audio file whose
+inputs did not change is reused.
 
 Exit codes: `0` complete **or a successful dry run**, `1` failed, `2` an
 incomplete run (some stages are still pending — e.g. `--stages S1_input,S2_story`).

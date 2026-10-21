@@ -88,6 +88,12 @@ export interface StoryJobOptions extends StoryCliOverrides {
   stages?: StoryStage[];
   /** Force this stage and every later stage to rerun. */
   from?: StoryStage;
+  /**
+   * Discard every scene's stored prompt and re-plan prompts in S4, without
+   * forcing S5-S8. Distinct from `from: "S4_visual_plan"`, which reruns the
+   * images, narration, alignment and render as well.
+   */
+  regeneratePrompts?: boolean;
   /** Validate input and report the plan without any paid call. */
   dryRun?: boolean;
   /** Pause after the story is written and wait for interactive approval. */
@@ -134,8 +140,13 @@ function stageIndex(stage: StoryStage): number {
   return STORY_STAGES.indexOf(stage);
 }
 
-function buildForceStages(options: StoryJobOptions): Set<StoryStage> {
+export function buildForceStages(options: StoryJobOptions): Set<StoryStage> {
   const forceStages = new Set<StoryStage>();
+  if (options.regeneratePrompts) {
+    // Only the prompt planner is forced. S5-S8 decide for themselves from
+    // their own fingerprints, so unchanged images and audio are reused.
+    forceStages.add("S4_visual_plan");
+  }
   if (options.from) {
     const from = stageIndex(options.from);
     if (from < 0) {
@@ -158,6 +169,29 @@ function buildForceStages(options: StoryJobOptions): Set<StoryStage> {
     forceStages.add(stage);
   }
   return forceStages;
+}
+
+/**
+ * Forget the per-scene prompt so the S4 planner re-plans it.
+ *
+ * Only prompt state is cleared: the scene's image, audio, transcript, timing
+ * and status for those stages stay untouched, so the rerun does not orphan
+ * work that is still valid.
+ */
+export function clearScenePromptState(
+  scenes: {
+    status: { prompt: "pending" | "done" | "failed" };
+    imagePrompt?: string;
+    promptFingerprint?: string;
+    imagePromptWarnings: string[];
+  }[],
+): void {
+  for (const scene of scenes) {
+    scene.status.prompt = "pending";
+    scene.imagePrompt = undefined;
+    scene.promptFingerprint = undefined;
+    scene.imagePromptWarnings = [];
+  }
 }
 
 function wantsStage(options: StoryJobOptions, stage: StoryStage): boolean {
@@ -230,6 +264,16 @@ export async function runStoryJob(
       sceneGapMs: config.sceneGapMs,
       asrVerify: config.asrVerify,
     });
+  }
+
+  if (options.regeneratePrompts && manifest.scenes.length > 0) {
+    clearScenePromptState(manifest.scenes);
+    // Persist before S4 starts: a crash mid-plan then resumes with the prompt
+    // state already cleared, instead of silently keeping the old prompts.
+    await writeJsonFile(paths.scenes, manifest.scenes);
+    logger.info(
+      `Discarded ${manifest.scenes.length} stored scene prompt(s); S4 will re-plan them`,
+    );
   }
 
   const ctx: StoryContext = {

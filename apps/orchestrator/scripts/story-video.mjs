@@ -88,6 +88,11 @@ program
     String,
   )
   .option(
+    "--regenerate-prompts",
+    "discard stored scene prompts and re-plan them in S4 (keeps images/audio unless their own inputs changed)",
+    false,
+  )
+  .option(
     "--dry-run",
     "validate the input and print the plan without any paid call",
     false,
@@ -137,6 +142,7 @@ if (options.stages !== undefined) {
   overrides.stages = stages;
 }
 assign("from", options.from);
+overrides.regeneratePrompts = options.regeneratePrompts;
 overrides.dryRun = options.dryRun;
 overrides.reviewStory = options.reviewStory;
 
@@ -147,6 +153,7 @@ const unknownOverrides = Object.keys(overrides).filter(
     !STORY_CLI_OVERRIDE_KEYS.includes(key) &&
     key !== "stages" &&
     key !== "from" &&
+    key !== "regeneratePrompts" &&
     key !== "dryRun" &&
     key !== "reviewStory",
 );
