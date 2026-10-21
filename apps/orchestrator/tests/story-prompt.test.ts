@@ -246,6 +246,39 @@ describe("story lintImagePrompt", () => {
     ).toContain("close, portrait and face shots");
   });
 
+  it.each([
+    "the crew waits in a line along the rail",
+    "the sailors stand lined up on the deck",
+    "a row of islanders watches from the beach",
+  ])("rejects a group lineup: %s", (composition) => {
+    expect(
+      messages({
+        slots: slots({
+          characters: [
+            {
+              id: "the_crew",
+              pose: "waiting together",
+              expression: "uneasy",
+            },
+          ],
+          composition,
+        }),
+        characters: [{ ...CREW, kind: "group" }, COLUMBUS],
+      }),
+    ).toContain("stagger the members in depth");
+  });
+
+  it("allows a lineup phrase when no group is in the scene", () => {
+    expect(
+      messages({
+        slots: slots({
+          composition:
+            "a row of pebbles across the foreground, the captain on the left third",
+        }),
+      }),
+    ).toBe("");
+  });
+
   it("accepts face-to-face staging and the allowed shot vocabulary", () => {
     expect(
       messages({

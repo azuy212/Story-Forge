@@ -14,7 +14,7 @@ import {
   buildNarrationConcatArgs,
   concatNarrationWithGaps,
 } from "./ffmpeg-args.js";
-import { measureLoudness } from "./media.js";
+import { detectSilence, measureLoudness } from "./media.js";
 import { sceneChunkPath, scenePartPath } from "./paths.js";
 import type { JobPaths } from "./paths.js";
 import { storyTtsMode } from "./config.js";
@@ -110,6 +110,10 @@ export interface AudioStageOptions {
  * words. One automatic re-synthesis runs before the warning is recorded.
  */
 export const ASR_COVERAGE_WARN = 0.85;
+/** An internal pause longer than this makes the scene feel stalled. */
+export const INTERNAL_SILENCE_WARN_SEC = 1.0;
+/** Cap on silence-driven re-synthesis per chunk (S8 still gates the master). */
+export const MAX_SILENCE_RETAKES = 2;
 
 async function measureCoverage(
   transcriber: WhisperXProvider,
@@ -349,6 +353,44 @@ export async function runAudioStage(
       }
     }
 
+    let silenceRetakes = reusable?.silenceRetakes ?? 0;
+    let maxInternalSilenceSec = reusable?.maxInternalSilenceSec ?? 0;
+    const internalSilences = async (duration: number) => {
+      const silences = await detectSilence(
+        chunkPath,
+        -50,
+        INTERNAL_SILENCE_WARN_SEC,
+      );
+      return silences.filter((silence) => {
+        const start = silence.start ?? 0;
+        const end = silence.end ?? duration;
+        return start > 0.05 && end < duration - 0.05;
+      });
+    };
+    let internal = await internalSilences(built.durationSec);
+    maxInternalSilenceSec = Math.max(
+      maxInternalSilenceSec,
+      ...internal.map((silence) => silence.duration),
+    );
+    while (internal.length > 0 && silenceRetakes < MAX_SILENCE_RETAKES) {
+      logger.warn(
+        `Scene ${scene.sceneId} narration has a ${internal[0].duration.toFixed(2)}s internal pause; re-synthesizing (retake ${silenceRetakes + 1}/${MAX_SILENCE_RETAKES})`,
+      );
+      built = await synthesizeChunk(true);
+      silenceRetakes += 1;
+      internal = await internalSilences(built.durationSec);
+      maxInternalSilenceSec = Math.max(
+        maxInternalSilenceSec,
+        ...internal.map((silence) => silence.duration),
+      );
+    }
+    if (internal.length > 0) {
+      const message =
+        `narration still has a ${internal[0].duration.toFixed(2)}s internal pause` +
+        ` after ${silenceRetakes} silence retake(s); S8 will gate the master`;
+      if (!scene.warnings.includes(message)) scene.warnings.push(message);
+    }
+
     const { pieces, durationSec } = built;
     const expectedPiecesDuration = pieces.reduce(
       (sum, piece) => sum + piece.durationSec,
@@ -381,6 +423,11 @@ export async function runAudioStage(
           : undefined,
       resynthesized: resynthesized ? true : undefined,
       asrChecked: asrChecked ? true : undefined,
+      silenceRetakes: silenceRetakes > 0 ? silenceRetakes : undefined,
+      maxInternalSilenceSec:
+        maxInternalSilenceSec > 0
+          ? Math.round(maxInternalSilenceSec * 1000) / 1000
+          : undefined,
     };
     scene.audio = audio;
     scene.status.audio = "done";

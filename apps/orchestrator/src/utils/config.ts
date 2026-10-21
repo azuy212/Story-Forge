@@ -314,7 +314,7 @@ export const config = {
   storyLanguage: (): string => read("STORY_LANGUAGE")?.trim() || "en",
   storyTone: (): string | undefined => read("STORY_TONE") || undefined,
   storyStyle: (): string => read("STORY_STYLE")?.trim() || "stickman-history",
-  storyTtsWpm: (): number => readPositiveNumber("STORY_TTS_WPM", 150),
+  storyTtsWpm: (): number => readPositiveNumber("STORY_TTS_WPM", 175),
   // Gemini web automation is captcha/session sensitive, so the story pipeline
   // defaults to one in-flight image request; raise it deliberately.
   storyImageConcurrency: (): number =>

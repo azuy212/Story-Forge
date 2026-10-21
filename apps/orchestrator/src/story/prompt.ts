@@ -190,6 +190,14 @@ const FACE_IDIOM =
   /\bface[sd]?\s+(?:to\s+face|the|towards?|away|him|her|them|each\s+other)\b/giu;
 
 /**
+ * A group drawn as a line reads as a copied stamp, not a crowd. The slot
+ * planner is told to stagger depth and vary poses; this keeps the old wording
+ * from slipping back in.
+ */
+const CROWD_LINEUP =
+  /\b(?:in\s+a\s+(?:straight\s+)?line|lined\s+up|row\s+of)\b/iu;
+
+/**
  * Lint the composed prompt before any image call (brief section 6):
  * script check for the job language, no repeated adjacent words, no unfilled
  * placeholders, every required slot non-empty, registered characters only,
@@ -282,6 +290,23 @@ export function lintImagePrompt(options: {
       issues.push({
         message: `slot asks for "${framing[0]}" framing — close, portrait and face shots make the model draw a detailed oversized head; use wide, medium, over-the-shoulder, high-angle or low-angle framing`,
       });
+    }
+  }
+
+  const groupIds = new Set(
+    characters
+      .filter((character) => character.kind === "group")
+      .map((character) => character.id),
+  );
+  const hasGroup = slots.characters.some((entry) => groupIds.has(entry.id));
+  if (hasGroup) {
+    for (const value of [slots.action, slots.composition]) {
+      const lineup = CROWD_LINEUP.exec(value);
+      if (lineup) {
+        issues.push({
+          message: `slot arranges a group as "${lineup[0]}" — stagger the members in depth with at least two poses, and face opposing groups toward each other`,
+        });
+      }
     }
   }
 

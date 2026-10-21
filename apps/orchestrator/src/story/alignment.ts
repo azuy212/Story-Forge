@@ -493,8 +493,20 @@ function fidelityKeys(tokens: string[]): FidelityKey[] {
     ) {
       index += 1;
     }
+    let canonical = canonicalNumberRun(tokens.slice(start, index));
+    // "twenty-three and a half" is spoken decimals: WhisperX writes "23.5"
+    // (and the reverse can happen too), so both sides collapse to one key.
+    const plain = (offset: number): string =>
+      (tokens[index + offset] ?? "").toLowerCase().replace(/[^a-z0-9]+$/, "");
+    if (plain(0) === "and" && plain(1) === "a" && plain(2) === "half") {
+      const base = Number(canonical);
+      if (Number.isFinite(base)) {
+        canonical = String(base + 0.5);
+        index += 3;
+      }
+    }
     keys.push({
-      key: `#${canonicalNumberRun(tokens.slice(start, index))}`,
+      key: `#${canonical}`,
       tokenIndexes: Array.from(
         { length: index - start },
         (_, offset) => start + offset,

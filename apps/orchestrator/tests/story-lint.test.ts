@@ -337,4 +337,91 @@ describe("story lintCharacterRegistry", () => {
   it("is case-insensitive and counts plurals once", () => {
     expect(characterCues("Boots, boots, and a HAT.")).toEqual(["boots", "hat"]);
   });
+
+  it("accepts v2 individuals with one item and one unique colour", () => {
+    expect(
+      lintCharacterRegistry(
+        [
+          character(
+            "columbus",
+            "A tall stick figure in a wide-brimmed black hat.",
+          ),
+          character("ferdinand", "A stick figure in a gold crown."),
+          character("isabella", "A stick figure in a red veil."),
+          character(
+            "the_crew",
+            "Stick figures in rough linen shirts with rope belts.",
+            "group",
+          ),
+        ],
+        { version: 2 },
+      ),
+    ).toEqual([]);
+  });
+
+  it("rejects a v2 individual without a colour", () => {
+    const issues = lintCharacterRegistry(
+      [character("columbus", "A tall stick figure in a wide-brimmed hat.")],
+      { version: 2 },
+    );
+    expect(issues.join("\n")).toMatch(/no colour cue/);
+  });
+
+  it("rejects two v2 individuals sharing a colour", () => {
+    const issues = lintCharacterRegistry(
+      [
+        character("columbus", "A stick figure in a black hat."),
+        character("ferdinand", "A stick figure in a black crown."),
+      ],
+      { version: 2 },
+    );
+    expect(issues.join("\n")).toMatch(
+      /individuals "columbus" and "ferdinand" share the colour "black"/,
+    );
+  });
+
+  it("rejects a group reusing an individual's cue in v2", () => {
+    const issues = lintCharacterRegistry(
+      [
+        character("columbus", "A stick figure in a black hat."),
+        character(
+          "the_crew",
+          "Stick figures in grey hats and rough shirts.",
+          "group",
+        ),
+      ],
+      { version: 2 },
+    );
+    expect(issues.join("\n")).toMatch(
+      /share the cue "hat"; a group may not reuse an individual's cue/,
+    );
+  });
+
+  it("rejects more than five individuals", () => {
+    const colours = ["black", "white", "red", "blue", "green", "yellow"];
+    const items = ["hat", "coat", "sash", "crown", "veil", "beard"];
+    const issues = lintCharacterRegistry(
+      colours.map((colour, index) =>
+        character(
+          `person_${index}`,
+          `A stick figure in a ${colour} ${items[index]}.`,
+        ),
+      ),
+      { version: 2 },
+    );
+    expect(issues.join("\n")).toMatch(/6 individuals \(max 5\)/);
+  });
+
+  it("keeps a legacy v1 registry without colours or cross-kind checks", () => {
+    expect(
+      lintCharacterRegistry([
+        character("columbus", "A stick figure in a flat black hat."),
+        character(
+          "the_crew",
+          "Stick figures in flat black hats and rough shirts.",
+          "group",
+        ),
+      ]),
+    ).toEqual([]);
+  });
 });

@@ -268,6 +268,15 @@ describe("story narrationFidelity", () => {
     expect(fidelity.missing).toEqual([]);
   });
 
+  it("matches a spoken half against the ASR decimal form", () => {
+    const fidelity = narrationFidelity(
+      "It leans over, tipped about twenty-three and a half degrees.",
+      asr(["It", "leans", "over", "tipped", "about", "23.5", "degrees"]),
+    );
+    expect(fidelity.coverage).toBe(1);
+    expect(fidelity.missing).toEqual([]);
+  });
+
   it("flags a repeated word in place of the script's ending", () => {
     const fidelity = narrationFidelity(
       "We saw land and we cheered.",

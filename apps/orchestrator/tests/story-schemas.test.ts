@@ -157,6 +157,7 @@ describe("CharacterRegistrySchema", () => {
   it("accepts a registry entry", () => {
     expect(
       CharacterRegistrySchema.safeParse({
+        registryVersion: 2,
         characters: [
           {
             id: "gutenberg",
@@ -172,21 +173,48 @@ describe("CharacterRegistrySchema", () => {
   it("rejects an entry without a visual description", () => {
     expect(
       CharacterRegistrySchema.safeParse({
+        registryVersion: 2,
         characters: [{ id: "g", name: "G", role: "printer" }],
       }).success,
     ).toBe(false);
   });
 
   it("accepts an empty registry for a story with no recurring character", () => {
+    expect(
+      CharacterRegistrySchema.safeParse({
+        registryVersion: 2,
+        characters: [],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects a registry without the v2 version marker", () => {
     expect(CharacterRegistrySchema.safeParse({ characters: [] }).success).toBe(
-      true,
+      false,
     );
+    expect(
+      CharacterRegistrySchema.safeParse({
+        registryVersion: 1,
+        characters: [],
+      }).success,
+    ).toBe(false);
   });
 });
 
 describe("SceneVisualSlotsSchema", () => {
   it("accepts a complete slot set", () => {
     expect(SceneVisualSlotsSchema.safeParse(slots).success).toBe(true);
+  });
+
+  it("rejects more than four characters in one scene", () => {
+    const many = Array.from({ length: 5 }, (_, index) => ({
+      id: `c${index}`,
+      pose: "standing",
+      expression: "calm",
+    }));
+    expect(
+      SceneVisualSlotsSchema.safeParse({ ...slots, characters: many }).success,
+    ).toBe(false);
   });
 
   it("rejects a blank required slot", () => {

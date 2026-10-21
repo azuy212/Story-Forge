@@ -108,7 +108,7 @@ describe("story resolveStoryConfig", () => {
       language: "en",
       tone: undefined,
       style: "stickman-history",
-      wpm: 150,
+      wpm: 175,
       imageConcurrency: 1,
       sceneMinSec: 3,
       sceneTargetMinSec: 6,
@@ -174,7 +174,7 @@ describe("story resolveStoryConfig", () => {
 
     const config = resolveStoryConfig({ topic: "x" });
     expect(config.targetDurationSec).toBe(150);
-    expect(config.wpm).toBe(150);
+    expect(config.wpm).toBe(175);
     // DP1: per-scene chunking is a constant, not an inherit-able mode.
     expect(storyTtsMode()).toBe("scene");
   });

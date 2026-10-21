@@ -224,6 +224,7 @@ describe("story agent prompt rendering", () => {
 
   it("renders the character designer prompt from the story", async () => {
     const { calls, inject } = captureInject({
+      registryVersion: 2,
       characters: [
         {
           id: "columbus",

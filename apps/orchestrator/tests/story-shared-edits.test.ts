@@ -281,7 +281,7 @@ describe("shared edit: the STORY_* config block is isolated", () => {
   });
 
   it("exposes the story defaults behind their own accessors", () => {
-    expect(config.storyTtsWpm()).toBe(150);
+    expect(config.storyTtsWpm()).toBe(175);
     expect(config.storyStyle()).toBe("stickman-history");
     expect(config.storyJobsDir()).toBe("jobs");
     expect(config.storyVoice()).toBe("narrator");
@@ -289,7 +289,7 @@ describe("shared edit: the STORY_* config block is isolated", () => {
     expect(config.storyReferenceSheet()).toBe(false);
 
     const story = resolveStoryConfig({ topic: "x" });
-    expect(story.wpm).toBe(150);
+    expect(story.wpm).toBe(175);
     expect(storyTtsMode()).toBe("scene");
   });
 });

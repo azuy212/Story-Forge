@@ -203,9 +203,24 @@ export function formatLintViolations(report: StoryLintReport): string {
  */
 export const CHARACTER_MAX_WORDS = 16;
 export const CHARACTER_MAX_CUES = 2;
+/** Five distinct silhouettes is the most a viewer can carry across scenes. */
+export const CHARACTER_MAX_INDIVIDUALS = 5;
 
 const COSTUME_CUE =
   /\b(hat|cap|hood|helmet|coat|cloak|cape|doublet|tunic|shirt|blouse|robe|dress|gown|skirt|breeches|trousers|pants|hose|stockings|boots|shoes|sandals|sash|belt|bandana|scarf|gloves|armour|armor|armband|necklace|crown|veil|apron|uniform|jacket|vest|waistcoat|kilt|poncho|headband|earring|beard|moustache|mustache|eyepatch|scar|tattoo|braid|topknot)s?\b/gi;
+
+const COLOUR_CUE =
+  /\b(black|white|red|crimson|blue|navy|green|olive|yellow|gold|orange|purple|pink|brown|tan|beige|grey|gray|silver|teal)\b/gi;
+
+/** Distinct basic colours named in a description (gray folds into grey). */
+export function characterColours(description: string): string[] {
+  const seen = new Set<string>();
+  for (const match of description.matchAll(COLOUR_CUE)) {
+    const colour = match[1].toLowerCase();
+    seen.add(colour === "gray" ? "grey" : colour);
+  }
+  return [...seen];
+}
 
 /** Distinct clothing or silhouette cues named in a description. */
 export function characterCues(description: string): string[] {
@@ -247,12 +262,16 @@ export function characterStagingIssues(description: string): string[] {
  * prompt. Returns one message per offending character, plus one per duplicated
  * cue.
  *
- * - an individual carries exactly one cue, because that is what makes them
- *   recognisable as the same person in the next scene;
+ * - an individual carries exactly one cue and (v2) exactly one colour,
+ *   because that is what makes them recognisable as the same person in the
+ *   next scene;
+ * - individuals share neither item nor colour;
  * - a group may carry none (an anonymous crowd) or up to the shared limit,
- *   and may repeat its members' base costume — that is what makes a crowd read
- *   as the same people;
+ *   but may not reuse an individual's cue;
  * - two individuals, or two groups, may not share a cue.
+ *
+ * Stored v1 registries (no version) skip the colour and cross-kind rules so a
+ * resume keeps working; new registries are planned as v2.
  */
 export function lintCharacterRegistry(
   characters: {
@@ -260,12 +279,23 @@ export function lintCharacterRegistry(
     kind?: "individual" | "group";
     visualDescription: string;
   }[],
+  options: { version?: number } = {},
 ): string[] {
+  const version = options.version ?? 1;
   const issues: string[] = [];
   const cueOwners = new Map<
     string,
     { id: string; kind: "individual" | "group" }[]
   >();
+  const colourOwners = new Map<string, string[]>();
+  const individuals = characters.filter(
+    (character) => (character.kind ?? "individual") === "individual",
+  );
+  if (individuals.length > CHARACTER_MAX_INDIVIDUALS) {
+    issues.push(
+      `${individuals.length} individuals (max ${CHARACTER_MAX_INDIVIDUALS}); fold the least important ones into a group`,
+    );
+  }
 
   for (const character of characters) {
     const kind = character.kind ?? "individual";
@@ -290,6 +320,21 @@ export function lintCharacterRegistry(
         `${cues.length} cues (${cues.join(", ")}; a group may name ${CHARACTER_MAX_CUES})`,
       );
     }
+    if (version >= 2 && kind === "individual") {
+      const colours = characterColours(description);
+      if (colours.length !== 1) {
+        problems.push(
+          colours.length === 0
+            ? "no colour cue (a v2 individual needs exactly one)"
+            : `${colours.length} colours (${colours.join(", ")}; a v2 individual needs exactly one)`,
+        );
+      }
+      for (const colour of colours) {
+        const owners = colourOwners.get(colour) ?? [];
+        owners.push(character.id);
+        colourOwners.set(colour, owners);
+      }
+    }
     if (problems.length > 0) {
       issues.push(`character "${character.id}": ${problems.join("; ")}`);
     }
@@ -305,7 +350,13 @@ export function lintCharacterRegistry(
       for (let right = left + 1; right < owners.length; right += 1) {
         const first = owners[left];
         const second = owners[right];
-        if (first.kind !== second.kind) continue;
+        if (first.kind !== second.kind) {
+          if (version < 2) continue;
+          issues.push(
+            `characters "${first.id}" and "${second.id}" share the cue "${cue}"; a group may not reuse an individual's cue`,
+          );
+          continue;
+        }
         issues.push(
           `characters "${first.id}" and "${second.id}" share the cue "${cue}"; ` +
             (first.kind === "individual"
@@ -313,6 +364,14 @@ export function lintCharacterRegistry(
               : "each group needs a distinct cue"),
         );
       }
+    }
+  }
+
+  for (const [colour, ids] of colourOwners) {
+    if (ids.length > 1) {
+      issues.push(
+        `individuals ${ids.map((id) => `"${id}"`).join(" and ")} share the colour "${colour}"; each individual needs a distinct colour`,
+      );
     }
   }
 

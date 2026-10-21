@@ -51,6 +51,43 @@ function writeWav(path: string, seconds: number, frequency = 440): void {
   );
 }
 
+function writeWavWithGap(
+  path: string,
+  gapSeconds: number,
+  toneSeconds = 0.8,
+  frequency = 300,
+): void {
+  mkdirSync(join(path, ".."), { recursive: true });
+  execFileSync(
+    "ffmpeg",
+    [
+      "-y",
+      "-loglevel",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      `sine=frequency=${frequency}:sample_rate=24000:duration=${toneSeconds}`,
+      "-f",
+      "lavfi",
+      "-i",
+      `anullsrc=r=24000:cl=mono:d=${gapSeconds}`,
+      "-f",
+      "lavfi",
+      "-i",
+      `sine=frequency=${frequency}:sample_rate=24000:duration=${toneSeconds}`,
+      "-filter_complex",
+      "[0:a][1:a][2:a]concat=n=3:v=0:a=1",
+      "-c:a",
+      "pcm_s16le",
+      "-ac",
+      "1",
+      path,
+    ],
+    { stdio: "pipe" },
+  );
+}
+
 interface FakeProvider extends TTSProvider {
   calls: number;
   texts: string[];
@@ -62,6 +99,8 @@ function fakeProvider(
     seconds?: (text: string, words: number) => number;
     /** Write an empty file instead of audio. */
     empty?: boolean;
+    /** Internal pause in seconds for the given synthesis call (1-based). */
+    gap?: (call: number) => number | undefined;
   } = {},
 ): FakeProvider {
   const provider: FakeProvider = {
@@ -80,7 +119,12 @@ function fakeProvider(
         const seconds = options.seconds
           ? options.seconds(opts.text, words)
           : Math.max(0.6, (words / 150) * 60);
-        writeWav(path, seconds, 300 + provider.calls * 20);
+        const gap = options.gap?.(provider.calls);
+        if (gap !== undefined) {
+          writeWavWithGap(path, gap, seconds / 2, 300 + provider.calls * 20);
+        } else {
+          writeWav(path, seconds, 300 + provider.calls * 20);
+        }
       }
       return { audioUrl: path, durationMs: 0 };
     },
@@ -259,6 +303,47 @@ describe("runAudioStage", () => {
     });
     expect(provider.calls).toBe(3);
     expect(provider.texts.at(-1)).toBe("A completely different second scene.");
+  });
+
+  it("re-synthesizes a chunk with a long internal pause and records it", async () => {
+    setup();
+    const provider = fakeProvider({
+      gap: (call) => (call === 1 ? 1.4 : undefined),
+    });
+    const audioScene = scene(1, "One two three four five six.");
+
+    await runAudioStage({
+      scenes: [audioScene],
+      paths,
+      config,
+      ttsProvider: provider,
+      voice: "narrator",
+      runId: "silence-retake",
+    });
+
+    expect(provider.calls).toBe(2);
+    expect(audioScene.audio?.silenceRetakes).toBe(1);
+    expect(audioScene.audio?.maxInternalSilenceSec).toBeGreaterThan(1.3);
+    expect(audioScene.warnings.join(" ")).not.toContain("still has");
+  });
+
+  it("caps silence retakes at two and leaves the S8 warning behind", async () => {
+    setup();
+    const provider = fakeProvider({ gap: () => 1.4 });
+    const audioScene = scene(1, "One two three four five six.");
+
+    await runAudioStage({
+      scenes: [audioScene],
+      paths,
+      config,
+      ttsProvider: provider,
+      voice: "narrator",
+      runId: "silence-retake-cap",
+    });
+
+    expect(provider.calls).toBe(3);
+    expect(audioScene.audio?.silenceRetakes).toBe(2);
+    expect(audioScene.warnings.join(" ")).toContain("S8 will gate the master");
   });
 
   it("asks the provider to skip WPM normalization", async () => {

@@ -76,6 +76,11 @@ export const SceneGroupingSchema = z.object({
 export type SceneGrouping = z.infer<typeof SceneGroupingSchema>;
 
 export const CharacterRegistrySchema = z.object({
+  /**
+   * Registry contract version. v2 adds per-individual item + colour
+   * uniqueness; stored v1 registries keep loading with a warning.
+   */
+  registryVersion: z.literal(2),
   characters: z
     .array(
       z.object({
@@ -112,6 +117,9 @@ function requiredText() {
   return z.string().trim().min(1);
 }
 
+/** A scene that names more than four characters reads as a crowd, not a beat. */
+export const SCENE_MAX_CHARACTERS = 4;
+
 export const SceneVisualSlotsSchema = z.object({
   sceneId: z.number().int().positive(),
   action: requiredText(),
@@ -122,6 +130,10 @@ export const SceneVisualSlotsSchema = z.object({
         pose: requiredText(),
         expression: requiredText(),
       }),
+    )
+    .max(
+      SCENE_MAX_CHARACTERS,
+      `a scene may name at most ${SCENE_MAX_CHARACTERS} characters`,
     )
     .default([]),
   setting: requiredText(),
@@ -202,6 +214,10 @@ export interface SceneAudioChunkRecord {
   resynthesized?: boolean;
   /** True once the free-ASR check ran; stops resume from re-checking forever. */
   asrChecked?: boolean;
+  /** Silence-driven re-syntheses performed in S6 (max 2). */
+  silenceRetakes?: number;
+  /** Longest internal pause measured after the last attempt, in seconds. */
+  maxInternalSilenceSec?: number;
 }
 
 export interface SceneTiming {

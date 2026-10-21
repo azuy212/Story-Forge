@@ -902,11 +902,13 @@ async function stageVisualPlan(
   await runStage(ctx, "S4_visual_plan", fingerprint, async () => {
     const storedRegistry =
       ctx.manifest.stages.S4_visual_plan?.metrics?.charactersFingerprint;
+    let plannedRegistryVersion: number | undefined;
     if (
       ctx.manifest.characters === undefined ||
       storedRegistry !== charactersFingerprint
     ) {
       let characters: Character[] = [];
+      let registryVersion = 1;
       let issues: string[] = [];
       for (let attempt = 0; attempt < STORY_ATTEMPTS; attempt++) {
         const registry = await requireAgent(
@@ -922,7 +924,10 @@ async function stageVisualPlan(
           "character registry",
         );
         characters = registry.characters;
-        issues = lintCharacterRegistry(characters);
+        registryVersion = registry.registryVersion;
+        issues = lintCharacterRegistry(characters, {
+          version: registryVersion,
+        });
         if (issues.length === 0) break;
       }
       if (issues.length > 0) {
@@ -932,13 +937,30 @@ async function stageVisualPlan(
         );
       }
       ctx.manifest.characters = characters;
+      plannedRegistryVersion = registryVersion;
       await writeJsonFile(ctx.paths.characters, ctx.manifest.characters);
     }
     const characters = ctx.manifest.characters ?? [];
+    const storedVersion =
+      ctx.manifest.stages.S4_visual_plan?.metrics?.registryVersion;
+    const effectiveVersion =
+      plannedRegistryVersion ??
+      (typeof storedVersion === "number" ? storedVersion : 1);
     updateStageMetrics(ctx.manifest, "S4_visual_plan", {
       charactersFingerprint,
       characterCount: characters.length,
+      registryVersion: effectiveVersion,
     });
+    // Legacy jobs keep their registry (and therefore their prompts, images
+    // and resume fingerprint); the warning records that the new item/colour
+    // invariants were not applied to them.
+    if (characters.length > 0 && effectiveVersion < 2) {
+      const message =
+        "character registry is legacy v1 (no registryVersion): item/colour uniqueness was not enforced; the stored registry is reused unchanged";
+      if (!ctx.manifest.warnings.includes(message)) {
+        ctx.manifest.warnings.push(message);
+      }
+    }
 
     const failures: string[] = [];
     await mapWithConcurrency(
