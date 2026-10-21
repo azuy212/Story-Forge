@@ -216,7 +216,7 @@ export interface SceneAudioChunkRecord {
   asrChecked?: boolean;
   /** Silence-driven re-syntheses performed in S6 (max 2). */
   silenceRetakes?: number;
-  /** Longest internal pause measured after the last attempt, in seconds. */
+  /** Longest internal pause observed during the S6 check, in seconds. */
   maxInternalSilenceSec?: number;
 }
 
