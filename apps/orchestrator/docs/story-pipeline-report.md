@@ -79,9 +79,20 @@ apps/orchestrator/docs/story-sample-manifest-real-media.json (every stage real, 
 apps/orchestrator/docs/story-pipeline-report.md (this file)
 ```
 
-Tests — 19 suites, 282 tests, all new except the two cases appended to the
+Tests — 19 suites, 297 tests, all new except the two cases appended to the
 existing Chatterbox suite (counts from `jest --testPathPatterns='tests/story-'`
-on 2026-10-21; the whole orchestrator suite is 91 suites / 1340 tests):
+on 2026-10-21; the whole orchestrator suite is 93 suites / 1386 unit tests plus
+3 suites / 21 integration tests, 96 / 1407 together).
+
+Count reconciliation: the earlier 91 suites / 1340 tests came from an
+unquoted `--testPathIgnorePatterns=\.int\.test\.ts$` in package.json; the
+shell stripped the backslashes, so the wildcard pattern `.int.test.ts$` also
+matched `story-lint.test.ts` (28 tests) and `tts-fingerprint.test.ts` (3).
+Quoting the patterns restored both suites (no test was deleted or skipped).
+The 95 suites / 1370 tests figure was the pre-follow-up unit + integration
+total (92 / 1349 + 3 / 21). The 237 in the older §5 log is the count at the
+time of that run, not the current one. Story tests grew 260 -> 297 in this
+pass (the 237 -> 282 claim mixed two different baselines).
 
 ```
 apps/orchestrator/tests/story-sentences.test.ts            25   (incl. randomised grouping properties)
@@ -719,10 +730,10 @@ never drift:
 Length and sentence limits
 - Aim for about 12 words per sentence, averaged across the whole story.
 - Never write a sentence longer than 22 words. Split it into two sentences instead.
-- Keep the whole story between 96 and 130 words.       (45 s at 150 wpm, ±15%)
+- Keep the whole story between 112 and 151 words.      (45 s at 175 wpm, ±15%)
 ...
 Before returning, re-read your story and count: no sentence may be above 22
-words, and the whole story must stay between 96 and 130 words.
+words, and the whole story must stay between 112 and 151 words.
 ```
 
 Result of the next real run: **1 attempt**, 10.5 words/sentence average, longest
@@ -794,9 +805,10 @@ master: 40.36 s = 39.36 s of speech + 5 × 200 ms between-chunk gaps
 no voice-outlier warnings, no chunk needed the 450-character split
 ```
 
-The measured pace is ~172 wpm against the 150 wpm planning assumption, inside
-the 0.5–2× plausibility band and inside the ±15% word budget, because the word
-count was budgeted rather than the real speaking rate.
+The measured pace is ~175.3 wpm against the new 175 wpm planning default
+(calibrated from the 150 s real run: 362 words / 123.92 s of speech after the
+14 x 200 ms gaps), so a 150 s target now budgets 438 words instead of 375.
+The 0.5–2× plausibility band and the ±15% word budget are unchanged.
 
 **Alignment — real WhisperX forced alignment, every scene at 1.00**
 
@@ -1020,6 +1032,76 @@ short one, “WHY SEASONS?”) were composed for the flattened single-block path
 but not sent, because the same allowance was already spent. There is therefore
 no typography evidence for either thumbnail, and no evidence that the model
 refuses a captives scene or how the softened prompt reads.
+
+### 6.9 Follow-up verification (2026-10-21)
+
+**Registry v2.** New registries carry `"registryVersion": 2`; the lint now
+enforces one item **and one colour** per individual, unique across
+individuals, no cue shared between a group and an individual, at most five
+individuals, and at most four characters per scene. Stored v1 registries keep
+their entries and their fingerprint (resume unchanged) and log a warning that
+the item/colour rules were not applied. Re-planning the Columbus S4 job with
+the new prompt produced:
+
+```json
+[
+  {
+    "id": "columbus",
+    "name": "Christopher Columbus",
+    "kind": "individual",
+    "visualDescription": "A stick figure in a wide-brimmed black hat."
+  },
+  {
+    "id": "ferdinand",
+    "name": "King Ferdinand",
+    "kind": "individual",
+    "visualDescription": "A stick figure in a gold crown."
+  },
+  {
+    "id": "isabella",
+    "name": "Queen Isabella",
+    "kind": "individual",
+    "visualDescription": "A stick figure in a long blue veil."
+  },
+  {
+    "id": "the_crew",
+    "name": "The crew",
+    "kind": "group",
+    "visualDescription": "Stick figures in rough brown shirts with rope belts."
+  },
+  {
+    "id": "the_taino",
+    "name": "The Taíno",
+    "kind": "group",
+    "visualDescription": "Stick figures with plain woven headbands and simple woven baskets."
+  }
+]
+```
+
+The monarchs are now separate individuals (they were one group under the old
+"three or more scenes" split rule). Rodrigo does not appear in either Columbus
+story, so no id was invented for him. The Taíno cue no longer mentions
+feathered headdresses or loincloths.
+
+**S6 early silence check.** After the free-ASR check, every chunk runs
+`silencedetect`; an internal pause over 1.0 s triggers up to two
+re-syntheses, recorded as `silenceRetakes` / `maxInternalSilenceSec` in
+`scene.audio`. If the pause survives both, the scene warning points at S8,
+which still gates the master. Fixture tests cover a 1.4 s gap (one retake) and
+a chunk whose gap never clears (two retakes, warning).
+
+**Scene 5 ASR.** Script: "…tipped about twenty-three and a half degrees."
+Free ASR: "…tipped about 23.5 degrees." This is number normalisation, not a
+mispronunciation; `fidelityKeys` now collapses "and a half" to `+0.5`, so the
+real ASR words score coverage 1.0 instead of 0.818.
+
+**Crowd composition.** The slot prompt asks for staggered depth, at least two
+poses, and opposing groups facing each other; the prompt lint rejects "in a
+line", "lined up" and "row of" when a group is in `slots.characters`.
+"row of pebbles" stays valid in a scene without a group.
+
+**WPM.** The default is now 175 (`STORY_TTS_WPM`), from 362 words in 123.92 s
+of speech; a 150 s target budgets 438 words. No other default changed.
 
 ## 7. Known limitations and deliberate choices
 

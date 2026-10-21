@@ -139,8 +139,8 @@ root; commands must run from orchestrator package or workspace root.
 | Provider interface + stub pattern            | all providers        | complete |
 | FFprobe media validation                     | ReleaseValidation    | complete |
 | SRT parsing (monotonic, overlap, bounds)     | ReleaseValidation    | complete |
-| Unit tests                                   | 237                  | passing  |
-| Integration test                             | 8                    | passing  |
+| Unit tests                                   | 1386                 | passing  |
+| Integration test                             | 21                   | passing  |
 
 ### Not Implemented
 
@@ -311,7 +311,7 @@ experiments, but is not invoked by the production LangGraph narration path.
 ### Run Tests
 
 ```bash
-# Unit tests (237 tests, no API key needed — uses DI mocks)
+# Unit tests (1386 tests, no API key needed — uses DI mocks)
 pnpm test
 
 # Integration test (end-to-end graph with mock LLM responses)
