@@ -225,6 +225,40 @@ describe("story lintImagePrompt", () => {
     expect(report).toContain("sign that reads");
   });
 
+  it.each([
+    "a close-up of Columbus at the rail",
+    "a tight portrait of the captain",
+    "a headshot of the sailor, framed from the shoulders up",
+    "a view of his face as he reads the chart",
+  ])("rejects close framing in the composition: %s", (composition) => {
+    expect(messages({ slots: slots({ composition }) })).toContain(
+      "close, portrait and face shots",
+    );
+  });
+
+  it("rejects close framing outside the composition slot too", () => {
+    expect(
+      messages({
+        slots: slots({
+          action: "A close-up of the sailor's face as the wind rises.",
+        }),
+      }),
+    ).toContain("close, portrait and face shots");
+  });
+
+  it("accepts face-to-face staging and the allowed shot vocabulary", () => {
+    expect(
+      messages({
+        slots: slots({
+          action:
+            "Two sailors argue face to face while a third grips the rail.",
+          composition:
+            "a medium shot from the deck, the pair on the left third, the rail across the lower frame",
+        }),
+      }),
+    ).toBe("");
+  });
+
   it("rejects an adjacent repeated word", () => {
     expect(
       messages({ prompt: "Scene: The the ship drifts through calm water." }),

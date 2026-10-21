@@ -172,6 +172,24 @@ const LEAKED_FIELD_NAME =
 const UNFILLED_PLACEHOLDER = /\{[^{}]*\}|\[[^[\]]*\]/;
 
 /**
+ * Close framing breaks the stick-figure style. At close range the image model
+ * draws a detailed face (nose, eyes, shading) and an oversized head, which the
+ * 19-scene drift run showed on the four close-up scenes while wide and medium
+ * shots stayed on style. The slot vocabulary is restricted to shot sizes that
+ * keep the whole figure in frame.
+ */
+const CLOSE_FRAMING =
+  /\b(?:close[ -]?ups?|extreme close|portrait|headshot|head and shoulders|bust shot|faces?|facial)\b/iu;
+
+/**
+ * "face to face" and "faces the horizon" are staging, not framing. Strip those
+ * idioms before the framing scan so a valid action is not punished for using
+ * the word.
+ */
+const FACE_IDIOM =
+  /\bface[sd]?\s+(?:to\s+face|the|towards?|away|him|her|them|each\s+other)\b/giu;
+
+/**
  * Lint the composed prompt before any image call (brief section 6):
  * script check for the job language, no repeated adjacent words, no unfilled
  * placeholders, every required slot non-empty, registered characters only,
@@ -257,6 +275,12 @@ export function lintImagePrompt(options: {
     if (leaked) {
       issues.push({
         message: `slot contains the schema field name "${leaked[0]}" — write prose, not a field name`,
+      });
+    }
+    const framing = CLOSE_FRAMING.exec(value.replace(FACE_IDIOM, " "));
+    if (framing) {
+      issues.push({
+        message: `slot asks for "${framing[0]}" framing — close, portrait and face shots make the model draw a detailed oversized head; use wide, medium, over-the-shoulder, high-angle or low-angle framing`,
       });
     }
   }
