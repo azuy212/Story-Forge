@@ -264,7 +264,8 @@ export function characterStagingIssues(description: string): string[] {
  *
  * - an individual carries exactly one cue and (v2) exactly one colour,
  *   because that is what makes them recognisable as the same person in the
- *   next scene;
+ *   next scene; the story's lead may carry two of each when both are needed
+ *   (one garment + one headwear shape);
  * - individuals share neither item nor colour;
  * - a group may carry none (an anonymous crowd) or up to the shared limit,
  *   but may not reuse an individual's cue;
@@ -277,6 +278,7 @@ export function lintCharacterRegistry(
   characters: {
     id: string;
     kind?: "individual" | "group";
+    lead?: boolean;
     visualDescription: string;
   }[],
   options: { version?: number } = {},
@@ -309,12 +311,17 @@ export function lintCharacterRegistry(
     if (words > CHARACTER_MAX_WORDS) {
       problems.push(`${words} words (max ${CHARACTER_MAX_WORDS})`);
     }
-    if (kind === "individual" && cues.length !== 1) {
-      problems.push(
-        cues.length === 0
-          ? "no silhouette cue (an individual needs exactly one)"
-          : `${cues.length} cues (${cues.join(", ")}; an individual needs exactly one)`,
-      );
+    if (kind === "individual") {
+      const maxCues = character.lead === true ? 2 : 1;
+      if (cues.length < 1 || cues.length > maxCues) {
+        problems.push(
+          cues.length === 0
+            ? "no silhouette cue (an individual needs at least one)"
+            : character.lead === true
+              ? `${cues.length} cues (${cues.join(", ")}; the lead may name at most two)`
+              : `${cues.length} cues (${cues.join(", ")}; an individual needs exactly one)`,
+        );
+      }
     }
     if (kind === "group" && cues.length > CHARACTER_MAX_CUES) {
       problems.push(
@@ -323,11 +330,15 @@ export function lintCharacterRegistry(
     }
     if (version >= 2) {
       const colours = characterColours(description);
-      if (colours.length !== 1) {
+      const maxColours =
+        kind === "individual" && character.lead === true ? 2 : 1;
+      if (colours.length < 1 || colours.length > maxColours) {
         problems.push(
           colours.length === 0
             ? `no base colour (a v2 ${kind} needs exactly one)`
-            : `${colours.length} colours (${colours.join(", ")}; a v2 ${kind} needs exactly one)`,
+            : character.lead === true && kind === "individual"
+              ? `${colours.length} colours (${colours.join(", ")}; the lead may name at most two)`
+              : `${colours.length} colours (${colours.join(", ")}; a v2 ${kind} needs exactly one)`,
         );
       }
       const owners = kind === "individual" ? colourOwners : groupColourOwners;

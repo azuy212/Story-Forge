@@ -359,6 +359,36 @@ describe("story lintCharacterRegistry", () => {
     ).toEqual([]);
   });
 
+  it("allows the lead two cues and two colours in v2", () => {
+    expect(
+      lintCharacterRegistry(
+        [
+          {
+            id: "columbus",
+            kind: "individual",
+            lead: true,
+            visualDescription:
+              "A stick figure in a long dark-red coat and a flat black cap.",
+          },
+        ],
+        { version: 2 },
+      ),
+    ).toEqual([]);
+  });
+
+  it("still rejects two cues on a non-lead individual in v2", () => {
+    const issues = lintCharacterRegistry(
+      [
+        character(
+          "rodrigo",
+          "A stick figure in a long dark-red coat and a flat black cap.",
+        ),
+      ],
+      { version: 2 },
+    );
+    expect(issues.join("\n")).toMatch(/needs exactly one/);
+  });
+
   it("rejects a v2 individual without a colour", () => {
     const issues = lintCharacterRegistry(
       [character("columbus", "A tall stick figure in a wide-brimmed hat.")],

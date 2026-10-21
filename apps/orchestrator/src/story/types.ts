@@ -99,6 +99,12 @@ export const CharacterRegistrySchema = z.object({
          * rule lives in the registry prompt; the lint enforces the cue budget.
          */
         kind: z.enum(["individual", "group"]).default("individual"),
+        /**
+         * The story's protagonist. A lead may carry two cues (a garment and
+         * a headwear shape) and the two colours they use; every other
+         * individual carries exactly one of each.
+         */
+        lead: z.boolean().optional(),
         visualDescription: z.string().min(1),
       }),
     )

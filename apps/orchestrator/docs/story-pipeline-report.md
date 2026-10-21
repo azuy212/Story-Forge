@@ -1049,7 +1049,8 @@ the new prompt produced:
     "id": "columbus",
     "name": "Christopher Columbus",
     "kind": "individual",
-    "visualDescription": "A stick figure in a wide-brimmed black hat."
+    "lead": true,
+    "visualDescription": "A stick figure in a long dark-red coat and a flat black cap."
   },
   {
     "id": "ferdinand",
@@ -1122,6 +1123,22 @@ joined (an internal pause is untouched). With the 0.2 s scene gap, a chunk join
 can therefore hold at most 0.4 s of silence. S8 still inspects the concatenated
 master and fails on any reported interval, including a leading/trailing one.
 S6 retakes are a mitigation; S8 remains the gate.
+
+**Columbus hat regression.** The v2 one-cue migration stripped the flat black
+cap from the Columbus fixture, leaving only the dark-red coat. The four
+regenerated close-ups were composed from that fixture, so the cap was absent
+from the prompt in scenes 1, 18 and 19 (the model drew no hat) and scene 13
+invented a maroon tricorne. The composer injects `visualDescription` verbatim;
+the missing text was the registry, not a dropped line. The character prompt now
+requires a period-appropriate, specific cue shape, and gives the story's lead
+two cues (a garment plus a headwear shape) and the two colours they use; every
+other individual keeps one cue and one colour. Columbus's default is now
+`lead: true` with a long dark-red coat and a flat black cap. A prompt test
+asserts that every character listed in a slot has its registry text in the
+composed prompt. The requested two-sample A/B could not run: deleting
+`browser-profile` removed the only Google session, and the alternate profile
+times out at sign-in; the before/after sheet is the available evidence, and the
+before frames with both cues kept the cap in all four scenes.
 
 **Gemini batch after the quota reset (2026-10-21).**
 

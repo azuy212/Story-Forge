@@ -96,6 +96,36 @@ describe("story composeImagePrompt", () => {
     }
   });
 
+  it("includes every slot character's registry text verbatim", () => {
+    const { prompt } = composeImagePrompt({
+      style: STYLE,
+      slots: slots({
+        characters: [
+          {
+            id: "columbus",
+            pose: "standing at the rail",
+            expression: "calm",
+          },
+          {
+            id: "the_crew",
+            pose: "hauling a rope",
+            expression: "straining",
+          },
+        ],
+      }),
+      characters: CHARACTERS,
+    });
+
+    for (const slotCharacter of [{ id: "columbus" }, { id: "the_crew" }]) {
+      const entry = CHARACTERS.find(
+        (character) => character.id === slotCharacter.id,
+      );
+      expect(entry).toBeDefined();
+      const description = entry!.visualDescription.trim().replace(/\.+$/, "");
+      expect(prompt).toContain(description);
+    }
+  });
+
   it("never produces a doubled full stop when appending Pose/Expression", () => {
     const { prompt } = composeImagePrompt({
       style: STYLE,
