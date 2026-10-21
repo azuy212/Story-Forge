@@ -632,16 +632,19 @@ was also very slow (2 kB ≈ 8 minutes of keystrokes); insertion is immediate.
 
 What the real run still does **not** prove:
 
-1. **Stickman style.** Gemini draws a consistent children's-book cartoon with
-   faces and detailed clothing, not the style profile's "simple stick figures".
-   All six scenes share one look and each depicts its prompt, but the style
-   itself is a deviation that needs a decision: accept the cartoon look, or
-   tighten the style constraints and re-test. Two things are already in place
-   for the retest: the character registry is now gated to short, one-or-two-cue
-   silhouettes (a costume list was competing with the style preamble), and the
-   face stays "eyebrows and a mouth only" rather than dropping the face, which
-   would delete the storytelling signal. The preamble itself is unchanged until
-   a real image run can compare the two versions.
+1. **Stickman style — resolved on 2026-10-21.** Two templates were compared on
+   scenes 1, 4 and 5, with a second sample per arm on scenes 1 and 4 (six
+   images, ~50 s each, headless). The candidates differed only in the opening
+   line and the style-constraints sentence. Judged against four criteria —
+   round white heads with line limbs and eyebrows-and-mouth faces, no clothing
+   folds or shading, one silhouette cue per character, environment detail
+   retained — the strict stick-figure template won scene 1 on both samples
+   (named cues: beret, eyepatch, beanie, scarf, against identical grey-clothed
+   figures) and was at least as good on 4 and 5. It is now the default in
+   `prompts/story/style/stickman-history.json`, and the golden Columbus fixture
+   still passes through the real profile and the real prompt linters. Both
+   templates render the "keep the lower third calm" instruction as an empty
+   band, which is what the subtitle strip needs.
 2. **Listening — done.** The channel owner listened to the 40.36 s
    `final.mp4` on 2026-10-20 and judged the narration acceptable. That is a
    human sign-off, not a measurement: the free ASR pass proves the script words
@@ -839,11 +842,9 @@ FFmpeg render).
 7. **Prompt versioning.** Story prompts are pinned to v1 independently of
    `PROMPT_VERSION`; changing a prompt changes the stage fingerprint and
    regenerates only the affected artifacts.
-8. **Style fidelity.** The style profile asks for "simple stick figures", but
-   Gemini's current image model returns a detailed children's-book cartoon with
-   faces and clothing (§6.5). It is consistent across scenes and follows each
-   scene's action, but it is not stickman art. This is the largest open product
-   decision, not a code defect.
+8. **Style fidelity — closed.** The strict stick-figure template won a two-arm
+   comparison and is now the default (§6.5). The risk that remains is drift
+   across a long episode, which the 19-scene run is meant to measure.
 9. **Resolution.** The provider returns 1024×559–572 stills regardless of the
    1920×1080 request in the prompt; the render upscales them, so frames are
    slightly soft. The `>= 1000×540` gate is what the provider can actually meet.
