@@ -924,6 +924,14 @@ with `composeImagePrompt()` and posting each prompt to `/generate`.
     English-specific, so a number run the heuristic misreads can consume
     coverage headroom — it cannot fail the run. A low-coverage chunk gets one
     automatic re-synthesis before the check gives up.
+12. **Image generation drives a signed-in consumer Gemini session.** The
+    provider automates Gemini's web UI in a headless browser. That depends on
+    Google's terms, can break with any UI change, and can leave the account
+    flagged, so it is suited to local, attended runs like the ones above. For
+    scheduled publishing, plan on a paid image API (OpenRouter or another
+    provider) behind the same `/generate` contract. The recorded-fixture tests
+    make a UI change fail loudly; they cannot make the automation permitted or
+    durable.
 
 ## 8. Reproduce
 
