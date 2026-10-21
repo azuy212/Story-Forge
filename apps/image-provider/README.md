@@ -228,7 +228,11 @@ Key design decisions:
   `Create image` item in the "+" menu when that surface is not served. Video
   still uses the menu. Prompts for the Images composer are flattened to one
   line: it answers a multi-block prompt with a generic error instead of
-  generating.
+  generating. Flattening removes line breaks only, never words; it was checked
+  against a real thumbnail prompt (4 paragraphs, exact on-screen text), and the
+  image rendered the text once, in the requested 3 stacked lines, with the
+  emphasis word in yellow and no stray lettering — so the shared Shorts
+  thumbnail path keeps its typography block.
 - Reference images are uploaded through the same menu before the prompt is sent.
 - **No arbitrary sleep() calls** — all waits use locators, DOM mutation observers, or network events.
 - **Network response interception** — captures image and video binaries as they load, avoiding re-downloads.
