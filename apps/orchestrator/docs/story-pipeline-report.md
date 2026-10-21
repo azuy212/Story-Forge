@@ -7,14 +7,18 @@ pipeline untouched.
 - Run command: `pnpm --filter youtube-shorts-orchestrator story "The long night at sea" --duration 150`
   (after `pnpm --filter youtube-shorts-orchestrator build`)
 - README: `apps/orchestrator/README.md` → "Story-Forge Stickman Storytelling Pipeline"
-- Sample manifests:
-  - `docs/story-sample-manifest.json` — complete S1–S8 job (fake agents/providers,
-    real FFmpeg/ffprobe, synthetic images and audio)
-  - `docs/story-sample-manifest-real-llm.json` — **real OpenRouter run of S1–S4**
-    (see §6; the media stages could not run in this environment)
+- Sample manifests (labeled by what is real):
+  - `docs/story-sample-manifest-real-media.json` — **every stage real**: a
+    150 s, 15-scene run (OpenRouter story, Gemini images, Chatterbox narration,
+    WhisperX alignment, FFmpeg render), §6.7
+  - `docs/story-sample-manifest-real-llm.json` — real OpenRouter S1–S4 only;
+    synthetic media (§6)
+  - `docs/story-sample-manifest.json` — complete S1–S8 job with fake
+    LLM/image providers and synthetic images and audio, real FFmpeg/ffprobe
+    (used by the smoke check)
 
 Everything below is output from commands that were actually run, in this
-checkout, on 2026-10-20.
+checkout, on 2026-10-20 and 2026-10-21.
 
 ---
 
@@ -75,29 +79,52 @@ apps/orchestrator/docs/story-sample-manifest-real-media.json (real S1–S4 + rea
 apps/orchestrator/docs/story-pipeline-report.md (this file)
 ```
 
-Tests — 17 suites, 237 tests, all new except the two cases appended to the
-existing Chatterbox suite:
+Tests — 19 suites, 282 tests, all new except the two cases appended to the
+existing Chatterbox suite (counts from `jest --testPathPatterns='tests/story-'`
+on 2026-10-21; the whole orchestrator suite is 91 suites / 1340 tests):
 
 ```
-apps/orchestrator/tests/story-sentences.test.ts       25   (incl. randomised grouping properties)
-apps/orchestrator/tests/story-alignment.test.ts       15
-apps/orchestrator/tests/story-subtitles.test.ts       13
-apps/orchestrator/tests/story-timing.test.ts          10
-apps/orchestrator/tests/story-lint.test.ts            17   (incl. up-front style limits)
-apps/orchestrator/tests/story-prompt.test.ts          30   (incl. two real-run regressions)
-apps/orchestrator/tests/story-columbus-golden.test.ts  5   (19-scene real fixture)
-apps/orchestrator/tests/story-ffmpeg-args.test.ts     13
-apps/orchestrator/tests/story-render.test.ts          10   (frame margin, severity, real FFmpeg failure, black threshold)
-apps/orchestrator/tests/story-manifest.test.ts        12
-apps/orchestrator/tests/story-resume.test.ts           9   (stored config wins; changed flags refused; zero calls)
-apps/orchestrator/tests/story-config.test.ts          19   (incl. bundled fonts)
-apps/orchestrator/tests/story-prompts.test.ts          8
-apps/orchestrator/tests/story-shared-edits.test.ts    15
-apps/orchestrator/tests/story-schemas.test.ts         19
-apps/orchestrator/tests/story-images.test.ts          10
-apps/orchestrator/tests/story-audio.test.ts           12
-apps/orchestrator/tests/story-cli.test.ts              4
+apps/orchestrator/tests/story-sentences.test.ts            25   (incl. randomised grouping properties)
+apps/orchestrator/tests/story-alignment.test.ts            23
+apps/orchestrator/tests/story-subtitles.test.ts            13
+apps/orchestrator/tests/story-timing.test.ts               10
+apps/orchestrator/tests/story-lint.test.ts                 28   (up-front style limits, registry split, framing bans)
+apps/orchestrator/tests/story-prompt.test.ts               36   (incl. real-run regressions, framing vocabulary)
+apps/orchestrator/tests/story-prompt-regeneration.test.ts   5   (--regenerate-prompts vs --from S4)
+apps/orchestrator/tests/story-columbus-golden.test.ts       6   (19-scene real fixture)
+apps/orchestrator/tests/story-ffmpeg-args.test.ts          13
+apps/orchestrator/tests/story-render.test.ts               10   (frame margin, severity, real FFmpeg failure, black threshold)
+apps/orchestrator/tests/story-manifest.test.ts             12
+apps/orchestrator/tests/story-resume.test.ts               12   (stored config wins; changed flags refused; zero calls)
+apps/orchestrator/tests/story-config.test.ts               19   (incl. bundled fonts)
+apps/orchestrator/tests/story-prompts.test.ts               8
+apps/orchestrator/tests/story-shared-edits.test.ts         15
+apps/orchestrator/tests/story-schemas.test.ts              19
+apps/orchestrator/tests/story-images.test.ts               11
+apps/orchestrator/tests/story-audio.test.ts                12
+apps/orchestrator/tests/story-cli.test.ts                   5
+```
+
+apps/orchestrator/tests/story-sentences.test.ts 25 (incl. randomised grouping properties)
+apps/orchestrator/tests/story-alignment.test.ts 15
+apps/orchestrator/tests/story-subtitles.test.ts 13
+apps/orchestrator/tests/story-timing.test.ts 10
+apps/orchestrator/tests/story-lint.test.ts 17 (incl. up-front style limits)
+apps/orchestrator/tests/story-prompt.test.ts 30 (incl. two real-run regressions)
+apps/orchestrator/tests/story-columbus-golden.test.ts 5 (19-scene real fixture)
+apps/orchestrator/tests/story-ffmpeg-args.test.ts 13
+apps/orchestrator/tests/story-render.test.ts 10 (frame margin, severity, real FFmpeg failure, black threshold)
+apps/orchestrator/tests/story-manifest.test.ts 12
+apps/orchestrator/tests/story-resume.test.ts 9 (stored config wins; changed flags refused; zero calls)
+apps/orchestrator/tests/story-config.test.ts 19 (incl. bundled fonts)
+apps/orchestrator/tests/story-prompts.test.ts 8
+apps/orchestrator/tests/story-shared-edits.test.ts 15
+apps/orchestrator/tests/story-schemas.test.ts 19
+apps/orchestrator/tests/story-images.test.ts 10
+apps/orchestrator/tests/story-audio.test.ts 12
+apps/orchestrator/tests/story-cli.test.ts 4
 apps/orchestrator/tests/fixtures/story-columbus-19.json
+
 ```
 
 ## 2. Files changed (additive / behaviour-preserving)
@@ -174,34 +201,39 @@ Remaining honest gaps in the matrix:
 ### 4.1 Unit tests
 
 ```
+
 $ pnpm --filter youtube-shorts-orchestrator exec node --experimental-vm-modules \
-    node_modules/jest/bin/jest.js
+node_modules/jest/bin/jest.js
 
 Test Suites: 94 passed, 94 total
-Tests:       1347 passed, 1347 total
-Time:        15.976 s
+Tests: 1347 passed, 1347 total
+Time: 15.976 s
+
 ```
 
 Story suites only:
 
 ```
+
 Test Suites: 17 passed, 17 total
-Tests:       237 passed, 237 total
+Tests: 237 passed, 237 total
+
 ```
 
 ### 4.2 Type check, lint, format, build, conventions
 
 ```
-$ pnpm --filter youtube-shorts-orchestrator typecheck     # tsc --noEmit
+
+$ pnpm --filter youtube-shorts-orchestrator typecheck # tsc --noEmit
 (no output — clean)
 
-$ pnpm lint                                               # full root gate
-youtube-shorts-orchestrator lint                 → clean (no output)
-youtube-shorts-orchestrator lint:langgraph-json  → All paths in langgraph.json are valid…
-gemini-image-automation lint                     → clean (no output)
-ai-series-monorepo lint:python                   → All checks passed! (tts, transcriber)
-check:conventions                                → conventions: all orchestrator conventions hold
-check:graph-docs                                 → graph-docs: AGENTS.md pipeline matches src/graph/index.ts
+$ pnpm lint # full root gate
+youtube-shorts-orchestrator lint → clean (no output)
+youtube-shorts-orchestrator lint:langgraph-json → All paths in langgraph.json are valid…
+gemini-image-automation lint → clean (no output)
+ai-series-monorepo lint:python → All checks passed! (tts, transcriber)
+check:conventions → conventions: all orchestrator conventions hold
+check:graph-docs → graph-docs: AGENTS.md pipeline matches src/graph/index.ts
 
 $ pnpm format:check
 orchestrator → All matched files use Prettier code style!
@@ -211,6 +243,7 @@ $ pnpm build
 tsc && node scripts/copy-mjs.mjs → copied 3 .mjs file(s) to dist/
 gemini-image-automation build → tsc (clean)
 admin-ui build → vite build → ✓ built in 2.91s
+
 ```
 
 Two environment notes, both resolved without touching production code:
@@ -245,47 +278,49 @@ Two environment notes, both resolved without touching production code:
 ### 4.3 End-to-end smoke — 4 passes, 26/26 checks
 
 ```
+
 $ rm -rf /tmp/opencode/story-smoke && node scripts/story-smoke.mjs
 exit=0
 
 pass 1 — full job
-  ok   job reports complete
-  ok   final.mp4 exists
-  ok   every stage is done
-  ok   render validations all passed
-  ok   four scenes, one image and one chunk each
-  ok   narration was rebuilt from sentence ids, not model text
-  ok   scene image gate recorded real source dimensions
-  ok   subtitles: cues exist, never overlap, respect the minimum duration
-  ok   subtitle text comes from the script
-  ok   timeline is contiguous and covers the audio
-  ok   alignment matched every scene
-  ok   no voice outliers were flagged
-  ok   manifest records the unverified grounding source
+ok job reports complete
+ok final.mp4 exists
+ok every stage is done
+ok render validations all passed
+ok four scenes, one image and one chunk each
+ok narration was rebuilt from sentence ids, not model text
+ok scene image gate recorded real source dimensions
+ok subtitles: cues exist, never overlap, respect the minimum duration
+ok subtitle text comes from the script
+ok timeline is contiguous and covers the audio
+ok alignment matched every scene
+ok no voice outliers were flagged
+ok manifest records the unverified grounding source
 
 pass 2 — resume with nothing changed
-  ok   second run is complete too
-  ok   no agent or provider was called again
-  ok   every stage fingerprint is unchanged and reused
+ok second run is complete too
+ok no agent or provider was called again
+ok every stage fingerprint is unchanged and reused
 
 pass 3 — force S5/S6/S7 and prove per-scene artifact reuse
-  ok   forced rerun still reports complete
-  ok   the forced stages actually re-ran
-  ok   every image was reused, not regenerated
-  ok   every narration chunk was reused, not re-synthesized
-  ok   every transcript was reused, not re-aligned
+ok forced rerun still reports complete
+ok the forced stages actually re-ran
+ok every image was reused, not regenerated
+ok every narration chunk was reused, not re-synthesized
+ok every transcript was reused, not re-aligned
 
 pass 4 — interrupt mid-image-generation, then resume
-  ok   the interrupted run fails loudly
-  ok   the first two images survived on disk
-  ok   the resumed run completes the job
-  ok   only the missing scenes were regenerated
-  ok   the crash did not re-run the text stages
+ok the interrupted run fails loudly
+ok the first two images survived on disk
+ok the resumed run completes the job
+ok only the missing scenes were regenerated
+ok the crash did not re-run the text stages
 
-first pass:   13.0s
+first pass: 13.0s
 provider calls: {"writeStory":2,"verifyStory":2,"planScenes":2,"designCharacters":2,
-                 "planSceneVisuals":8,"image":8,"tts":8,"align":8}
+"planSceneVisuals":8,"image":8,"tts":8,"align":8}
 26/26 checks passed
+
 ```
 
 The provider counts are cumulative across all four passes: one text run per job
@@ -305,37 +340,41 @@ production code path.
 ### 4.4 The output file (real ffprobe)
 
 ```
+
 $ ffprobe -v error -show_format -show_streams -of json final.mp4
 
-format:  duration=31.000000  size=945711  bit_rate=244054
-video:   codec_name=h264 profile=High width=1920 height=1080 pix_fmt=yuv420p
-         r_frame_rate=30/1 avg_frame_rate=30/1 nb_frames=930 sample_aspect_ratio=1:1
-audio:   codec_name=aac sample_rate=48000
+format: duration=31.000000 size=945711 bit_rate=244054
+video: codec_name=h264 profile=High width=1920 height=1080 pix_fmt=yuv420p
+r_frame_rate=30/1 avg_frame_rate=30/1 nb_frames=930 sample_aspect_ratio=1:1
+audio: codec_name=aac sample_rate=48000
+
 ```
 
 S8 validation report (all 18 checks passed — every scene is now checked, not a
 first/middle/last sample):
 
 ```
-video_stream h264 1920x1080 yuv420p          ok
-video_codec expected h264                    ok
-pixel_format expected yuv420p                ok
-resolution expected 1920x1080                ok
-frame_rate expected 30 fps                   ok
-audio_stream aac                             ok
-audio_codec expected aac                     ok
-duration_matches_audio 31.000 vs 31.000       ok
-no_black_frames no interval > 0.6s (0 dark intervals seen)   ok
-no_long_silence no silence > 1s at -50 dB                     ok
-scene_1_shows_source correlation 1.000 with its own source; closest other scene 2 at 0.651   ok
-scene_1_subtitles_visible band difference 7.55%   ok
-scene_2_shows_source correlation 1.000; closest other scene 1 at 0.651                       ok
-scene_2_subtitles_visible band difference 5.89%   ok
-scene_3_shows_source correlation 1.000; closest other scene 4 at 0.665                       ok
-scene_3_subtitles_visible band difference 6.67%   ok
-scene_4_shows_source correlation 1.000; closest other scene 3 at 0.665                       ok
-scene_4_subtitles_visible band difference 8.15%   ok
-```
+
+video_stream h264 1920x1080 yuv420p ok
+video_codec expected h264 ok
+pixel_format expected yuv420p ok
+resolution expected 1920x1080 ok
+frame_rate expected 30 fps ok
+audio_stream aac ok
+audio_codec expected aac ok
+duration_matches_audio 31.000 vs 31.000 ok
+no_black_frames no interval > 0.6s (0 dark intervals seen) ok
+no_long_silence no silence > 1s at -50 dB ok
+scene_1_shows_source correlation 1.000 with its own source; closest other scene 2 at 0.651 ok
+scene_1_subtitles_visible band difference 7.55% ok
+scene_2_shows_source correlation 1.000; closest other scene 1 at 0.651 ok
+scene_2_subtitles_visible band difference 5.89% ok
+scene_3_shows_source correlation 1.000; closest other scene 4 at 0.665 ok
+scene_3_subtitles_visible band difference 6.67% ok
+scene_4_shows_source correlation 1.000; closest other scene 3 at 0.665 ok
+scene_4_subtitles_visible band difference 8.15% ok
+
+````
 
 Why this check is no longer vacuous: a frame is compared against **every** scene
 source, and the check passes only if its own source is the best match (within
@@ -388,7 +427,7 @@ samples including the first and last.
   "+faststart",
   outputPath,
 ];
-```
+````
 
 `-vf` is a single chain (verbatim, as built for the smoke job):
 
@@ -584,15 +623,18 @@ run is real: OpenRouter, Gemini, Chatterbox, WhisperX and FFmpeg.
 An earlier day stopped accepting generations after roughly 14 images: the
 "+" menu showed "Create image" with `aria-disabled="true"`, and every further
 request would have waited out three generation timeouts. On 2026-10-21 the
-same account completed 24 generations with no 429 before the thumbnail check
-(the 19-scene drift run, four A/B second samples, and one smoke image), and 25
-with the thumbnail. The provider reports `quota_exhausted` (non-retryable) when
-the allowance is actually spent, and the story stage stops the batch and names
-the scenes still missing an image, so a rerun after the refill generates only
+same account completed 41 generations before the next request was refused:
+24 (the 19-scene drift run, four A/B second samples, and one smoke image),
+then the thumbnail, then the 15 images of the §6.7 run, then one refusal-probe
+image. The 42nd request returned `quota_exhausted` (non-retryable) with
+"Your limit resets at 3:06 PM". The provider reports `quota_exhausted` when the
+allowance is actually spent, and the story stage stops the batch and names the
+scenes still missing an image, so a rerun after the refill generates only
 those. At roughly 20 s per image, a 19-scene episode is about 7 minutes of
-generation; the allowance, not the clock, is the binding constraint, and it
-varies enough that a run should plan for a partial batch rather than a fixed
-number.
+generation; the allowance, not the clock, is the binding constraint, it resets
+at a time of day rather than at midnight, and the observed range (about 14 to
+at least 41) is wide enough that a run should plan for a partial batch rather
+than a fixed number.
 
 **The Images surface is the live path.** Gemini now serves image creation at
 `gemini.google.com/images`, and for accounts on that UI the "+" menu's
@@ -612,11 +654,12 @@ failure. With the port in place, six A/B prompts were regenerated headless in
 about 50 s each.
 
 **Publishing cadence.** The allowance, not the render, sets the schedule. A
-19-scene episode needs 19 successful generations, so it cannot finish in one
-free-tier day: it takes two runs (14 + 5), which is what `quota_exhausted` and
-the resume path are for. Two days per episode leaves room for at most three a
-week, and realistically **one to two** once retries, thumbnail drafts and any
-style re-test share the same allowance. That is a production limit, not a
+19-scene episode needs 19 successful generations. On a day that stops at 14 it
+takes two runs (14 + 5), which is what `quota_exhausted` and the resume path are
+for; on 2026-10-21 the same account did 41, so an episode plus retries fits in
+one day. The variability is the constraint: plan for a partial batch, and
+realistically **one to two** episodes a week once retries, thumbnail drafts and
+any style re-test share the same allowance. That is a production limit, not a
 pipeline limit: a paid image path (Gemini API key or OpenRouter image models)
 removes the ceiling at cents per episode and is the prerequisite for a
 weekly-or-faster series. Confirm the refill number on the next reset before
@@ -654,11 +697,15 @@ What the real run still does **not** prove:
    human sign-off, not a measurement: the free ASR pass proves the script words
    were spoken (coverage 1.00 on all six chunks) but says nothing about pacing
    or emphasis, so a listen stays on the checklist for each future episode.
-3. **Refusal handling** (the single softening retry) is still only unit-tested:
-   none of these six prompts was refused. Unit coverage is acceptable until the
-   Gemini quota resets, but the real refusal path — a swords/mutiny scene the
-   model declines, then the softened retry — has not run end to end and must
-   before a violent-topic episode ships.
+3. **Refusal handling** (the single softening retry) is still only unit-tested.
+   None of these six prompts was refused. On 2026-10-21 a deliberately
+   borderline prompt — sailors with drawn swords confronting the captain, sent
+   through the real `runImageStage` path — also generated on the first attempt
+   with no refusal and no softening. The stronger captives prompt that followed
+   never reached the model: the free allowance was spent and the batch stopped
+   with `quota_exhausted`. So "Gemini accepts swords in a stick drawing" is one
+   real data point; the retry path itself has still not fired outside a unit
+   test and must before a violent-topic episode ships.
 
 ### 6.4 Writer limits moved from feedback to the prompt
 
@@ -817,9 +864,11 @@ status was `running`) and S1–S7 were all reused, which is the documented crash
 behaviour; the stale `render/final.tmp.mp4` was overwritten and only the
 validated file was renamed to `final.mp4`.
 
-Manifest: `docs/story-sample-manifest-real-media.json` — every stage real
-(OpenRouter story, Gemini images, Chatterbox narration, WhisperX alignment,
-FFmpeg render).
+The checked-in `docs/story-sample-manifest-real-media.json` was later replaced
+by the longer 150 s run in §6.7; the numbers above belong to this 45 s job
+(`real-llm-probe-c`). Both runs are all-real (OpenRouter story, Gemini images,
+Chatterbox narration, WhisperX alignment, FFmpeg render); this one produced 18
+checks, §6.7 produces 22 because it has 15 scenes rather than 6.
 
 ### 6.6 Style A/B and the 19-scene drift run
 
@@ -883,6 +932,95 @@ Evidence: `docs/evidence/story-drift-19.jpg` (all 19 frames, 5×4 contact
 sheet). Prompts and per-scene timings are regenerated by composing the fixture
 with `composeImagePrompt()` and posting each prompt to `/generate`.
 
+### 6.7 Full real run, 150 s: “Why do we have seasons?”
+
+Run on 2026-10-21 with
+`story "Why do we have seasons?" --duration 150 --language en --review-story`,
+job `seasons-e2e-21oct`, every stage real: OpenRouter
+(`anthropic/claude-haiku-5.5`), Gemini web images, Chatterbox TTS, WhisperX
+alignment, FFmpeg. Manifest:
+`docs/story-sample-manifest-real-media.json`.
+
+**Story and claims.** “Why the Seasons Come Around”, 362 words, 36 sentences,
+15 scenes, reading grade 3.6, 10.1 words per sentence (budget 375, −3.5%),
+one writer attempt, lint passed. The ledger has 5 `established` claims (1
+hedged in narration) and 2 `fiction` claims (2 hedged). Verification made one
+attempt and blocked nothing; its one advisory says the two fiction claims are
+narrated as plain events, not visibly marked as invented. `groundingSource` is
+`model-knowledge` and `unverified` is `true` by design: no research agent runs
+in this pipeline, so the ledger records support, not external fact-checking.
+
+**Images.** 15/15 generated, one attempt each, no refusal and no softening
+retry: 1024×572, aspect 1.79, luminance variance 187.47–3490.82 (gates:
+≥1000×540, aspect 1.6–1.9, variance ≥8). Prompt lint reported 0 warnings across
+all 15 scenes. S5 took 311.3 s (≈21 s per image) and is the only stage that
+spends the free Gemini allowance.
+
+**Narration and alignment.** S6 251.0 s, S7 6.7 s. All 15 chunks aligned with
+`matchRatio 1.00`; free-ASR coverage was 1.00 on 14 chunks and 0.818 on scene 5
+after one automatic re-synthesis (missing “twenty-three and a half”), carried as
+a warning. Subtitle writer produced 36 cues with overall match ratio 1.00.
+
+The first render failed `no_long_silence`: two Chatterbox takes contained
+internal pauses of 1.069 s and 1.139 s (reported at 100.40 s and 124.76 s;
+gate: 1.0 s at −50 dB). Direct retakes of the same two lines measured 0.868 s
+and 0.795 s, so those two scenes were re-synthesized (`--from S6_audio`
+re-generated only the two cleared chunks), then alignment and render re-ran and
+the check passed. The pause length varies between takes; the pipeline does not
+shorten internal silence.
+
+**Render.** S8 140.5 s. `final.mp4` is 1920×1080, 30 fps, h264/yuv420p + aac,
+126.72 s, 9.43 MB. All 22 checks passed (16 gates, 6 warnings):
+
+```
+video_stream, video_codec, pixel_format, resolution, frame_rate,
+audio_stream, audio_codec, duration_matches_audio, no_black_frames,
+no_long_silence                                    16 gate checks (10 + 6 subtitles)
+scene_{1,4,7,9,12,15}_shows_source                 6 warning checks
+scene_{1,4,7,9,12,15}_subtitles_visible            6 gate checks
+```
+
+Frame check: own correlation 0.949–0.980 (floor 0.35); the closest other scene
+scored 0.502–0.678, leaving a margin of 0.271–0.474 (needs ≥0.02). Subtitle
+band difference 3.46–7.76% (gate ≥0.50%). The only run warning is scene 5's
+0.818 ASR coverage.
+
+**Cost and wall time.** 19 OpenRouter calls totalling **$0.0138**; images came
+from the free Gemini allowance and TTS/WhisperX ran locally, so no other paid
+spend. Stage time: S2 34.2 s, S3 11.3 s, S4 42.5 s, S5 311.3 s, S6 251.0 s,
+S7 6.7 s, S8 140.5 s (≈13.3 min of measured stages). The job's own timestamps
+span 44.1 min because the run waited at the `--review-story` prompt before
+continuing; the failed first render (129.3 s) is also not in the final stage
+time.
+
+Not verified by this run: nobody listened to the narration or watched the video
+end to end (the ASR pass and the frame checks measure words and frames, not
+whether it sounds or looks right), the captives refusal probe and the two
+thumbnail prompts were blocked by the quota, and the 2b framing regeneration
+did not run.
+
+### 6.8 Borderline prompts (partial: quota cut the batch)
+
+Two deliberately borderline scenes were sent through the real `runImageStage`
+path (the same code that owns the single softening retry), after both composed
+prompts passed the prompt linter with zero warnings:
+
+1. **Mutiny with drawn swords** — sailors confront the captain, two holding
+   swords at their sides, low-angle wide shot. Result: generated on attempt 1,
+   1024×572, `softened: false`; the provider did not refuse, so the softening
+   retry never fired.
+2. **Bound captives on the beach** — islanders seated with wrists bound while
+   sailors stand guard. Result: never generated. The provider answered
+   `quota_exhausted` ("Your limit resets at 3:06 PM", non-retryable) and the
+   batch stopped with `{generated: 1, failed: ["scene 2: ..."],
+quotaExhausted: true}`.
+
+The two thumbnail prompts (a long title, “EARTH IS TILTED NOT CLOSER”, and a
+short one, “WHY SEASONS?”) were composed for the flattened single-block path
+but not sent, because the same allowance was already spent. There is therefore
+no typography evidence for either thumbnail, and no evidence that the model
+refuses a captives scene or how the softened prompt reads.
+
 ## 7. Known limitations and deliberate choices
 
 1. **Subtitle minimum duration yields to no-overlap.** When two cues are closer
@@ -910,9 +1048,13 @@ with `composeImagePrompt()` and posting each prompt to `/generate`.
    regenerates only the affected artifacts.
 8. **Style fidelity — measured.** The strict stick-figure template won a two-arm
    comparison and is the default (§6.6). The 19-scene run shows no cross-scene
-   style drift and stable named characters; the remaining gap is that a group
-   character re-rolls its members' individual cues per scene, which per-member
-   character ids would fix.
+   style drift and stable named characters. A person followed through three or
+   more scenes is now split into its own individual id, but an anonymous crowd
+   stays one group entry, so its members still have no stable individual cues:
+   scenes 16–17 draw four islanders identical to each other (brown tunic, shell
+   necklace, same face and pose), and both groups are composed as parallel
+   lineups all facing the same direction instead of facing one another. They are
+   distinct from the crew by tunic colour and rope belt, not from each other.
 9. **Resolution.** The provider returns 1024×559–572 stills regardless of the
    1920×1080 request in the prompt; the render upscales them, so frames are
    slightly soft. The `>= 1000×540` gate is what the provider can actually meet.
@@ -936,6 +1078,27 @@ with `composeImagePrompt()` and posting each prompt to `/generate`.
     provider) behind the same `/generate` contract. The recorded-fixture tests
     make a UI change fail loudly; they cannot make the automation permitted or
     durable.
+13. **Narration pauses are not compressed.** The 1.0 s `no_long_silence` gate is
+    applied after concatenation. Chatterbox occasionally puts a longer pause
+    between sentences inside one chunk (1.07 s and 1.14 s in 2 of 15 chunks in
+    §6.7), which fails the gate even though the words are correct. The operator
+    fix is a re-synthesis of the affected scenes, as done there; the pipeline
+    does not trim silence automatically, because that would also cut breath and
+    emphasis, and re-synthesis is not guaranteed to produce a shorter pause.
+14. **Subtitles use a thin outline, not a box.** White Noto Sans at 100 px with
+    a 2 px black outline (`BorderStyle 1`, no shadow, no background box). It is
+    legible over the pale paper backgrounds in the burned-frame check
+    (`/tmp/opencode/subtitles/frame-010.png` and `frame-016.png`), but on a
+    nearly white bottom the outline is the only separation; a translucent box
+    is the fallback if a future style drops the pale-background rule.
+15. **Scene framing is prompt-constrained, not provider-enforced.** The slot
+    prompt allows only wide, medium, over-the-shoulder, high-angle and low-angle
+    shots, and the linter rejects close-framing words, but the image provider
+    does not accept a camera parameter. The 19-scene drift run produced four
+    close figure shots despite all four prompts saying “wide horizontal
+    framing”; the stricter prompt and lint are committed, but their effect was
+    not re-measured because the quota ran out before the four scenes could be
+    regenerated.
 
 ## 8. Reproduce
 

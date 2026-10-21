@@ -904,12 +904,16 @@ during image generation and asserts that the resume regenerates only the two
 missing stills) and prints the real `ffprobe` output plus the S8 validation
 report.
 
-Real manifests from those runs are checked in at
-`docs/story-sample-manifest-real-media.json` (every stage real: OpenRouter
-story, Gemini images, Chatterbox narration, WhisperX alignment, FFmpeg render —
-the primary example), `docs/story-sample-manifest-real-llm.json` (S1–S4 only)
-and `docs/story-sample-manifest.json` (complete job with fake LLM/image
-providers but real FFmpeg, used by the smoke check), and
+Manifests from those runs are checked in, labeled by what is real:
+
+- `docs/story-sample-manifest-real-media.json` — **every stage real**: the
+  150 s, 15-scene “Why do we have seasons?” run (OpenRouter story, Gemini
+  images, Chatterbox narration, WhisperX alignment, FFmpeg render; report §6.7)
+- `docs/story-sample-manifest-real-llm.json` — real OpenRouter S1–S4 only,
+  synthetic media
+- `docs/story-sample-manifest.json` — complete S1–S8 job with fake LLM/image
+  providers and synthetic images/audio, real FFmpeg (used by the smoke check)
+
 `docs/story-pipeline-report.md` records the verification results, the bugs the
 tests and the real runs caught, and the known limitations.
 
