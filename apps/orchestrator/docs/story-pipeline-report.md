@@ -79,10 +79,10 @@ apps/orchestrator/docs/story-sample-manifest-real-media.json (every stage real, 
 apps/orchestrator/docs/story-pipeline-report.md (this file)
 ```
 
-Tests — 19 suites, 297 tests, all new except the two cases appended to the
+Tests — 19 suites, 300 tests, all new except the two cases appended to the
 existing Chatterbox suite (counts from `jest --testPathPatterns='tests/story-'`
-on 2026-10-21; the whole orchestrator suite is 93 suites / 1386 unit tests plus
-3 suites / 21 integration tests, 96 / 1407 together).
+on 2026-10-21; the whole orchestrator suite is 93 suites / 1389 unit tests plus
+3 suites / 21 integration tests, 96 / 1410 together).
 
 Count reconciliation: the earlier 91 suites / 1340 tests came from an
 unquoted `--testPathIgnorePatterns=\.int\.test\.ts$` in package.json; the
@@ -91,7 +91,7 @@ matched `story-lint.test.ts` (28 tests) and `tts-fingerprint.test.ts` (3).
 Quoting the patterns restored both suites (no test was deleted or skipped).
 The 95 suites / 1370 tests figure was the pre-follow-up unit + integration
 total (92 / 1349 + 3 / 21). The 237 in the older §5 log is the count at the
-time of that run, not the current one. Story tests grew 260 -> 297 in this
+time of that run, not the current one. Story tests grew 260 -> 300 in this
 pass (the 237 -> 282 claim mixed two different baselines).
 
 ```
@@ -1083,6 +1083,21 @@ The monarchs are now separate individuals (they were one group under the old
 story, so no id was invented for him. The Taíno cue no longer mentions
 feathered headdresses or loincloths.
 
+**Group base colour.** In v2 a group must also name exactly one base colour,
+different from every individual's colour and from every other group's colour.
+The re-planned Columbus registry uses grey for the crew and brown for the
+Taíno. This is a lint invariant only: the style template paints characters in
+ink and allows flat colour in the background only, so the rendered figures do
+not show the registered colours. Shape cues (crown, veil, hat) carry
+recognition; colours disambiguate the registry text, not the pixels.
+
+**Individual cap overflow.** Named people are never dropped silently. If the
+designer returns more than five individuals, the lint reports
+`N individuals (max 5)`; the agent loop retries with that feedback up to
+`STORY_ATTEMPTS` (3), and if it still overflows the stage fails with
+`STORY_STAGE_FAILED` and the lint message. The run does not proceed with a
+trimmed or invented registry.
+
 **S6 early silence check.** After the free-ASR check, every chunk runs
 `silencedetect`; an internal pause over 1.0 s triggers up to two
 re-syntheses, recorded as `silenceRetakes` / `maxInternalSilenceSec` in
@@ -1099,6 +1114,34 @@ real ASR words score coverage 1.0 instead of 0.818.
 poses, and opposing groups facing each other; the prompt lint rejects "in a
 line", "lined up" and "row of" when a group is in `slots.characters`.
 "row of pebbles" stays valid in a scene without a group.
+
+**S6 vs S8 silence settings.** Both use the same detector arguments:
+`silencedetect=n=-50dB:d=1.0`. S6 inspects each chunk and ignores leading and
+trailing silence (only an internal pause counts); S8 inspects the concatenated
+master and fails on any silence interval the detector reports, including a
+leading/trailing one. S6 retakes are a mitigation; S8 remains the gate.
+
+**Gemini batch after the quota reset (2026-10-21).**
+
+- Captives scene: generated on **attempt 1**, `softened: false`, no warnings,
+  1024×572. The provider did not refuse, so the softening retry did not fire
+  and there is only one prompt to show.
+- Thumbnail typography, flattened provider path: long title
+  "EARTH IS TILTED NOT CLOSER" rendered exactly, four stacked lines, white with
+  one yellow emphasis word and a thick outline; short title "WHY SEASONS?"
+  rendered exactly, two lines, same treatment. Both are 9:16 and legible at
+  phone size.
+- Four drift close-ups: scenes 1 and 13 generated directly; scenes 18 and 19
+  first returned a retryable `server_error` ("fetch failed"), succeeded on one
+  focused retry. After sheet: `/tmp/opencode/regen-closeups/before-after.jpg`;
+  all four now show the whole figure.
+- Columbus split-out member: the v2 registry defines King Ferdinand and Queen
+  Isabella as individuals split out of the old `the_monarchs` group. They
+  appear in only scenes 5 and 17 of the 18-scene story, so only two distinct
+  scenes exist. Images were generated for both (`/tmp/opencode/columbus-split`);
+  no third scene was fabricated. Ferdinand's crown is recognizable in both,
+  although the style renders it in the same ink/blue palette as Isabella's
+  veil.
 
 **WPM.** The default is now 175 (`STORY_TTS_WPM`), from 362 words in 123.92 s
 of speech; a 150 s target budgets 438 words. No other default changed.
