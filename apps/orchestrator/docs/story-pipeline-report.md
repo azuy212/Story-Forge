@@ -75,7 +75,7 @@ apps/orchestrator/scripts/story-video.mjs     commander CLI (loads .env, imports
 apps/orchestrator/scripts/story-smoke.mjs     4-pass end-to-end smoke test
 apps/orchestrator/docs/story-sample-manifest.json          (smoke job, fake LLM/images, real FFmpeg)
 apps/orchestrator/docs/story-sample-manifest-real-llm.json  (real OpenRouter S1–S4)
-apps/orchestrator/docs/story-sample-manifest-real-media.json (real S1–S4 + real S6–S8)
+apps/orchestrator/docs/story-sample-manifest-real-media.json (every stage real, S1–S8; §6.7)
 apps/orchestrator/docs/story-pipeline-report.md (this file)
 ```
 
