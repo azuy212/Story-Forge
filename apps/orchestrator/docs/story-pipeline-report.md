@@ -580,15 +580,19 @@ Six real images were then generated for the six scenes in **2 m 07 s**
 (1024×572 and 1024×559, one attempt each, no refusals), so every stage of this
 run is real: OpenRouter, Gemini, Chatterbox, WhisperX and FFmpeg.
 
-**Capacity on this account.** The free tier stopped accepting generations after
-roughly 14 images across the day's runs; after that the "+" menu showed
-"Create image" with `aria-disabled="true"` and every request would have waited
-out three generation timeouts. The provider now detects that state before
-typing and answers `quota_exhausted` (non-retryable), and the story stage stops
-the batch and names the scenes still missing an image, so a rerun after the
-refill generates only those. At 2 m 07 s for six images, a 19-scene episode is
-about 7 minutes of generation — the daily allowance, not the clock, is the
-binding constraint. Treat ~14 as the number to confirm on the next refill.
+**Capacity on this account.** The allowance is not a fixed daily number.
+An earlier day stopped accepting generations after roughly 14 images: the
+"+" menu showed "Create image" with `aria-disabled="true"`, and every further
+request would have waited out three generation timeouts. On 2026-10-21 the
+same account completed 24 generations with no 429 before the thumbnail check
+(the 19-scene drift run, four A/B second samples, and one smoke image), and 25
+with the thumbnail. The provider reports `quota_exhausted` (non-retryable) when
+the allowance is actually spent, and the story stage stops the batch and names
+the scenes still missing an image, so a rerun after the refill generates only
+those. At roughly 20 s per image, a 19-scene episode is about 7 minutes of
+generation; the allowance, not the clock, is the binding constraint, and it
+varies enough that a run should plan for a partial batch rather than a fixed
+number.
 
 **The Images surface is the live path.** Gemini now serves image creation at
 `gemini.google.com/images`, and for accounts on that UI the "+" menu's
