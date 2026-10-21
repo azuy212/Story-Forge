@@ -196,6 +196,21 @@ export function clearScenePromptState(
   }
 }
 
+/**
+ * What --regenerate-prompts should do before the stages run. The flag is only
+ * safe when S4 will actually re-plan: a dry run writes nothing, and clearing
+ * prompts while S4 is not scheduled would leave the job with scenes that have
+ * no prompt to generate an image from.
+ */
+export function promptRegenerationAction(
+  options: StoryJobOptions,
+): "none" | "skip-dry-run" | "skip-stage" | "clear" {
+  if (!options.regeneratePrompts) return "none";
+  if (options.dryRun) return "skip-dry-run";
+  if (!wantsStage(options, "S4_visual_plan")) return "skip-stage";
+  return "clear";
+}
+
 function wantsStage(options: StoryJobOptions, stage: StoryStage): boolean {
   return !options.stages || options.stages.length === 0
     ? true
@@ -268,7 +283,13 @@ export async function runStoryJob(
     });
   }
 
-  if (options.regeneratePrompts && manifest.scenes.length > 0) {
+  const promptAction = promptRegenerationAction(options);
+  if (promptAction === "skip-stage") {
+    addWarning(
+      manifest,
+      "regenerate-prompts was ignored because S4_visual_plan is not in --stages",
+    );
+  } else if (promptAction === "clear" && manifest.scenes.length > 0) {
     clearScenePromptState(manifest.scenes);
     // Persist before S4 starts: a crash mid-plan then resumes with the prompt
     // state already cleared, instead of silently keeping the old prompts.

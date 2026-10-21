@@ -1,5 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
-import { buildForceStages, clearScenePromptState } from "../src/story/run.js";
+import {
+  buildForceStages,
+  clearScenePromptState,
+  promptRegenerationAction,
+} from "../src/story/run.js";
 
 /**
  * `--regenerate-prompts` exists because the only other way to force new
@@ -56,5 +60,19 @@ describe("story prompt regeneration", () => {
     expect(scenes[0].status.audio).toBe("done");
     expect(scenes[0].image).toEqual({ path: "scene-001.png" });
     expect(scenes[0].audio).toEqual({ path: "scene-001.wav" });
+  });
+
+  it("only clears when S4 is actually scheduled", () => {
+    expect(promptRegenerationAction({ regeneratePrompts: true })).toBe("clear");
+    expect(
+      promptRegenerationAction({ regeneratePrompts: true, dryRun: true }),
+    ).toBe("skip-dry-run");
+    expect(
+      promptRegenerationAction({
+        regeneratePrompts: true,
+        stages: ["S8_render"],
+      }),
+    ).toBe("skip-stage");
+    expect(promptRegenerationAction({})).toBe("none");
   });
 });
