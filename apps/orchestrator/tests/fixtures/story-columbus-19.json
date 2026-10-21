@@ -29,25 +29,29 @@
       "id": "columbus",
       "name": "Columbus",
       "role": "the captain",
-      "visualDescription": "stickman in a long dark-red captain's coat, flat black cap, rolled chart under one arm"
+      "kind": "individual",
+      "visualDescription": "stickman in a long dark-red captain's coat"
     },
     {
       "id": "the_crew",
       "name": "The crew",
       "role": "the sailors",
-      "visualDescription": "three stickmen in rough linen shirts with rope belts and bare feet"
+      "kind": "group",
+      "visualDescription": "three stickmen in rough linen shirts with rope belts"
     },
     {
       "id": "the_monarchs",
       "name": "The monarchs",
       "role": "the king and queen of Spain",
-      "visualDescription": "a king in a crimson cloak with a gold chain, and a queen in a deep-blue gown with a small crown"
+      "kind": "group",
+      "visualDescription": "a king in a crimson cloak and a queen with a small crown"
     },
     {
       "id": "islanders",
       "name": "The islanders",
       "role": "the people already living on the island",
-      "visualDescription": "stickmen in simple woven tunics with shell necklaces, standing calmly"
+      "kind": "group",
+      "visualDescription": "stickmen in simple woven tunics with shell necklaces"
     }
   ],
   "scenes": [
@@ -107,7 +111,7 @@
         "setting": "the crowded deck at dusk, sails slack overhead",
         "props": ["an empty wooden bowl", "a torn sail"],
         "lighting": "dim blue evening light with one warm lamp",
-        "composition": "wide horizontal framing from the bow, the sailors grouped left, calm deck boards across the lower third 背景",
+        "composition": "wide horizontal framing from the bow, the sailors grouped left, calm deck boards across the lower third \u80cc\u666f",
         "metaphor": false
       }
     },

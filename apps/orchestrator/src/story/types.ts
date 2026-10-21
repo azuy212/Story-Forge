@@ -88,6 +88,12 @@ export const CharacterRegistrySchema = z.object({
           ),
         name: z.string().min(1),
         role: z.string().min(1),
+        /**
+         * `individual` is a person the pictures must follow across scenes;
+         * `group` is an anonymous crowd drawn as one collective. The split
+         * rule lives in the registry prompt; the lint enforces the cue budget.
+         */
+        kind: z.enum(["individual", "group"]).default("individual"),
         visualDescription: z.string().min(1),
       }),
     )

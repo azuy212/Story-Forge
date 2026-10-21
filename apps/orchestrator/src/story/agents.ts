@@ -81,6 +81,8 @@ export interface PlanScenesInput {
 export interface DesignCharactersInput {
   story: string;
   language: string;
+  /** Scene plan, so the agent can count where a person recurs. */
+  scenes: { sceneId: number; narration: string }[];
   feedback?: string;
 }
 
@@ -130,6 +132,14 @@ function toTelemetry(result: {
 function renderSentences(sentences: { id: string; text: string }[]): string {
   return sentences
     .map((sentence) => `${sentence.id}: ${sentence.text}`)
+    .join("\n");
+}
+
+function renderScenes(
+  scenes: { sceneId: number; narration: string }[],
+): string {
+  return scenes
+    .map((scene) => `scene ${scene.sceneId}: ${scene.narration}`)
     .join("\n");
 }
 
@@ -274,6 +284,7 @@ export function createStoryAgents(
         },
         variables: {
           story: input.story,
+          scenes: renderScenes(input.scenes),
           language: input.language,
           feedback: input.feedback ?? "(none)",
           maxWords: String(CHARACTER_MAX_WORDS),

@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "@jest/globals";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { lintStory } from "../src/story/lint.js";
+import { lintCharacterRegistry, lintStory } from "../src/story/lint.js";
 import { composeImagePrompt, lintImagePrompt } from "../src/story/prompt.js";
 import { countWords } from "../src/story/sentences.js";
 import { loadStyleProfile } from "../src/story/style-profile.js";
@@ -67,6 +67,10 @@ describe("golden Columbus fixture", () => {
     expect(fixture.scenes.map((scene) => scene.sceneId)).toEqual(
       Array.from({ length: 19 }, (_, index) => index + 1),
     );
+  });
+
+  it("the character registry passes the silhouette, cue and staging lint", () => {
+    expect(lintCharacterRegistry(fixture.characters)).toEqual([]);
   });
 
   it("reading-level lint flags mutiny, Genoese and uncharted", () => {

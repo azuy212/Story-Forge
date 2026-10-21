@@ -818,6 +818,10 @@ async function stageVisualPlan(
           agents.designCharacters({
             story,
             language: ctx.config.language,
+            scenes: ctx.manifest.scenes.map((scene) => ({
+              sceneId: scene.sceneId,
+              narration: scene.narration,
+            })),
             feedback: issues.length > 0 ? formatFeedback(issues) : undefined,
           }),
           "character registry",

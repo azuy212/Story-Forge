@@ -205,9 +205,9 @@ export const CHARACTER_MAX_WORDS = 16;
 export const CHARACTER_MAX_CUES = 2;
 
 const COSTUME_CUE =
-  /\b(hat|cap|hood|helmet|coat|cloak|cape|doublet|tunic|shirt|blouse|robe|dress|gown|skirt|breeches|trousers|pants|hose|stockings|boots|shoes|sandals|sash|belt|bandana|scarf|gloves|armour|armor|armband|necklace|crown|veil|apron|uniform|jacket|vest|waistcoat|kilt|poncho|headband|earring)s?\b/gi;
+  /\b(hat|cap|hood|helmet|coat|cloak|cape|doublet|tunic|shirt|blouse|robe|dress|gown|skirt|breeches|trousers|pants|hose|stockings|boots|shoes|sandals|sash|belt|bandana|scarf|gloves|armour|armor|armband|necklace|crown|veil|apron|uniform|jacket|vest|waistcoat|kilt|poncho|headband|earring|beard|moustache|mustache|eyepatch|scar|tattoo|braid|topknot)s?\b/gi;
 
-/** Distinct clothing cues named in a description, lowercased and singular. */
+/** Distinct clothing or silhouette cues named in a description. */
 export function characterCues(description: string): string[] {
   const seen = new Set<string>();
   for (const match of description.matchAll(COSTUME_CUE)) {
@@ -218,29 +218,103 @@ export function characterCues(description: string): string[] {
 }
 
 /**
+ * A registry entry describes a body, not a moment. A place or an action in
+ * `visualDescription` is pasted into every scene the character appears in, so
+ * "on a deck" puts them on a deck in the palace, and "holding a chart" gives
+ * them the chart in scenes where the narration needs their hands empty.
+ */
+const PLACE_NOUN =
+  "deck|ship|boat|cabin|room|hall|palace|throne|table|beach|shore|island|sea|ocean|forest|jungle|village|town|city|street|market|harbou?r|port|tent|cave|mountain|river|field|rail|mast|wheel|door|window|stairs|steps";
+const LOCATION_PHRASE = new RegExp(
+  `\\b(?:on|in|at|aboard|beside|near|behind|under|inside|outside|by|through|across)\\s+(?:the|a|an)\\s+(?:[a-z-]+\\s+){0,2}(?:${PLACE_NOUN})\\b`,
+  "i",
+);
+const ACTION_VERB =
+  /\b(standing|stands|sitting|sits|walking|walks|holding|holds|carrying|carries|pointing|points|writing|writes|reading|reads|rowing|rows|waving|waves|fighting|fights|kneeling|kneels|lying|lies|looking|looks|gazing|gazes|watching|watches|raising|raised|gripping|grips|leaning|leans)\b/i;
+
+/** Staging words that belong in the scene slots, not in a reusable registry. */
+export function characterStagingIssues(description: string): string[] {
+  const issues: string[] = [];
+  const location = description.match(LOCATION_PHRASE);
+  if (location) issues.push(`names a place ("${location[0]}")`);
+  const action = description.match(ACTION_VERB);
+  if (action) issues.push(`names an action ("${action[0]}")`);
+  return issues;
+}
+
+/**
  * Gate the character registry before it is injected verbatim into every scene
- * prompt. Returns one message per offending character.
+ * prompt. Returns one message per offending character, plus one per duplicated
+ * cue.
+ *
+ * - an individual carries exactly one cue, because that is what makes them
+ *   recognisable as the same person in the next scene;
+ * - a group may carry none (an anonymous crowd) or up to the shared limit,
+ *   and may repeat its members' base costume — that is what makes a crowd read
+ *   as the same people;
+ * - two individuals, or two groups, may not share a cue.
  */
 export function lintCharacterRegistry(
-  characters: { id: string; visualDescription: string }[],
+  characters: {
+    id: string;
+    kind?: "individual" | "group";
+    visualDescription: string;
+  }[],
 ): string[] {
   const issues: string[] = [];
+  const cueOwners = new Map<
+    string,
+    { id: string; kind: "individual" | "group" }[]
+  >();
+
   for (const character of characters) {
+    const kind = character.kind ?? "individual";
     const description = character.visualDescription.trim();
     const words = countWords(description);
     const cues = characterCues(description);
     const problems: string[] = [];
+    const staging = characterStagingIssues(description);
+    if (staging.length > 0) problems.push(...staging);
     if (words > CHARACTER_MAX_WORDS) {
       problems.push(`${words} words (max ${CHARACTER_MAX_WORDS})`);
     }
-    if (cues.length > CHARACTER_MAX_CUES) {
+    if (kind === "individual" && cues.length !== 1) {
       problems.push(
-        `${cues.length} clothing cues (${cues.join(", ")}; max ${CHARACTER_MAX_CUES})`,
+        cues.length === 0
+          ? "no silhouette cue (an individual needs exactly one)"
+          : `${cues.length} cues (${cues.join(", ")}; an individual needs exactly one)`,
+      );
+    }
+    if (kind === "group" && cues.length > CHARACTER_MAX_CUES) {
+      problems.push(
+        `${cues.length} cues (${cues.join(", ")}; a group may name ${CHARACTER_MAX_CUES})`,
       );
     }
     if (problems.length > 0) {
       issues.push(`character "${character.id}": ${problems.join("; ")}`);
     }
+    for (const cue of cues) {
+      const owners = cueOwners.get(cue) ?? [];
+      owners.push({ id: character.id, kind });
+      cueOwners.set(cue, owners);
+    }
   }
+
+  for (const [cue, owners] of cueOwners) {
+    for (let left = 0; left < owners.length; left += 1) {
+      for (let right = left + 1; right < owners.length; right += 1) {
+        const first = owners[left];
+        const second = owners[right];
+        if (first.kind !== second.kind) continue;
+        issues.push(
+          `characters "${first.id}" and "${second.id}" share the cue "${cue}"; ` +
+            (first.kind === "individual"
+              ? "each individual needs a distinct cue"
+              : "each group needs a distinct cue"),
+        );
+      }
+    }
+  }
+
   return issues;
 }

@@ -229,12 +229,13 @@ describe("story lintStory complexity integration", () => {
 });
 
 describe("story lintCharacterRegistry", () => {
-  const character = (id: string, visualDescription: string) => ({
-    id,
-    visualDescription,
-  });
+  const character = (
+    id: string,
+    visualDescription: string,
+    kind: "individual" | "group" = "individual",
+  ) => ({ id, kind, visualDescription });
 
-  it("accepts a one-cue description", () => {
+  it("accepts one cue on an individual", () => {
     expect(
       lintCharacterRegistry([
         character(
@@ -245,12 +246,70 @@ describe("story lintCharacterRegistry", () => {
     ).toEqual([]);
   });
 
-  it("accepts two cues", () => {
+  it("rejects a second cue on an individual", () => {
+    const issues = lintCharacterRegistry([
+      character("rodrigo", "A stick figure with a red sash and a knit cap."),
+    ]);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toContain('character "rodrigo"');
+    expect(issues[0]).toMatch(/an individual needs exactly one/);
+  });
+
+  it("rejects an individual with no cue", () => {
+    const issues = lintCharacterRegistry([
+      character("sailor", "A plain stick figure in rough linen."),
+    ]);
+    expect(issues[0]).toMatch(/no silhouette cue/);
+  });
+
+  it("allows a group with two cues, or none at all", () => {
     expect(
       lintCharacterRegistry([
-        character("rodrigo", "A stick figure with a red sash and a knit cap."),
+        character(
+          "the_crew",
+          "Stick figures in rough shirts with rope belts.",
+          "group",
+        ),
+        character("islanders", "A crowd of plain stick figures.", "group"),
       ]),
     ).toEqual([]);
+  });
+
+  it("rejects two individuals sharing a cue", () => {
+    const issues = lintCharacterRegistry([
+      character("columbus", "A stick figure in a flat black hat."),
+      character("rodrigo", "A stick figure in a flat black hat."),
+    ]);
+    expect(issues.join("\n")).toMatch(
+      /characters "columbus" and "rodrigo" share the cue "hat"/,
+    );
+  });
+
+  it("allows a group to repeat a member's base costume", () => {
+    expect(
+      lintCharacterRegistry([
+        character("columbus", "A stick figure in a long dark-red coat."),
+        character(
+          "the_crew",
+          "Stick figures in linen shirts and a dark-red coat.",
+          "group",
+        ),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("rejects a place in the description", () => {
+    const issues = lintCharacterRegistry([
+      character("sailor", "A stick figure in a linen shirt on a deck."),
+    ]);
+    expect(issues[0]).toMatch(/names a place \("on a deck"\)/);
+  });
+
+  it("rejects an action in the description", () => {
+    const issues = lintCharacterRegistry([
+      character("columbus", "A stick figure holding a chart."),
+    ]);
+    expect(issues[0]).toMatch(/names an action \("holding"\)/);
   });
 
   it("rejects a costume list and names the cues", () => {
@@ -269,7 +328,7 @@ describe("story lintCharacterRegistry", () => {
     const issues = lintCharacterRegistry([
       character(
         "sailor",
-        "A young sailor with a red sash who stands beside the rail and looks out over the water.",
+        "A young sailor with a red sash who always smiles and never speaks unless the captain speaks to him first.",
       ),
     ]);
     expect(issues[0]).toMatch(/words \(max 16\)/);

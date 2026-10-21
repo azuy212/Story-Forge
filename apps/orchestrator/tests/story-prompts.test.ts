@@ -81,6 +81,7 @@ const DECLARED_VARIABLES: Record<string, string[]> = {
     "language",
     "maxCues",
     "maxWords",
+    "scenes",
     "story",
   ],
   "story-slots/v1.md": [
@@ -234,11 +235,16 @@ describe("story agent prompt rendering", () => {
     });
     const agents = createStoryAgents({ inject });
 
-    await agents.designCharacters({ story: "STORY-MARKER", language: "en" });
+    await agents.designCharacters({
+      story: "STORY-MARKER",
+      language: "en",
+      scenes: [{ sceneId: 1, narration: "SCENE-MARKER" }],
+    });
 
     expect(calls[0].agent).toBe(AgentModel.StoryCharacterDesigner);
     expect(calls[0].text).not.toContain("{{");
     expect(calls[0].text).toContain("STORY-MARKER");
+    expect(calls[0].text).toContain("SCENE-MARKER");
   });
 
   it("renders the slot planner with the registry description injected verbatim", async () => {
