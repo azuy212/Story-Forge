@@ -1,6 +1,8 @@
 import { createInterface } from "node:readline";
 import { resolve } from "node:path";
 import { hashObject } from "../artifacts/hash.js";
+import { loadPrompt } from "../utils/load-prompt.js";
+import { promptPathsFor } from "../models/prompt-paths.js";
 import { config as appConfig } from "../utils/config.js";
 import { PipelineError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
@@ -822,6 +824,31 @@ async function mapWithConcurrency<T>(
   await Promise.all(runners);
 }
 
+/**
+ * The registry is reused across resumes, so its fingerprint must cover the
+ * prompt that produced it. Without the prompt hash, editing the character
+ * prompt (the per-member split rule, the appearance-only rule) changed nothing
+ * for an existing job: S4 saw an unchanged story/style fingerprint, kept the
+ * stored registry, and quietly drew the old characters with the new scene
+ * prompts. The scene prompts are deliberately not part of this: use
+ * --regenerate-prompts for those.
+ */
+export function characterRegistryFingerprint(input: {
+  story: string;
+  language: string;
+  styleId: string;
+  style: unknown;
+  characterPrompt: string;
+}): string {
+  return stageFingerprint({
+    storyHash: hashObject(input.story),
+    language: input.language,
+    style: input.styleId,
+    styleHash: hashObject(input.style),
+    characterPromptHash: hashObject(input.characterPrompt),
+  });
+}
+
 function scenePromptFingerprint(scene: StoryScene): string {
   return hashObject({
     narration: scene.narration,
@@ -834,11 +861,14 @@ async function stageVisualPlan(
   agents: StoryAgents,
 ): Promise<void> {
   const { story } = requireManifestStory(ctx.manifest);
-  const charactersFingerprint = stageFingerprint({
-    storyHash: hashObject(story),
+  const charactersFingerprint = characterRegistryFingerprint({
+    story,
     language: ctx.config.language,
-    style: ctx.style.id,
-    styleHash: hashObject(ctx.style),
+    styleId: ctx.style.id,
+    style: ctx.style,
+    characterPrompt: await loadPrompt(
+      promptPathsFor("v1").StoryCharacterDesigner,
+    ),
   });
   const fingerprint = stageFingerprint({
     storyHash: hashObject(story),

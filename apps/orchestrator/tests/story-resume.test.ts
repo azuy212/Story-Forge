@@ -8,7 +8,7 @@ import { resolveStoryConfig } from "../src/story/config.js";
 import { createManifest, saveManifest } from "../src/story/manifest.js";
 import { jobDir, jobPaths } from "../src/story/paths.js";
 import { reconcileResumeConfig } from "../src/story/resume.js";
-import { runStoryJob } from "../src/story/run.js";
+import { characterRegistryFingerprint, runStoryJob } from "../src/story/run.js";
 import type { ResolvedStoryConfig } from "../src/story/types.js";
 
 /**
@@ -249,5 +249,42 @@ describe("runStoryJob resume", () => {
 
     expect(result.status).toBe("stopped");
     expect(result.plan?.wordBudget).toBeGreaterThan(0);
+  });
+});
+
+describe("characterRegistryFingerprint", () => {
+  const base = {
+    story: "A story.",
+    language: "en",
+    styleId: "stickman-history",
+    style: { id: "stickman-history", promptTemplate: "A template." },
+    characterPrompt: "The registry prompt.",
+  };
+
+  it("is stable when nothing changed", () => {
+    expect(characterRegistryFingerprint(base)).toBe(
+      characterRegistryFingerprint({ ...base }),
+    );
+  });
+
+  it("changes when the character prompt changes, so a stored registry is re-planned", () => {
+    expect(
+      characterRegistryFingerprint({
+        ...base,
+        characterPrompt: "The registry prompt, with the split rule.",
+      }),
+    ).not.toBe(characterRegistryFingerprint(base));
+  });
+
+  it("changes when the story or the style changes", () => {
+    expect(
+      characterRegistryFingerprint({ ...base, story: "Another story." }),
+    ).not.toBe(characterRegistryFingerprint(base));
+    expect(
+      characterRegistryFingerprint({
+        ...base,
+        style: { id: "stickman-history", promptTemplate: "Another template." },
+      }),
+    ).not.toBe(characterRegistryFingerprint(base));
   });
 });
