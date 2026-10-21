@@ -11,7 +11,10 @@ import {
   findVoiceOutliers,
   runAudioStage,
   splitForTts,
+  trimEdgeSilence,
 } from "../src/story/audio.js";
+import { concatNarrationWithGaps } from "../src/story/ffmpeg-args.js";
+import { detectSilence } from "../src/story/media.js";
 import { resolveStoryConfig } from "../src/story/config.js";
 import { jobPaths } from "../src/story/paths.js";
 import { countWords } from "../src/story/sentences.js";
@@ -76,6 +79,43 @@ function writeWavWithGap(
       "lavfi",
       "-i",
       `sine=frequency=${frequency}:sample_rate=24000:duration=${toneSeconds}`,
+      "-filter_complex",
+      "[0:a][1:a][2:a]concat=n=3:v=0:a=1",
+      "-c:a",
+      "pcm_s16le",
+      "-ac",
+      "1",
+      path,
+    ],
+    { stdio: "pipe" },
+  );
+}
+
+function writeWavWithEdges(
+  path: string,
+  edgeSeconds: number,
+  toneSeconds = 1,
+  frequency = 440,
+): void {
+  mkdirSync(join(path, ".."), { recursive: true });
+  execFileSync(
+    "ffmpeg",
+    [
+      "-y",
+      "-loglevel",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      `anullsrc=r=24000:cl=mono:d=${edgeSeconds}`,
+      "-f",
+      "lavfi",
+      "-i",
+      `sine=frequency=${frequency}:sample_rate=24000:duration=${toneSeconds}`,
+      "-f",
+      "lavfi",
+      "-i",
+      `anullsrc=r=24000:cl=mono:d=${edgeSeconds}`,
       "-filter_complex",
       "[0:a][1:a][2:a]concat=n=3:v=0:a=1",
       "-c:a",
@@ -185,6 +225,42 @@ describe("splitForTts", () => {
 
   it("returns nothing for empty input", () => {
     expect(splitForTts("   ", 450)).toEqual([]);
+  });
+});
+
+describe("trimEdgeSilence", () => {
+  it("keeps a two-chunk join under S8's 1 s silence gate", async () => {
+    const dir = join(ROOT, "edge-trim");
+    const first = join(dir, "first.wav");
+    const second = join(dir, "second.wav");
+    writeWavWithEdges(first, 0.5, 1, 440);
+    writeWavWithEdges(second, 0.5, 1, 660);
+
+    const untrimmed = join(dir, "untrimmed.wav");
+    await concatNarrationWithGaps({
+      chunkPaths: [first, second],
+      gapMs: 200,
+      outputPath: untrimmed,
+    });
+    const before = await detectSilence(untrimmed, -50, 1.0);
+    // The fixture is adversarial: 0.5 s trailing + 0.2 s gap + 0.5 s
+    // leading is a 1.2 s silence at the join, so S8 would fail it.
+    expect(before.length).toBeGreaterThan(0);
+
+    const firstDuration = await trimEdgeSilence(first, 2);
+    const secondDuration = await trimEdgeSilence(second, 2);
+    expect(firstDuration).toBeGreaterThan(1.1);
+    expect(firstDuration).toBeLessThan(1.3);
+    expect(secondDuration).toBeGreaterThan(1.1);
+    expect(secondDuration).toBeLessThan(1.3);
+
+    const trimmed = join(dir, "trimmed.wav");
+    await concatNarrationWithGaps({
+      chunkPaths: [first, second],
+      gapMs: 200,
+      outputPath: trimmed,
+    });
+    expect(await detectSilence(trimmed, -50, 1.0)).toEqual([]);
   });
 });
 

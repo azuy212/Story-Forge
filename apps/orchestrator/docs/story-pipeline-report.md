@@ -1116,10 +1116,12 @@ line", "lined up" and "row of" when a group is in `slots.characters`.
 "row of pebbles" stays valid in a scene without a group.
 
 **S6 vs S8 silence settings.** Both use the same detector arguments:
-`silencedetect=n=-50dB:d=1.0`. S6 inspects each chunk and ignores leading and
-trailing silence (only an internal pause counts); S8 inspects the concatenated
-master and fails on any silence interval the detector reports, including a
-leading/trailing one. S6 retakes are a mitigation; S8 remains the gate.
+`silencedetect=n=-50dB:d=1.0`. S6 retakes internal pauses over 1.0 s, then trims
+each chunk's leading and trailing silence to at most 0.1 s before the master is
+joined (an internal pause is untouched). With the 0.2 s scene gap, a chunk join
+can therefore hold at most 0.4 s of silence. S8 still inspects the concatenated
+master and fails on any reported interval, including a leading/trailing one.
+S6 retakes are a mitigation; S8 remains the gate.
 
 **Gemini batch after the quota reset (2026-10-21).**
 

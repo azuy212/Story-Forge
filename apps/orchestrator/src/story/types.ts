@@ -216,6 +216,8 @@ export interface SceneAudioChunkRecord {
   asrChecked?: boolean;
   /** Silence-driven re-syntheses performed in S6 (max 2). */
   silenceRetakes?: number;
+  /** Total leading/trailing silence trimmed from the chunk edge, in seconds. */
+  edgeTrimmedSec?: number;
   /** Longest internal pause observed during the S6 check, in seconds. */
   maxInternalSilenceSec?: number;
 }

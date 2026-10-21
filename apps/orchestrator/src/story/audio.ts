@@ -1,4 +1,4 @@
-import { copyFile, stat } from "node:fs/promises";
+import { copyFile, rename, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { PipelineError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
@@ -25,6 +25,13 @@ import type {
 } from "./types.js";
 
 /**
+ * Maximum silence kept at each edge of a scene chunk. Two chunks plus the
+ * 200 ms scene gap can then leave at most 0.4 s of silence at a boundary,
+ * safely under S8's 1.0 s `no_long_silence` gate.
+ */
+export const MAX_CHUNK_EDGE_SILENCE_SEC = 0.1;
+
+/**
  * S6 narration audio — DP1: per-scene TTS chunks.
  *
  * Each scene's narration is one chunk. A narration longer than the provider's
@@ -37,6 +44,55 @@ import type {
  * NARRATION_GENERATION_MODE is never consulted, and WPM tempo normalization is
  * skipped so measured durations are the engine's true output.
  */
+
+/**
+ * Trim a chunk's leading and trailing silence down to `maxEdgeSec`, in place.
+ * Internal pauses are untouched — S6's re-synthesis check and S8's gate own
+ * those — so this only reconciles the chunk joins S8 measures. Returns the
+ * trimmed duration.
+ */
+export async function trimEdgeSilence(
+  path: string,
+  durationSec: number,
+  maxEdgeSec = MAX_CHUNK_EDGE_SILENCE_SEC,
+): Promise<number> {
+  const duration = durationSec > 0 ? durationSec : (await probe(path)).duration;
+  if (!(duration > maxEdgeSec * 2)) return duration;
+
+  const silences = await detectSilence(path, -50, maxEdgeSec);
+  const leading = silences.find((silence) => (silence.start ?? 0) <= 0.05);
+  let trailing;
+  for (let index = silences.length - 1; index >= 0; index--) {
+    const silence = silences[index];
+    if ((silence.end ?? duration) >= duration - 0.05) {
+      trailing = silence;
+      break;
+    }
+  }
+
+  const head = leading ? Math.max(0, leading.duration - maxEdgeSec) : 0;
+  const tail = trailing ? Math.max(0, trailing.duration - maxEdgeSec) : 0;
+  if (head === 0 && tail === 0) return duration;
+
+  const start = Math.min(head, duration);
+  const end = Math.max(start, duration - tail);
+  const temp = `${path}.trim.wav`;
+  await runFfmpegWithRetry(
+    [
+      "-y",
+      "-i",
+      path,
+      "-af",
+      `atrim=start=${start.toFixed(3)}:end=${end.toFixed(3)},asetpts=PTS-STARTPTS`,
+      "-c:a",
+      "pcm_s16le",
+      temp,
+    ],
+    `trim edge silence from ${path}`,
+  );
+  await rename(temp, path);
+  return (await probe(path)).duration;
+}
 
 /** Split narration into provider-sized pieces at sentence boundaries. */
 export function splitForTts(text: string, maxChars: number): string[] {
@@ -310,11 +366,19 @@ export async function runAudioStage(
           "STORY_TTS_INVALID",
         );
       }
-      return { pieces, durationSec: probeResult.duration };
+      return {
+        pieces,
+        durationSec: probeResult.duration,
+        edgeTrimmedSec: 0,
+      };
     };
 
     let built = reusable
-      ? { pieces: reusable.pieces, durationSec: reusable.durationSec }
+      ? {
+          pieces: reusable.pieces,
+          durationSec: reusable.durationSec,
+          edgeTrimmedSec: reusable.edgeTrimmedSec ?? 0,
+        }
       : await synthesizeChunk(false);
     let coverage: NarrationFidelity | undefined;
     let resynthesized = reusable?.resynthesized === true;
@@ -391,11 +455,24 @@ export async function runAudioStage(
       if (!scene.warnings.includes(message)) scene.warnings.push(message);
     }
 
-    const { pieces, durationSec } = built;
-    const expectedPiecesDuration = pieces.reduce(
-      (sum, piece) => sum + piece.durationSec,
-      0,
-    );
+    // Trim chunk edges before the master is joined: trailing(i) + scene gap
+    // + leading(i+1) can otherwise exceed S8's 1.0 s gate even when each
+    // chunk's internal pauses are clean.
+    const untrimmedDuration = built.durationSec;
+    const trimmedDuration = await trimEdgeSilence(chunkPath, untrimmedDuration);
+    if (trimmedDuration < untrimmedDuration) {
+      built = {
+        ...built,
+        durationSec: trimmedDuration,
+        edgeTrimmedSec:
+          built.edgeTrimmedSec + (untrimmedDuration - trimmedDuration),
+      };
+    }
+
+    const { pieces, durationSec, edgeTrimmedSec } = built;
+    const expectedPiecesDuration =
+      pieces.reduce((sum, piece) => sum + piece.durationSec, 0) -
+      edgeTrimmedSec;
     if (Math.abs(durationSec - expectedPiecesDuration) > 0.1) {
       logger.warn(
         `Scene ${scene.sceneId} chunk duration differs from its pieces`,
@@ -424,6 +501,10 @@ export async function runAudioStage(
       resynthesized: resynthesized ? true : undefined,
       asrChecked: asrChecked ? true : undefined,
       silenceRetakes: silenceRetakes > 0 ? silenceRetakes : undefined,
+      edgeTrimmedSec:
+        edgeTrimmedSec > 0
+          ? Math.round(edgeTrimmedSec * 1000) / 1000
+          : undefined,
       maxInternalSilenceSec:
         maxInternalSilenceSec > 0
           ? Math.round(maxInternalSilenceSec * 1000) / 1000
