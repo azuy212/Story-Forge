@@ -350,7 +350,7 @@ describe("story lintCharacterRegistry", () => {
           character("isabella", "A stick figure in a red veil."),
           character(
             "the_crew",
-            "Stick figures in rough linen shirts with rope belts.",
+            "Stick figures in rough brown shirts with rope belts.",
             "group",
           ),
         ],
@@ -364,7 +364,7 @@ describe("story lintCharacterRegistry", () => {
       [character("columbus", "A tall stick figure in a wide-brimmed hat.")],
       { version: 2 },
     );
-    expect(issues.join("\n")).toMatch(/no colour cue/);
+    expect(issues.join("\n")).toMatch(/no base colour/);
   });
 
   it("rejects two v2 individuals sharing a colour", () => {
@@ -377,6 +377,47 @@ describe("story lintCharacterRegistry", () => {
     );
     expect(issues.join("\n")).toMatch(
       /individuals "columbus" and "ferdinand" share the colour "black"/,
+    );
+  });
+
+  it("rejects a v2 group without a base colour", () => {
+    const issues = lintCharacterRegistry(
+      [
+        character("columbus", "A stick figure in a black hat."),
+        character(
+          "the_crew",
+          "Stick figures in rough shirts with rope belts.",
+          "group",
+        ),
+      ],
+      { version: 2 },
+    );
+    expect(issues.join("\n")).toMatch(/no base colour/);
+  });
+
+  it("rejects a group whose base colour matches an individual", () => {
+    const issues = lintCharacterRegistry(
+      [
+        character("columbus", "A stick figure in a black hat."),
+        character("the_crew", "Stick figures in black shirts.", "group"),
+      ],
+      { version: 2 },
+    );
+    expect(issues.join("\n")).toMatch(
+      /shares the colour "black" with individual "columbus"/,
+    );
+  });
+
+  it("rejects two groups sharing a base colour", () => {
+    const issues = lintCharacterRegistry(
+      [
+        character("g1", "Stick figures in green shirts.", "group"),
+        character("g2", "Stick figures in green sashes.", "group"),
+      ],
+      { version: 2 },
+    );
+    expect(issues.join("\n")).toMatch(
+      /groups "g1" and "g2" share the colour "green"/,
     );
   });
 

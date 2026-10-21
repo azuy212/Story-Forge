@@ -288,6 +288,7 @@ export function lintCharacterRegistry(
     { id: string; kind: "individual" | "group" }[]
   >();
   const colourOwners = new Map<string, string[]>();
+  const groupColourOwners = new Map<string, string[]>();
   const individuals = characters.filter(
     (character) => (character.kind ?? "individual") === "individual",
   );
@@ -320,19 +321,20 @@ export function lintCharacterRegistry(
         `${cues.length} cues (${cues.join(", ")}; a group may name ${CHARACTER_MAX_CUES})`,
       );
     }
-    if (version >= 2 && kind === "individual") {
+    if (version >= 2) {
       const colours = characterColours(description);
       if (colours.length !== 1) {
         problems.push(
           colours.length === 0
-            ? "no colour cue (a v2 individual needs exactly one)"
-            : `${colours.length} colours (${colours.join(", ")}; a v2 individual needs exactly one)`,
+            ? `no base colour (a v2 ${kind} needs exactly one)`
+            : `${colours.length} colours (${colours.join(", ")}; a v2 ${kind} needs exactly one)`,
         );
       }
+      const owners = kind === "individual" ? colourOwners : groupColourOwners;
       for (const colour of colours) {
-        const owners = colourOwners.get(colour) ?? [];
-        owners.push(character.id);
-        colourOwners.set(colour, owners);
+        const ids = owners.get(colour) ?? [];
+        ids.push(character.id);
+        owners.set(colour, ids);
       }
     }
     if (problems.length > 0) {
@@ -371,6 +373,19 @@ export function lintCharacterRegistry(
     if (ids.length > 1) {
       issues.push(
         `individuals ${ids.map((id) => `"${id}"`).join(" and ")} share the colour "${colour}"; each individual needs a distinct colour`,
+      );
+    }
+  }
+  for (const [colour, ids] of groupColourOwners) {
+    if (ids.length > 1) {
+      issues.push(
+        `groups ${ids.map((id) => `"${id}"`).join(" and ")} share the colour "${colour}"; each group needs a distinct base colour`,
+      );
+    }
+    const individuals = colourOwners.get(colour);
+    if (individuals && individuals.length > 0) {
+      issues.push(
+        `group ${ids.map((id) => `"${id}"`).join(" and ")} shares the colour "${colour}" with individual ${individuals.map((id) => `"${id}"`).join(" and ")}; a group's base colour must differ from every individual's colour`,
       );
     }
   }
