@@ -1130,8 +1130,8 @@ feeding untrimmed silence into timings, subtitles and the master.
 **Columbus hat regression.** The v2 one-cue migration stripped the flat black
 cap from the Columbus fixture, leaving only the dark-red coat. The four
 regenerated close-ups were composed from that fixture, so the cap was absent
-from the prompt in scenes 1, 18 and 19 (the model drew no hat) and scene 13
-invented a maroon tricorne. The composer injects `visualDescription` verbatim;
+from the prompt in all four scenes; the model drew no hat in scenes 1 and 18,
+and substituted a maroon tricorne in scenes 13 and 19. The composer injects `visualDescription` verbatim;
 the missing text was the registry, not a dropped line. The character prompt now
 requires a period-appropriate, specific cue shape and uses "flat black cap" as
 its example. A prompt test asserts that every character listed in a slot has
