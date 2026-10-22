@@ -1050,7 +1050,7 @@ the new prompt produced:
     "name": "Christopher Columbus",
     "kind": "individual",
     "lead": true,
-    "visualDescription": "A stick figure in a long dark-red coat and a flat black cap."
+    "visualDescription": "A stick figure in a flat black cap."
   },
   {
     "id": "ferdinand",
@@ -1122,7 +1122,10 @@ each chunk's leading and trailing silence to at most 0.1 s before the master is
 joined (an internal pause is untouched). With the 0.2 s scene gap, a chunk join
 can therefore hold at most 0.4 s of silence. S8 still inspects the concatenated
 master and fails on any reported interval, including a leading/trailing one.
-S6 retakes are a mitigation; S8 remains the gate.
+S6 retakes are a mitigation; S8 remains the gate. A chunk reused from a resume
+also goes through the edge trim before its duration is recorded, so a chunk
+cached by an older build is trimmed on the next run rather than silently
+feeding untrimmed silence into timings, subtitles and the master.
 
 **Columbus hat regression.** The v2 one-cue migration stripped the flat black
 cap from the Columbus fixture, leaving only the dark-red coat. The four
@@ -1130,15 +1133,31 @@ regenerated close-ups were composed from that fixture, so the cap was absent
 from the prompt in scenes 1, 18 and 19 (the model drew no hat) and scene 13
 invented a maroon tricorne. The composer injects `visualDescription` verbatim;
 the missing text was the registry, not a dropped line. The character prompt now
-requires a period-appropriate, specific cue shape, and gives the story's lead
-two cues (a garment plus a headwear shape) and the two colours they use; every
-other individual keeps one cue and one colour. Columbus's default is now
-`lead: true` with a long dark-red coat and a flat black cap. A prompt test
-asserts that every character listed in a slot has its registry text in the
-composed prompt. The requested two-sample A/B could not run: deleting
-`browser-profile` removed the only Google session, and the alternate profile
-times out at sign-in; the before/after sheet is the available evidence, and the
-before frames with both cues kept the cap in all four scenes.
+requires a period-appropriate, specific cue shape and uses "flat black cap" as
+its example. A prompt test asserts that every character listed in a slot has
+its registry text in the composed prompt.
+
+**Hat verification and cue A/B (2026-10-21).** Six corrected images (scene 1
+twice, 13, 18 twice, 19) used the lead description with both the long dark-red
+coat and the flat black cap. The cap was present and flat in 6/6, but every
+image also drew detailed faces, hair and hands: adding two costume cues made
+the model abandon the stick-figure preamble. That batch fails the "no facial
+detail regressions" gate.
+
+The follow-up A/B on scenes 1 and 18, two samples per variant:
+
+- **a, flat black cap only:** flat cap in 4/4; stick face and line body; the
+  red coat appears in scene 18 but not scene 1.
+- **b, long dark-red coat only:** coat in 4/4; no cap in 4/4; stick face.
+- **c, both cues:** cap and coat in 4/4, but detailed faces, hair and hands in
+  4/4 — the same style regression as the six-image batch.
+
+Variant **a** is the only one that restores the missing cap without breaking
+the stick-figure style. Columbus's registry default is therefore
+`lead: true` with `"stickman in a flat black cap"`; the lead marker records the
+protagonist but does not widen the one-cue budget. The red coat is no longer a
+registry cue. Lint rejects a second lead and a group marked as lead, and tests
+cover both.
 
 **Gemini batch after the quota reset (2026-10-21).**
 

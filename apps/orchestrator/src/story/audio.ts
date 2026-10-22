@@ -249,6 +249,21 @@ export async function runAudioStage(
         try {
           const info = await stat(scene.audio.path);
           if (info.size > 0) {
+            // A chunk cached before edge trimming was introduced (or a resume
+            // from an older run) must still be trimmed before its duration
+            // feeds timings, subtitles and the master. Trimming is idempotent:
+            // the ≤maxEdgeSec of silence left at each edge is not removed
+            // again.
+            const untrimmed = scene.audio.durationSec;
+            const trimmed = await trimEdgeSilence(scene.audio.path, untrimmed);
+            if (trimmed < untrimmed) {
+              scene.audio.durationSec = Math.round(trimmed * 1000) / 1000;
+              scene.audio.edgeTrimmedSec =
+                Math.round(
+                  ((scene.audio.edgeTrimmedSec ?? 0) + (untrimmed - trimmed)) *
+                    1000,
+                ) / 1000;
+            }
             chunkResults.push({
               sceneId: scene.sceneId,
               path: scene.audio.path,

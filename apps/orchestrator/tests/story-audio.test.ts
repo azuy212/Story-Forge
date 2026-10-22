@@ -16,7 +16,7 @@ import {
 import { concatNarrationWithGaps } from "../src/story/ffmpeg-args.js";
 import { detectSilence } from "../src/story/media.js";
 import { resolveStoryConfig } from "../src/story/config.js";
-import { jobPaths } from "../src/story/paths.js";
+import { jobPaths, sceneChunkPath } from "../src/story/paths.js";
 import { countWords } from "../src/story/sentences.js";
 import type { StoryScene } from "../src/story/types.js";
 
@@ -379,6 +379,41 @@ describe("runAudioStage", () => {
     });
     expect(provider.calls).toBe(3);
     expect(provider.texts.at(-1)).toBe("A completely different second scene.");
+  });
+
+  it("re-trims a cached chunk instead of reusing an untrimmed edge", async () => {
+    setup();
+    const audioScene = scene(1, "One two three.");
+    const chunkPath = sceneChunkPath(paths, 1);
+    writeWavWithEdges(chunkPath, 0.5, 1, 440);
+    audioScene.status.audio = "done";
+    audioScene.audio = {
+      path: chunkPath,
+      durationSec: 2,
+      pieces: [
+        {
+          path: chunkPath,
+          durationSec: 2,
+          text: audioScene.narration,
+          providerFingerprint: "fake-tts-v1",
+        },
+      ],
+    };
+    const provider = fakeProvider();
+
+    const result = await runAudioStage({
+      scenes: [audioScene],
+      paths,
+      config,
+      ttsProvider: provider,
+      voice: "narrator",
+      runId: "cached-edge",
+    });
+
+    expect(provider.calls).toBe(0);
+    expect(result.chunks[0].durationSec).toBeLessThan(1.5);
+    expect(audioScene.audio.durationSec).toBeLessThan(1.5);
+    expect(audioScene.audio.edgeTrimmedSec).toBeGreaterThan(0.5);
   });
 
   it("re-synthesizes a chunk with a long internal pause and records it", async () => {

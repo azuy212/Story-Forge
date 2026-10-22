@@ -359,30 +359,52 @@ describe("story lintCharacterRegistry", () => {
     ).toEqual([]);
   });
 
-  it("allows the lead two cues and two colours in v2", () => {
-    expect(
-      lintCharacterRegistry(
-        [
-          {
-            id: "columbus",
-            kind: "individual",
-            lead: true,
-            visualDescription:
-              "A stick figure in a long dark-red coat and a flat black cap.",
-          },
-        ],
-        { version: 2 },
-      ),
-    ).toEqual([]);
-  });
-
-  it("still rejects two cues on a non-lead individual in v2", () => {
+  it("rejects more than one lead", () => {
     const issues = lintCharacterRegistry(
       [
-        character(
-          "rodrigo",
-          "A stick figure in a long dark-red coat and a flat black cap.",
-        ),
+        {
+          id: "columbus",
+          kind: "individual",
+          lead: true,
+          visualDescription: "A stick figure in a flat black cap.",
+        },
+        {
+          id: "ferdinand",
+          kind: "individual",
+          lead: true,
+          visualDescription: "A stick figure in a gold crown.",
+        },
+      ],
+      { version: 2 },
+    );
+    expect(issues.join("\n")).toMatch(/2 leads .*at most one lead/);
+  });
+
+  it("rejects a group marked as the lead", () => {
+    const issues = lintCharacterRegistry(
+      [
+        {
+          id: "the_crew",
+          kind: "group",
+          lead: true,
+          visualDescription: "Stick figures in grey shirts.",
+        },
+      ],
+      { version: 2 },
+    );
+    expect(issues.join("\n")).toMatch(/marked lead but is a group/);
+  });
+
+  it("rejects two cues on the lead as well", () => {
+    const issues = lintCharacterRegistry(
+      [
+        {
+          id: "columbus",
+          kind: "individual",
+          lead: true,
+          visualDescription:
+            "A stick figure in a long dark-red coat and a flat black cap.",
+        },
       ],
       { version: 2 },
     );
