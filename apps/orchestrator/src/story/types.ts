@@ -100,9 +100,10 @@ export const CharacterRegistrySchema = z.object({
          */
         kind: z.enum(["individual", "group"]).default("individual"),
         /**
-         * The story's protagonist. At most one entry may be the lead; its one
-         * cue must name a flat-cap shape, which becomes the story's recurring
-         * visual identifier.
+         * The story's protagonist. At most one entry may be the lead. If the
+         * lead's one cue is a hat, it may not name a tricorn, bicorne,
+         * three-cornered or pointed shape; a non-hat cue (sash, scarf) and a
+         * non-historical hat are allowed.
          */
         lead: z.boolean().optional(),
         visualDescription: z.string().min(1),

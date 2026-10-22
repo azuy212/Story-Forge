@@ -401,4 +401,47 @@ describe("runImageStage", () => {
     expect(nonces[1]).toEqual(expect.any(String));
     expect(scenes[0].warnings.join(" ")).toContain("failed its gate");
   });
+
+  it("retries a failed gate at most once and names the scene", async () => {
+    setup();
+    const blank = makeImage(
+      join(ROOT, "gate-fail"),
+      "color=c=0xffffff:s=1920x1080",
+    );
+    const nonces: Array<string | undefined> = [];
+    let calls = 0;
+    const provider: AssetProvider = {
+      async generateImage({ cacheNonce }) {
+        nonces.push(cacheNonce);
+        calls += 1;
+        return { url: blank };
+      },
+      async generateVideo() {
+        throw new Error("not used");
+      },
+    };
+    const scenes = [scene(7)];
+
+    const result = await runImageStage({
+      scenes,
+      paths,
+      config,
+      assetProvider: provider,
+      runId: "gate-fail",
+      workDir: paths.renderDir,
+    });
+
+    // One initial call plus exactly one fresh-image retry; there is no third.
+    expect(calls).toBe(2);
+    expect(nonces).toHaveLength(2);
+    expect(nonces[0]).toBeUndefined();
+    expect(nonces[1]).toEqual(expect.any(String));
+    expect(result.failed).toHaveLength(1);
+    expect(result.failed[0]).toMatch(/^scene 7: /);
+    expect(result.failed[0]).toContain("blank");
+    expect(scenes[0].status.image).toBe("failed");
+    expect(scenes[0].warnings.join(" ")).toContain(
+      "retrying once with a fresh image",
+    );
+  });
 });

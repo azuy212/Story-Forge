@@ -207,11 +207,11 @@ export const CHARACTER_MAX_CUES = 2;
 export const CHARACTER_MAX_INDIVIDUALS = 5;
 
 /**
- * The lead's one cue is the story's visual identifier, so it must name a flat
- * cap explicitly. A generic hat (or a tricorn/bicorne) lets the model drift to
- * a period costume that no longer reads as the same stick figure.
+ * The lead's one cue is the story's visual identifier. A hat cue must not drift
+ * into a tricorn/bicorne/three-cornered/pointed silhouette, but a lead may carry
+ * a non-hat cue, and a non-historical lead may wear a non-flat hat. The lint
+ * therefore rejects those shapes only when the lead's cue is a hat.
  */
-const FLAT_CAP_SHAPE = /\bflat(?:\s+[\p{L}][\p{L}'-]*){0,3}\s+cap\b/iu;
 const NON_FLAT_HAT =
   /\b(?:tricorn(?:e)?|bicorn(?:e)?|three[- ]cornered|pointed)\b/iu;
 const NEGATED_HAT = /\b(?:no|not|without|never|avoid)\b[^.;:]{0,24}$/iu;
@@ -283,7 +283,8 @@ export function characterStagingIssues(description: string): string[] {
  * - an individual carries exactly one cue and (v2) exactly one colour,
  *   because that is what makes them recognisable as the same person in the
  *   next scene, including the story's lead; at most one entry may be the lead,
- *   and that lead's cue must name a flat-cap shape (no tricorn or bicorne);
+ *   and if that lead's cue is a hat it may not name a tricorn, bicorne,
+ *   three-cornered or pointed shape;
  * - individuals share neither item nor colour;
  * - a group may carry none (an anonymous crowd) or up to the shared limit,
  *   but may not reuse an individual's cue;
@@ -331,15 +332,12 @@ export function lintCharacterRegistry(
       continue;
     }
     const description = lead.visualDescription.trim();
-    if (!FLAT_CAP_SHAPE.test(description)) {
-      issues.push(
-        `character "${lead.id}" is the lead but its cue does not name a flat cap; use a flat-cap shape such as "flat black cap" or "dark-red flat cap"`,
-      );
-    }
-    const nonFlatHat = nonFlatHatName(description);
+    const cues = characterCues(description);
+    const hatCue = cues.some((cue) => cue === "hat" || cue === "cap");
+    const nonFlatHat = hatCue ? nonFlatHatName(description) : undefined;
     if (nonFlatHat) {
       issues.push(
-        `character "${lead.id}" is the lead but names "${nonFlatHat}"; no tricorn, no three-cornered or pointed hat`,
+        `character "${lead.id}" is the lead but its hat names "${nonFlatHat}"; no tricorn, no three-cornered or pointed hat`,
       );
     }
   }

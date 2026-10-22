@@ -79,10 +79,10 @@ apps/orchestrator/docs/story-sample-manifest-real-media.json (every stage real, 
 apps/orchestrator/docs/story-pipeline-report.md (this file)
 ```
 
-Tests — 19 suites, 323 tests, all new except the two cases appended to the
+Tests — 19 suites, 326 tests, all new except the two cases appended to the
 existing Chatterbox suite (counts from `jest --testPathPatterns='tests/story-'`
-on 2026-10-22; the whole orchestrator suite is 93 suites / 1412 unit tests plus
-3 suites / 21 integration tests, 96 / 1433 together).
+on 2026-10-22; the whole orchestrator suite is 93 suites / 1415 unit tests plus
+3 suites / 21 integration tests, 96 / 1436 together).
 
 Count reconciliation: the earlier 91 suites / 1340 tests came from an
 unquoted `--testPathIgnorePatterns=\.int\.test\.ts$` in package.json; the
@@ -91,11 +91,12 @@ matched `story-lint.test.ts` and `tts-fingerprint.test.ts`. Quoting the patterns
 restored both suites (no test was deleted or skipped). The 95 suites / 1370
 tests figure was the pre-follow-up unit + integration total (92 / 1349 + 3 /
 21). The last count before this follow-up was 93 / 1395 unit plus 3 / 21
-integration; the additions here are 17 unit tests (face-slot lint, final-take
-ASR, cache bypass/gate retry and the CLI/force-stage cases), giving 93 / 1412
-and 96 / 1433 together. The 237 in the older §5 log is the count at the time of
+integration; the additions here are 20 unit tests (face-slot lint, final-take
+ASR, cache bypass/gate retry, the CLI/force-stage cases, and the correction's
+scoped-lead, normal-cache-hit and one-shot gate-failure cases), giving 93 / 1415
+and 96 / 1436 together. The 237 in the older §5 log is the count at the time of
 that run, not the current one. The previous 300 story-test figure was not the
-sum of the listed suites and is superseded by the measured 323 below.
+sum of the listed suites and is superseded by the measured 326 below.
 
 ```
 apps/orchestrator/tests/story-alignment.test.ts             24
@@ -104,8 +105,8 @@ apps/orchestrator/tests/story-cli.test.ts                    6   (--regenerate-i
 apps/orchestrator/tests/story-columbus-golden.test.ts        7   (19-scene real fixture; no face-feature slot)
 apps/orchestrator/tests/story-config.test.ts                19   (incl. bundled fonts)
 apps/orchestrator/tests/story-ffmpeg-args.test.ts           13
-apps/orchestrator/tests/story-images.test.ts                13   (forced regeneration and gate retry cache bypass)
-apps/orchestrator/tests/story-lint.test.ts                  43   (style limits, registry split, lead flat-cap gate)
+apps/orchestrator/tests/story-images.test.ts                14   (forced regeneration, gate retry and one-shot failure)
+apps/orchestrator/tests/story-lint.test.ts                  45   (style limits, registry split, scoped lead hat-shape gate)
 apps/orchestrator/tests/story-manifest.test.ts              12
 apps/orchestrator/tests/story-prompt-regeneration.test.ts    7   (--regenerate-prompts vs --from S4; S5 force)
 apps/orchestrator/tests/story-prompt.test.ts                48   (real-run regressions, framing, face-feature slots)
@@ -1153,15 +1154,18 @@ Variant **a** is the only one that restores the missing cap without breaking
 the stick-figure style. Columbus's registry default is therefore
 `lead: true` with `"stickman in a flat black cap"`; the lead marker records the
 protagonist but does not widen the one-cue budget. The red coat is no longer a
-registry cue. Lint rejects a second lead and a group marked as lead, and now
-also requires the lead's cue to name a flat-cap shape; it rejects a tricorn,
-bicorne, three-cornered or pointed hat. The character prompt carries the same
-negative (`no tricorn, no three-cornered or pointed hat`). Tests cover a lead
-flat cap, a non-flat hat, a second lead and a group marked as lead.
+registry cue. Lint rejects a second lead and a group marked as lead. When the
+lead's single cue is a hat or cap, it also rejects a tricorn, bicorne,
+three-cornered or pointed shape; it does not require a flat cap. A lead with a
+non-hat cue (sash, scarf) and a non-historical lead in a non-flat hat (for
+example a baseball cap) both pass. The character prompt carries the same scoped
+negative (`no tricorn, no three-cornered or pointed hat`). Tests cover a flat
+cap, all four rejected hat shapes, non-hat cues, a non-historical cap, a second
+lead and a group marked as lead.
 
 The lead field had only one reader before this change (`lintCharacterRegistry`,
-validating the marker itself); it is kept because the flat-cap gate is now
-real pipeline behavior, not dead metadata.
+validating the marker itself); it is kept because the scoped hat-shape gate is
+now real pipeline behavior, not dead metadata.
 
 **Face words in slot prompts.** The three image batches above also revealed a
 prompt-level cause of the detailed-face drift: pose/expression slots such as
@@ -1202,7 +1206,7 @@ writes a review page carrying the five per-image pass criteria (round white
 head; eyebrows and mouth only; no coat or clothing folds; flat cap shape;
 visible red identifier) and, in the same provider session, records the pending
 known-issue checks (fixed-batch tricorn/bicorne, scene 13 body/crew) plus the
-face-word and lead flat-cap lints. It is not part of `pnpm test`.
+face-word and lead hat-shape lints. It is not part of `pnpm test`.
 
 **Gemini batch after the quota reset (2026-10-21).**
 

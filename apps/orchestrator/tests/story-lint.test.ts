@@ -416,6 +416,43 @@ describe("story lintCharacterRegistry", () => {
     }
   });
 
+  it("accepts a lead with a non-hat cue such as a sash or scarf", () => {
+    for (const description of [
+      "A stick figure in a red sash.",
+      "A stick figure in a blue scarf.",
+    ]) {
+      expect(
+        lintCharacterRegistry(
+          [
+            {
+              id: "columbus",
+              kind: "individual",
+              lead: true,
+              visualDescription: description,
+            },
+          ],
+          { version: 2 },
+        ),
+      ).toEqual([]);
+    }
+  });
+
+  it("accepts a non-historical lead wearing a non-flat hat", () => {
+    expect(
+      lintCharacterRegistry(
+        [
+          {
+            id: "columbus",
+            kind: "individual",
+            lead: true,
+            visualDescription: "A stick figure in a blue baseball cap.",
+          },
+        ],
+        { version: 2 },
+      ),
+    ).toEqual([]);
+  });
+
   it("accepts a flat-cap lead that explicitly rules out a tricorn", () => {
     expect(
       lintCharacterRegistry(
@@ -433,20 +470,27 @@ describe("story lintCharacterRegistry", () => {
     ).toEqual([]);
   });
 
-  it("rejects a lead whose cue is not a flat cap", () => {
-    const issues = lintCharacterRegistry(
-      [
-        {
-          id: "columbus",
-          kind: "individual",
-          lead: true,
-          visualDescription: "A stick figure in a black tricorne hat.",
-        },
-      ],
-      { version: 2 },
-    ).join("\n");
-    expect(issues).toMatch(/does not name a flat cap/);
-    expect(issues).toMatch(/no tricorn, no three-cornered or pointed hat/);
+  it("rejects tricorn, bicorne, three-cornered and pointed hats on the lead", () => {
+    for (const [shape, description] of [
+      ["tricorne", "A stick figure in a black tricorne hat."],
+      ["bicorne", "A stick figure in a black bicorne hat."],
+      ["three-cornered", "A stick figure in a black three-cornered hat."],
+      ["pointed", "A stick figure in a black pointed hat."],
+    ]) {
+      const issues = lintCharacterRegistry(
+        [
+          {
+            id: "columbus",
+            kind: "individual",
+            lead: true,
+            visualDescription: description,
+          },
+        ],
+        { version: 2 },
+      ).join("\n");
+      expect(issues).toContain(`names "${shape}"`);
+      expect(issues).toMatch(/no tricorn, no three-cornered or pointed hat/);
+    }
   });
 
   it("rejects two cues on the lead as well", () => {

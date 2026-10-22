@@ -29,6 +29,25 @@ describe('AssetCache cache nonce', () => {
     }
   });
 
+  it('serves two normal requests with the same prompt from the cache', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'gemini-cache-hit-'));
+    try {
+      const cache = new AssetCache(new Logger('error'), dir);
+      await cache.put('a prompt', 'image', [{ filename: 'image-1', buffer: PNG }]);
+
+      const first = await cache.get('a prompt', 'image');
+      const second = await cache.get('a prompt', 'image');
+
+      assert.ok(first);
+      assert.ok(second);
+      assert.equal(first.timestamp, second.timestamp);
+      assert.deepEqual(first.assets[0].buffer, PNG);
+      assert.deepEqual(second.assets[0].buffer, PNG);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('does not let a fresh nonce read an older cached entry', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'gemini-cache-nonce-'));
     try {
