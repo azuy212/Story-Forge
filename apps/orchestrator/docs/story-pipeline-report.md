@@ -1140,17 +1140,23 @@ its registry text in the composed prompt.
 **Hat verification and cue A/B (2026-10-21).** Six corrected images (scene 1
 twice, 13, 18 twice, 19) used the lead description with both the long dark-red
 coat and the flat black cap. The cap was present and flat in 6/6, but every
-image also drew detailed faces, hair and hands: adding two costume cues made
-the model abandon the stick-figure preamble. That batch fails the "no facial
-detail regressions" gate.
+image also drew eyes and a more detailed face, and the coat picked up folds and
+shading: adding two costume cues made the model abandon the stick-figure
+preamble. That batch fails the "no facial detail regressions" gate.
 
-The follow-up A/B on scenes 1 and 18, two samples per variant:
+The follow-up A/B on scenes 1 and 18 asked for two samples per variant:
 
 - **a, flat black cap only:** flat cap in 4/4; stick face and line body; the
   red coat appears in scene 18 but not scene 1.
 - **b, long dark-red coat only:** coat in 4/4; no cap in 4/4; stick face.
-- **c, both cues:** cap and coat in 4/4, but detailed faces, hair and hands in
-  4/4 — the same style regression as the six-image batch.
+- **c, both cues:** cap and coat in 4/4, but eyes and detailed faces in 4/4 —
+  the same style regression as the six-image batch.
+
+The provider cache served the c samples from the six-image batch and repeated
+b's second sample; the a samples and b's first sample per scene were fresh.
+The six-image batch still supplies six independent both-cue samples, and the
+earlier after run supplies four coat-only images, so the comparison does not
+depend on the repeats.
 
 Variant **a** is the only one that restores the missing cap without breaking
 the stick-figure style. Columbus's registry default is therefore
