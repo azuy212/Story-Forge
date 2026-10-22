@@ -108,6 +108,18 @@ describe("golden Columbus fixture", () => {
     );
   });
 
+  it("no pose or expression slot names a face feature", () => {
+    for (const scene of fixture.scenes) {
+      const report = lintScene(scene)
+        .map((issue) => issue.message)
+        .filter((message) => message.includes("names the face feature"));
+      expect({ sceneId: scene.sceneId, report }).toEqual({
+        sceneId: scene.sceneId,
+        report: [],
+      });
+    }
+  });
+
   it("every other scene passes the prompt lint unchanged", () => {
     for (const scene of fixture.scenes) {
       if (scene.sceneId === 3 || scene.sceneId === 13) continue;

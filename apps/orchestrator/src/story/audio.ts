@@ -484,6 +484,26 @@ export async function runAudioStage(
       };
     }
 
+    // The first ASR pass runs before the internal-silence retakes, so a retake
+    // replaces the take it measured. Re-measure the accepted take instead of
+    // persisting a coverage number for audio that no longer exists.
+    if (silenceRetakes > 0 && transcriber && config.asrVerify) {
+      try {
+        coverage = await measureCoverage(
+          transcriber,
+          chunkPath,
+          scene.narration,
+          runId,
+          scene.sceneId,
+        );
+        asrChecked = true;
+      } catch (err) {
+        asrChecked = true;
+        const message = `free ASR verification failed on the final take: ${(err as Error)?.message ?? String(err)}`;
+        if (!scene.warnings.includes(message)) scene.warnings.push(message);
+      }
+    }
+
     const { pieces, durationSec, edgeTrimmedSec } = built;
     const expectedPiecesDuration =
       pieces.reduce((sum, piece) => sum + piece.durationSec, 0) -
@@ -532,7 +552,7 @@ export async function runAudioStage(
       const missing = coverage.missing.slice(0, 8).join(", ");
       scene.warnings.push(
         `free ASR heard ${(coverage.coverage * 100).toFixed(0)}% of the script` +
-          ` after one re-synthesis` +
+          ` after the automatic retries` +
           (missing ? ` (missing: ${missing})` : ""),
       );
     }

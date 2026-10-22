@@ -79,63 +79,44 @@ apps/orchestrator/docs/story-sample-manifest-real-media.json (every stage real, 
 apps/orchestrator/docs/story-pipeline-report.md (this file)
 ```
 
-Tests — 19 suites, 300 tests, all new except the two cases appended to the
+Tests — 19 suites, 323 tests, all new except the two cases appended to the
 existing Chatterbox suite (counts from `jest --testPathPatterns='tests/story-'`
-on 2026-10-21; the whole orchestrator suite is 93 suites / 1389 unit tests plus
-3 suites / 21 integration tests, 96 / 1410 together).
+on 2026-10-22; the whole orchestrator suite is 93 suites / 1412 unit tests plus
+3 suites / 21 integration tests, 96 / 1433 together).
 
 Count reconciliation: the earlier 91 suites / 1340 tests came from an
 unquoted `--testPathIgnorePatterns=\.int\.test\.ts$` in package.json; the
 shell stripped the backslashes, so the wildcard pattern `.int.test.ts$` also
-matched `story-lint.test.ts` (28 tests) and `tts-fingerprint.test.ts` (3).
-Quoting the patterns restored both suites (no test was deleted or skipped).
-The 95 suites / 1370 tests figure was the pre-follow-up unit + integration
-total (92 / 1349 + 3 / 21). The 237 in the older §5 log is the count at the
-time of that run, not the current one. Story tests grew 260 -> 300 in this
-pass (the 237 -> 282 claim mixed two different baselines).
+matched `story-lint.test.ts` and `tts-fingerprint.test.ts`. Quoting the patterns
+restored both suites (no test was deleted or skipped). The 95 suites / 1370
+tests figure was the pre-follow-up unit + integration total (92 / 1349 + 3 /
+21). The last count before this follow-up was 93 / 1395 unit plus 3 / 21
+integration; the additions here are 17 unit tests (face-slot lint, final-take
+ASR, cache bypass/gate retry and the CLI/force-stage cases), giving 93 / 1412
+and 96 / 1433 together. The 237 in the older §5 log is the count at the time of
+that run, not the current one. The previous 300 story-test figure was not the
+sum of the listed suites and is superseded by the measured 323 below.
 
 ```
-apps/orchestrator/tests/story-sentences.test.ts            25   (incl. randomised grouping properties)
-apps/orchestrator/tests/story-alignment.test.ts            23
-apps/orchestrator/tests/story-subtitles.test.ts            13
-apps/orchestrator/tests/story-timing.test.ts               10
-apps/orchestrator/tests/story-lint.test.ts                 28   (up-front style limits, registry split, framing bans)
-apps/orchestrator/tests/story-prompt.test.ts               36   (incl. real-run regressions, framing vocabulary)
-apps/orchestrator/tests/story-prompt-regeneration.test.ts   5   (--regenerate-prompts vs --from S4)
-apps/orchestrator/tests/story-columbus-golden.test.ts       6   (19-scene real fixture)
-apps/orchestrator/tests/story-ffmpeg-args.test.ts          13
-apps/orchestrator/tests/story-render.test.ts               10   (frame margin, severity, real FFmpeg failure, black threshold)
-apps/orchestrator/tests/story-manifest.test.ts             12
-apps/orchestrator/tests/story-resume.test.ts               12   (stored config wins; changed flags refused; zero calls)
-apps/orchestrator/tests/story-config.test.ts               19   (incl. bundled fonts)
-apps/orchestrator/tests/story-prompts.test.ts               8
-apps/orchestrator/tests/story-shared-edits.test.ts         15
-apps/orchestrator/tests/story-schemas.test.ts              19
-apps/orchestrator/tests/story-images.test.ts               11
-apps/orchestrator/tests/story-audio.test.ts                12
-apps/orchestrator/tests/story-cli.test.ts                   5
-```
-
-apps/orchestrator/tests/story-sentences.test.ts 25 (incl. randomised grouping properties)
-apps/orchestrator/tests/story-alignment.test.ts 15
-apps/orchestrator/tests/story-subtitles.test.ts 13
-apps/orchestrator/tests/story-timing.test.ts 10
-apps/orchestrator/tests/story-lint.test.ts 17 (incl. up-front style limits)
-apps/orchestrator/tests/story-prompt.test.ts 30 (incl. two real-run regressions)
-apps/orchestrator/tests/story-columbus-golden.test.ts 5 (19-scene real fixture)
-apps/orchestrator/tests/story-ffmpeg-args.test.ts 13
-apps/orchestrator/tests/story-render.test.ts 10 (frame margin, severity, real FFmpeg failure, black threshold)
-apps/orchestrator/tests/story-manifest.test.ts 12
-apps/orchestrator/tests/story-resume.test.ts 9 (stored config wins; changed flags refused; zero calls)
-apps/orchestrator/tests/story-config.test.ts 19 (incl. bundled fonts)
-apps/orchestrator/tests/story-prompts.test.ts 8
-apps/orchestrator/tests/story-shared-edits.test.ts 15
-apps/orchestrator/tests/story-schemas.test.ts 19
-apps/orchestrator/tests/story-images.test.ts 10
-apps/orchestrator/tests/story-audio.test.ts 12
-apps/orchestrator/tests/story-cli.test.ts 4
-apps/orchestrator/tests/fixtures/story-columbus-19.json
-
+apps/orchestrator/tests/story-alignment.test.ts             24
+apps/orchestrator/tests/story-audio.test.ts                 17   (final-take ASR after a silence retake)
+apps/orchestrator/tests/story-cli.test.ts                    6   (--regenerate-images)
+apps/orchestrator/tests/story-columbus-golden.test.ts        7   (19-scene real fixture; no face-feature slot)
+apps/orchestrator/tests/story-config.test.ts                19   (incl. bundled fonts)
+apps/orchestrator/tests/story-ffmpeg-args.test.ts           13
+apps/orchestrator/tests/story-images.test.ts                13   (forced regeneration and gate retry cache bypass)
+apps/orchestrator/tests/story-lint.test.ts                  43   (style limits, registry split, lead flat-cap gate)
+apps/orchestrator/tests/story-manifest.test.ts              12
+apps/orchestrator/tests/story-prompt-regeneration.test.ts    7   (--regenerate-prompts vs --from S4; S5 force)
+apps/orchestrator/tests/story-prompt.test.ts                48   (real-run regressions, framing, face-feature slots)
+apps/orchestrator/tests/story-prompts.test.ts                8
+apps/orchestrator/tests/story-render.test.ts                10   (frame margin, severity, real FFmpeg failure, black threshold)
+apps/orchestrator/tests/story-resume.test.ts                12   (stored config wins; changed flags refused; zero calls)
+apps/orchestrator/tests/story-schemas.test.ts               21
+apps/orchestrator/tests/story-sentences.test.ts             25   (incl. randomised grouping properties)
+apps/orchestrator/tests/story-shared-edits.test.ts          15
+apps/orchestrator/tests/story-subtitles.test.ts             13
+apps/orchestrator/tests/story-timing.test.ts                10
 ```
 
 ## 2. Files changed (additive / behaviour-preserving)
@@ -385,7 +366,7 @@ scene_3_subtitles_visible band difference 6.67% ok
 scene_4_shows_source correlation 1.000; closest other scene 3 at 0.665 ok
 scene_4_subtitles_visible band difference 8.15% ok
 
-````
+```
 
 Why this check is no longer vacuous: a frame is compared against **every** scene
 source, and the check passes only if its own source is the best match (within
@@ -438,7 +419,7 @@ samples including the first and last.
   "+faststart",
   outputPath,
 ];
-````
+```
 
 `-vf` is a single chain (verbatim, as built for the smoke job):
 
@@ -1139,10 +1120,20 @@ its registry text in the composed prompt.
 
 **Hat verification and cue A/B (2026-10-21).** Six corrected images (scene 1
 twice, 13, 18 twice, 19) used the lead description with both the long dark-red
-coat and the flat black cap. The cap was present and flat in 6/6, but every
-image also drew eyes and a more detailed face, and the coat picked up folds and
-shading: adding two costume cues made the model abandon the stick-figure
-preamble. That batch fails the "no facial detail regressions" gate.
+coat and the flat black cap. The cap was present in 6/6, but **every hat was a
+tricorn or bicorne shape, not a flat cap**: the flat-cap-shape gate is 0/6.
+Every image also drew eyes and a more detailed face, and the coat picked up
+folds and shading: adding two costume cues made the model abandon the
+stick-figure preamble. That batch fails both the "flat cap" and "no facial
+detail regressions" gates.
+
+Two further defects in that batch are recorded as known issues, with no
+regeneration:
+
+- **Scene 13:** Columbus is a plain red triangle body; only one crew member is
+  shown where the slot asked for three.
+- The hat correction applies to scenes 1, 13, 18 and 19; the earlier report's
+  "flat, short brim 6/6" was wrong.
 
 The follow-up A/B on scenes 1 and 18 asked for two samples per variant:
 
@@ -1162,8 +1153,56 @@ Variant **a** is the only one that restores the missing cap without breaking
 the stick-figure style. Columbus's registry default is therefore
 `lead: true` with `"stickman in a flat black cap"`; the lead marker records the
 protagonist but does not widen the one-cue budget. The red coat is no longer a
-registry cue. Lint rejects a second lead and a group marked as lead, and tests
-cover both.
+registry cue. Lint rejects a second lead and a group marked as lead, and now
+also requires the lead's cue to name a flat-cap shape; it rejects a tricorn,
+bicorne, three-cornered or pointed hat. The character prompt carries the same
+negative (`no tricorn, no three-cornered or pointed hat`). Tests cover a lead
+flat cap, a non-flat hat, a second lead and a group marked as lead.
+
+The lead field had only one reader before this change (`lintCharacterRegistry`,
+validating the marker itself); it is kept because the flat-cap gate is now
+real pipeline behavior, not dead metadata.
+
+**Face words in slot prompts.** The three image batches above also revealed a
+prompt-level cause of the detailed-face drift: pose/expression slots such as
+`"calm, eyes forward"` and `"tired, eyes down"` instructed the model to draw
+eyes, while the style preamble asked for eyebrows and a mouth only. The
+existing lint never inspected those two slots, so the contradiction passed and
+was injected verbatim. `lintImagePrompt` now rejects `eyes`, `eye`, `nose`,
+`pupils`, `hair` and `gaze` in pose and expression slots; `eyebrows` and `mouth`
+remain allowed. The golden Columbus fixture used four such phrases (scenes 1,
+12, 15 and 19) and now runs clean:
+`calm, facing forward`, `uneasy, eyebrows raised`, `startled, eyebrows raised`
+and `tired, head bowed`. The golden suite has an explicit no-face-feature test
+in addition to the existing per-scene prompt-lint test.
+
+**ASR coverage on the accepted take.** The free WhisperX coverage check used to
+run before the internal-silence retakes, so a retake replaced the audio without
+replacing the recorded number. S6 now re-measures after any silence retake (on
+the trimmed final chunk), and the manifest records that value. A regression
+test uses a first take that omits one script word and a clean retake that says
+all of them; the old order persisted 0.9, the new one persists 1.0.
+
+**Explicit image-cache bypass.** The provider cache key now accepts a
+`cacheNonce`; a non-empty nonce makes a new key and the entry metadata records
+it. Story mode exposes `--regenerate-images <sceneIds>`: it forces S5, skips
+the stored-image reuse for those scenes, and sends a fresh nonce on the first
+call. Every image retry also gets a fresh nonce — the prompt-softening retry,
+the transient-failure retry, and the new one-shot gate retry. The gate retry
+was added because a cached image that fails resolution/variance would
+otherwise be served again forever. Tests cover a forced scene, a gate failure
+that succeeds on a fresh retry, the provider cache key, and the route
+pass-through. No prompt padding or trailing-space trick is used.
+
+**Prepared D/E experiment.** `scripts/next-cue-experiment.mjs` is checked in but
+not run. It generates two fresh samples for each combination of variant D
+(`"dark-red flat cap"`), variant E (`"flat black cap plus a dark-red sash"`),
+scenes 1 and 18 — eight images total — with a random cache nonce per call. It
+writes a review page carrying the five per-image pass criteria (round white
+head; eyebrows and mouth only; no coat or clothing folds; flat cap shape;
+visible red identifier) and, in the same provider session, records the pending
+known-issue checks (fixed-batch tricorn/bicorne, scene 13 body/crew) plus the
+face-word and lead flat-cap lints. It is not part of `pnpm test`.
 
 **Gemini batch after the quota reset (2026-10-21).**
 
@@ -1200,10 +1239,10 @@ of speech; a 150 s target budgets 438 words. No other default changed.
    script), so a ±1 word boundary error is possible on a noisy chunk; the
    proportional fallback is used when a chunk's match ratio drops below
    `SCENE_ALIGNMENT_GATE`.
-3. **Image-provider contract.** `/generate` accepts only `prompt`, `type`,
-   `mode`, and up to 4 `referenceImages`; the 16:9 size is requested in the
-   prompt text and enforced by the post-generation gate, not by a provider
-   parameter.
+3. **Image-provider contract.** `/generate` accepts `prompt`, `type`, `mode`,
+   up to 4 `referenceImages`, and an optional `cacheNonce`; the 16:9 size is
+   requested in the prompt text and enforced by the post-generation gate, not
+   by a provider parameter.
 4. **Concurrency.** `STORY_IMAGE_CONCURRENCY` defaults to 1 because the provider
    drives a logged-in browser session. S4 visual planning uses a fixed in-flight
    limit of 2.

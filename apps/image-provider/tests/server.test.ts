@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { GeminiClient } from '../src/core/gemini-client.js';
 import { ProviderError, type ProviderErrorType } from '../src/core/errors.js';
+import type { AssetType, GenerationOptions, GenerationResult } from '../src/core/types.js';
 import { Logger } from '../src/logger.js';
 import { createApp } from '../src/http/app.js';
 import type { Config } from '../src/config.js';
@@ -15,8 +16,16 @@ const CONFIG = {
 
 function makeDeps(
   overrides: {
-    generate?: () => Promise<never>;
-    isCached?: () => Promise<boolean>;
+    generate?: (
+      prompt: string,
+      assetType: AssetType,
+      options: GenerationOptions,
+    ) => Promise<GenerationResult>;
+    isCached?: (
+      prompt: string,
+      assetType: AssetType,
+      options: GenerationOptions,
+    ) => Promise<boolean>;
     ensureBrowser?: () => Promise<void>;
   } = {},
 ) {
@@ -204,6 +213,45 @@ describe('http app', () => {
         assert.equal(body.fromCache, false);
         assert.equal(body.media[0].filename, 'image-1');
         assert.ok(body.media[0].base64.length > 0);
+      },
+    );
+  });
+
+  it('passes an explicit cache nonce to both cache lookup and generation', async () => {
+    let cachedOptions: GenerationOptions | undefined;
+    let generateOptions: GenerationOptions | undefined;
+    await withApp(
+      makeDeps({
+        isCached: async (_prompt, _assetType, options) => {
+          cachedOptions = options;
+          return false;
+        },
+        ensureBrowser: async () => {},
+        generate: async (_prompt, _assetType, options) => {
+          generateOptions = options;
+          return {
+            prompt: 'a red pixel',
+            assetType: 'image' as const,
+            fromCache: false,
+            assets: [
+              {
+                filename: 'image-1',
+                buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+              },
+            ],
+          };
+        },
+      }),
+      async (app) => {
+        const response = await app.inject({
+          method: 'POST',
+          url: '/generate',
+          headers: { accept: 'application/json' },
+          payload: { prompt: 'a red pixel', cacheNonce: 'force-1' },
+        });
+        assert.equal(response.statusCode, 200);
+        assert.equal(cachedOptions?.cacheNonce, 'force-1');
+        assert.equal(generateOptions?.cacheNonce, 'force-1');
       },
     );
   });

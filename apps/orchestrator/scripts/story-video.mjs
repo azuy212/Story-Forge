@@ -93,6 +93,11 @@ program
     false,
   )
   .option(
+    "--regenerate-images <sceneIds>",
+    "comma-separated scene ids to regenerate in S5, bypassing the image-provider cache",
+    String,
+  )
+  .option(
     "--dry-run",
     "validate the input and print the plan without any paid call",
     false,
@@ -143,6 +148,25 @@ if (options.stages !== undefined) {
 }
 assign("from", options.from);
 overrides.regeneratePrompts = options.regeneratePrompts;
+if (options.regenerateImages !== undefined) {
+  const rawIds = String(options.regenerateImages)
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const ids = rawIds.map(Number);
+  if (
+    ids.length === 0 ||
+    rawIds.some((value) => !/^[1-9]\d*$/.test(value)) ||
+    ids.some((id) => !Number.isInteger(id) || id < 1) ||
+    new Set(ids).size !== ids.length
+  ) {
+    console.error(
+      `Invalid --regenerate-images value "${options.regenerateImages}": use unique positive scene ids separated by commas`,
+    );
+    process.exit(1);
+  }
+  overrides.regenerateImages = ids;
+}
 overrides.dryRun = options.dryRun;
 overrides.reviewStory = options.reviewStory;
 
@@ -154,6 +178,7 @@ const unknownOverrides = Object.keys(overrides).filter(
     key !== "stages" &&
     key !== "from" &&
     key !== "regeneratePrompts" &&
+    key !== "regenerateImages" &&
     key !== "dryRun" &&
     key !== "reviewStory",
 );

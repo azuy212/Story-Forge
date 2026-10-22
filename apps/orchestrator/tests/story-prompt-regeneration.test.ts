@@ -28,6 +28,21 @@ describe("story prompt regeneration", () => {
     ]);
   });
 
+  it("forces only S5 for explicit scene regeneration", () => {
+    expect([...buildForceStages({ regenerateImages: [1, 18] })]).toEqual([
+      "S5_images",
+    ]);
+  });
+
+  it("does not force S5 when --stages excludes it", () => {
+    expect([
+      ...buildForceStages({
+        regenerateImages: [1],
+        stages: ["S8_render"],
+      }),
+    ]).toEqual(["S8_render"]);
+  });
+
   it("forces nothing by default", () => {
     expect([...buildForceStages({})]).toEqual([]);
   });

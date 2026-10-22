@@ -322,6 +322,41 @@ describe("story lintImagePrompt", () => {
     ).toBe("");
   });
 
+  it.each(["eyes", "eye", "nose", "pupils", "hair", "gaze"])(
+    "rejects the face-feature word %s in a pose or expression slot",
+    (word) => {
+      for (const slot of ["pose", "expression"] as const) {
+        const character = {
+          id: "columbus",
+          pose: "standing at the rail",
+          expression: "calm",
+          [slot]: `calm with ${word} visible`,
+        };
+        expect(
+          messages({
+            slots: slots({ characters: [character] }),
+          }),
+        ).toContain("stick faces use eyebrows and a mouth only");
+      }
+    },
+  );
+
+  it("allows eyebrows and a mouth in a pose or expression slot", () => {
+    expect(
+      messages({
+        slots: slots({
+          characters: [
+            {
+              id: "columbus",
+              pose: "standing at the rail",
+              expression: "calm, eyebrows lifted, mouth closed",
+            },
+          ],
+        }),
+      }),
+    ).toBe("");
+  });
+
   it("rejects an adjacent repeated word", () => {
     expect(
       messages({ prompt: "Scene: The the ship drifts through calm water." }),

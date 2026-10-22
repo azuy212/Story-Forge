@@ -395,6 +395,60 @@ describe("story lintCharacterRegistry", () => {
     expect(issues.join("\n")).toMatch(/marked lead but is a group/);
   });
 
+  it("accepts a lead whose cue names a flat-cap shape", () => {
+    for (const description of [
+      "A stick figure in a flat black cap.",
+      "A stick figure in a dark-red flat cap.",
+    ]) {
+      expect(
+        lintCharacterRegistry(
+          [
+            {
+              id: "columbus",
+              kind: "individual",
+              lead: true,
+              visualDescription: description,
+            },
+          ],
+          { version: 2 },
+        ),
+      ).toEqual([]);
+    }
+  });
+
+  it("accepts a flat-cap lead that explicitly rules out a tricorn", () => {
+    expect(
+      lintCharacterRegistry(
+        [
+          {
+            id: "columbus",
+            kind: "individual",
+            lead: true,
+            visualDescription:
+              "A stick figure in a flat black cap, no tricorn.",
+          },
+        ],
+        { version: 2 },
+      ),
+    ).toEqual([]);
+  });
+
+  it("rejects a lead whose cue is not a flat cap", () => {
+    const issues = lintCharacterRegistry(
+      [
+        {
+          id: "columbus",
+          kind: "individual",
+          lead: true,
+          visualDescription: "A stick figure in a black tricorne hat.",
+        },
+      ],
+      { version: 2 },
+    ).join("\n");
+    expect(issues).toMatch(/does not name a flat cap/);
+    expect(issues).toMatch(/no tricorn, no three-cornered or pointed hat/);
+  });
+
   it("rejects two cues on the lead as well", () => {
     const issues = lintCharacterRegistry(
       [

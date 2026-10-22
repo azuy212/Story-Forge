@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { copyFile, readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { hashObject } from "../artifacts/hash.js";
@@ -155,6 +156,11 @@ export interface ImageStageOptions {
   providerLabel?: string;
   /** Optional shared reference image (character sheet) for every scene. */
   referenceImage?: AssetReference;
+  /**
+   * Scene ids whose stored image must not be reused and whose first provider
+   * call bypasses the cache. Retries always bypass the cache with a fresh nonce.
+   */
+  regenerateSceneIds?: ReadonlySet<number>;
   dryRun?: boolean;
 }
 
@@ -182,6 +188,7 @@ async function generateOnce(
     filename: string;
     runId: string;
     referenceImage?: AssetReference;
+    cacheNonce?: string;
   },
 ): Promise<string> {
   const result = await assetProvider.generateImage({
@@ -189,6 +196,7 @@ async function generateOnce(
     sceneId: options.sceneId,
     filename: options.filename,
     runId: options.runId,
+    ...(options.cacheNonce ? { cacheNonce: options.cacheNonce } : {}),
     ...(options.referenceImage
       ? {
           referenceImages: [options.referenceImage],
@@ -227,8 +235,10 @@ export async function runImageStage(
     }
     const promptHash = hashObject(scene.imagePrompt);
     const target = sceneImagePath(paths, scene.sceneId);
+    const forced = options.regenerateSceneIds?.has(scene.sceneId) === true;
 
     if (
+      !forced &&
       scene.status.image === "done" &&
       scene.image &&
       scene.image.promptHash === promptHash
@@ -264,100 +274,132 @@ export async function runImageStage(
     let softenedFrom: string | undefined;
     let attempts = 0;
     let downloaded: string | undefined;
+    let validation: Awaited<ReturnType<typeof validateSceneImage>> | undefined;
 
-    try {
-      for (let attempt = 0; attempt < IMAGE_TRANSIENT_MAX_ATTEMPTS; attempt++) {
-        attempts += 1;
-        try {
-          downloaded = await generateOnce(assetProvider, {
-            prompt,
-            sceneId: scene.sceneId,
-            filename,
-            runId,
-            referenceImage: options.referenceImage,
-          });
-          break;
-        } catch (err) {
-          if (!isImageGenerationProviderError(err)) throw err;
-          const type = err.info.type;
-          if (isRepairCandidate(type) && !softenedFrom) {
-            // Exactly one logged softening retry for this scene.
-            softenedFrom = prompt;
-            prompt = softenPrompt(prompt);
-            logger.warn(
-              `Story scene ${scene.sceneId}: image provider refused the prompt; retrying once with a softened prompt`,
-              { reason: err.info.message },
-            );
-            continue;
+    // A forced regeneration bypasses the cache from the first call. Every
+    // retry (provider failure, softening, or a failed image gate) gets a fresh
+    // nonce, otherwise the provider would serve the image that just failed.
+    let cacheNonce: string | undefined = forced ? randomUUID() : undefined;
+    const MAX_GATE_ATTEMPTS = 2;
+
+    for (let gateAttempt = 0; gateAttempt < MAX_GATE_ATTEMPTS; gateAttempt++) {
+      downloaded = undefined;
+      try {
+        for (
+          let attempt = 0;
+          attempt < IMAGE_TRANSIENT_MAX_ATTEMPTS;
+          attempt++
+        ) {
+          attempts += 1;
+          try {
+            downloaded = await generateOnce(assetProvider, {
+              prompt,
+              sceneId: scene.sceneId,
+              filename,
+              runId,
+              referenceImage: options.referenceImage,
+              cacheNonce,
+            });
+            break;
+          } catch (err) {
+            if (!isImageGenerationProviderError(err)) throw err;
+            const type = err.info.type;
+            if (isRepairCandidate(type) && !softenedFrom) {
+              // Exactly one logged softening retry for this scene.
+              softenedFrom = prompt;
+              prompt = softenPrompt(prompt);
+              cacheNonce = randomUUID();
+              logger.warn(
+                `Story scene ${scene.sceneId}: image provider refused the prompt; retrying once with a softened prompt`,
+                { reason: err.info.message },
+              );
+              continue;
+            }
+            if (
+              isRetryableFailure(type) &&
+              attempt < IMAGE_TRANSIENT_MAX_ATTEMPTS - 1
+            ) {
+              const delay = IMAGE_TRANSIENT_RETRY_DELAYS_MS[attempt] ?? 2000;
+              await sleep(delay);
+              cacheNonce = randomUUID();
+              continue;
+            }
+            throw err;
           }
-          if (
-            isRetryableFailure(type) &&
-            attempt < IMAGE_TRANSIENT_MAX_ATTEMPTS - 1
-          ) {
-            const delay = IMAGE_TRANSIENT_RETRY_DELAYS_MS[attempt] ?? 2000;
-            await sleep(delay);
-            continue;
-          }
-          throw err;
         }
+      } catch (err) {
+        scene.status.image = "failed";
+        const message = (err as Error)?.message ?? String(err);
+        scene.warnings.push(`image generation failed: ${message}`);
+        result.failed.push(`scene ${scene.sceneId}: ${message}`);
+        if (
+          isImageGenerationProviderError(err) &&
+          err.info.type === "quota_exhausted"
+        ) {
+          result.quotaExhausted = true;
+        }
+        return;
       }
-    } catch (err) {
-      scene.status.image = "failed";
-      const message = (err as Error)?.message ?? String(err);
-      scene.warnings.push(`image generation failed: ${message}`);
-      result.failed.push(`scene ${scene.sceneId}: ${message}`);
-      if (
-        isImageGenerationProviderError(err) &&
-        err.info.type === "quota_exhausted"
-      ) {
-        result.quotaExhausted = true;
+
+      if (!downloaded) {
+        scene.status.image = "failed";
+        scene.warnings.push("image generation produced no file");
+        result.failed.push(`scene ${scene.sceneId}: no file produced`);
+        return;
       }
-      return;
+
+      // Persist into the job's own images/ directory (deterministic mapping).
+      if (resolve(downloaded) !== target) {
+        await copyFile(downloaded, target);
+      }
+
+      validation = await validateSceneImage(target, {
+        minWidth: config.imageMinWidth,
+        minHeight: config.imageMinHeight,
+        minAspect: config.imageMinAspect,
+        maxAspect: config.imageMaxAspect,
+        workDir,
+        tag: `scene-${scene.sceneId}`,
+      });
+
+      if (!validation.ok) {
+        if (gateAttempt + 1 < MAX_GATE_ATTEMPTS) {
+          const message = `image failed its gate (${validation.issues.join("; ")}); retrying once with a fresh image`;
+          logger.warn(`Story scene ${scene.sceneId}: ${message}`);
+          scene.warnings.push(message);
+          cacheNonce = randomUUID();
+          continue;
+        }
+        scene.status.image = "failed";
+        scene.warnings.push(...validation.issues);
+        result.failed.push(
+          `scene ${scene.sceneId}: ${validation.issues.join("; ")}`,
+        );
+        return;
+      }
+
+      const fileHash = await hashFile(target);
+      const previous = seenHashes.get(fileHash);
+      if (previous !== undefined) {
+        scene.status.image = "failed";
+        scene.warnings.push(
+          `image is byte-identical to scene ${previous}'s image`,
+        );
+        result.failed.push(
+          `scene ${scene.sceneId}: duplicate of scene ${previous}`,
+        );
+        return;
+      }
+      seenHashes.set(fileHash, scene.sceneId);
+      break;
     }
 
-    if (!downloaded) {
+    if (!validation?.ok) {
       scene.status.image = "failed";
-      scene.warnings.push("image generation produced no file");
-      result.failed.push(`scene ${scene.sceneId}: no file produced`);
+      scene.warnings.push("image validation did not produce an accepted file");
+      result.failed.push(`scene ${scene.sceneId}: image validation failed`);
       return;
     }
-
-    // Persist into the job's own images/ directory (deterministic mapping).
-    if (resolve(downloaded) !== target) {
-      await copyFile(downloaded, target);
-    }
-
-    const validation = await validateSceneImage(target, {
-      minWidth: config.imageMinWidth,
-      minHeight: config.imageMinHeight,
-      minAspect: config.imageMinAspect,
-      maxAspect: config.imageMaxAspect,
-      workDir,
-      tag: `scene-${scene.sceneId}`,
-    });
-
-    if (!validation.ok) {
-      scene.status.image = "failed";
-      scene.warnings.push(...validation.issues);
-      result.failed.push(
-        `scene ${scene.sceneId}: ${validation.issues.join("; ")}`,
-      );
-      return;
-    }
-
-    const fileHash = await hashFile(target);
-    const previous = seenHashes.get(fileHash);
-    if (previous !== undefined) {
-      scene.status.image = "failed";
-      scene.warnings.push(
-        `image is byte-identical to scene ${previous}'s image`,
-      );
-      result.failed.push(
-        `scene ${scene.sceneId}: duplicate of scene ${previous}`,
-      );
-      return;
-    }
-    seenHashes.set(fileHash, scene.sceneId);
 
     const byteSize = (await stat(target)).size;
     scene.image = {

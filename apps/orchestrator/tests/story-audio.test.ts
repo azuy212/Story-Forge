@@ -7,6 +7,7 @@ import type {
   SynthesizeOptions,
   TTSProvider,
 } from "../src/providers/tts-provider.js";
+import type { WhisperXProvider } from "../src/providers/whisperx-provider.js";
 import {
   findVoiceOutliers,
   runAudioStage,
@@ -436,6 +437,63 @@ describe("runAudioStage", () => {
     expect(audioScene.audio?.silenceRetakes).toBe(1);
     expect(audioScene.audio?.maxInternalSilenceSec).toBeGreaterThan(1.3);
     expect(audioScene.warnings.join(" ")).not.toContain("still has");
+  });
+
+  it("measures ASR coverage on the final take after a silence retake", async () => {
+    setup();
+    let take = 0;
+    const provider: FakeProvider = {
+      calls: 0,
+      texts: [],
+      cacheFingerprint: () => "fake-tts-v1",
+      async synthesize(opts: SynthesizeOptions) {
+        take += 1;
+        provider.calls += 1;
+        provider.texts.push(opts.text);
+        const path = join(ROOT, "synth", `final-take-${take}.wav`);
+        if (take === 1) {
+          writeWavWithGap(path, 1.4, 2, 300);
+        } else {
+          writeWav(path, 4, 340);
+        }
+        return { audioUrl: path, durationMs: 0 };
+      },
+    };
+    const narration = "The captain saw a small bird fly past the ship.";
+    const scriptWords = narration.split(/\s+/);
+    const transcriber: WhisperXProvider & { calls: number } = {
+      calls: 0,
+      async align() {
+        transcriber.calls += 1;
+        // The first take omits the last word; the accepted retake says all of
+        // them. The old ordering persisted 0.9 after the retake.
+        const heard = take === 1 ? scriptWords.slice(0, -1) : scriptWords;
+        return {
+          wordTimestamps: heard.map((word, index) => ({
+            word,
+            start: index * 0.2,
+            end: index * 0.2 + 0.15,
+          })),
+        };
+      },
+    };
+    const audioScene = scene(1, narration);
+
+    await runAudioStage({
+      scenes: [audioScene],
+      paths,
+      config,
+      ttsProvider: provider,
+      transcriber,
+      voice: "narrator",
+      runId: "asr-final-take",
+    });
+
+    expect(provider.calls).toBe(2);
+    expect(audioScene.audio?.silenceRetakes).toBe(1);
+    expect(audioScene.audio?.asrCoverage).toBe(1);
+    expect(audioScene.audio?.asrChecked).toBe(true);
+    expect(transcriber.calls).toBe(2);
   });
 
   it("caps silence retakes at two and leaves the S8 warning behind", async () => {

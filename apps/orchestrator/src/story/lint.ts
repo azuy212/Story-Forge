@@ -206,6 +206,24 @@ export const CHARACTER_MAX_CUES = 2;
 /** Five distinct silhouettes is the most a viewer can carry across scenes. */
 export const CHARACTER_MAX_INDIVIDUALS = 5;
 
+/**
+ * The lead's one cue is the story's visual identifier, so it must name a flat
+ * cap explicitly. A generic hat (or a tricorn/bicorne) lets the model drift to
+ * a period costume that no longer reads as the same stick figure.
+ */
+const FLAT_CAP_SHAPE = /\bflat(?:\s+[\p{L}][\p{L}'-]*){0,3}\s+cap\b/iu;
+const NON_FLAT_HAT =
+  /\b(?:tricorn(?:e)?|bicorn(?:e)?|three[- ]cornered|pointed)\b/iu;
+const NEGATED_HAT = /\b(?:no|not|without|never|avoid)\b[^.;:]{0,24}$/iu;
+
+/** A named non-flat hat, unless the description explicitly rules it out. */
+function nonFlatHatName(description: string): string | undefined {
+  const match = NON_FLAT_HAT.exec(description);
+  if (!match) return undefined;
+  const before = description.slice(0, match.index);
+  return NEGATED_HAT.test(before) ? undefined : match[0];
+}
+
 const COSTUME_CUE =
   /\b(hat|cap|hood|helmet|coat|cloak|cape|doublet|tunic|shirt|blouse|robe|dress|gown|skirt|breeches|trousers|pants|hose|stockings|boots|shoes|sandals|sash|belt|bandana|scarf|gloves|armour|armor|armband|necklace|crown|veil|apron|uniform|jacket|vest|waistcoat|kilt|poncho|headband|earring|beard|moustache|mustache|eyepatch|scar|tattoo|braid|topknot)s?\b/gi;
 
@@ -264,7 +282,8 @@ export function characterStagingIssues(description: string): string[] {
  *
  * - an individual carries exactly one cue and (v2) exactly one colour,
  *   because that is what makes them recognisable as the same person in the
- *   next scene, including the story's lead; at most one entry may be the lead;
+ *   next scene, including the story's lead; at most one entry may be the lead,
+ *   and that lead's cue must name a flat-cap shape (no tricorn or bicorne);
  * - individuals share neither item nor colour;
  * - a group may carry none (an anonymous crowd) or up to the shared limit,
  *   but may not reuse an individual's cue;
@@ -308,6 +327,19 @@ export function lintCharacterRegistry(
     if ((lead.kind ?? "individual") !== "individual") {
       issues.push(
         `character "${lead.id}" is marked lead but is a group; only an individual can be the lead`,
+      );
+      continue;
+    }
+    const description = lead.visualDescription.trim();
+    if (!FLAT_CAP_SHAPE.test(description)) {
+      issues.push(
+        `character "${lead.id}" is the lead but its cue does not name a flat cap; use a flat-cap shape such as "flat black cap" or "dark-red flat cap"`,
+      );
+    }
+    const nonFlatHat = nonFlatHatName(description);
+    if (nonFlatHat) {
+      issues.push(
+        `character "${lead.id}" is the lead but names "${nonFlatHat}"; no tricorn, no three-cornered or pointed hat`,
       );
     }
   }

@@ -96,6 +96,11 @@ export interface StoryJobOptions extends StoryCliOverrides {
    * images, narration, alignment and render as well.
    */
   regeneratePrompts?: boolean;
+  /**
+   * Scene ids to regenerate in S5 even when their stored image is current.
+   * Every forced call bypasses the provider cache.
+   */
+  regenerateImages?: number[];
   /** Validate input and report the plan without any paid call. */
   dryRun?: boolean;
   /** Pause after the story is written and wait for interactive approval. */
@@ -148,6 +153,12 @@ export function buildForceStages(options: StoryJobOptions): Set<StoryStage> {
     // Only the prompt planner is forced. S5-S8 decide for themselves from
     // their own fingerprints, so unchanged images and audio are reused.
     forceStages.add("S4_visual_plan");
+  }
+  if (
+    (options.regenerateImages?.length ?? 0) > 0 &&
+    wantsStage(options, "S5_images")
+  ) {
+    forceStages.add("S5_images");
   }
   if (options.from) {
     const from = stageIndex(options.from);
@@ -1108,6 +1119,7 @@ async function stageImages(
       workDir: ctx.paths.renderDir,
       providerLabel: options.imageProviderLabel,
       referenceImage,
+      regenerateSceneIds: new Set(options.regenerateImages ?? []),
     });
     await writeJsonFile(ctx.paths.scenes, ctx.manifest.scenes);
     updateStageMetrics(ctx.manifest, "S5_images", {

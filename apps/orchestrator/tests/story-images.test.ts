@@ -318,4 +318,87 @@ describe("runImageStage", () => {
     expect(third.reused).toBe(1);
     expect(calls()).toBe(3);
   });
+
+  it("forces a fresh generation and cache bypass for a requested scene", async () => {
+    setup();
+    const a = makeImage(join(ROOT, "force"), STRUCTURED(1920, 1080));
+    const b = makeImage(
+      join(ROOT, "force"),
+      `color=c=0x331122:s=1920x1080,drawbox=x=40:y=40:w=800:h=500:color=0x44bb88:t=fill`,
+    );
+    const nonces: Array<string | undefined> = [];
+    let calls = 0;
+    const provider: AssetProvider = {
+      async generateImage({ cacheNonce }) {
+        nonces.push(cacheNonce);
+        return { url: calls++ % 2 === 0 ? a : b };
+      },
+      async generateVideo() {
+        throw new Error("not used");
+      },
+    };
+    const scenes = [scene(1), scene(2)];
+
+    await runImageStage({
+      scenes,
+      paths,
+      config,
+      assetProvider: provider,
+      runId: "force-run",
+      workDir: paths.renderDir,
+    });
+    expect(nonces).toEqual([undefined, undefined]);
+
+    const regenerated = await runImageStage({
+      scenes,
+      paths,
+      config,
+      assetProvider: provider,
+      runId: "force-run",
+      workDir: paths.renderDir,
+      regenerateSceneIds: new Set([1]),
+    });
+
+    expect(regenerated.generated).toBe(1);
+    expect(regenerated.reused).toBe(1);
+    expect(nonces).toHaveLength(3);
+    expect(nonces[2]).toEqual(expect.any(String));
+  });
+
+  it("retries a failed image gate with a fresh cache nonce", async () => {
+    setup();
+    const blank = makeImage(
+      join(ROOT, "gate-retry"),
+      "color=c=0xffffff:s=1920x1080",
+    );
+    const valid = makeImage(join(ROOT, "gate-retry"), STRUCTURED(1920, 1080));
+    const nonces: Array<string | undefined> = [];
+    let calls = 0;
+    const provider: AssetProvider = {
+      async generateImage({ cacheNonce }) {
+        nonces.push(cacheNonce);
+        return { url: calls++ === 0 ? blank : valid };
+      },
+      async generateVideo() {
+        throw new Error("not used");
+      },
+    };
+    const scenes = [scene(1)];
+
+    const result = await runImageStage({
+      scenes,
+      paths,
+      config,
+      assetProvider: provider,
+      runId: "gate-retry",
+      workDir: paths.renderDir,
+    });
+
+    expect(result.failed).toEqual([]);
+    expect(result.generated).toBe(1);
+    expect(nonces).toHaveLength(2);
+    expect(nonces[0]).toBeUndefined();
+    expect(nonces[1]).toEqual(expect.any(String));
+    expect(scenes[0].warnings.join(" ")).toContain("failed its gate");
+  });
 });

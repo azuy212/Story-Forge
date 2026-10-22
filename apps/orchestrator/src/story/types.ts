@@ -100,9 +100,9 @@ export const CharacterRegistrySchema = z.object({
          */
         kind: z.enum(["individual", "group"]).default("individual"),
         /**
-         * The story's protagonist. A lead may carry two cues (a garment and
-         * a headwear shape) and the two colours they use; every other
-         * individual carries exactly one of each.
+         * The story's protagonist. At most one entry may be the lead; its one
+         * cue must name a flat-cap shape, which becomes the story's recurring
+         * visual identifier.
          */
         lead: z.boolean().optional(),
         visualDescription: z.string().min(1),

@@ -198,10 +198,20 @@ const CROWD_LINEUP =
   /\b(?:in\s+a\s+(?:straight\s+)?line|lined\s+up|row\s+of)\b/iu;
 
 /**
+ * The stick style draws a round white head with eyebrows and a mouth only.
+ * Pose/expression slots that name eyes, a nose, pupils, hair or gaze are
+ * instructions to draw a detailed face, and the model follows them even when
+ * the style preamble says otherwise. Eyebrows are intentionally not matched:
+ * they are the allowed facial feature.
+ */
+const FACE_FEATURE_WORD = /\b(?:eyes?|nose|pupils?|hair|gaze)\b/iu;
+
+/**
  * Lint the composed prompt before any image call (brief section 6):
  * script check for the job language, no repeated adjacent words, no unfilled
  * placeholders, every required slot non-empty, registered characters only,
- * no request for readable text, and under the provider length limit.
+ * no face-feature words in pose/expression slots, no request for readable text,
+ * and under the provider length limit.
  */
 export function lintImagePrompt(options: {
   prompt: string;
@@ -261,6 +271,14 @@ export function lintImagePrompt(options: {
       issues.push({
         message: `slot references unregistered character "${slotCharacter.id}"`,
       });
+    }
+    for (const slot of ["pose", "expression"] as const) {
+      const faceFeature = FACE_FEATURE_WORD.exec(slotCharacter[slot]);
+      if (faceFeature) {
+        issues.push({
+          message: `slot ${slot} for "${slotCharacter.id}" names the face feature "${faceFeature[0]}" — stick faces use eyebrows and a mouth only`,
+        });
+      }
     }
   }
 

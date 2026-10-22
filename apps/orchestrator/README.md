@@ -757,6 +757,7 @@ manifest: /…/jobs/the-mutiny-…/manifest.json
 | `--stages <list>`                  | all                      | run only these stages                                         |
 | `--from <stage>`                   | —                        | force this stage and every later stage to rerun               |
 | `--regenerate-prompts`             | `false`                  | discard stored scene prompts and re-plan them in S4 only      |
+| `--regenerate-images <sceneIds>`   | —                        | regenerate these scenes in S5 and bypass the image cache      |
 | `--dry-run`                        | `false`                  | validate the input, print the plan, make no paid call         |
 | `--review-story`                   | `false`                  | print the story and wait for approval (`y`) before continuing |
 | `--json`                           | `false`                  | print the result summary as JSON                              |
@@ -767,6 +768,12 @@ image, narration chunk, alignment and the render are rebuilt. With
 `--regenerate-prompts`, only the prompts are discarded and re-planned; S5-S8
 still decide from their own fingerprints, so an image or audio file whose
 inputs did not change is reused.
+
+`--regenerate-images 1,18` keeps the stored prompts and forces only S5 for the
+listed scene ids. Those scenes skip stored-image reuse and send a fresh
+`cacheNonce` to the image provider, so the result is a new generation rather
+than a cache hit. Every automatic image retry also receives a fresh nonce.
+Scene ids are unique positive integers.
 
 Exit codes: `0` complete **or a successful dry run**, `1` failed, `2` an
 incomplete run (some stages are still pending — e.g. `--stages S1_input,S2_story`).

@@ -66,7 +66,7 @@
           {
             "id": "columbus",
             "pose": "standing upright at the helm",
-            "expression": "calm, eyes forward"
+            "expression": "calm, facing forward"
           }
         ],
         "setting": "the deck of a small wooden sailing ship on open water",
@@ -296,7 +296,7 @@
           {
             "id": "the_crew",
             "pose": "shoulders against the rail, heads turned outward",
-            "expression": "uneasy, eyes wide"
+            "expression": "uneasy, eyebrows raised"
           }
         ],
         "setting": "the ship's rail with open ocean beyond",
@@ -370,7 +370,7 @@
           {
             "id": "columbus",
             "pose": "running toward the bow",
-            "expression": "wide eyes"
+            "expression": "startled, eyebrows raised"
           }
         ],
         "setting": "the bow of the ship at first light",
@@ -465,7 +465,7 @@
           {
             "id": "columbus",
             "pose": "seated, shoulders rounded, chart on his knees",
-            "expression": "tired, eyes down"
+            "expression": "tired, head bowed"
           }
         ],
         "setting": "a harbour town at dusk with ships and masts behind him",
