@@ -49,6 +49,7 @@ export interface JobPaths {
   manifest: string;
   story: string;
   claims: string;
+  claimsChecklist: string;
   characters: string;
   scenes: string;
   imagesDir: string;
@@ -80,6 +81,7 @@ export function jobPaths(dir: string): JobPaths {
     manifest: resolve(dir, "manifest.json"),
     story: resolve(dir, "story.json"),
     claims: resolve(dir, "claims.json"),
+    claimsChecklist: resolve(dir, "claims-checklist.md"),
     characters: resolve(dir, "characters.json"),
     scenes: resolve(dir, "scenes.json"),
     imagesDir: resolve(dir, "images"),

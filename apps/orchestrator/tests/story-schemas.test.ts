@@ -59,6 +59,44 @@ describe("StoryOutputSchema", () => {
     ).toBe(false);
   });
 
+  it("defaults the pronunciation map to an empty list", () => {
+    const parsed = StoryOutputSchema.safeParse({
+      title: "The Press",
+      story: "A short story.",
+      claims: [],
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.pronunciations).toEqual([]);
+  });
+
+  it("accepts a respelling with syllable hyphens", () => {
+    const parsed = StoryOutputSchema.safeParse({
+      title: "The Bounty",
+      story: "Bligh sailed.",
+      claims: [],
+      pronunciations: [{ word: "Bligh", respelling: "Bly" }],
+    });
+    expect(parsed.success).toBe(true);
+    const parsedMulti = StoryOutputSchema.safeParse({
+      title: "Kupang",
+      story: "They reached Kupang.",
+      claims: [],
+      pronunciations: [{ word: "Kupang", respelling: "Koo-pang" }],
+    });
+    expect(parsedMulti.success).toBe(true);
+  });
+
+  it("rejects a respelling with a space", () => {
+    expect(
+      StoryOutputSchema.safeParse({
+        title: "T",
+        story: "A story.",
+        claims: [],
+        pronunciations: [{ word: "Kupang", respelling: "Koo pang" }],
+      }).success,
+    ).toBe(false);
+  });
+
   it("rejects an unknown claim status", () => {
     expect(
       StoryClaimSchema.safeParse({
@@ -230,6 +268,41 @@ describe("SceneVisualSlotsSchema", () => {
       SceneVisualSlotsSchema.safeParse({
         ...slots,
         characters: [{ id: "gutenberg", expression: "focused" }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts an anonymous group with one cue and no registry id", () => {
+    const parsed = SceneVisualSlotsSchema.safeParse({
+      ...slots,
+      characters: [
+        { cue: "a crowd of islanders in grass skirts", pose: "watching", expression: "curious" },
+      ],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rejects a scene character with both an id and a cue", () => {
+    expect(
+      SceneVisualSlotsSchema.safeParse({
+        ...slots,
+        characters: [
+          {
+            id: "islanders",
+            cue: "a crowd of islanders",
+            pose: "watching",
+            expression: "curious",
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a scene character with neither an id nor a cue", () => {
+    expect(
+      SceneVisualSlotsSchema.safeParse({
+        ...slots,
+        characters: [{ pose: "watching", expression: "curious" }],
       }).success,
     ).toBe(false);
   });

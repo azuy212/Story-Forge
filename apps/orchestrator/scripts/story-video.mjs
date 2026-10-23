@@ -107,6 +107,11 @@ program
     "print the written story and wait for approval before continuing",
     false,
   )
+  .option(
+    "--confirm-claims",
+    "refuse to render until every box in claims-checklist.md is ticked",
+    false,
+  )
   .option("--json", "print the result summary as JSON", false)
   .showHelpAfterError();
 
@@ -169,6 +174,7 @@ if (options.regenerateImages !== undefined) {
 }
 overrides.dryRun = options.dryRun;
 overrides.reviewStory = options.reviewStory;
+overrides.confirmClaims = options.confirmClaims;
 
 // Fail loudly on a flag that maps to a key the config does not read, instead of
 // silently ignoring it (the `--duration` bug: it wrote `targetDurationSec`).
@@ -180,7 +186,8 @@ const unknownOverrides = Object.keys(overrides).filter(
     key !== "regeneratePrompts" &&
     key !== "regenerateImages" &&
     key !== "dryRun" &&
-    key !== "reviewStory",
+    key !== "reviewStory" &&
+    key !== "confirmClaims",
 );
 if (unknownOverrides.length > 0) {
   console.error(

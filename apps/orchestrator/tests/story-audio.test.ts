@@ -417,6 +417,43 @@ describe("runAudioStage", () => {
     expect(audioScene.audio.edgeTrimmedSec).toBeGreaterThan(0.5);
   });
 
+  it("shortens a long pause in a cached chunk without re-synthesizing", async () => {
+    setup();
+    const audioScene = scene(1, "One two three four five six.");
+    const chunkPath = sceneChunkPath(paths, 1);
+    // 0.8 s tone + 1.4 s pause + 0.8 s tone.
+    writeWavWithGap(chunkPath, 1.4, 0.8, 440);
+    audioScene.status.audio = "done";
+    audioScene.audio = {
+      path: chunkPath,
+      durationSec: 3,
+      pieces: [
+        {
+          path: chunkPath,
+          durationSec: 3,
+          text: audioScene.narration,
+          providerFingerprint: "fake-tts-v1",
+        },
+      ],
+    };
+    const provider = fakeProvider();
+
+    const result = await runAudioStage({
+      scenes: [audioScene],
+      paths,
+      config,
+      ttsProvider: provider,
+      voice: "narrator",
+      runId: "cached-pause",
+    });
+
+    expect(provider.calls).toBe(0);
+    expect(audioScene.audio.shortenedPauses).toHaveLength(1);
+    expect(audioScene.audio.durationSec).toBeLessThan(2.6);
+    expect(result.chunks[0].durationSec).toBe(audioScene.audio.durationSec);
+    expect(await detectSilence(chunkPath, -50, 1)).toEqual([]);
+  });
+
   it("re-synthesizes a chunk with a long internal pause and records it", async () => {
     setup();
     const provider = fakeProvider({
@@ -496,12 +533,12 @@ describe("runAudioStage", () => {
     expect(transcriber.calls).toBe(2);
   });
 
-  it("caps silence retakes at two and leaves the S8 warning behind", async () => {
+  it("shortens a pause that survives the retake cap instead of shipping it", async () => {
     setup();
     const provider = fakeProvider({ gap: () => 1.4 });
     const audioScene = scene(1, "One two three four five six.");
 
-    await runAudioStage({
+    const result = await runAudioStage({
       scenes: [audioScene],
       paths,
       config,
@@ -512,7 +549,33 @@ describe("runAudioStage", () => {
 
     expect(provider.calls).toBe(3);
     expect(audioScene.audio?.silenceRetakes).toBe(2);
-    expect(audioScene.warnings.join(" ")).toContain("S8 will gate the master");
+    // The stall is cut before the chunk duration feeds S7 and the master.
+    expect(audioScene.audio?.shortenedPauses).toHaveLength(1);
+    expect(audioScene.audio?.shortenedPauses?.[0].originalSec).toBeGreaterThan(
+      1.3,
+    );
+    expect(audioScene.audio?.shortenedPauses?.[0].shortenedSec).toBe(0.6);
+    expect(audioScene.warnings.join(" ")).not.toContain("still has");
+
+    const silences = await detectSilence(
+      sceneChunkPath(paths, 1),
+      -50,
+      1,
+    );
+    expect(
+      silences.filter(
+        (silence) =>
+          silence.start !== undefined &&
+          silence.end !== undefined &&
+          silence.start > 0.05,
+      ),
+    ).toEqual([]);
+
+    // The shortened chunk is what gets timed and joined.
+    const chunkDuration = audioScene.audio?.durationSec ?? 0;
+    expect(result.chunks[0].durationSec).toBe(chunkDuration);
+    expect(chunkDuration).toBeGreaterThan(2.8);
+    expect(chunkDuration).toBeLessThan(3.4);
   });
 
   it("asks the provider to skip WPM normalization", async () => {
@@ -571,6 +634,27 @@ describe("findVoiceOutliers", () => {
     ]);
     expect(outliers.map((entry) => entry.sceneId)).toEqual([4]);
     expect(outliers[0].reason).toContain("pace");
+  });
+
+  it("does not flag a deliberately slower chunk", () => {
+    const outliers = findVoiceOutliers([
+      withAudio(1, 150),
+      withAudio(2, 152),
+      withAudio(3, 148),
+      withAudio(4, 80),
+    ]);
+    expect(outliers).toEqual([]);
+  });
+
+  it("flags a chunk just past 1.25x the run median", () => {
+    const outliers = findVoiceOutliers([
+      withAudio(1, 150),
+      withAudio(2, 150),
+      withAudio(3, 150),
+      withAudio(4, 188),
+    ]);
+    expect(outliers.map((entry) => entry.sceneId)).toEqual([4]);
+    expect(outliers[0].reason).toContain("1.25×");
   });
 
   it("flags a loudness outlier against the run median", () => {

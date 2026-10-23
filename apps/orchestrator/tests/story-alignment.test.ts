@@ -2,9 +2,12 @@ import { describe, it, expect } from "@jest/globals";
 import {
   SCENE_ALIGNMENT_GATE,
   alignScene,
+  applyPronunciations,
+  canonicalizeAsrWords,
   narrationFidelity,
   numberValue,
   normalizeToken,
+  pronunciationAliases,
   proportionalAlignment,
   tokenizeScript,
 } from "../src/story/alignment.js";
@@ -321,5 +324,78 @@ describe("story narrationFidelity", () => {
 
   it("treats an empty script as fully covered", () => {
     expect(narrationFidelity("   ", [])).toEqual({ coverage: 1, missing: [] });
+  });
+});
+
+describe("pronunciation aliases", () => {
+  it("maps a respelling back to its original spelling", () => {
+    const aliases = pronunciationAliases([
+      { word: "Bligh", respelling: "Bly" },
+      { word: "Kupang", respelling: "Koo-pang" },
+    ]);
+    expect(aliases.get("bly")).toBe("bligh");
+    expect(aliases.get("koopang")).toBe("kupang");
+  });
+});
+
+describe("canonicalizeAsrWords", () => {
+  it("restores the script spelling where the voice said a respelling", () => {
+    const words = canonicalizeAsrWords(
+      asr(["Bly", "sailed", "to", "Koo-pang"]),
+      [{ word: "Bligh", respelling: "Bly" }, { word: "Kupang", respelling: "Koo-pang" }],
+    );
+    expect(words.map((w) => w.word)).toEqual(["bligh", "sailed", "to", "kupang"]);
+  });
+
+  it("does not rewrite a word that is not in the map", () => {
+    const words = canonicalizeAsrWords(
+      asr(["Captain", "Bligh"]),
+      [{ word: "Bligh", respelling: "Bly" }],
+    );
+    expect(words.map((w) => w.word)).toEqual(["Captain", "Bligh"]);
+  });
+});
+
+describe("applyPronunciations", () => {
+  it("rewrites original spellings to respellings for TTS only", () => {
+    const spoken = applyPronunciations(
+      "Bligh reached Kupang.",
+      [{ word: "Bligh", respelling: "Bly" }, { word: "Kupang", respelling: "Koo-pang" }],
+    );
+    expect(spoken).toBe("Bly reached Koo-pang.");
+  });
+
+  it("does not touch a partial substring (longest match wins)", () => {
+    const spoken = applyPronunciations("New South Wales is south.", [
+      { word: "South Wales", respelling: "Suth-Wayls" },
+      { word: "Wales", respelling: "Wayls" },
+    ]);
+    expect(spoken).toBe("New Suth-Wayls is south.");
+  });
+
+  it("returns the text unchanged when there is no map", () => {
+    expect(applyPronunciations("Nothing to say.")).toBe("Nothing to say.");
+  });
+});
+
+describe("narrationFidelity with pronunciations", () => {
+  it("does not count a respelling as missing script words", () => {
+    const fidelity = narrationFidelity(
+      "Bligh reached Kupang.",
+      asr(["Bly", "reached", "Koo-pang"]),
+      [{ word: "Bligh", respelling: "Bly" }, { word: "Kupang", respelling: "Koo-pang" }],
+    );
+    expect(fidelity.coverage).toBe(1);
+    expect(fidelity.missing).toEqual([]);
+  });
+
+  it("still counts genuinely missing script words", () => {
+    const fidelity = narrationFidelity(
+      "Bligh reached Kupang.",
+      asr(["Bly", "reached"]),
+      [{ word: "Bligh", respelling: "Bly" }, { word: "Kupang", respelling: "Koo-pang" }],
+    );
+    expect(fidelity.coverage).toBeCloseTo(0.667, 3);
+    expect(fidelity.missing.some((word) => /^kupang/i.test(word))).toBe(true);
   });
 });

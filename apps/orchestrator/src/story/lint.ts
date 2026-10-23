@@ -88,10 +88,51 @@ export interface StoryLintOptions {
   targetDurationSec: number;
   hardWords: string[];
   explanationCues: string[];
+  /**
+   * The story topic. A hard word the topic names ("mutiny" for "The mutiny on
+   * the Bounty") must appear in the story AND be explained by its sentence; a
+   * draft cannot dodge the topic's own vocabulary by only writing
+   * "mutineers".
+   */
+  topic?: string;
 }
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Match a hard word and its ordinary inflections. A topic such as "the mutiny
+ * on the Bounty" is told through "mutineers", and "navigator" through
+ * "navigators"; an exact `\bmutiny\b` check let both slip past the reading
+ * gate. The suffix families stay tied to the word's own stem, so "mutiny"
+ * never matches "mutation" and "navigator" never matches "navigable".
+ */
+export function hardWordPattern(hardWord: string): RegExp {
+  const word = hardWord.trim().toLowerCase();
+  let stem = word;
+  let suffixes: string;
+  if (/[^aeiou]y$/.test(word)) {
+    // mutiny → mutin-: mutiny, mutinies, mutinied, mutineer(s), mutinous.
+    stem = word.slice(0, -1);
+    suffixes = "(?:y|ies|ied|ier|iers|eer|eers|eering|ous|ously|ousness)?";
+  } else if (word.endsWith("e")) {
+    // organise → organis-: organise, organised, organising, organisation.
+    stem = word.slice(0, -1);
+    suffixes = "(?:e|es|ed|ing|er|ers|ion|ions|ive|ively)?";
+  } else if (/(?:or|er)$/.test(word)) {
+    // navigator → navigator(s), sailor → sailor(s).
+    suffixes = "(?:s|'s)?";
+  } else {
+    suffixes = "(?:s|es|ed|ing|er|ers)?";
+  }
+  return new RegExp(`\\b${escapeRegExp(stem)}${suffixes}\\b`, "i");
+}
+
+/** Hard words whose stem the topic itself names. */
+export function topicHardWords(topic: string, hardWords: string[]): string[] {
+  if (!topic.trim()) return [];
+  return hardWords.filter((hardWord) => hardWordPattern(hardWord).test(topic));
 }
 
 function compileCues(sources: string[]): RegExp[] {
@@ -116,19 +157,36 @@ export function findHardWordIssues(
   story: string,
   hardWords: string[],
   explanationCues: string[],
+  options: { requiredWords?: string[] } = {},
 ): string[] {
   if (hardWords.length === 0) return [];
   const cues = compileCues(explanationCues);
   const sentences = splitSentences(story);
+  const required = new Set(
+    (options.requiredWords ?? []).map((word) => word.toLowerCase()),
+  );
   const issues: string[] = [];
 
   for (const hardWord of hardWords) {
-    const wordRe = new RegExp(`\\b${escapeRegExp(hardWord)}\\b`, "i");
+    const wordRe = hardWordPattern(hardWord);
     const sentence = sentences.find((entry) => wordRe.test(entry));
-    if (!sentence) continue;
+    const isRequired = required.has(hardWord.toLowerCase());
+    if (!sentence) {
+      if (isRequired) {
+        issues.push(
+          `Hard word "${hardWord}" is the story's topic word but the story never uses it; name it once and explain it in the same sentence`,
+        );
+      }
+      continue;
+    }
     if (cues.some((cue) => cue.test(sentence))) continue;
+    const usedAs = wordRe.exec(sentence)?.[0];
+    const form =
+      usedAs && usedAs.toLowerCase() !== hardWord.toLowerCase()
+        ? ` (used as "${usedAs}")`
+        : "";
     issues.push(
-      `Hard word "${hardWord}" is used without an in-sentence explanation: "${sentence.slice(0, 90)}"`,
+      `Hard word "${hardWord}"${form} is used without an in-sentence explanation: "${sentence.slice(0, 90)}"`,
     );
   }
   return issues;
@@ -149,7 +207,9 @@ export function lintStory(
   );
 
   issues.push(
-    ...findHardWordIssues(story, options.hardWords, options.explanationCues),
+    ...findHardWordIssues(story, options.hardWords, options.explanationCues, {
+      requiredWords: topicHardWords(options.topic ?? "", options.hardWords),
+    }),
   );
 
   const wordCount = countWords(story);
@@ -229,6 +289,14 @@ const COSTUME_CUE =
 
 const COLOUR_CUE =
   /\b(black|white|red|crimson|blue|navy|green|olive|yellow|gold|orange|purple|pink|brown|tan|beige|grey|gray|silver|teal)\b/gi;
+
+/**
+ * Neutral colours disappear against the pale paper background and the white
+ * round heads, so a group drawn in one reads as a shapeless smear rather than
+ * a body. Groups need a saturated base colour that stays distinct from every
+ * individual's.
+ */
+export const NEUTRAL_GROUP_COLOURS = new Set(["grey", "white", "beige"]);
 
 /** Distinct basic colours named in a description (gray folds into grey). */
 export function characterColours(description: string): string[] {
@@ -373,6 +441,15 @@ export function lintCharacterRegistry(
             ? `no base colour (a v2 ${kind} needs exactly one)`
             : `${colours.length} colours (${colours.join(", ")}; a v2 ${kind} needs exactly one)`,
         );
+      }
+      if (kind === "group") {
+        for (const colour of colours) {
+          if (NEUTRAL_GROUP_COLOURS.has(colour)) {
+            problems.push(
+              `uses the neutral colour "${colour}"; grey, white and beige bleed into the figure bodies — give a group a distinct saturated colour`,
+            );
+          }
+        }
       }
       const owners = kind === "individual" ? colourOwners : groupColourOwners;
       for (const colour of colours) {

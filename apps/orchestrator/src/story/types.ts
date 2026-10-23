@@ -25,6 +25,27 @@ export const StoryClaimSchema = z.object({
   status: z.enum(STORY_CLAIM_STATUSES),
   /** True when the narration hedges the claim ("People say…", "Some tell…"). */
   hedgeInNarration: z.boolean(),
+  /** Derived by code: a claim about what a named person "later" did. */
+  needsSource: z.boolean().optional(),
+  /** Derived by code: the query a reviewer should search first. */
+  searchQuery: z.string().optional(),
+});
+
+/**
+ * A pronunciation pair: the original spelling that must survive in the script
+ * and subtitles, and the respelling the TTS voice should actually say.
+ */
+export const StoryPronunciationSchema = z.object({
+  word: z.string().trim().min(1),
+  /** One word; use hyphens for syllables so it stays one spoken token. */
+  respelling: z
+    .string()
+    .trim()
+    .min(1)
+    .regex(
+      /^\S+$/u,
+      "respelling must be a single word (use hyphens for syllables)",
+    ),
 });
 
 export const StoryOutputSchema = z.object({
@@ -33,10 +54,16 @@ export const StoryOutputSchema = z.object({
   // Required, not defaulted: a missing ledger would silently skip claim
   // verification (the whole point of DP3). An explicit `[]` is still allowed.
   claims: z.array(StoryClaimSchema),
+  /**
+   * Names and foreign words the voice would otherwise mispronounce. TTS input
+   * uses the respelling; the script, subtitles and manifest keep the original.
+   */
+  pronunciations: z.array(StoryPronunciationSchema).default([]),
 });
 
 export type StoryOutput = z.infer<typeof StoryOutputSchema>;
 export type StoryClaim = z.infer<typeof StoryClaimSchema>;
+export type StoryPronunciation = z.infer<typeof StoryPronunciationSchema>;
 
 export const VERIFICATION_ISSUE_KINDS = [
   "unsupported_event",
@@ -127,17 +154,30 @@ function requiredText() {
 /** A scene that names more than four characters reads as a crowd, not a beat. */
 export const SCENE_MAX_CHARACTERS = 4;
 
+/**
+ * A scene character is either a registry reference (`id`) or an anonymous
+ * group described inline by exactly one silhouette `cue`. The anonymous form
+ * exists so unrelated people never have to borrow a registered group's id;
+ * `lintImagePrompt` and the slots prompt both enforce the distinction.
+ */
+export const SceneCharacterSchema = z
+  .object({
+    id: z.string().min(1).optional(),
+    /** One silhouette cue for an anonymous group (no registry id). */
+    cue: z.string().trim().min(1).optional(),
+    pose: requiredText(),
+    expression: requiredText(),
+  })
+  .refine(
+    (entry) => (entry.id === undefined) !== (entry.cue === undefined),
+    "a scene character needs exactly one of id (registry) or cue (anonymous group)",
+  );
+
 export const SceneVisualSlotsSchema = z.object({
   sceneId: z.number().int().positive(),
   action: requiredText(),
   characters: z
-    .array(
-      z.object({
-        id: z.string().min(1),
-        pose: requiredText(),
-        expression: requiredText(),
-      }),
-    )
+    .array(SceneCharacterSchema)
     .max(
       SCENE_MAX_CHARACTERS,
       `a scene may name at most ${SCENE_MAX_CHARACTERS} characters`,
@@ -227,6 +267,20 @@ export interface SceneAudioChunkRecord {
   edgeTrimmedSec?: number;
   /** Longest internal pause observed during the S6 check, in seconds. */
   maxInternalSilenceSec?: number;
+  /**
+   * Internal pauses still over 1.0 s after the retake limit, shortened to
+   * 0.6 s before the chunk duration is measured. Recorded for the manifest.
+   */
+  shortenedPauses?: ScenePauseShortening[];
+}
+
+export interface ScenePauseShortening {
+  /** Pause position in the chunk, in seconds (before shortening). */
+  startSec: number;
+  /** Measured pause length before shortening. */
+  originalSec: number;
+  /** Pause length kept after shortening. */
+  shortenedSec: number;
 }
 
 export interface SceneTiming {
@@ -405,6 +459,8 @@ export interface StoryManifest {
     lint: StoryLintSummary;
   };
   claims?: StoryClaim[];
+  /** TTS respellings; the script and subtitles keep the original spelling. */
+  pronunciations?: StoryPronunciation[];
   verification?: StoryVerificationSummary;
   groundingSource: "model-knowledge";
   /** DP3: every claim is model knowledge, so nothing here is verified. */

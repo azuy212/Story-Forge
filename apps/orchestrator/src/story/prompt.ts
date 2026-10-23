@@ -1,4 +1,5 @@
 import { PipelineError } from "../utils/errors.js";
+import { characterCues } from "./lint.js";
 import {
   REQUIRED_PROMPT_PLACEHOLDERS,
   type StoryStyleProfile,
@@ -32,6 +33,18 @@ export function composeImagePrompt(options: {
   const registry = new Map(characters.map((entry) => [entry.id, entry]));
 
   const characterLines = slots.characters.map((slotCharacter) => {
+    const pose = slotCharacter.pose.trim().replace(/\.+$/, "");
+    const expression = slotCharacter.expression.trim().replace(/\.+$/, "");
+    const suffix = ` Pose: ${pose}.${expression ? ` Expression: ${expression}.` : ""}`;
+
+    // An anonymous group has no registry id: its own one-cue description is
+    // injected verbatim. This is the escape hatch that stops the planner from
+    // borrowing a registered group for people who are not that group.
+    if (slotCharacter.id === undefined) {
+      const cue = slotCharacter.cue?.trim().replace(/\.+$/, "") ?? "";
+      return `- An anonymous group: ${cue}.${suffix}`;
+    }
+
     const entry = registry.get(slotCharacter.id);
     if (!entry) {
       throw new PipelineError(
@@ -42,11 +55,7 @@ export function composeImagePrompt(options: {
     // Registry text is injected verbatim; only the sentence-final period is
     // normalized so appending "Pose:" never produces "..".
     const description = entry.visualDescription.trim().replace(/\.+$/, "");
-    const pose = slotCharacter.pose.trim().replace(/\.+$/, "");
-    const expression = slotCharacter.expression.trim().replace(/\.+$/, "");
-    return `- ${entry.name}: ${description}. Pose: ${pose}.${
-      expression ? ` Expression: ${expression}.` : ""
-    }`;
+    return `- ${entry.name}: ${description}.${suffix}`;
   });
 
   const props = slots.props.filter((prop) => prop.trim().length > 0);
@@ -69,7 +78,9 @@ export function composeImagePrompt(options: {
 
   return {
     prompt,
-    characterIds: slots.characters.map((entry) => entry.id),
+    characterIds: slots.characters
+      .map((entry) => entry.id)
+      .filter((id): id is string => id !== undefined),
   };
 }
 
@@ -198,6 +209,14 @@ const CROWD_LINEUP =
   /\b(?:in\s+a\s+(?:straight\s+)?line|lined\s+up|row\s+of)\b/iu;
 
 /**
+ * The picture must run to the bottom edge in one continuous scene. A slot that
+ * reserves a calm strip "across the bottom of the frame" produces a painted
+ * band that reads as a letterbox, and it was wording the planner learned from
+ * the old slot guidance. The global style line owns this rule now.
+ */
+const BOTTOM_BAND = /across\s+the\s+bottom\s+of\s+the\s+frame/iu;
+
+/**
  * The stick style draws a round white head with eyebrows and a mouth only.
  * Pose/expression slots that name eyes, a nose, pupils, hair or gaze are
  * instructions to draw a detailed face, and the model follows them even when
@@ -267,7 +286,27 @@ export function lintImagePrompt(options: {
 
   const registry = new Set(characters.map((entry) => entry.id));
   for (const slotCharacter of slots.characters) {
-    if (!registry.has(slotCharacter.id)) {
+    const label = slotCharacter.id ?? "anonymous group";
+    if (slotCharacter.id === undefined) {
+      const cue = slotCharacter.cue?.trim() ?? "";
+      if (!cue) {
+        issues.push({
+          message:
+            "anonymous group has no cue — give it one silhouette cue (a crowd of islanders in grass skirts)",
+        });
+      } else {
+        const cues = characterCues(cue);
+        if (cues.length > 1) {
+          issues.push({
+            message: `anonymous group names ${cues.length} cues (${cues.join(", ")}); describe one silhouette cue only`,
+          });
+        }
+      }
+    } else if (slotCharacter.cue !== undefined) {
+      issues.push({
+        message: `slot character "${slotCharacter.id}" also carries an anonymous cue; use either a registry id or a cue, not both`,
+      });
+    } else if (!registry.has(slotCharacter.id)) {
       issues.push({
         message: `slot references unregistered character "${slotCharacter.id}"`,
       });
@@ -276,7 +315,7 @@ export function lintImagePrompt(options: {
       const faceFeature = FACE_FEATURE_WORD.exec(slotCharacter[slot]);
       if (faceFeature) {
         issues.push({
-          message: `slot ${slot} for "${slotCharacter.id}" names the face feature "${faceFeature[0]}" — stick faces use eyebrows and a mouth only`,
+          message: `slot ${slot} for "${label}" names the face feature "${faceFeature[0]}" — stick faces use eyebrows and a mouth only`,
         });
       }
     }
@@ -309,6 +348,12 @@ export function lintImagePrompt(options: {
         message: `slot asks for "${framing[0]}" framing — close, portrait and face shots make the model draw a detailed oversized head; use wide, medium, over-the-shoulder, high-angle or low-angle framing`,
       });
     }
+    const band = BOTTOM_BAND.exec(value);
+    if (band) {
+      issues.push({
+        message: `slot reserves a strip "${band[0]}" — the picture continues to the bottom edge with no bars, bands, panels or borders`,
+      });
+    }
   }
 
   const groupIds = new Set(
@@ -316,7 +361,11 @@ export function lintImagePrompt(options: {
       .filter((character) => character.kind === "group")
       .map((character) => character.id),
   );
-  const hasGroup = slots.characters.some((entry) => groupIds.has(entry.id));
+  const hasGroup = slots.characters.some(
+    (entry) =>
+      entry.cue !== undefined ||
+      (entry.id !== undefined && groupIds.has(entry.id)),
+  );
   if (hasGroup) {
     for (const value of [slots.action, slots.composition]) {
       const lineup = CROWD_LINEUP.exec(value);

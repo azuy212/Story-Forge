@@ -207,6 +207,19 @@ async function generateOnce(
   return result.url;
 }
 
+/**
+ * Drop warnings left by a previous image attempt once this scene has a current
+ * accepted image. All S5 warnings are image-scoped (`image …` or the missing
+ * prompt), so matching on that prefix cannot remove a prompt/style warning.
+ */
+export function clearImageWarnings(scene: { warnings: string[] }): void {
+  scene.warnings = scene.warnings.filter(
+    (warning) =>
+      warning !== "scene has no composed image prompt" &&
+      !/^image\b/u.test(warning),
+  );
+}
+
 export async function runImageStage(
   options: ImageStageOptions,
 ): Promise<ImageStageResult> {
@@ -259,6 +272,7 @@ export async function runImageStage(
             return;
           }
           seenHashes.set(fileHash, scene.sceneId);
+          clearImageWarnings(scene);
           result.reused += 1;
           return;
         }
@@ -423,6 +437,7 @@ export async function runImageStage(
       generatedAt: new Date().toISOString(),
     };
     scene.status.image = "done";
+    clearImageWarnings(scene);
     result.generated += 1;
   }
 

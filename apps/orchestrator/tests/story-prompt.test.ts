@@ -157,6 +157,35 @@ describe("story composeImagePrompt", () => {
     expect(prompt).toContain("Three tired sailors in rough linen shirts");
   });
 
+  it("describes an anonymous group from its own cue", () => {
+    const { prompt, characterIds } = composeImagePrompt({
+      style: STYLE,
+      slots: slots({
+        characters: [
+          {
+            id: "columbus",
+            pose: "standing at the rail",
+            expression: "calm",
+          },
+          {
+            cue: "a crowd of islanders in grass skirts",
+            pose: "watching from the shore",
+            expression: "curious",
+          },
+        ],
+      }),
+      characters: CHARACTERS,
+    });
+
+    expect(prompt).toContain(
+      "- An anonymous group: a crowd of islanders in grass skirts.",
+    );
+    expect(prompt).toContain("Pose: watching from the shore");
+    // The anonymous group is not a registry id and must not leak into it.
+    expect(characterIds).toEqual(["columbus"]);
+    expect(prompt).not.toContain("Three tired sailors");
+  });
+
   it("throws for a slot that references an unregistered character", () => {
     let caught: unknown;
     try {
@@ -380,6 +409,61 @@ describe("story lintImagePrompt", () => {
     expect(issues).toContain("slot setting is empty");
     expect(issues).toContain("slot lighting is empty");
     expect(issues).toContain("slot composition is empty");
+  });
+
+  it("accepts an anonymous group with one cue", () => {
+    expect(
+      messages({
+        slots: slots({
+          characters: [
+            {
+              cue: "a crowd of islanders in grass skirts",
+              pose: "watching from the shore",
+              expression: "curious",
+            },
+          ],
+        }),
+      }),
+    ).toBe("");
+  });
+
+  it("rejects an anonymous group that names several cues", () => {
+    expect(
+      messages({
+        slots: slots({
+          characters: [
+            {
+              cue: "a crowd of islanders in grass skirts and black hats",
+              pose: "watching from the shore",
+              expression: "curious",
+            },
+          ],
+        }),
+      }),
+    ).toContain("describe one silhouette cue only");
+  });
+
+  it("rejects an anonymous group with no cue", () => {
+    expect(
+      messages({
+        slots: slots({
+          characters: [
+            { pose: "watching from the shore", expression: "curious" },
+          ] as SceneVisualSlots["characters"],
+        }),
+      }),
+    ).toContain("anonymous group has no cue");
+  });
+
+  it("rejects a bottom band that reads as a letterbox", () => {
+    expect(
+      messages({
+        slots: slots({
+          composition:
+            "wide shot with a calm strip of open water across the bottom of the frame",
+        }),
+      }),
+    ).toContain("continues to the bottom edge");
   });
 
   it("rejects a slot character missing from the registry", () => {

@@ -1,4 +1,6 @@
 import { describe, it, expect } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import {
   STORY_COMPLEXITY_THRESHOLDS,
   WORD_BUDGET_TOLERANCE,
@@ -36,6 +38,11 @@ function storyOfWords(total: number): string {
 
 const EXPLANATION_CUES = ["\\bwhich (?:is|was|means)\\b"];
 
+const BOUNTY_STORY = readFileSync(
+  fileURLToPath(new URL("./fixtures/bounty-story.txt", import.meta.url)),
+  "utf8",
+).trim();
+
 describe("story findHardWordIssues", () => {
   it("returns nothing when the style lists no hard words", () => {
     expect(
@@ -72,7 +79,7 @@ describe("story findHardWordIssues", () => {
     expect(issues).toHaveLength(1);
   });
 
-  it("matches whole words, case-insensitively", () => {
+  it("matches whole words and their ordinary inflections", () => {
     expect(
       findHardWordIssues(
         "A Mutiny, which means trouble.",
@@ -80,13 +87,70 @@ describe("story findHardWordIssues", () => {
         EXPLANATION_CUES,
       ),
     ).toEqual([]);
+    // Inflected forms reach the same gate instead of slipping past it.
     expect(
       findHardWordIssues(
         "The mutinous sailors left.",
         ["mutiny"],
         EXPLANATION_CUES,
       ),
+    ).toHaveLength(1);
+    expect(
+      findHardWordIssues(
+        "The mutineers, who had seized the ship, sailed home.",
+        ["mutiny"],
+        EXPLANATION_CUES,
+      ),
+    ).toHaveLength(1);
+    expect(
+      findHardWordIssues(
+        "The navigators, who found the way, drew the charts.",
+        ["navigator"],
+        EXPLANATION_CUES,
+      ),
+    ).toHaveLength(1);
+    // Stems stay tied to their own word family.
+    expect(
+      findHardWordIssues(
+        "The mutation was harmless.",
+        ["mutiny"],
+        EXPLANATION_CUES,
+      ),
     ).toEqual([]);
+    expect(
+      findHardWordIssues(
+        "The navigable river turned west.",
+        ["navigator"],
+        EXPLANATION_CUES,
+      ),
+    ).toEqual([]);
+  });
+
+  it("catches the Bounty story's unexplicated topic word and inflections", () => {
+    // The real 492-word draft that shipped through the old exact-word check:
+    // it says "mutineers" and "navigator" but never "mutiny".
+    const issues = findHardWordIssues(
+      BOUNTY_STORY,
+      ["mutiny", "navigator"],
+      EXPLANATION_CUES,
+      { requiredWords: ["mutiny"] },
+    );
+    const joined = issues.join("\n");
+    expect(joined).toMatch(/Hard word "mutiny" \(used as "mutineers"\)/);
+    expect(joined).toMatch(/Hard word "navigator"/);
+    expect(joined).toMatch(/without an in-sentence explanation/);
+  });
+
+  it("requires the topic's own word when the story avoids it entirely", () => {
+    const issues = findHardWordIssues(
+      "A story about breadfruit trees and the sea.",
+      ["mutiny"],
+      EXPLANATION_CUES,
+      { requiredWords: ["mutiny"] },
+    );
+    expect(issues.join("\n")).toMatch(
+      /is the story's topic word but the story never uses it/,
+    );
   });
 
   it("falls back to the built-in cues when the profile supplies none", () => {
@@ -570,6 +634,26 @@ describe("story lintCharacterRegistry", () => {
       /groups "g1" and "g2" share the colour "green"/,
     );
   });
+
+  it.each(["grey", "gray", "white", "beige"])(
+    "rejects a v2 group drawn in the neutral colour %s",
+    (colour) => {
+      const issues = lintCharacterRegistry(
+        [
+          character(
+            "the_crew",
+            `Stick figures in ${colour} shirts.`,
+            "group",
+          ),
+        ],
+        { version: 2 },
+      );
+      const expected = colour === "gray" ? "grey" : colour;
+      expect(issues.join("\n")).toContain(
+        `uses the neutral colour "${expected}"`,
+      );
+    },
+  );
 
   it("rejects a group reusing an individual's cue in v2", () => {
     const issues = lintCharacterRegistry(

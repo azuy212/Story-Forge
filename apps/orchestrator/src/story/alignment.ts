@@ -1,4 +1,4 @@
-import type { SceneWordTimestamp } from "./types.js";
+import type { SceneWordTimestamp, StoryPronunciation } from "./types.js";
 
 /**
  * Script-to-audio alignment (brief S7).
@@ -73,6 +73,76 @@ export function normalizeToken(token: string): string {
     .toLowerCase()
     .replace(/[^\p{L}\p{N}'-]/gu, "")
     .replace(/^['-]+|['-]+$/g, "");
+}
+
+/**
+ * Comparison key for a spoken respelling. Hyphens and spaces are dropped so
+ * "Koo-pahng", "koo pahng" and the ASR's "Kupang" all land on one key; the
+ * key is only used to find the alias, never to change subtitle text.
+ */
+function pronunciationKey(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+/**
+ * Map every respelling to the original spelling it stands for. The script and
+ * subtitles keep "Bligh"; the TTS voice says "Bly"; the ASR therefore hears
+ * "Bly". Without this map that name counts as a missing script word on every
+ * coverage check.
+ */
+export function pronunciationAliases(
+  pronunciations: StoryPronunciation[] = [],
+): Map<string, string> {
+  const aliases = new Map<string, string>();
+  for (const entry of pronunciations) {
+    const key = pronunciationKey(entry.respelling);
+    const canonical = normalizeToken(entry.word);
+    if (key && canonical) aliases.set(key, canonical);
+  }
+  return aliases;
+}
+
+/** Restore the script spelling on ASR tokens that heard a respelling. */
+export function canonicalizeAsrWords(
+  words: AsrWord[],
+  pronunciations: StoryPronunciation[] = [],
+): AsrWord[] {
+  const aliases = pronunciationAliases(pronunciations);
+  if (aliases.size === 0) return words;
+  return words.map((word) => {
+    const canonical = aliases.get(pronunciationKey(word.word));
+    return canonical ? { ...word, word: canonical } : word;
+  });
+}
+
+/**
+ * Replace original spellings with their TTS respellings. This is applied ONLY
+ * to the text sent to the voice; the narration text that becomes subtitles and
+ * the stored script is never rewritten.
+ */
+export function applyPronunciations(
+  text: string,
+  pronunciations: StoryPronunciation[] = [],
+): string {
+  if (pronunciations.length === 0) return text;
+  let spoken = text;
+  // Longest first, so "New South Wales" wins over a hypothetical "Wales".
+  const ordered = [...pronunciations].sort(
+    (left, right) => right.word.length - left.word.length,
+  );
+  for (const entry of ordered) {
+    const escaped = entry.word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(
+      `(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`,
+      "giu",
+    );
+    spoken = spoken.replace(pattern, entry.respelling);
+  }
+  return spoken;
 }
 
 const ORDINAL_IRREGULAR: Record<string, number> = {
@@ -401,6 +471,8 @@ export function alignScene(options: {
   scriptText: string;
   asrWords: AsrWord[];
   bounds: { start: number; end: number };
+  /** Respellings the voice said in place of the script's spelling. */
+  pronunciations?: StoryPronunciation[];
 }): AlignmentResult {
   const tokens = tokenizeScript(options.scriptText);
   if (tokens.length === 0) {
@@ -413,8 +485,12 @@ export function alignScene(options: {
     };
   }
 
-  const partner = lcsAlignment(tokens, options.asrWords);
-  matchNumericSpans(tokens, options.asrWords, partner);
+  const asrWords = canonicalizeAsrWords(
+    options.asrWords,
+    options.pronunciations,
+  );
+  const partner = lcsAlignment(tokens, asrWords);
+  matchNumericSpans(tokens, asrWords, partner);
   const matched = partner.filter((index) => index >= 0).length;
   const matchRatio = matched / tokens.length;
 
@@ -429,12 +505,7 @@ export function alignScene(options: {
   }
 
   return {
-    words: interpolateUnmatched(
-      tokens,
-      partner,
-      options.asrWords,
-      options.bounds,
-    ),
+    words: interpolateUnmatched(tokens, partner, asrWords, options.bounds),
     matched,
     total: tokens.length,
     matchRatio,
@@ -538,20 +609,22 @@ function canonicalNumberRun(run: string[]): string {
 export function narrationFidelity(
   scriptText: string,
   asrWords: AsrWord[],
+  pronunciations: StoryPronunciation[] = [],
 ): NarrationFidelity {
   const scriptTokens = tokenizeScript(scriptText);
   if (scriptTokens.length === 0) return { coverage: 1, missing: [] };
 
+  const spokenWords = canonicalizeAsrWords(asrWords, pronunciations);
   const reference = fidelityKeys(scriptTokens);
-  const hypothesis = fidelityKeys(asrWords.map((word) => word.word));
+  const hypothesis = fidelityKeys(spokenWords.map((word) => word.word));
   const partner = lcsAlignment(
     reference.map((entry) => entry.key),
     hypothesis.map((entry) => {
       const indexes = entry.tokenIndexes;
       return {
         word: entry.key,
-        start: asrWords[indexes[0]]?.start ?? 0,
-        end: asrWords[indexes[indexes.length - 1]]?.end ?? 0,
+        start: spokenWords[indexes[0]]?.start ?? 0,
+        end: spokenWords[indexes[indexes.length - 1]]?.end ?? 0,
       };
     }),
   );

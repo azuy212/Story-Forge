@@ -399,7 +399,61 @@ describe("runImageStage", () => {
     expect(nonces).toHaveLength(2);
     expect(nonces[0]).toBeUndefined();
     expect(nonces[1]).toEqual(expect.any(String));
-    expect(scenes[0].warnings.join(" ")).toContain("failed its gate");
+    // The accepted retry is current, so the failed attempt's warning is stale.
+    expect(scenes[0].warnings).toEqual([]);
+  });
+
+  it("clears an image warning from an earlier failed run on success", async () => {
+    setup();
+    const image = makeImage(join(ROOT, "stale-warning"), STRUCTURED(1920, 1080));
+    const { provider } = providerFor([image]);
+    const scenes = [scene(1)];
+    scenes[0].warnings.push("image generation failed: provider returned 500");
+
+    const result = await runImageStage({
+      scenes,
+      paths,
+      config,
+      assetProvider: provider,
+      runId: "stale-warning",
+      workDir: paths.renderDir,
+    });
+
+    expect(result.generated).toBe(1);
+    expect(scenes[0].warnings).toEqual([]);
+  });
+
+  it("clears an image warning when a stored image is reused", async () => {
+    setup();
+    const image = makeImage(join(ROOT, "stale-reuse"), STRUCTURED(1920, 1080));
+    const { provider, calls } = providerFor([image]);
+    const scenes = [scene(1)];
+
+    await runImageStage({
+      scenes,
+      paths,
+      config,
+      assetProvider: provider,
+      runId: "stale-reuse",
+      workDir: paths.renderDir,
+    });
+    expect(calls()).toBe(1);
+
+    scenes[0].warnings.push(
+      "image is 640x480; the gate requires at least 1080x1080",
+    );
+    const reused = await runImageStage({
+      scenes,
+      paths,
+      config,
+      assetProvider: provider,
+      runId: "stale-reuse",
+      workDir: paths.renderDir,
+    });
+
+    expect(reused.reused).toBe(1);
+    expect(calls()).toBe(1);
+    expect(scenes[0].warnings).toEqual([]);
   });
 
   it("retries a failed gate at most once and names the scene", async () => {

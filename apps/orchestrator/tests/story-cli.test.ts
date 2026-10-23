@@ -59,6 +59,12 @@ describe("story-video CLI", () => {
     expect(SCRIPT).toContain('key !== "regenerateImages"');
   });
 
+  it("accepts --confirm-claims as a job option and exempts it from the guard", () => {
+    expect(SCRIPT).toContain('"--confirm-claims"');
+    expect(SCRIPT).toContain("overrides.confirmClaims = options.confirmClaims");
+    expect(SCRIPT).toContain('key !== "confirmClaims"');
+  });
+
   it("rejects an unknown override key instead of ignoring it", () => {
     // The guard has to exist, otherwise a future flag can go dead silently.
     expect(SCRIPT).toContain("unknownOverrides");

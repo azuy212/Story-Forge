@@ -29,6 +29,11 @@ import {
   runAudioStage,
   type AudioStageResult,
 } from "./audio.js";
+import {
+  annotateClaims,
+  assertClaimsConfirmed,
+  ensureClaimsChecklist,
+} from "./claims.js";
 import { resolveStoryConfig, type StoryCliOverrides } from "./config.js";
 import { buildCharacterSheetReference, runImageStage } from "./images.js";
 import { assertStoryInput, deriveJobId } from "./input.js";
@@ -105,6 +110,11 @@ export interface StoryJobOptions extends StoryCliOverrides {
   dryRun?: boolean;
   /** Pause after the story is written and wait for interactive approval. */
   reviewStory?: boolean;
+  /**
+   * Refuse to render until every claim in `claims-checklist.md` is ticked.
+   * Rendering from an unconfirmed ledger would ship unverified claims as fact.
+   */
+  confirmClaims?: boolean;
   /** Test/smoke seams. Production callers omit them. */
   agents?: StoryAgents;
   agentInject?: AgentInject;
@@ -320,6 +330,15 @@ export async function runStoryJob(
   };
 
   if (options.dryRun) return runDryRun(ctx);
+
+  // Backfill the reviewer checklist for a job written before it existed. An
+  // existing file is never overwritten, so ticks survive a resume.
+  if (manifest.story && (manifest.claims?.length ?? 0) > 0) {
+    await ensureClaimsChecklist(
+      ctx.paths,
+      annotateClaims(manifest.claims ?? []),
+    );
+  }
 
   const agents =
     options.agents ?? createStoryAgents({ inject: options.agentInject });
@@ -539,6 +558,10 @@ async function stageStory(
 
     for (const warning of lint.warnings) addWarning(ctx.manifest, warning);
 
+    // Code owns the reviewer-facing fields: `needsSource` and `searchQuery`
+    // are derived from the accepted text, never trusted from the model.
+    const claims = annotateClaims(story.claims);
+
     ctx.manifest.story = {
       title: story.title,
       // Narration downstream is rebuilt from sentence ids; the story text is
@@ -559,7 +582,8 @@ async function stageStory(
         warnings: lint.warnings,
       },
     };
-    ctx.manifest.claims = story.claims;
+    ctx.manifest.claims = claims;
+    ctx.manifest.pronunciations = story.pronunciations ?? [];
     // DP3: no research agent ran, so nothing here is externally verified.
     ctx.manifest.groundingSource = "model-knowledge";
     ctx.manifest.unverified = true;
@@ -576,13 +600,15 @@ async function stageStory(
       title: story.title,
       story: story.story,
       wordCount: ctx.manifest.story.wordCount,
-      claims: story.claims,
+      claims,
+      pronunciations: ctx.manifest.pronunciations,
       lint: ctx.manifest.story.lint,
       verification: ctx.manifest.verification,
       groundingSource: ctx.manifest.groundingSource,
       unverified: ctx.manifest.unverified,
     });
-    await writeJsonFile(ctx.paths.claims, story.claims);
+    await writeJsonFile(ctx.paths.claims, claims);
+    await ensureClaimsChecklist(ctx.paths, claims);
 
     if (ctx.options.reviewStory) await reviewStory(ctx);
   });
@@ -592,6 +618,7 @@ function lintOptions(ctx: StoryContext) {
   return {
     wpm: ctx.config.wpm,
     targetDurationSec: ctx.config.targetDurationSec,
+    topic: ctx.config.topic,
     hardWords: ctx.style.hardWords,
     explanationCues: ctx.style.explanationCues,
   };
@@ -1177,6 +1204,7 @@ async function stageAudio(
     gapMs: ctx.config.sceneGapMs,
     maxChars: ctx.config.ttsMaxChars,
     asrVerify: ctx.config.asrVerify,
+    pronunciations: ctx.manifest.pronunciations ?? [],
   });
 
   await runStage(ctx, "S6_audio", fingerprint, async () => {
@@ -1188,6 +1216,7 @@ async function stageAudio(
       transcriber: options.transcriber ?? new HttpWhisperXProvider(),
       voice,
       runId: ctx.manifest.jobId,
+      pronunciations: ctx.manifest.pronunciations ?? [],
     });
 
     for (const outlier of findVoiceOutliers(ctx.manifest.scenes)) {
@@ -1303,6 +1332,7 @@ async function stageAlign(
       durationSec: scene.audio?.durationSec ?? null,
       narrationHash: hashObject(scene.narration),
     })),
+    pronunciations: ctx.manifest.pronunciations ?? [],
     timings: timing.timings,
     gapMs: ctx.manifest.audio?.gapMs ?? null,
     audioDurationSec: ctx.manifest.audio?.durationSec ?? null,
@@ -1329,6 +1359,7 @@ async function stageAlign(
       const chunkFingerprint = hashObject({
         narration: scene.narration,
         durationSec: chunkDurationSec,
+        pronunciations: ctx.manifest.pronunciations ?? [],
       });
       const stored = (
         ctx.manifest.stages.S7_align?.metrics?.chunkFingerprints as
@@ -1355,6 +1386,7 @@ async function stageAlign(
           start: word.start,
           end: word.end,
         })),
+        pronunciations: ctx.manifest.pronunciations ?? [],
         bounds: { start: 0, end: chunkDurationSec },
       });
       scene.transcript = {
@@ -1481,6 +1513,13 @@ async function stageRender(
   options: StoryJobOptions,
   cues: SubtitleCue[],
 ): Promise<void> {
+  // Checked before the fingerprint/resume so the flag refuses even when the
+  // render itself would have been reused — the gate is about the claims, not
+  // about whether pixels need re-encoding.
+  if (options.confirmClaims) {
+    await assertClaimsConfirmed(ctx.paths);
+  }
+
   const audio = ctx.manifest.audio;
   if (!audio) {
     throw new PipelineError(

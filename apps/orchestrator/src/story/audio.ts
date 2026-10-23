@@ -8,7 +8,11 @@ import {
 } from "../providers/composer/ffmpeg/ffmpeg.js";
 import type { TTSProvider } from "../providers/tts-provider.js";
 import type { WhisperXProvider } from "../providers/whisperx-provider.js";
-import { narrationFidelity, type NarrationFidelity } from "./alignment.js";
+import {
+  applyPronunciations,
+  narrationFidelity,
+  type NarrationFidelity,
+} from "./alignment.js";
 import { countWords, splitSentences } from "./sentences.js";
 import {
   buildNarrationConcatArgs,
@@ -21,6 +25,8 @@ import { storyTtsMode } from "./config.js";
 import type {
   ResolvedStoryConfig,
   SceneAudioChunkRecord,
+  ScenePauseShortening,
+  StoryPronunciation,
   StoryScene,
 } from "./types.js";
 
@@ -158,6 +164,12 @@ export interface AudioStageOptions {
   transcriber?: WhisperXProvider;
   voice: string;
   runId: string;
+  /**
+   * Respellings applied to the TTS text only. The scene narration, subtitles
+   * and script keep the original spelling, and the ASR coverage check treats
+   * the respelling as the same word.
+   */
+  pronunciations?: StoryPronunciation[];
   dryRun?: boolean;
 }
 
@@ -168,8 +180,14 @@ export interface AudioStageOptions {
 export const ASR_COVERAGE_WARN = 0.85;
 /** An internal pause longer than this makes the scene feel stalled. */
 export const INTERNAL_SILENCE_WARN_SEC = 1.0;
-/** Cap on silence-driven re-synthesis per chunk (S8 still gates the master). */
+/** Cap on silence-driven re-synthesis per chunk. */
 export const MAX_SILENCE_RETAKES = 2;
+/**
+ * Pause length kept when a pause survives the retake limit. Cutting the pause
+ * is deterministic and keeps the take's delivery; re-synthesizing again would
+ * spend another upload and could return the same pause.
+ */
+export const SHORTENED_PAUSE_SEC = 0.6;
 
 async function measureCoverage(
   transcriber: WhisperXProvider,
@@ -177,6 +195,7 @@ async function measureCoverage(
   narration: string,
   runId: string,
   sceneId: number,
+  pronunciations: StoryPronunciation[] = [],
 ): Promise<NarrationFidelity> {
   const result = await transcriber.align(chunkPath, undefined, {
     runId,
@@ -189,7 +208,86 @@ async function measureCoverage(
       start: word.start,
       end: word.end,
     })),
+    pronunciations,
   );
+}
+
+/**
+ * Shorten every internal pause still longer than `INTERNAL_SILENCE_WARN_SEC`
+ * to `SHORTENED_PAUSE_SEC`, in place, and report the new duration. The
+ * segments are rebuilt with `atrim` + `concat`, so only the middle of each
+ * pause is removed and the speech itself is untouched.
+ */
+export async function shortenLongPauses(
+  path: string,
+  durationSec: number,
+): Promise<{ durationSec: number; pauses: ScenePauseShortening[] }> {
+  const duration =
+    durationSec > 0 ? durationSec : (await probe(path)).duration;
+  if (!(duration > INTERNAL_SILENCE_WARN_SEC)) {
+    return { durationSec: duration, pauses: [] };
+  }
+
+  const silences = await detectSilence(
+    path,
+    -50,
+    INTERNAL_SILENCE_WARN_SEC,
+  );
+  const internal = silences.filter((silence) => {
+    const start = silence.start ?? 0;
+    const end = silence.end ?? duration;
+    return (
+      silence.duration > INTERNAL_SILENCE_WARN_SEC &&
+      start > 0.05 &&
+      end < duration - 0.05
+    );
+  });
+  if (internal.length === 0) return { durationSec: duration, pauses: [] };
+
+  const segments: { start: number; end: number }[] = [];
+  const pauses: ScenePauseShortening[] = [];
+  let cursor = 0;
+  for (const silence of internal) {
+    const start = silence.start ?? cursor;
+    const end = silence.end ?? start + silence.duration;
+    // Keep the first 0.6 s of the pause, drop the rest.
+    segments.push({ start: cursor, end: start + SHORTENED_PAUSE_SEC });
+    pauses.push({
+      startSec: Math.round(start * 1000) / 1000,
+      originalSec: Math.round(silence.duration * 1000) / 1000,
+      shortenedSec: SHORTENED_PAUSE_SEC,
+    });
+    cursor = end;
+  }
+  segments.push({ start: cursor, end: duration });
+
+  const filters = segments
+    .map(
+      (segment, index) =>
+        `[0:a]atrim=start=${segment.start.toFixed(3)}:end=${segment.end.toFixed(3)},asetpts=PTS-STARTPTS[a${index}]`,
+    )
+    .join(";");
+  const labels = segments.map((_, index) => `[a${index}]`).join("");
+  const filterComplex = `${filters};${labels}concat=n=${segments.length}:v=0:a=1[out]`;
+
+  const temp = `${path}.pauses.wav`;
+  await runFfmpegWithRetry(
+    [
+      "-y",
+      "-i",
+      path,
+      "-filter_complex",
+      filterComplex,
+      "-map",
+      "[out]",
+      "-c:a",
+      "pcm_s16le",
+      temp,
+    ],
+    `shorten internal pauses in ${path}`,
+  );
+  await rename(temp, path);
+  return { durationSec: (await probe(path)).duration, pauses };
 }
 
 function providerFingerprint(provider: TTSProvider): string {
@@ -221,11 +319,14 @@ export async function runAudioStage(
   }
 
   const fingerprint = providerFingerprint(ttsProvider);
+  const pronunciations = options.pronunciations ?? [];
   const chunkResults: AudioChunkResult[] = [];
 
   for (const scene of scenes) {
     const chunkPath = sceneChunkPath(paths, scene.sceneId);
     const words = countWords(scene.narration);
+    // TTS says the respelling; every stored script/caption keeps the original.
+    const ttsText = applyPronunciations(scene.narration, pronunciations);
 
     // Reuse a chunk whose pieces still match text + provider identity, unless
     // verification is on and this chunk has never been checked: then it is
@@ -245,7 +346,7 @@ export async function runAudioStage(
       const piecesText = scene.audio.pieces
         .map((piece) => piece.text)
         .join(" ");
-      if (piecesText === scene.narration.trim()) {
+      if (piecesText === ttsText.trim()) {
         try {
           const info = await stat(scene.audio.path);
           if (info.size > 0) {
@@ -263,6 +364,21 @@ export async function runAudioStage(
                   ((scene.audio.edgeTrimmedSec ?? 0) + (untrimmed - trimmed)) *
                     1000,
                 ) / 1000;
+            }
+            // A chunk cached before pause shortening existed (or from a run
+            // whose S6 short-circuit skipped the check) still has to be
+            // shortened before its duration feeds S7 and the master.
+            const shortened = await shortenLongPauses(
+              scene.audio.path,
+              scene.audio.durationSec,
+            );
+            if (shortened.pauses.length > 0) {
+              scene.audio.shortenedPauses = [
+                ...(scene.audio.shortenedPauses ?? []),
+                ...shortened.pauses,
+              ];
+              scene.audio.durationSec =
+                Math.round(shortened.durationSec * 1000) / 1000;
             }
             chunkResults.push({
               sceneId: scene.sceneId,
@@ -283,14 +399,14 @@ export async function runAudioStage(
         (piece) => piece.providerFingerprint === fingerprint,
       ) &&
       scene.audio.pieces.map((piece) => piece.text).join(" ") ===
-        scene.narration.trim()
+        ttsText.trim()
     ) {
       reusable = scene.audio;
     }
 
     if (options.dryRun) continue;
 
-    const texts = splitForTts(scene.narration, config.ttsMaxChars);
+    const texts = splitForTts(ttsText, config.ttsMaxChars);
     if (texts.length === 0) {
       scene.status.audio = "failed";
       scene.warnings.push("scene has no narration to synthesize");
@@ -406,6 +522,7 @@ export async function runAudioStage(
           scene.narration,
           runId,
           scene.sceneId,
+          pronunciations,
         );
         asrChecked = true;
         if (coverage.coverage < ASR_COVERAGE_WARN) {
@@ -421,6 +538,7 @@ export async function runAudioStage(
             scene.narration,
             runId,
             scene.sceneId,
+            pronunciations,
           );
         }
       } catch (err) {
@@ -434,6 +552,9 @@ export async function runAudioStage(
 
     let silenceRetakes = reusable?.silenceRetakes ?? 0;
     let maxInternalSilenceSec = reusable?.maxInternalSilenceSec ?? 0;
+    let shortenedPauses: ScenePauseShortening[] = [
+      ...(reusable?.shortenedPauses ?? []),
+    ];
     const internalSilences = async (duration: number) => {
       const silences = await detectSilence(
         chunkPath,
@@ -464,10 +585,22 @@ export async function runAudioStage(
       );
     }
     if (internal.length > 0) {
-      const message =
-        `narration still has a ${internal[0].duration.toFixed(2)}s internal pause` +
-        ` after ${silenceRetakes} silence retake(s); S8 will gate the master`;
-      if (!scene.warnings.includes(message)) scene.warnings.push(message);
+      // Re-synthesis did not remove the pause. Cutting it is deterministic and
+      // keeps the take's delivery, so the stall is removed here — before the
+      // chunk duration feeds S7's timing and S8's gate.
+      const shortened = await shortenLongPauses(chunkPath, built.durationSec);
+      if (shortened.pauses.length > 0) {
+        logger.warn(
+          `Scene ${scene.sceneId} narration still had ${shortened.pauses.length} pause(s) over ${INTERNAL_SILENCE_WARN_SEC}s after ${silenceRetakes} silence retake(s); shortened to ${SHORTENED_PAUSE_SEC}s`,
+        );
+        shortenedPauses = [...shortenedPauses, ...shortened.pauses];
+        built = { ...built, durationSec: shortened.durationSec };
+      } else {
+        const message =
+          `narration still has a ${internal[0].duration.toFixed(2)}s internal pause` +
+          ` after ${silenceRetakes} silence retake(s) and it could not be shortened`;
+        if (!scene.warnings.includes(message)) scene.warnings.push(message);
+      }
     }
 
     // Trim chunk edges before the master is joined: trailing(i) + scene gap
@@ -495,6 +628,7 @@ export async function runAudioStage(
           scene.narration,
           runId,
           scene.sceneId,
+          pronunciations,
         );
         asrChecked = true;
       } catch (err) {
@@ -505,9 +639,14 @@ export async function runAudioStage(
     }
 
     const { pieces, durationSec, edgeTrimmedSec } = built;
+    const shortenedSec = shortenedPauses.reduce(
+      (sum, pause) => sum + (pause.originalSec - pause.shortenedSec),
+      0,
+    );
     const expectedPiecesDuration =
       pieces.reduce((sum, piece) => sum + piece.durationSec, 0) -
-      edgeTrimmedSec;
+      edgeTrimmedSec -
+      shortenedSec;
     if (Math.abs(durationSec - expectedPiecesDuration) > 0.1) {
       logger.warn(
         `Scene ${scene.sceneId} chunk duration differs from its pieces`,
@@ -544,6 +683,8 @@ export async function runAudioStage(
         maxInternalSilenceSec > 0
           ? Math.round(maxInternalSilenceSec * 1000) / 1000
           : undefined,
+      shortenedPauses:
+        shortenedPauses.length > 0 ? shortenedPauses : undefined,
     };
     scene.audio = audio;
     scene.status.audio = "done";
@@ -639,10 +780,12 @@ export function findVoiceOutliers(
   const outliers: { sceneId: number; reason: string }[] = [];
   for (const scene of withAudio) {
     const wpm = scene.audio?.wordsPerMinute ?? 0;
-    if (medianWpm > 0 && Math.abs(wpm - medianWpm) / medianWpm > 0.25) {
+    // Only a chunk that reads noticeably faster than the run's own median is
+    // a drift signal; slower chunks are usually just deliberate scene pacing.
+    if (medianWpm > 0 && wpm > medianWpm * 1.25) {
       outliers.push({
         sceneId: scene.sceneId,
-        reason: `pace ${wpm.toFixed(1)} wpm deviates more than 25% from the run median ${medianWpm.toFixed(1)} wpm`,
+        reason: `pace ${wpm.toFixed(1)} wpm is more than 1.25× the run median ${medianWpm.toFixed(1)} wpm`,
       });
     }
     const db = scene.audio?.meanVolumeDb;

@@ -61,11 +61,18 @@ export type {
   StoryAgentTelemetry,
 } from "./agents.js";
 
-export { findVoiceOutliers, runAudioStage, splitForTts } from "./audio.js";
+export {
+  findVoiceOutliers,
+  runAudioStage,
+  shortenLongPauses,
+  splitForTts,
+  trimEdgeSilence,
+} from "./audio.js";
 export type { AudioChunkResult, AudioStageResult } from "./audio.js";
 
 export {
   MIN_LUMINANCE_VARIANCE,
+  clearImageWarnings,
   runImageStage,
   softenPrompt,
   validateSceneImage,
@@ -75,12 +82,33 @@ export {
   OVERALL_ALIGNMENT_GATE,
   SCENE_ALIGNMENT_GATE,
   alignScene,
+  applyPronunciations,
+  canonicalizeAsrWords,
+  narrationFidelity,
   numberValue,
   normalizeToken,
   proportionalAlignment,
+  pronunciationAliases,
   tokenizeScript,
 } from "./alignment.js";
-export type { AlignedWord, AlignmentResult, AsrWord } from "./alignment.js";
+export type {
+  AlignedWord,
+  AlignmentResult,
+  AsrWord,
+  NarrationFidelity,
+} from "./alignment.js";
+
+export {
+  CLAIM_CHECKBOX,
+  annotateClaims,
+  assertClaimsConfirmed,
+  buildClaimsChecklist,
+  claimNeedsSource,
+  claimsChecklistProgress,
+  ensureClaimsChecklist,
+  suggestClaimQuery,
+} from "./claims.js";
+export type { ClaimsChecklistProgress } from "./claims.js";
 
 export { computeSceneTimings, validateTimings } from "./timing.js";
 export type { SceneChunkDuration, TimingResult } from "./timing.js";
@@ -130,7 +158,9 @@ export type {
 
 export {
   STORY_STAGES,
+  StoryClaimSchema,
   StoryOutputSchema,
+  StoryPronunciationSchema,
   StoryVerificationSchema,
   SceneGroupingSchema,
   CharacterRegistrySchema,
@@ -143,6 +173,7 @@ export type {
   ResolvedStoryConfig,
   SceneAudioChunkRecord,
   SceneImageRecord,
+  ScenePauseShortening,
   SceneTiming,
   SceneVisualSlots,
   SceneWordTimestamp,
@@ -151,6 +182,7 @@ export type {
   StoryJobInput,
   StoryManifest,
   StoryOutput,
+  StoryPronunciation,
   StoryScene,
   StoryStage,
   StoryVerification,

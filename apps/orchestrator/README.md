@@ -760,6 +760,7 @@ manifest: /…/jobs/the-mutiny-…/manifest.json
 | `--regenerate-images <sceneIds>`   | —                        | regenerate these scenes in S5 and bypass the image cache      |
 | `--dry-run`                        | `false`                  | validate the input, print the plan, make no paid call         |
 | `--review-story`                   | `false`                  | print the story and wait for approval (`y`) before continuing |
+| `--confirm-claims`                 | `false`                  | refuse to render until every box in `claims-checklist.md` is ticked |
 | `--json`                           | `false`                  | print the result summary as JSON                              |
 
 `--regenerate-prompts` and `--from S4_visual_plan` are not the same thing.
@@ -774,6 +775,15 @@ listed scene ids. Those scenes skip stored-image reuse and send a fresh
 `cacheNonce` to the image provider, so the result is a new generation rather
 than a cache hit. Every automatic image retry also receives a fresh nonce.
 Scene ids are unique positive integers.
+
+`--confirm-claims` refuses to render until every box in `claims-checklist.md`
+is ticked. S2 writes the story's claims ledger (`claims.json`) and S2 also
+writes `claims-checklist.md` (one unchecked box per claim, its status, a
+suggested search query, and `needsSource: true` for claims about what a named
+person "later" did). A resume backfills a missing checklist from the ledger but
+never overwrites ticks a reviewer already made. The check runs at the top of
+S8, before the fingerprint/resume, so it refuses even when the render would
+otherwise be reused.
 
 Exit codes: `0` complete **or a successful dry run**, `1` failed, `2` an
 incomplete run (some stages are still pending — e.g. `--stages S1_input,S2_story`).
@@ -801,7 +811,7 @@ deliberately does **not** inherit `NARRATION_GENERATION_MODE` or
 | Stage            | What it does                                                                                                                                                                                                                                                                                                                                 |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `S1_input`       | validate the input, resolve the style profile, record the word budget and the `unverified` grounding source                                                                                                                                                                                                                                  |
-| `S2_story`       | `StoryAuthor` writes the story + claims ledger, then a measurable lint gate (sentence length, word budget ±15%, hard words need an in-sentence explanation). One automatic rewrite, then hard fail                                                                                                                                           |
+| `S2_story`       | `StoryAuthor` writes the story + claims ledger + pronunciation map, then a measurable lint gate (sentence length, word budget ±15%, hard words need an in-sentence explanation, and any hard word the topic names must appear and be explained). One automatic rewrite, then hard fail                                                                                                                                           |
 | `S3_scenes`      | `StoryScenePlanner` groups **sentence ids** into scenes; code re-assembles the narration from those ids, so the model can never alter the text                                                                                                                                                                                               |
 | `S4_visual_plan` | `StoryCharacterDesigner` builds the character registry, then `StoryVisualPlanner` fills one visual slot set per scene (2 in flight)                                                                                                                                                                                                          |
 | `S5_images`      | compose each prompt from the style profile + registry (never model-authored), lint it, generate, and gate the still (≥1000×540, aspect 1.6–1.9)                                                                                                                                                                                              |
@@ -856,8 +866,11 @@ travels with them in `assets/branding/LICENSE-OFL-1.1.txt`. Override with
 
 ```text
 jobs/<jobId>/
-  manifest.json      S1–S8 fingerprints, per-stage metrics, warnings, validations
-  story.json  claims.json  characters.json  scenes.json
+  manifest.json        S1–S8 fingerprints, per-stage metrics, warnings, validations
+  story.json           story text + word count + lint + pronunciations
+  claims.json          claims ledger (status, hedgeInNarration, needsSource, searchQuery)
+  claims-checklist.md  one unchecked box per claim; --confirm-claims refuses while unticked
+  characters.json  scenes.json
   images/scene-001.png
   audio/parts/scene-001-part01.wav   audio/chunks/scene-001.wav   audio/narration.wav
   transcript.json    subtitles.ass   subtitles.srt
