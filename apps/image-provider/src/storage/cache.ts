@@ -22,7 +22,22 @@ interface CacheMetadata {
   assetFilenames: string[];
   mode?: string;
   referenceHash?: string;
+  cacheNonce?: string;
 }
+
+/**
+ * Cache-key version.
+ *
+ * Bump this whenever a change alters the image a prompt produces without
+ * changing the prompt text: a delivery fix, a model swap, a UI default. The
+ * version is part of the key, so old entries stop matching instead of being
+ * served as if they came from the new pipeline.
+ *
+ * v2: prompts are now inserted with `keyboard.insertText()`. Before that fix
+ * Gemini received only the first line of a multi-line prompt, so v1 entries
+ * may hold images generated from a truncated prompt.
+ */
+const CACHE_KEY_VERSION = 'v2';
 
 export class AssetCache {
   constructor(
@@ -33,21 +48,31 @@ export class AssetCache {
   }
 
   key(prompt: string, assetType: AssetType, options: GenerationOptions = {}): string {
-    if (
-      (options.mode ?? 'text_to_image') === 'text_to_image' &&
-      (options.referenceImages?.length ?? 0) === 0
-    ) {
-      return createHash('sha256').update(prompt).update('\0').update(assetType).digest('hex');
-    }
-    return createHash('sha256')
+    const hash = createHash('sha256')
+      .update(CACHE_KEY_VERSION)
+      .update('\0')
       .update(prompt)
       .update('\0')
-      .update(assetType)
-      .update('\0')
-      .update(options.mode ?? 'text_to_image')
-      .update('\0')
-      .update(this.referenceHash(options))
-      .digest('hex');
+      .update(assetType);
+
+    if (
+      (options.mode ?? 'text_to_image') !== 'text_to_image' ||
+      (options.referenceImages?.length ?? 0) > 0
+    ) {
+      hash
+        .update('\0')
+        .update(options.mode ?? 'text_to_image')
+        .update('\0')
+        .update(this.referenceHash(options));
+    }
+
+    // An empty nonce must leave the key byte-identical to the pre-nonce key so
+    // existing cache entries keep matching.
+    if (options.cacheNonce) {
+      hash.update('\0cache-nonce\0').update(options.cacheNonce);
+    }
+
+    return hash.digest('hex');
   }
 
   private referenceHash(options: GenerationOptions): string {
@@ -147,6 +172,7 @@ export class AssetCache {
         assetFilenames,
         mode: options.mode ?? 'text_to_image',
         referenceHash: this.referenceHash(options),
+        ...(options.cacheNonce ? { cacheNonce: options.cacheNonce } : {}),
       };
 
       await writeFile(path.join(tmp, 'metadata.json'), JSON.stringify(metadata, null, 2));
@@ -206,6 +232,7 @@ export class AssetCache {
       meta.assetType !== assetType ||
       (meta.mode ?? 'text_to_image') !== (options.mode ?? 'text_to_image') ||
       (meta.referenceHash ?? this.referenceHash({})) !== this.referenceHash(options) ||
+      (meta.cacheNonce ?? '') !== (options.cacheNonce ?? '') ||
       !Array.isArray(meta.assetFilenames) ||
       meta.assetCount !== meta.assetFilenames.length ||
       meta.assetCount < 1

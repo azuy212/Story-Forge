@@ -6,6 +6,11 @@ export interface GenerateImageOptions {
   runLogSink?: import("../utils/run-log.js").RunLogSink | null;
   referenceImages?: AssetReference[];
   mode?: ImageGenerationMode;
+  /**
+   * Bypass the provider cache for this call. Each retry must use a fresh value
+   * so the provider cannot serve the image that just failed a gate.
+   */
+  cacheNonce?: string;
 }
 
 export type ImageGenerationMode = "text_to_image" | "image_to_image" | "edit";

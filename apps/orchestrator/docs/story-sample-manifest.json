@@ -1,0 +1,1026 @@
+{
+  "version": 1,
+  "jobId": "smoke",
+  "createdAt": "2026-10-20T08:47:50.335Z",
+  "updatedAt": "2026-10-20T08:48:05.606Z",
+  "input": {
+    "topic": "The long night at sea",
+    "targetDurationSec": 30,
+    "language": "en",
+    "style": "stickman-history",
+    "jobId": "smoke",
+    "outputDir": "/tmp/opencode/story-smoke"
+  },
+  "config": {
+    "topic": "The long night at sea",
+    "targetDurationSec": 30,
+    "language": "en",
+    "style": "stickman-history",
+    "jobId": "smoke",
+    "outputDir": "/tmp/opencode/story-smoke",
+    "wpm": 150,
+    "imageConcurrency": 1,
+    "sceneMinSec": 3,
+    "sceneTargetMinSec": 6,
+    "sceneTargetMaxSec": 12,
+    "sceneSoftMaxSec": 15,
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "sceneGapMs": 200,
+    "imageMinWidth": 1000,
+    "imageMinHeight": 540,
+    "imageMinAspect": 1.6,
+    "imageMaxAspect": 1.9,
+    "ttsMaxChars": 450,
+    "subtitleMaxCharsPerLine": 42,
+    "subtitleMinDurationMs": 800,
+    "crf": 19,
+    "preset": "medium"
+  },
+  "stages": {
+    "S1_input": {
+      "status": "done",
+      "fingerprint": "b52c6a0b2f62204ff0f90e695a49fb4175b0bc3e313bb47129be079fad54c137",
+      "startedAt": "2026-10-20T08:47:50.336Z",
+      "finishedAt": "2026-10-20T08:47:50.338Z",
+      "durationMs": 2,
+      "metrics": {
+        "wordBudget": 75,
+        "style": "stickman-history",
+        "stylePath": "/home/ali/projects/practice/Story-Forge-stickman/apps/orchestrator/prompts/story/style/stickman-history.json",
+        "grounded": false,
+        "unverified": true
+      }
+    },
+    "S2_story": {
+      "status": "done",
+      "fingerprint": "f915a9831a7e61782adfbcba0957ab1c5ddc621742dd40ac16b7ddba445e9e0d",
+      "startedAt": "2026-10-20T08:47:50.354Z",
+      "finishedAt": "2026-10-20T08:47:50.361Z",
+      "durationMs": 7
+    },
+    "S3_scenes": {
+      "status": "done",
+      "fingerprint": "c53ffcaeee0391c0672dda7373f49d2c348d547be4311e8b4d4c6dff3bf42932",
+      "startedAt": "2026-10-20T08:47:50.362Z",
+      "finishedAt": "2026-10-20T08:47:50.364Z",
+      "durationMs": 2,
+      "metrics": {
+        "method": "model",
+        "sceneCount": 4,
+        "sentenceCount": 8,
+        "estimatedDurationSec": 30.4,
+        "groupingIssues": []
+      }
+    },
+    "S4_visual_plan": {
+      "status": "done",
+      "fingerprint": "ec9b591dd6264c73ff6839c00240f5394e07987dc6380df154ce491830824119",
+      "startedAt": "2026-10-20T08:47:50.365Z",
+      "finishedAt": "2026-10-20T08:47:50.372Z",
+      "durationMs": 7,
+      "metrics": {
+        "charactersFingerprint": "6b206ddce2f712b613e8e5a7e88693e55975ed2197b67929c4980956846b669c",
+        "characterCount": 2
+      }
+    },
+    "S5_images": {
+      "status": "done",
+      "fingerprint": "b69d8e2a08af23eb70b1d59689da0eafdc50e1b810888a0378e59edb235396f6",
+      "startedAt": "2026-10-20T08:48:05.127Z",
+      "finishedAt": "2026-10-20T08:48:05.132Z",
+      "durationMs": 5,
+      "metrics": {
+        "generated": 0,
+        "reused": 4,
+        "failed": 0
+      }
+    },
+    "S6_audio": {
+      "status": "done",
+      "fingerprint": "4037f08d798961655df970e5be90eb60618adb503642b9b0eabb3cd4f4af7b76",
+      "startedAt": "2026-10-20T08:48:05.177Z",
+      "finishedAt": "2026-10-20T08:48:05.328Z",
+      "durationMs": 151,
+      "metrics": {
+        "chunks": 4,
+        "durationSec": 31,
+        "voice": "narrator",
+        "providerFingerprint": "story-smoke-tts-v1"
+      }
+    },
+    "S7_align": {
+      "status": "done",
+      "fingerprint": "605b9ed5cff2abc2a4dd19df9e3a20242eebb24edd23a855399934d0e11933d0",
+      "startedAt": "2026-10-20T08:48:05.601Z",
+      "finishedAt": "2026-10-20T08:48:05.603Z",
+      "durationMs": 2,
+      "metrics": {
+        "chunkFingerprints": {
+          "1": "4d0a6162b3342e3ae5f3a110aa66620026a5c1f53e4be7b51952044633205e56",
+          "2": "d661b93e20d7ad5cede860c7f86c7334e444a7dfc96028aec89389cf6ecb2fa3",
+          "3": "ad21abcc9800169a034fc562dbb2e230e809650243d5a13db5827f2fe30bf4ca",
+          "4": "a161150e09bf0e0ca85a85953ef842194c6b0a19f892c71c51021894fbd85c5f"
+        },
+        "totalFrames": 930,
+        "videoDurationSec": 31,
+        "audioDurationSec": 31,
+        "cues": 8,
+        "overallMatchRatio": 1
+      }
+    },
+    "S8_render": {
+      "status": "done",
+      "fingerprint": "10b00aeaeb2ededf28c455c9b4f08bf439be6aaa48389a0975dd41bebd45b104",
+      "startedAt": "2026-10-20T08:47:54.738Z",
+      "finishedAt": "2026-10-20T08:48:05.011Z",
+      "durationMs": 10273
+    }
+  },
+  "groundingSource": "model-knowledge",
+  "unverified": true,
+  "scenes": [
+    {
+      "sceneId": 1,
+      "sentenceIds": ["s1", "s2"],
+      "narration": "Columbus stood on the deck of a small wooden ship. The crew had not seen land for many days.",
+      "wordCount": 19,
+      "visualPurpose": "Show how small the ship is on the open sea.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 1,
+        "action": "Columbus stands at the rail of the small wooden ship and points ahead at the wide empty sea.",
+        "characters": [
+          {
+            "id": "columbus",
+            "pose": "standing at the rail with one arm raised and pointing ahead",
+            "expression": "calm and hopeful, eyebrows lifted"
+          }
+        ],
+        "setting": "the deck of a small wooden sailing ship on open water in the late afternoon",
+        "props": ["a wooden rail", "coiled rope", "a tall mast"],
+        "lighting": "warm low sunlight across the deck",
+        "composition": "wide horizontal framing with the camera low behind the rail, ship and captain on the left third, calm empty sea across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: Columbus stands at the rail of the small wooden ship and points ahead at the wide empty sea.\n\nCharacters:\n- Columbus: A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat. Pose: standing at the rail with one arm raised and pointing ahead. Expression: calm and hopeful, eyebrows lifted.\n\nSetting: the deck of a small wooden sailing ship on open water in the late afternoon\n\nKey props: a wooden rail, coiled rope, a tall mast\n\nLighting: warm low sunlight across the deck\n\nComposition: wide horizontal framing with the camera low behind the rail, ship and captain on the left third, calm empty sea across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "a3c394874292f8d60caede1cbb019972a6970bd35c2f6f1b2f027887b32cd4a7",
+      "image": {
+        "path": "/tmp/opencode/story-smoke/smoke/images/scene-001.png",
+        "prompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: Columbus stands at the rail of the small wooden ship and points ahead at the wide empty sea.\n\nCharacters:\n- Columbus: A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat. Pose: standing at the rail with one arm raised and pointing ahead. Expression: calm and hopeful, eyebrows lifted.\n\nSetting: the deck of a small wooden sailing ship on open water in the late afternoon\n\nKey props: a wooden rail, coiled rope, a tall mast\n\nLighting: warm low sunlight across the deck\n\nComposition: wide horizontal framing with the camera low behind the rail, ship and captain on the left third, calm empty sea across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "fake-lavfi",
+        "attempts": 1,
+        "promptHash": "280e2a6c41649d58ba5091c24957c37818d5506a12b55ac79ef1ca2df6c583cb",
+        "byteSize": 11871,
+        "width": 1920,
+        "height": 1080,
+        "aspect": 1.778,
+        "luminanceVariance": 2004.09,
+        "generatedAt": "2026-10-20T08:47:50.662Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-smoke/smoke/audio/chunks/scene-001.wav",
+        "durationSec": 7.6,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-smoke/smoke/audio/parts/scene-001-part01.wav",
+            "durationSec": 7.6,
+            "text": "Columbus stood on the deck of a small wooden ship. The crew had not seen land for many days.",
+            "providerFingerprint": "story-smoke-tts-v1"
+          }
+        ],
+        "meanVolumeDb": -21.1,
+        "wordsPerMinute": 150
+      },
+      "timing": {
+        "start": 0,
+        "end": 7.8,
+        "startFrame": 0,
+        "endFrame": 234,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "Columbus",
+            "start": 0,
+            "end": 0.4
+          },
+          {
+            "word": "stood",
+            "start": 0.4,
+            "end": 0.8
+          },
+          {
+            "word": "on",
+            "start": 0.8,
+            "end": 1.2
+          },
+          {
+            "word": "the",
+            "start": 1.2,
+            "end": 1.6
+          },
+          {
+            "word": "deck",
+            "start": 1.6,
+            "end": 2
+          },
+          {
+            "word": "of",
+            "start": 2,
+            "end": 2.4
+          },
+          {
+            "word": "a",
+            "start": 2.4,
+            "end": 2.8
+          },
+          {
+            "word": "small",
+            "start": 2.8,
+            "end": 3.2
+          },
+          {
+            "word": "wooden",
+            "start": 3.2,
+            "end": 3.6
+          },
+          {
+            "word": "ship.",
+            "start": 3.6,
+            "end": 4
+          },
+          {
+            "word": "The",
+            "start": 4,
+            "end": 4.4
+          },
+          {
+            "word": "crew",
+            "start": 4.4,
+            "end": 4.8
+          },
+          {
+            "word": "had",
+            "start": 4.8,
+            "end": 5.2
+          },
+          {
+            "word": "not",
+            "start": 5.2,
+            "end": 5.6
+          },
+          {
+            "word": "seen",
+            "start": 5.6,
+            "end": 6
+          },
+          {
+            "word": "land",
+            "start": 6,
+            "end": 6.4
+          },
+          {
+            "word": "for",
+            "start": 6.4,
+            "end": 6.8
+          },
+          {
+            "word": "many",
+            "start": 6.8,
+            "end": 7.2
+          },
+          {
+            "word": "days.",
+            "start": 7.2,
+            "end": 7.6
+          }
+        ]
+      }
+    },
+    {
+      "sceneId": 2,
+      "sentenceIds": ["s3", "s4"],
+      "narration": "They were tired, hungry, and very afraid. Some sailors wanted to turn the ship around and go home.",
+      "wordCount": 18,
+      "visualPurpose": "Show how tired and frightened the crew has become.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 2,
+        "action": "Three sailors sit slumped against the mast while Columbus watches them from the helm.",
+        "characters": [
+          {
+            "id": "columbus",
+            "pose": "standing behind the helm with both hands on the wheel",
+            "expression": "steady, mouth a flat line"
+          },
+          {
+            "id": "the_crew",
+            "pose": "slumped on the deck with heads lowered and knees drawn up",
+            "expression": "exhausted and anxious, mouths turned down"
+          }
+        ],
+        "setting": "the crowded deck of the small ship at dusk, sails slack above them",
+        "props": ["a coiled rope", "an empty wooden bowl"],
+        "lighting": "dim blue evening light with one warm lamp from below",
+        "composition": "wide horizontal framing from beside the mast, crew grouped in the right third and the helm behind them, calm deck boards across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: Three sailors sit slumped against the mast while Columbus watches them from the helm.\n\nCharacters:\n- Columbus: A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat. Pose: standing behind the helm with both hands on the wheel. Expression: steady, mouth a flat line.\n- The crew: Six lean weathered sailors in rough linen shirts, loose dark trousers and cloth caps, drawn at chest height. Pose: slumped on the deck with heads lowered and knees drawn up. Expression: exhausted and anxious, mouths turned down.\n\nSetting: the crowded deck of the small ship at dusk, sails slack above them\n\nKey props: a coiled rope, an empty wooden bowl\n\nLighting: dim blue evening light with one warm lamp from below\n\nComposition: wide horizontal framing from beside the mast, crew grouped in the right third and the helm behind them, calm deck boards across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "a7ec026f16dfed8a33dc4ea5158ad881d88f591aa5c4bb6163ff281d3fc9fa80",
+      "image": {
+        "path": "/tmp/opencode/story-smoke/smoke/images/scene-002.png",
+        "prompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: Three sailors sit slumped against the mast while Columbus watches them from the helm.\n\nCharacters:\n- Columbus: A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat. Pose: standing behind the helm with both hands on the wheel. Expression: steady, mouth a flat line.\n- The crew: Six lean weathered sailors in rough linen shirts, loose dark trousers and cloth caps, drawn at chest height. Pose: slumped on the deck with heads lowered and knees drawn up. Expression: exhausted and anxious, mouths turned down.\n\nSetting: the crowded deck of the small ship at dusk, sails slack above them\n\nKey props: a coiled rope, an empty wooden bowl\n\nLighting: dim blue evening light with one warm lamp from below\n\nComposition: wide horizontal framing from beside the mast, crew grouped in the right third and the helm behind them, calm deck boards across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "fake-lavfi",
+        "attempts": 1,
+        "promptHash": "e2c18d3f9d5a7d4076d8f62b83e40e4dfd500d808e23fd83ebfcc116225d56d9",
+        "byteSize": 12712,
+        "width": 1920,
+        "height": 1080,
+        "aspect": 1.778,
+        "luminanceVariance": 2326.47,
+        "generatedAt": "2026-10-20T08:47:50.872Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-smoke/smoke/audio/chunks/scene-002.wav",
+        "durationSec": 7.2,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-smoke/smoke/audio/parts/scene-002-part01.wav",
+            "durationSec": 7.2,
+            "text": "They were tired, hungry, and very afraid. Some sailors wanted to turn the ship around and go home.",
+            "providerFingerprint": "story-smoke-tts-v1"
+          }
+        ],
+        "meanVolumeDb": -21.1,
+        "wordsPerMinute": 150
+      },
+      "timing": {
+        "start": 7.8,
+        "end": 15.2,
+        "startFrame": 234,
+        "endFrame": 456,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "They",
+            "start": 7.8,
+            "end": 8.2
+          },
+          {
+            "word": "were",
+            "start": 8.2,
+            "end": 8.6
+          },
+          {
+            "word": "tired,",
+            "start": 8.6,
+            "end": 9
+          },
+          {
+            "word": "hungry,",
+            "start": 9,
+            "end": 9.4
+          },
+          {
+            "word": "and",
+            "start": 9.4,
+            "end": 9.8
+          },
+          {
+            "word": "very",
+            "start": 9.8,
+            "end": 10.2
+          },
+          {
+            "word": "afraid.",
+            "start": 10.2,
+            "end": 10.6
+          },
+          {
+            "word": "Some",
+            "start": 10.6,
+            "end": 11
+          },
+          {
+            "word": "sailors",
+            "start": 11,
+            "end": 11.4
+          },
+          {
+            "word": "wanted",
+            "start": 11.4,
+            "end": 11.8
+          },
+          {
+            "word": "to",
+            "start": 11.8,
+            "end": 12.2
+          },
+          {
+            "word": "turn",
+            "start": 12.2,
+            "end": 12.6
+          },
+          {
+            "word": "the",
+            "start": 12.6,
+            "end": 13
+          },
+          {
+            "word": "ship",
+            "start": 13,
+            "end": 13.4
+          },
+          {
+            "word": "around",
+            "start": 13.4,
+            "end": 13.8
+          },
+          {
+            "word": "and",
+            "start": 13.8,
+            "end": 14.2
+          },
+          {
+            "word": "go",
+            "start": 14.2,
+            "end": 14.6
+          },
+          {
+            "word": "home.",
+            "start": 14.6,
+            "end": 15
+          }
+        ]
+      }
+    },
+    {
+      "sceneId": 3,
+      "sentenceIds": ["s5", "s6"],
+      "narration": "Columbus asked them to wait one more night. That night a sailor saw a small light far away.",
+      "wordCount": 18,
+      "visualPurpose": "Show the captain holding the crew back until a light appears.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 3,
+        "action": "A sailor grips the rail and leans out over the water as a tiny light glimmers on the horizon.",
+        "characters": [
+          {
+            "id": "the_crew",
+            "pose": "leaning over the rail with one hand shielding the eyes",
+            "expression": "surprised, eyebrows raised high"
+          }
+        ],
+        "setting": "the bow of the ship at night, black water stretching to a faint glow far away",
+        "props": ["a wooden rail", "a hanging lantern"],
+        "lighting": "near-black night with a single cold glow on the horizon",
+        "composition": "wide horizontal framing at the bow, sailor on the left third and the far glow on the right, calm dark water across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: A sailor grips the rail and leans out over the water as a tiny light glimmers on the horizon.\n\nCharacters:\n- The crew: Six lean weathered sailors in rough linen shirts, loose dark trousers and cloth caps, drawn at chest height. Pose: leaning over the rail with one hand shielding the eyes. Expression: surprised, eyebrows raised high.\n\nSetting: the bow of the ship at night, black water stretching to a faint glow far away\n\nKey props: a wooden rail, a hanging lantern\n\nLighting: near-black night with a single cold glow on the horizon\n\nComposition: wide horizontal framing at the bow, sailor on the left third and the far glow on the right, calm dark water across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "d888537ed936647e98b8ea6830cd0c5c0d5b8ec3959f0d1f4a58ee1d6882524c",
+      "image": {
+        "path": "/tmp/opencode/story-smoke/smoke/images/scene-003.png",
+        "prompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: A sailor grips the rail and leans out over the water as a tiny light glimmers on the horizon.\n\nCharacters:\n- The crew: Six lean weathered sailors in rough linen shirts, loose dark trousers and cloth caps, drawn at chest height. Pose: leaning over the rail with one hand shielding the eyes. Expression: surprised, eyebrows raised high.\n\nSetting: the bow of the ship at night, black water stretching to a faint glow far away\n\nKey props: a wooden rail, a hanging lantern\n\nLighting: near-black night with a single cold glow on the horizon\n\nComposition: wide horizontal framing at the bow, sailor on the left third and the far glow on the right, calm dark water across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "fake-lavfi",
+        "attempts": 1,
+        "promptHash": "546be9299607e4d7987140cde59f4bc3c23db8a98b2c40a69dd86335b5f21c0f",
+        "byteSize": 12164,
+        "width": 1920,
+        "height": 1080,
+        "aspect": 1.778,
+        "luminanceVariance": 2247.67,
+        "generatedAt": "2026-10-20T08:47:51.084Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-smoke/smoke/audio/chunks/scene-003.wav",
+        "durationSec": 7.2,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-smoke/smoke/audio/parts/scene-003-part01.wav",
+            "durationSec": 7.2,
+            "text": "Columbus asked them to wait one more night. That night a sailor saw a small light far away.",
+            "providerFingerprint": "story-smoke-tts-v1"
+          }
+        ],
+        "meanVolumeDb": -21.1,
+        "wordsPerMinute": 150
+      },
+      "timing": {
+        "start": 15.2,
+        "end": 22.6,
+        "startFrame": 456,
+        "endFrame": 678,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "Columbus",
+            "start": 15.2,
+            "end": 15.6
+          },
+          {
+            "word": "asked",
+            "start": 15.6,
+            "end": 16
+          },
+          {
+            "word": "them",
+            "start": 16,
+            "end": 16.4
+          },
+          {
+            "word": "to",
+            "start": 16.4,
+            "end": 16.8
+          },
+          {
+            "word": "wait",
+            "start": 16.8,
+            "end": 17.2
+          },
+          {
+            "word": "one",
+            "start": 17.2,
+            "end": 17.6
+          },
+          {
+            "word": "more",
+            "start": 17.6,
+            "end": 18
+          },
+          {
+            "word": "night.",
+            "start": 18,
+            "end": 18.4
+          },
+          {
+            "word": "That",
+            "start": 18.4,
+            "end": 18.8
+          },
+          {
+            "word": "night",
+            "start": 18.8,
+            "end": 19.2
+          },
+          {
+            "word": "a",
+            "start": 19.2,
+            "end": 19.6
+          },
+          {
+            "word": "sailor",
+            "start": 19.6,
+            "end": 20
+          },
+          {
+            "word": "saw",
+            "start": 20,
+            "end": 20.4
+          },
+          {
+            "word": "a",
+            "start": 20.4,
+            "end": 20.8
+          },
+          {
+            "word": "small",
+            "start": 20.8,
+            "end": 21.2
+          },
+          {
+            "word": "light",
+            "start": 21.2,
+            "end": 21.6
+          },
+          {
+            "word": "far",
+            "start": 21.6,
+            "end": 22
+          },
+          {
+            "word": "away.",
+            "start": 22,
+            "end": 22.4
+          }
+        ]
+      }
+    },
+    {
+      "sceneId": 4,
+      "sentenceIds": ["s7", "s8"],
+      "narration": "In the morning they found a green island with tall trees. The long journey across the wide sea was finally over.",
+      "wordCount": 21,
+      "visualPurpose": "Show the green island reached at last.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 4,
+        "action": "The ship glides toward a green island of tall trees while the crew gathers at the rail.",
+        "characters": [
+          {
+            "id": "columbus",
+            "pose": "standing at the bow with arms lowered at his sides",
+            "expression": "relieved, slight smile"
+          },
+          {
+            "id": "the_crew",
+            "pose": "clustered at the rail, one sailor waving an arm overhead",
+            "expression": "delighted, mouths open in cheer"
+          }
+        ],
+        "setting": "a calm bay beside a green island with tall trees in the early morning",
+        "props": ["a wooden rail", "rolled sailcloth"],
+        "lighting": "bright soft morning light",
+        "composition": "wide horizontal framing from behind the ship, island filling the right third and the crew at the rail on the left, calm water across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: The ship glides toward a green island of tall trees while the crew gathers at the rail.\n\nCharacters:\n- Columbus: A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat. Pose: standing at the bow with arms lowered at his sides. Expression: relieved, slight smile.\n- The crew: Six lean weathered sailors in rough linen shirts, loose dark trousers and cloth caps, drawn at chest height. Pose: clustered at the rail, one sailor waving an arm overhead. Expression: delighted, mouths open in cheer.\n\nSetting: a calm bay beside a green island with tall trees in the early morning\n\nKey props: a wooden rail, rolled sailcloth\n\nLighting: bright soft morning light\n\nComposition: wide horizontal framing from behind the ship, island filling the right third and the crew at the rail on the left, calm water across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "004a214781b3957b4a130b4e517f29b7bb75f57dc827531660c8d7c20e93eb0b",
+      "image": {
+        "path": "/tmp/opencode/story-smoke/smoke/images/scene-004.png",
+        "prompt": "A hand-drawn digital illustration in a simple children's storybook style.\n\nScene: The ship glides toward a green island of tall trees while the crew gathers at the rail.\n\nCharacters:\n- Columbus: A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat. Pose: standing at the bow with arms lowered at his sides. Expression: relieved, slight smile.\n- The crew: Six lean weathered sailors in rough linen shirts, loose dark trousers and cloth caps, drawn at chest height. Pose: clustered at the rail, one sailor waving an arm overhead. Expression: delighted, mouths open in cheer.\n\nSetting: a calm bay beside a green island with tall trees in the early morning\n\nKey props: a wooden rail, rolled sailcloth\n\nLighting: bright soft morning light\n\nComposition: wide horizontal framing from behind the ship, island filling the right third and the crew at the rail on the left, calm water across the bottom of the frame\n\nStyle constraints: clean vector line art with heavy black outlines, simple round white heads, minimal faces drawn with eyebrows and a mouth only, flat cel-shaded colouring, desaturated muted colours with one warm accent, soft paper texture in the background, no photorealism, no 3D render, no gradients on the characters. Keep the lower third of the frame visually calm and uncluttered. No text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "fake-lavfi",
+        "attempts": 1,
+        "promptHash": "4c5979070b57a53ae6ee9d09d9406640539c8d0294cedea97297c6a62b78b467",
+        "byteSize": 12201,
+        "width": 1920,
+        "height": 1080,
+        "aspect": 1.778,
+        "luminanceVariance": 2056.35,
+        "generatedAt": "2026-10-20T08:47:51.316Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-smoke/smoke/audio/chunks/scene-004.wav",
+        "durationSec": 8.4,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-smoke/smoke/audio/parts/scene-004-part01.wav",
+            "durationSec": 8.4,
+            "text": "In the morning they found a green island with tall trees. The long journey across the wide sea was finally over.",
+            "providerFingerprint": "story-smoke-tts-v1"
+          }
+        ],
+        "meanVolumeDb": -21.1,
+        "wordsPerMinute": 150
+      },
+      "timing": {
+        "start": 22.6,
+        "end": 31,
+        "startFrame": 678,
+        "endFrame": 930,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "In",
+            "start": 22.6,
+            "end": 23
+          },
+          {
+            "word": "the",
+            "start": 23,
+            "end": 23.4
+          },
+          {
+            "word": "morning",
+            "start": 23.4,
+            "end": 23.8
+          },
+          {
+            "word": "they",
+            "start": 23.8,
+            "end": 24.2
+          },
+          {
+            "word": "found",
+            "start": 24.2,
+            "end": 24.6
+          },
+          {
+            "word": "a",
+            "start": 24.6,
+            "end": 25
+          },
+          {
+            "word": "green",
+            "start": 25,
+            "end": 25.4
+          },
+          {
+            "word": "island",
+            "start": 25.4,
+            "end": 25.8
+          },
+          {
+            "word": "with",
+            "start": 25.8,
+            "end": 26.2
+          },
+          {
+            "word": "tall",
+            "start": 26.2,
+            "end": 26.6
+          },
+          {
+            "word": "trees.",
+            "start": 26.6,
+            "end": 27
+          },
+          {
+            "word": "The",
+            "start": 27,
+            "end": 27.4
+          },
+          {
+            "word": "long",
+            "start": 27.4,
+            "end": 27.8
+          },
+          {
+            "word": "journey",
+            "start": 27.8,
+            "end": 28.2
+          },
+          {
+            "word": "across",
+            "start": 28.2,
+            "end": 28.6
+          },
+          {
+            "word": "the",
+            "start": 28.6,
+            "end": 29
+          },
+          {
+            "word": "wide",
+            "start": 29,
+            "end": 29.4
+          },
+          {
+            "word": "sea",
+            "start": 29.4,
+            "end": 29.8
+          },
+          {
+            "word": "was",
+            "start": 29.8,
+            "end": 30.2
+          },
+          {
+            "word": "finally",
+            "start": 30.2,
+            "end": 30.6
+          },
+          {
+            "word": "over.",
+            "start": 30.6,
+            "end": 31
+          }
+        ]
+      }
+    }
+  ],
+  "warnings": [],
+  "errors": [],
+  "story": {
+    "title": "The Long Night at Sea",
+    "story": "Columbus stood on the deck of a small wooden ship. The crew had not seen land for many days. They were tired, hungry, and very afraid. Some sailors wanted to turn the ship around and go home. Columbus asked them to wait one more night. That night a sailor saw a small light far away. In the morning they found a green island with tall trees. The long journey across the wide sea was finally over.",
+    "wordCount": 76,
+    "lint": {
+      "passed": true,
+      "attempts": 1,
+      "sentenceCount": 8,
+      "wordCount": 76,
+      "averageSentenceWords": 9.5,
+      "maximumSentenceWords": 11,
+      "readingGrade": 3.5,
+      "wordBudgetTarget": 75,
+      "wordBudgetVariance": 0.013,
+      "issues": [],
+      "warnings": []
+    }
+  },
+  "claims": [
+    {
+      "claim": "Columbus commanded a small wooden sailing ship.",
+      "status": "established",
+      "hedgeInNarration": false
+    },
+    {
+      "claim": "The crew went many days without seeing land.",
+      "status": "established",
+      "hedgeInNarration": false
+    },
+    {
+      "claim": "A sailor sighted land in the morning.",
+      "status": "established",
+      "hedgeInNarration": false
+    }
+  ],
+  "verification": {
+    "attempts": 1,
+    "issues": [],
+    "blocking": [],
+    "notes": []
+  },
+  "characters": [
+    {
+      "id": "columbus",
+      "name": "Columbus",
+      "role": "the captain",
+      "visualDescription": "A tall middle-aged man with shoulder-length greying hair, a short beard, a dark red knee-length coat over a black doublet, dark hose, and a wide-brimmed black hat."
+    },
+    {
+      "id": "the_crew",
+      "name": "The crew",
+      "role": "the tired sailors",
+      "visualDescription": "Six lean weathered sailors in rough linen shirts, loose dark trousers and cloth caps, drawn at chest height."
+    }
+  ],
+  "audio": {
+    "masterPath": "/tmp/opencode/story-smoke/smoke/audio/narration.wav",
+    "durationSec": 31,
+    "gapMs": 200,
+    "sampleRate": 48000
+  },
+  "transcriptPath": "/tmp/opencode/story-smoke/smoke/transcript.json",
+  "subtitles": {
+    "ass": "/tmp/opencode/story-smoke/smoke/subtitles.ass",
+    "srt": "/tmp/opencode/story-smoke/smoke/subtitles.srt",
+    "cueCount": 8,
+    "overallMatchRatio": 1
+  },
+  "render": {
+    "finalVideo": "/tmp/opencode/story-smoke/smoke/final.mp4",
+    "ffprobe": {
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "duration": 31,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "pixFmt": "yuv420p"
+    },
+    "validations": {
+      "passed": true,
+      "checks": [
+        {
+          "name": "video_stream",
+          "passed": true,
+          "detail": "h264 1920x1080 yuv420p",
+          "severity": "gate"
+        },
+        {
+          "name": "video_codec",
+          "passed": true,
+          "detail": "expected h264, got h264",
+          "severity": "gate"
+        },
+        {
+          "name": "pixel_format",
+          "passed": true,
+          "detail": "expected yuv420p, got yuv420p",
+          "severity": "gate"
+        },
+        {
+          "name": "resolution",
+          "passed": true,
+          "detail": "expected 1920x1080, got 1920x1080",
+          "severity": "gate"
+        },
+        {
+          "name": "frame_rate",
+          "passed": true,
+          "detail": "expected 30 fps, got 30",
+          "severity": "gate"
+        },
+        {
+          "name": "audio_stream",
+          "passed": true,
+          "detail": "aac",
+          "severity": "gate"
+        },
+        {
+          "name": "audio_codec",
+          "passed": true,
+          "detail": "expected aac, got aac",
+          "severity": "gate"
+        },
+        {
+          "name": "duration_matches_audio",
+          "passed": true,
+          "detail": "video 31.000s vs audio 31.000s",
+          "severity": "gate"
+        },
+        {
+          "name": "no_black_frames",
+          "passed": true,
+          "detail": "no interval longer than 0.35s (0 dark interval(s) seen)",
+          "severity": "gate"
+        },
+        {
+          "name": "no_long_silence",
+          "passed": true,
+          "detail": "no silence longer than 1s at -50 dB",
+          "severity": "gate"
+        },
+        {
+          "name": "scene_1_shows_source",
+          "passed": true,
+          "detail": "correlation 1.000 with its own source (floor 0.35); closest other scene 2 at 0.651 (margin 0.349, needs >= 0.02)",
+          "severity": "warning"
+        },
+        {
+          "name": "scene_1_subtitles_visible",
+          "passed": true,
+          "detail": "subtitle band difference 7.55% (>= 0.50%)",
+          "severity": "gate"
+        },
+        {
+          "name": "scene_2_shows_source",
+          "passed": true,
+          "detail": "correlation 1.000 with its own source (floor 0.35); closest other scene 1 at 0.651 (margin 0.349, needs >= 0.02)",
+          "severity": "warning"
+        },
+        {
+          "name": "scene_2_subtitles_visible",
+          "passed": true,
+          "detail": "subtitle band difference 5.89% (>= 0.50%)",
+          "severity": "gate"
+        },
+        {
+          "name": "scene_3_shows_source",
+          "passed": true,
+          "detail": "correlation 1.000 with its own source (floor 0.35); closest other scene 4 at 0.665 (margin 0.335, needs >= 0.02)",
+          "severity": "warning"
+        },
+        {
+          "name": "scene_3_subtitles_visible",
+          "passed": true,
+          "detail": "subtitle band difference 6.67% (>= 0.50%)",
+          "severity": "gate"
+        },
+        {
+          "name": "scene_4_shows_source",
+          "passed": true,
+          "detail": "correlation 1.000 with its own source (floor 0.35); closest other scene 3 at 0.665 (margin 0.335, needs >= 0.02)",
+          "severity": "warning"
+        },
+        {
+          "name": "scene_4_subtitles_visible",
+          "passed": true,
+          "detail": "subtitle band difference 8.15% (>= 0.50%)",
+          "severity": "gate"
+        }
+      ]
+    }
+  }
+}

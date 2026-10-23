@@ -6,6 +6,19 @@ export const SCRIPT_COMPLEXITY_THRESHOLDS = {
   targetSentenceMaxWords: 15,
 } as const;
 
+/**
+ * The threshold set consumed by `validateScriptComplexity`. Callers may pass
+ * their own set (the story pipeline uses a stricter child-friendly one);
+ * omitting it keeps the historical Shorts-pipeline thresholds.
+ */
+export type ScriptComplexityThresholds = {
+  maxAverageSentenceWords: number;
+  maxSentenceWords: number;
+  maxReadingGrade: number;
+  targetSentenceMinWords: number;
+  targetSentenceMaxWords: number;
+};
+
 export type ScriptComplexityIssueCode =
   | "empty_narration"
   | "average_sentence_length"
@@ -271,6 +284,7 @@ function findLanguageIssues(
 
 export function validateScriptComplexity(
   narration: string,
+  thresholds: ScriptComplexityThresholds = SCRIPT_COMPLEXITY_THRESHOLDS,
 ): ScriptComplexityReport {
   const sentences = splitSentences(narration);
   const words = wordsIn(narration);
@@ -284,8 +298,8 @@ export function validateScriptComplexity(
   const maximumSentenceWords = Math.max(0, ...sentenceLengths);
   const targetSentenceCount = sentenceLengths.filter(
     (length) =>
-      length >= SCRIPT_COMPLEXITY_THRESHOLDS.targetSentenceMinWords &&
-      length <= SCRIPT_COMPLEXITY_THRESHOLDS.targetSentenceMaxWords,
+      length >= thresholds.targetSentenceMinWords &&
+      length <= thresholds.targetSentenceMaxWords,
   ).length;
   const targetSentenceRate =
     sentenceCount > 0 ? targetSentenceCount / sentenceCount : 0;
@@ -302,18 +316,16 @@ export function validateScriptComplexity(
       message: "Narration must contain spoken words.",
     });
   }
-  if (
-    averageSentenceWords > SCRIPT_COMPLEXITY_THRESHOLDS.maxAverageSentenceWords
-  ) {
+  if (averageSentenceWords > thresholds.maxAverageSentenceWords) {
     issues.push({
       code: "average_sentence_length",
-      message: `Average sentence length is ${averageSentenceWords.toFixed(1)} words; target is at most ${SCRIPT_COMPLEXITY_THRESHOLDS.maxAverageSentenceWords}.`,
+      message: `Average sentence length is ${averageSentenceWords.toFixed(1)} words; target is at most ${thresholds.maxAverageSentenceWords}.`,
     });
   }
-  if (maximumSentenceWords > SCRIPT_COMPLEXITY_THRESHOLDS.maxSentenceWords) {
+  if (maximumSentenceWords > thresholds.maxSentenceWords) {
     issues.push({
       code: "maximum_sentence_length",
-      message: `Longest sentence is ${maximumSentenceWords} words; limit is ${SCRIPT_COMPLEXITY_THRESHOLDS.maxSentenceWords}.`,
+      message: `Longest sentence is ${maximumSentenceWords} words; limit is ${thresholds.maxSentenceWords}.`,
     });
   }
 
@@ -324,15 +336,14 @@ export function validateScriptComplexity(
   // necessary technical terms can make those measures noisy.
   if (targetSentenceRate < 0.5 && sentenceCount > 1) {
     warnings.push(
-      `Only ${Math.round(targetSentenceRate * 100)}% of sentences are within the ${SCRIPT_COMPLEXITY_THRESHOLDS.targetSentenceMinWords}-${SCRIPT_COMPLEXITY_THRESHOLDS.targetSentenceMaxWords}-word target.`,
+      `Only ${Math.round(targetSentenceRate * 100)}% of sentences are within the ${thresholds.targetSentenceMinWords}-${thresholds.targetSentenceMaxWords}-word target.`,
     );
   }
-  if (readingGrade > SCRIPT_COMPLEXITY_THRESHOLDS.maxReadingGrade) {
+  if (readingGrade > thresholds.maxReadingGrade) {
     warnings.push(
       `Approximate reading grade is ${readingGrade}; target range is grade 6-8.`,
     );
   }
-
   return {
     passed: issues.length === 0,
     sentenceCount,

@@ -33,6 +33,8 @@ export const GenerateRequestSchema = z
     type: z.enum(['image', 'video']).optional().default('image'),
     mode: z.enum(['text_to_image', 'image_to_image', 'edit']).optional().default('text_to_image'),
     referenceImages: z.array(ReferenceImageSchema).max(4).optional().default([]),
+    /** Force a fresh generation by including this value in the cache key. */
+    cacheNonce: z.string().min(1).max(128).optional(),
   })
   .superRefine((request, ctx) => {
     request.referenceImages.forEach((reference, index) => {

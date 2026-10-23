@@ -17,6 +17,12 @@ export type GenerationMode = 'text_to_image' | 'image_to_image' | 'edit';
 export interface GenerationOptions {
   mode?: GenerationMode;
   referenceImages?: ReferenceImage[];
+  /**
+   * Unique value appended to the cache key. Callers use it to force a fresh
+   * generation without changing the prompt (for example a scene regeneration
+   * or a gate-failure retry).
+   */
+  cacheNonce?: string;
 }
 
 export interface GenerationResult {

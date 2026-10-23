@@ -1,0 +1,1792 @@
+[
+  {
+    "tag": "div",
+    "text": "Gemini",
+    "inChrome": false
+  },
+  {
+    "tag": "chat-app-side-nav-menu-button",
+    "text": "Gemini",
+    "inChrome": false
+  },
+  {
+    "tag": "side-nav-sparkle-button",
+    "text": "Gemini",
+    "inChrome": false
+  },
+  {
+    "tag": "a",
+    "text": "Gemini",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "Gemini",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "search",
+    "inChrome": true
+  },
+  {
+    "tag": "div",
+    "text": "search",
+    "inChrome": true
+  },
+  {
+    "tag": "div",
+    "text": "search",
+    "inChrome": true
+  },
+  {
+    "tag": "div",
+    "text": "search",
+    "inChrome": true
+  },
+  {
+    "tag": "button",
+    "text": "search",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "search",
+    "inChrome": true
+  },
+  {
+    "tag": "div",
+    "text": "New chatsearch",
+    "inChrome": true
+  },
+  {
+    "tag": "mat-nav-list",
+    "text": "New chat",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "New chat",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "New chat",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "New chat",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "New chat",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "New chat",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "New chat",
+    "inChrome": true
+  },
+  {
+    "tag": "mat-nav-list",
+    "text": "LibraryImagesScheduledStudentsCustomize",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Library",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Library",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Library",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Library",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Library",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Library",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Images",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Images",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Images",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Images",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Images",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Images",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Scheduled",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Scheduled",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Scheduled",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Scheduled",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Scheduled",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Scheduled",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Students",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Students",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Students",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Students",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Students",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Students",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Customize",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Customize",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Customize",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Customize",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Customize",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Customize",
+    "inChrome": true
+  },
+  {
+    "tag": "expandable-section",
+    "text": "NotebooksNew notebook",
+    "inChrome": true
+  },
+  {
+    "tag": "div",
+    "text": "Notebooks",
+    "inChrome": true
+  },
+  {
+    "tag": "button",
+    "text": "Notebooks",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Notebooks",
+    "inChrome": true
+  },
+  {
+    "tag": "div",
+    "text": "New notebook",
+    "inChrome": true
+  },
+  {
+    "tag": "div",
+    "text": "New notebook",
+    "inChrome": true
+  },
+  {
+    "tag": "project-sidenav-list",
+    "text": "New notebook",
+    "inChrome": true
+  },
+  {
+    "tag": "mat-nav-list",
+    "text": "New notebook",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "New notebook",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "New notebook",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "New notebook",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "New notebook",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "New notebook",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "New notebook",
+    "inChrome": true
+  },
+  {
+    "tag": "div",
+    "text": "All",
+    "inChrome": true
+  },
+  {
+    "tag": "button",
+    "text": "All",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "All",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Weary Sailors at Sea",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Weary Sailors at Sea",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors at Sea",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors at Sea",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors at Sea",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors at Sea",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Green Square Photograph",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Green Square Photograph",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Green Square Photograph",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Green Square Photograph",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Green Square Photograph",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Green Square Photograph",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Blue Triangle Minimalist",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Blue Triangle Minimalist",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Blue Triangle Minimalist",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Blue Triangle Minimalist",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Blue Triangle Minimalist",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Blue Triangle Minimalist",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Failed Image Generation",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Failed Image Generation",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Failed Image Generation",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Failed Image Generation",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Failed Image Generation",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Failed Image Generation",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Weary Sailors At Sea",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Weary Sailors At Sea",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors At Sea",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors At Sea",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors At Sea",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors At Sea",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Red Circle Request",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Red Circle Request",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Red Circle Request",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Red Circle Request",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Red Circle Request",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Red Circle Request",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Failed Image Generation",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Failed Image Generation",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Failed Image Generation",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Failed Image Generation",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Failed Image Generation",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Failed Image Generation",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Weary Sailors' Doubt",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Minimalist Red Circle",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Minimalist Red Circle",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Minimalist Red Circle",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Minimalist Red Circle",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Minimalist Red Circle",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Minimalist Red Circle",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Illustration Generation Error",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Minimalist Red Circle",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Minimalist Red Circle",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Minimalist Red Circle",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Minimalist Red Circle",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Minimalist Red Circle",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Minimalist Red Circle",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Whimsical Forest Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Whimsical Forest Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Whimsical Forest Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Whimsical Forest Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Whimsical Forest Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Whimsical Forest Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Whimsical Bear Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Whimsical Bear Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Whimsical Bear Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Whimsical Bear Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Whimsical Bear Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Whimsical Bear Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Limit Reached",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Limit Reached",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Limit Reached",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Limit Reached",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Limit Reached",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Limit Reached",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Rate Limit Reached",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Rate Limit Reached",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Rate Limit Reached",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Rate Limit Reached",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Rate Limit Reached",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Rate Limit Reached",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Columbus Plants Flag",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Columbus Plants Flag",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Columbus Plants Flag",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Columbus Plants Flag",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Columbus Plants Flag",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Columbus Plants Flag",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Land Ahoy",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Land Ahoy",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ahoy",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ahoy",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ahoy",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ahoy",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Land Ahoy Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Land Ahoy Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ahoy Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ahoy Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ahoy Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ahoy Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Land Ho",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Land Ho",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ho",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ho",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ho",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ho",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Land on the Horizon",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Land on the Horizon",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land on the Horizon",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land on the Horizon",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land on the Horizon",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land on the Horizon",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Land Ho!",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Land Ho!",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ho!",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ho!",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ho!",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ho!",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Land Ahoy Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Land Ahoy Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ahoy Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ahoy Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ahoy Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ahoy Illustration",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Land Ahoy!",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Land Ahoy!",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ahoy!",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ahoy!",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ahoy!",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Ahoy!",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Land Sighted!",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Land Sighted!",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Sighted!",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Sighted!",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Sighted!",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land Sighted!",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Land in Sight",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Land in Sight",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land in Sight",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land in Sight",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land in Sight",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land in Sight",
+    "inChrome": true
+  },
+  {
+    "tag": "gem-nav-list-item",
+    "text": "Land in Sight",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Land in Sight",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land in Sight",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land in Sight",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land in Sight",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Land in Sight",
+    "inChrome": true
+  },
+  {
+    "tag": "mat-action-list",
+    "text": "Ali Zain Ul Yasoob",
+    "inChrome": true
+  },
+  {
+    "tag": "sidenav-mavatar-footer",
+    "text": "Ali Zain Ul Yasoob",
+    "inChrome": true
+  },
+  {
+    "tag": "div",
+    "text": "Ali Zain Ul Yasoob",
+    "inChrome": true
+  },
+  {
+    "tag": "a",
+    "text": "Ali Zain Ul Yasoob",
+    "inChrome": true
+  },
+  {
+    "tag": "div",
+    "text": "Ali Zain Ul Yasoob",
+    "inChrome": true
+  },
+  {
+    "tag": "span",
+    "text": "Ali Zain Ul Yasoob",
+    "inChrome": true
+  },
+  {
+    "tag": "bard-sidenav-content",
+    "text": "Conversation with Gemini You said a red circle on a white background a red circle on a white background Gemini said I seem to be encountering an error. Can I try something else for you?ImagesGeminiAuto Aspect ratio Gemini is AI and can make mistakes.",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Conversation with Gemini You said a red circle on a white background a red circle on a white background Gemini said I seem to be encountering an error. Can I try something else for you?ImagesGeminiAuto Aspect ratio Gemini is AI and can make mistakes.",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Conversation with Gemini You said a red circle on a white background a red circle on a white background Gemini said I seem to be encountering an error. Can I try something else for you?ImagesGeminiAuto Aspect ratio Gemini is AI and can make mistakes.",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Conversation with Gemini You said a red circle on a white background a red circle on a white background Gemini said I seem to be encountering an error. Can I try something else for you?ImagesGeminiAuto Aspect ratio Gemini is AI and can make mistakes.",
+    "inChrome": false
+  },
+  {
+    "tag": "chat-window",
+    "text": "Conversation with Gemini You said a red circle on a white background a red circle on a white background Gemini said I seem to be encountering an error. Can I try something else for you?ImagesGeminiAuto Aspect ratio Gemini is AI and can make mistakes.",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Conversation with Gemini You said a red circle on a white background a red circle on a white background Gemini said I seem to be encountering an error. Can I try something else for you?ImagesGeminiAuto Aspect ratio Gemini is AI and can make mistakes.",
+    "inChrome": false
+  },
+  {
+    "tag": "chat-window-content",
+    "text": "Conversation with Gemini You said a red circle on a white background a red circle on a white background Gemini said I seem to be encountering an error. Can I try something else for you?",
+    "inChrome": false
+  },
+  {
+    "tag": "h1",
+    "text": "Conversation with Gemini",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "You said a red circle on a white background a red circle on a white background Gemini said I seem to be encountering an error. Can I try something else for you?",
+    "inChrome": false
+  },
+  {
+    "tag": "infinite-scroller",
+    "text": "You said a red circle on a white background a red circle on a white background Gemini said I seem to be encountering an error. Can I try something else for you?",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "You said a red circle on a white background a red circle on a white background Gemini said I seem to be encountering an error. Can I try something else for you?",
+    "inChrome": false
+  },
+  {
+    "tag": "user-query",
+    "text": "You said a red circle on a white background a red circle on a white background",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "You said a red circle on a white background a red circle on a white background",
+    "inChrome": false
+  },
+  {
+    "tag": "user-query-content",
+    "text": "You said a red circle on a white background a red circle on a white background",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "You said a red circle on a white background a red circle on a white background",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "You said a red circle on a white background a red circle on a white background",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "You said a red circle on a white background a red circle on a white background",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "You said a red circle on a white background a red circle on a white background",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "You said a red circle on a white background a red circle on a white background",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "You said a red circle on a white background a red circle on a white background",
+    "inChrome": false
+  },
+  {
+    "tag": "h5",
+    "text": "You said a red circle on a white background",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "You said",
+    "inChrome": false
+  },
+  {
+    "tag": "p",
+    "text": "a red circle on a white background",
+    "inChrome": false
+  },
+  {
+    "tag": "model-response",
+    "text": "Gemini said I seem to be encountering an error. Can I try something else for you?",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Gemini said I seem to be encountering an error. Can I try something else for you?",
+    "inChrome": false
+  },
+  {
+    "tag": "response-container",
+    "text": "Gemini said I seem to be encountering an error. Can I try something else for you?",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Gemini said I seem to be encountering an error. Can I try something else for you?",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Gemini said I seem to be encountering an error. Can I try something else for you?",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Gemini said I seem to be encountering an error. Can I try something else for you?",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Gemini said I seem to be encountering an error. Can I try something else for you?",
+    "inChrome": false
+  },
+  {
+    "tag": "h6",
+    "text": "Gemini said",
+    "inChrome": false
+  },
+  {
+    "tag": "model-response-content",
+    "text": "I seem to be encountering an error. Can I try something else for you?",
+    "inChrome": false
+  },
+  {
+    "tag": "structured-content-container",
+    "text": "I seem to be encountering an error. Can I try something else for you?",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "I seem to be encountering an error. Can I try something else for you?",
+    "inChrome": false
+  },
+  {
+    "tag": "message-content",
+    "text": "I seem to be encountering an error. Can I try something else for you?",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "I seem to be encountering an error. Can I try something else for you?",
+    "inChrome": false
+  },
+  {
+    "tag": "p",
+    "text": "I seem to be encountering an error. Can I try something else for you?",
+    "inChrome": false
+  },
+  {
+    "tag": "input-container",
+    "text": "ImagesGeminiAuto Aspect ratio Gemini is AI and can make mistakes.",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "ImagesGeminiAuto Aspect ratio",
+    "inChrome": false
+  },
+  {
+    "tag": "input-area-v2",
+    "text": "ImagesGeminiAuto Aspect ratio",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "ImagesGeminiAuto Aspect ratio",
+    "inChrome": false
+  },
+  {
+    "tag": "fieldset",
+    "text": "ImagesGeminiAuto Aspect ratio",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "ImagesGeminiAuto Aspect ratio",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Images",
+    "inChrome": false
+  },
+  {
+    "tag": "simplified-input-menu",
+    "text": "Images",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Images",
+    "inChrome": false
+  },
+  {
+    "tag": "toolbox-drawer",
+    "text": "Images",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Images",
+    "inChrome": false
+  },
+  {
+    "tag": "gem-button",
+    "text": "Images",
+    "inChrome": false
+  },
+  {
+    "tag": "button",
+    "text": "Images",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "Images",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "Images",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "Images",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "GeminiAuto",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "GeminiAuto",
+    "inChrome": false
+  },
+  {
+    "tag": "bard-mode-switcher",
+    "text": "GeminiAuto",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "GeminiAuto",
+    "inChrome": false
+  },
+  {
+    "tag": "button",
+    "text": "GeminiAuto",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "GeminiAuto",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "GeminiAuto",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "Gemini",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "Auto",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Aspect ratio",
+    "inChrome": false
+  },
+  {
+    "tag": "input-companion",
+    "text": "Aspect ratio",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Aspect ratio",
+    "inChrome": false
+  },
+  {
+    "tag": "input-companion-chip",
+    "text": "Aspect ratio",
+    "inChrome": false
+  },
+  {
+    "tag": "gem-button",
+    "text": "Aspect ratio",
+    "inChrome": false
+  },
+  {
+    "tag": "button",
+    "text": "Aspect ratio",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "Aspect ratio",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "Aspect ratio",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "Aspect ratio",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Aspect ratio",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Aspect ratio",
+    "inChrome": false
+  },
+  {
+    "tag": "hallucination-disclaimer",
+    "text": "Gemini is AI and can make mistakes.",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Gemini is AI and can make mistakes.",
+    "inChrome": false
+  },
+  {
+    "tag": "p",
+    "text": "Gemini is AI and can make mistakes.",
+    "inChrome": false
+  },
+  {
+    "tag": "top-bar-actions",
+    "text": "Upgrade",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Upgrade",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Upgrade",
+    "inChrome": false
+  },
+  {
+    "tag": "div",
+    "text": "Upgrade",
+    "inChrome": false
+  },
+  {
+    "tag": "g1-dynamic-upsell-button",
+    "text": "Upgrade",
+    "inChrome": false
+  },
+  {
+    "tag": "gem-button",
+    "text": "Upgrade",
+    "inChrome": false
+  },
+  {
+    "tag": "button",
+    "text": "Upgrade",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "Upgrade",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "Upgrade",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "Upgrade",
+    "inChrome": false
+  },
+  {
+    "tag": "span",
+    "text": "Upgrade",
+    "inChrome": false
+  }
+]

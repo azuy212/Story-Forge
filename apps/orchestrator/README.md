@@ -139,8 +139,8 @@ root; commands must run from orchestrator package or workspace root.
 | Provider interface + stub pattern            | all providers        | complete |
 | FFprobe media validation                     | ReleaseValidation    | complete |
 | SRT parsing (monotonic, overlap, bounds)     | ReleaseValidation    | complete |
-| Unit tests                                   | 221                  | passing  |
-| Integration test                             | 8                    | passing  |
+| Unit tests                                   | 1386                 | passing  |
+| Integration test                             | 21                   | passing  |
 
 ### Not Implemented
 
@@ -311,7 +311,7 @@ experiments, but is not invoked by the production LangGraph narration path.
 ### Run Tests
 
 ```bash
-# Unit tests (221 tests, no API key needed — uses DI mocks)
+# Unit tests (1386 tests, no API key needed — uses DI mocks)
 pnpm test
 
 # Integration test (end-to-end graph with mock LLM responses)
@@ -627,6 +627,29 @@ src/
     tts-fingerprint.ts               — canonical TTS cache identity
     publisher-provider.ts            — PublisherProvider interface
     stub-publisher-provider.ts       — stub for tests
+  story/                             — Story-Forge stickman pipeline (isolated from src/graph)
+    index.ts                         — public entry point
+    run.ts                           — S1–S8 orchestrator, resume, review gate
+    agents.ts                        — five story LLM calls behind one injectable interface
+    config.ts                        — STORY_* / CLI configuration resolution
+    input.ts                         — input validation + deterministic job id
+    paths.ts                         — jobs/<jobId>/ artifact layout
+    manifest.ts                      — fingerprinted stages + resume lifecycle
+    atomic.ts                        — atomic JSON/text writes
+    types.ts                         — Zod schemas + data contracts
+    sentences.ts                     — script-aware sentence segmentation
+    style-profile.ts                 — image style profile loader
+    prompt.ts                        — image prompt composition + prompt lint
+    lint.ts                          — reading-level lint + hard-word gate
+    alignment.ts                     — script↔ASR token alignment
+    subtitles.ts                     — sentence-aware cue building (ASS + SRT)
+    timing.ts                        — measured, frame-snapped scene timeline
+    images.ts                        — per-scene image stage + DP4 gates
+    audio.ts                         — per-scene TTS chunks + master narration
+    media.ts                         — ffprobe duration/loudness helpers
+    ffmpeg-args.ts                   — FFmpeg argument construction (pure)
+    render.ts                        — single-pass render + output validation
+    runner.ts                        — stage runner (fingerprint + atomic resume)
   utils/
     scene-id.ts                      — padSceneId helper
     subtitle-format.ts               — SRT/ASS timestamp formatting
@@ -650,6 +673,12 @@ prompts/
   metadata-generator/v1.md
   thumbnail-generator/v1.md
   release-review/v1.md
+  story-story/v1.md                 — story writer (topic → story + claims ledger)
+  story-verify/v1.md                — claims-ledger verification gate
+  story-scenes/v1.md                — sentence→scene grouping
+  story-characters/v1.md            — character registry
+  story-slots/v1.md                 — per-scene visual slots
+  story/style/stickman-history.json — image style profile (template + constraints)
 tests/
   graph.int.test.ts                 — end-to-end integration (8 scenarios)
   agent.test.ts                     — runAgent harness
@@ -674,7 +703,239 @@ tests/
   chatterbox-tts-provider.test.ts
   openrouter-tts-provider.test.ts
   image-provider-asset-provider.test.ts
+  story-sentences.test.ts           — segmentation, grouping, narration assembly
+  story-alignment.test.ts           — tokenizer, numeric spans, LCS, fallback
+  story-subtitles.test.ts           — cue splitting, wrapping, ASS/SRT output
+  story-timing.test.ts              — cumulative frame boundaries
+  story-lint.test.ts                — word budget + hard-word gate
+  story-prompt.test.ts              — prompt composition, lint, style profiles
+  story-ffmpeg-args.test.ts         — concat list, render args, filter graph
+  story-manifest.test.ts            — fingerprints, resume, atomic writes
+  story-resume.test.ts              — frozen-config resume: stored values win, changed flags fail
+  story-config.test.ts              — config precedence, input validation, paths
+  story-prompts.test.ts             — prompt files render with the agent variables
+  story-shared-edits.test.ts        — one regression per shared-code change
 ```
+
+## Story-Forge Stickman Storytelling Pipeline
+
+A second, self-contained pipeline that turns a **topic** into a **validated 1080p
+MP4** with hand-drawn stickman illustrations, per-scene narration, and
+audio-timed subtitles. It shares the LLM harness, providers, and FFmpeg helpers
+with the Shorts graph but never touches `src/graph/**` or any agent node — all
+of its code lives in `src/story/`, its prompts in `prompts/story-*/`, and its
+entry point in `scripts/story-video.mjs`.
+
+### One Command
+
+```bash
+pnpm --filter youtube-shorts-orchestrator build          # dist/story/index.js is what the CLI runs
+pnpm --filter youtube-shorts-orchestrator story "The mutiny on the Bounty" --duration 150
+```
+
+```text
+job:      the-mutiny-on-the-bounty-7f3a91c4
+dir:      /…/apps/orchestrator/jobs/the-mutiny-on-the-bounty-7f3a91c4
+status:   complete
+video:    /…/jobs/the-mutiny-…/final.mp4
+          1920x1080 30fps 151.2s h264/aac
+manifest: /…/jobs/the-mutiny-…/manifest.json
+```
+
+| Option                             | Default                  | Meaning                                                       |
+| ---------------------------------- | ------------------------ | ------------------------------------------------------------- |
+| `--duration <s>`                   | `150`                    | target narration length (`STORY_TARGET_DURATION_SEC`)         |
+| `--language <tag>`                 | `en`                     | BCP-47 tag; also selects the expected prompt script           |
+| `--tone <text>`                    | —                        | narration tone hint                                           |
+| `--style <id>`                     | `stickman-history`       | image style profile under `prompts/story/style/`              |
+| `--job-id <id>`                    | `slug(topic)-<8 hex>`    | job id **and** output directory name                          |
+| `--out-dir <dir>`                  | `apps/orchestrator/jobs` | directory that holds the job folder                           |
+| `--wpm <n>`                        | `150`                    | speaking rate used for word budgets and the lint gate         |
+| `--fps <n>` / `--resolution <WxH>` | `30` / `1920x1080`       | render grid                                                   |
+| `--image-concurrency <n>`          | `1`                      | in-flight image requests                                      |
+| `--scene-gap-ms <ms>`              | `200`                    | silence held between scenes (never after the last one)        |
+| `--stages <list>`                  | all                      | run only these stages                                         |
+| `--from <stage>`                   | —                        | force this stage and every later stage to rerun               |
+| `--regenerate-prompts`             | `false`                  | discard stored scene prompts and re-plan them in S4 only      |
+| `--regenerate-images <sceneIds>`   | —                        | regenerate these scenes in S5 and bypass the image cache      |
+| `--dry-run`                        | `false`                  | validate the input, print the plan, make no paid call         |
+| `--review-story`                   | `false`                  | print the story and wait for approval (`y`) before continuing |
+| `--confirm-claims`                 | `false`                  | refuse to render until every box in `claims-checklist.md` is ticked |
+| `--json`                           | `false`                  | print the result summary as JSON                              |
+
+`--regenerate-prompts` and `--from S4_visual_plan` are not the same thing.
+Both re-plan prompts, but `--from S4_visual_plan` also forces S5-S8, so every
+image, narration chunk, alignment and the render are rebuilt. With
+`--regenerate-prompts`, only the prompts are discarded and re-planned; S5-S8
+still decide from their own fingerprints, so an image or audio file whose
+inputs did not change is reused.
+
+`--regenerate-images 1,18` keeps the stored prompts and forces only S5 for the
+listed scene ids. Those scenes skip stored-image reuse and send a fresh
+`cacheNonce` to the image provider, so the result is a new generation rather
+than a cache hit. Every automatic image retry also receives a fresh nonce.
+Scene ids are unique positive integers.
+
+`--confirm-claims` refuses to render until every box in `claims-checklist.md`
+is ticked. S2 writes the story's claims ledger (`claims.json`) and S2 also
+writes `claims-checklist.md` (one unchecked box per claim, its status, a
+suggested search query, and `needsSource: true` for claims about what a named
+person "later" did). A resume backfills a missing checklist from the ledger but
+never overwrites ticks a reviewer already made. The check runs at the top of
+S8, before the fingerprint/resume, so it refuses even when the render would
+otherwise be reused.
+
+Exit codes: `0` complete **or a successful dry run**, `1` failed, `2` an
+incomplete run (some stages are still pending — e.g. `--stages S1_input,S2_story`).
+
+The CLI loads `apps/orchestrator/.env` itself (anchored to the package, like
+every other `.mjs` entrypoint here) and configures the IPv4-first network
+runtime before importing the compiled pipeline. Nothing under `src/` reads
+`.env`, so without this the documented `OPENROUTER_API_KEY` was invisible to the
+one-command entry point.
+
+All `STORY_*` environment variables mirror these flags (`STORY_LANGUAGE`,
+`STORY_TONE`, `STORY_STYLE`, `STORY_TTS_WPM`, `STORY_VOICE`,
+`STORY_IMAGE_CONCURRENCY`, `STORY_RESOLUTION`, `STORY_FPS`, `STORY_SCENE_GAP_MS`,
+`STORY_IMAGE_MIN_WIDTH`, `STORY_IMAGE_MIN_HEIGHT`, `STORY_IMAGE_MIN_ASPECT`,
+`STORY_IMAGE_MAX_ASPECT`, `STORY_TTS_MAX_CHARS`, `STORY_SUBTITLE_MAX_CHARS_PER_LINE`,
+`STORY_SUBTITLE_MIN_DURATION_MS`, `STORY_CRF`, `STORY_PRESET`, `STORY_JOBS_DIR`,
+`STORY_PROMPTS_PATH`, `STORY_REVIEW_STORY_TIMEOUT_MS`). `STORY_LLM_MODEL` is a
+single story-only model fallback that sits between the per-agent/per-role model
+and `DEFAULT_MODEL`. A CLI flag always wins over the environment. Story mode
+deliberately does **not** inherit `NARRATION_GENERATION_MODE` or
+`TARGET_DURATION_SEC`: scene-bounded chunking is a constant here, not a mode.
+
+### Stages
+
+| Stage            | What it does                                                                                                                                                                                                                                                                                                                                 |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `S1_input`       | validate the input, resolve the style profile, record the word budget and the `unverified` grounding source                                                                                                                                                                                                                                  |
+| `S2_story`       | `StoryAuthor` writes the story + claims ledger + pronunciation map, then a measurable lint gate (sentence length, word budget ±15%, hard words need an in-sentence explanation, and any hard word the topic names must appear and be explained). One automatic rewrite, then hard fail                                                                                                                                           |
+| `S3_scenes`      | `StoryScenePlanner` groups **sentence ids** into scenes; code re-assembles the narration from those ids, so the model can never alter the text                                                                                                                                                                                               |
+| `S4_visual_plan` | `StoryCharacterDesigner` builds the character registry, then `StoryVisualPlanner` fills one visual slot set per scene (2 in flight)                                                                                                                                                                                                          |
+| `S5_images`      | compose each prompt from the style profile + registry (never model-authored), lint it, generate, and gate the still (≥1000×540, aspect 1.6–1.9)                                                                                                                                                                                              |
+| `S6_audio`       | one TTS call per scene (`skipWpmNormalization`, chunks >450 chars split at sentence boundaries), a free unconstrained ASR pass per chunk, one automatic re-synthesis when that pass hears less than 85% of the script (advisory; `STORY_ASR_VERIFY=false` skips it), then an FFmpeg concat of the measured chunks into `audio/narration.wav` |
+| `S7_align`       | per-scene transcriber word timings aligned to the script tokens (LCS + numeric spans, proportional fallback); cues and timing are rebuilt from the script, never from ASR text                                                                                                                                                               |
+| `S8_render`      | one lossy FFmpeg pass (concat demuxer + Lanczos cover-crop to 1080p + burned subtitles) and the deterministic output validation                                                                                                                                                                                                              |
+
+Four decisions the brief called out:
+
+- **DP1/DP2 — measured audio, not estimates.** Each scene is synthesized
+  separately and its real duration is probed, so scene boundaries and subtitle
+  timings come from the audio that was actually produced. A scene's still is
+  held from `start_i` to `start_{i+1}`, so the inter-scene gap reads as a short
+  hold of the previous image. Frame counts come from cumulative boundaries
+  (`round(cum × fps)` differences), never per-scene rounding, so drift cannot
+  accumulate.
+- **DP3 — no research agent, no silent fabrication.** Claims are checked against
+  the story's own ledger by `StoryVerifier` (blocking: unsupported events,
+  invented quotes/dialogue/motive, unhedged disputed claims) and the manifest is
+  written with `groundingSource: "model-knowledge"` and `unverified: true`.
+- **DP4 — provider limits are handled, not assumed.** The image gate is
+  size/aspect based, the source dimensions are recorded per image, and the
+  1080p frame is reached by a Lanczos cover-crop upscale at render time.
+- **One encode.** The image sequence goes through the concat demuxer with
+  frame-snapped durations, and subtitles are burned in the same pass — there is
+  no intermediate lossy file and no second encoding.
+- **Validation separates gates from warnings.** Codec, resolution, duration,
+  black-frame and silence checks gate completion. The frame-vs-source check is
+  a warning: it requires the sampled frame to match its own scene image better
+  than any other scene's image by a margin, with the subtitle band masked, and
+  its failure is recorded in `manifest.warnings` until the margin has been
+  tuned on real illustrations. `blackdetect` is configured for "empty frame"
+  (`pix_th=0.05`, `picture_black_ratio_th=0.995`), so a pre-dawn or stormy
+  panel is not mistaken for a missing image.
+
+### Subtitles and Fonts
+
+Cues are built from the script's own sentences (never the ASR text), broken at
+sentence terminators, and timed from the aligned word timings. The ASS header
+plays at 1920×1080 with no `force_style`, and libass is pointed at
+`apps/orchestrator/assets/branding/` so the face is pinned instead of resolved
+through fontconfig:
+
+- `NotoSans-Bold.ttf` — the style's `Noto Sans` face
+- `NotoNaskhArabic-Bold.ttf` — Arabic-script fallback for `--language ur` etc.
+
+Both are unmodified Noto files under the SIL Open Font License 1.1; the licence
+travels with them in `assets/branding/LICENSE-OFL-1.1.txt`. Override with
+`SUBTITLE_FONT_PATH` / `SUBTITLE_FONT_NAME` if you want a different face.
+
+### Artifacts and Resumability
+
+```text
+jobs/<jobId>/
+  manifest.json        S1–S8 fingerprints, per-stage metrics, warnings, validations
+  story.json           story text + word count + lint + pronunciations
+  claims.json          claims ledger (status, hedgeInNarration, needsSource, searchQuery)
+  claims-checklist.md  one unchecked box per claim; --confirm-claims refuses while unticked
+  characters.json  scenes.json
+  images/scene-001.png
+  audio/parts/scene-001-part01.wav   audio/chunks/scene-001.wav   audio/narration.wav
+  transcript.json    subtitles.ass   subtitles.srt
+  render/concat.txt  final.mp4
+```
+
+Every artifact is written atomically (temp file + rename). Every stage stores a
+fingerprint of its inputs, so a rerun reuses whatever still matches and the job
+is complete only once S8 validation passes:
+
+```bash
+# resume: nothing is re-called, the job is already complete
+pnpm --filter youtube-shorts-orchestrator story "The mutiny on the Bounty" --job-id my-job
+
+# force a rerun from the narration stage onwards, reusing images and chunks
+pnpm --filter youtube-shorts-orchestrator story "The mutiny on the Bounty" --job-id my-job --from S6_audio --json
+```
+
+A resume **replays the configuration stored in the manifest**. Flags such as
+`--duration`, `--wpm`, `--style`, `--language`, `--fps` or `--resolution` are
+part of the stage fingerprints, so passing one that disagrees with the manifest
+is refused with `STORY_CONFIG_CONFLICT` (and nothing is called or written)
+instead of quietly invalidating the fingerprints and re-running paid stages:
+
+```
+$ story "…" --job-id my-job --duration 150
+Story job failed: Refusing to resume job my-job with changed flags:
+--duration (manifest: 45, requested: 150). …
+```
+
+Rerun with the stored value, or start a genuinely different run with a new
+`--job-id`. `--image-concurrency` and `--out-dir` are the exceptions: they change
+how the job runs, not what it produces, so they may change on resume.
+
+### Tests and End-to-End Smoke
+
+```bash
+# story unit tests (no API key, no provider calls)
+pnpm --filter youtube-shorts-orchestrator exec node --experimental-vm-modules \
+  node_modules/jest/bin/jest.js --testPathPatterns=tests/story-
+
+# full pipeline with fake agents and real FFmpeg/ffprobe (real images via lavfi,
+# real WAVs via sine): three passes — full job, unchanged resume, forced stages
+pnpm --filter youtube-shorts-orchestrator build
+node apps/orchestrator/scripts/story-smoke.mjs
+```
+
+The smoke script proves resumability by counting provider calls (pass 2 makes
+none; pass 3 reuses every image, chunk, and transcript; pass 4 kills the job
+during image generation and asserts that the resume regenerates only the two
+missing stills) and prints the real `ffprobe` output plus the S8 validation
+report.
+
+Manifests from those runs are checked in, labeled by what is real:
+
+- `docs/story-sample-manifest-real-media.json` — **every stage real**: the
+  150 s, 15-scene “Why do we have seasons?” run (OpenRouter story, Gemini
+  images, Chatterbox narration, WhisperX alignment, FFmpeg render; report §6.7)
+- `docs/story-sample-manifest-real-llm.json` — real OpenRouter S1–S4 only,
+  synthetic media
+- `docs/story-sample-manifest.json` — complete S1–S8 job with fake LLM/image
+  providers and synthetic images/audio, real FFmpeg (used by the smoke check)
+
+`docs/story-pipeline-report.md` records the verification results, the bugs the
+tests and the real runs caught, and the known limitations.
 
 ## Key Design Decisions
 

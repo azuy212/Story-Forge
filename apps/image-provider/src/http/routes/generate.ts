@@ -54,13 +54,18 @@ export function createGenerateHandler(deps: GenerateRouteDeps) {
       );
     }
 
-    const { prompt, type, mode, referenceImages } = result.data;
+    const { prompt, type, mode, referenceImages, cacheNonce } = result.data;
     const assetType: AssetType = type;
-    const options: GenerationOptions = { mode, referenceImages };
+    const options: GenerationOptions = {
+      mode,
+      referenceImages,
+      ...(cacheNonce ? { cacheNonce } : {}),
+    };
 
     logger.info('Generating asset', {
       prompt: prompt.substring(0, 60),
       assetType,
+      ...(cacheNonce ? { cacheNonce } : {}),
     });
 
     if (!(await client.isCached(prompt, assetType, options))) {

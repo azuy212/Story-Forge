@@ -30,6 +30,14 @@ export interface NormalizeOptions {
   panVariant?: number;
   fastSeek?: boolean;
   encoder: EncoderConfig;
+  /**
+   * How a source that does not match the target aspect is fitted.
+   * "contain" (default) pads; "cover" scales up and center-crops so there are
+   * no bars. Defaults preserve the historical contain+pad behaviour exactly.
+   */
+  fit?: "contain" | "cover";
+  /** libswscale scaler flags, e.g. "lanczos". Omitted by default. */
+  scaleFlags?: string;
 }
 
 const PAN_PRESETS: { x: string; y: string }[] = [
@@ -254,8 +262,18 @@ async function normalizeVideo(
 }
 
 export function staticScaleFilter(opts: NormalizeOptions): string {
+  const flags = opts.scaleFlags ? `:flags=${opts.scaleFlags}` : "";
+  if (opts.fit === "cover") {
+    return [
+      `scale=${opts.width}:${opts.height}:force_original_aspect_ratio=increase${flags}`,
+      `crop=${opts.width}:${opts.height}`,
+      "setsar=1",
+      `fps=${opts.fps}`,
+      "format=yuv420p",
+    ].join(",");
+  }
   return [
-    `scale=${opts.width}:${opts.height}:force_original_aspect_ratio=decrease`,
+    `scale=${opts.width}:${opts.height}:force_original_aspect_ratio=decrease${flags}`,
     `pad=${opts.width}:${opts.height}:(ow-iw)/2:(oh-ih)/2`,
     "setsar=1",
     `fps=${opts.fps}`,

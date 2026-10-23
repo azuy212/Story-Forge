@@ -12,8 +12,8 @@
     "build": "tsc && node scripts/copy-mjs.mjs",
     "dev": "npx @langchain/langgraph-cli dev --no-browser --no-reload",
     "clean": "rm -rf dist",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns=\\.test\\.ts$ --testPathIgnorePatterns=\\.int\\.test\\.ts$",
-    "test:int": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns=\\.int\\.test\\.ts$",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns='\\.test\\.ts$' --testPathIgnorePatterns='\\.int\\.test\\.ts$'",
+    "test:int": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns='\\.int\\.test\\.ts$'",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "lint": "oxlint src --config ../../.oxlintrc.json --import-plugin --deny-warnings --type-aware",
@@ -24,7 +24,8 @@
     "resume": "node scripts/resume.mjs",
     "run-next": "node scripts/run-next.mjs",
     "seed-run": "node scripts/seed-run.mjs",
-    "qa-eval": "node scripts/qa-eval.mjs"
+    "qa-eval": "node scripts/qa-eval.mjs",
+    "story": "node scripts/story-video.mjs"
   },
   "dependencies": {
     "@langchain/core": "^1.2.3",
@@ -45,6 +46,7 @@
     "dotenv": "^17.4.2",
     "jest": "^30.4.2",
     "oxlint": "^1.78.0",
+    "oxlint-tsgolint": "^7.0.2001",
     "prettier": "^3.9.5",
     "ts-jest": "^29.4.11",
     "typescript": "^6.0.3"

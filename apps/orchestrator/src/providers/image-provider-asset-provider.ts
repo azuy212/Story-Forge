@@ -81,6 +81,7 @@ export class ImageProviderAssetProvider implements AssetProvider {
       sceneId: opts.sceneId,
       mode: opts.mode ?? "text_to_image",
       referenceImageCount: opts.referenceImages?.length ?? 0,
+      ...(opts.cacheNonce ? { cacheNonce: opts.cacheNonce } : {}),
       filename,
     };
 
@@ -108,13 +109,18 @@ export class ImageProviderAssetProvider implements AssetProvider {
             type: "image",
             mode: opts.mode ?? "text_to_image",
             referenceImages,
+            ...(opts.cacheNonce ? { cacheNonce: opts.cacheNonce } : {}),
           }
-        : { prompt: opts.prompt };
+        : {
+            prompt: opts.prompt,
+            ...(opts.cacheNonce ? { cacheNonce: opts.cacheNonce } : {}),
+          };
       requestEvent.requestBody = {
-        prompt: body.prompt,
-        type: body.type,
-        mode: body.mode,
+        prompt: opts.prompt,
+        type: referenceImages ? "image" : undefined,
+        mode: opts.mode ?? "text_to_image",
         referenceImageCount: referenceImages?.length ?? 0,
+        ...(opts.cacheNonce ? { cacheNonce: opts.cacheNonce } : {}),
         ...(referenceImages
           ? {
               referenceImages: referenceImages.map((ref) => ({

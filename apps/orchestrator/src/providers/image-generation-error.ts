@@ -3,6 +3,7 @@ import { z } from "zod";
 export const ImageGenerationFailureTypeEnum = z.enum([
   "content_policy",
   "invalid_prompt",
+  "quota_exhausted",
   "rate_limit",
   "timeout",
   "server_error",
@@ -72,13 +73,16 @@ export function isRepairCandidate(type: ImageGenerationFailureType): boolean {
 
 /**
  * Fatal infrastructure problems that surface immediately, never repaired and
- * never blindly retried. `unknown` is fatal: an unclassifiable failure could
+ * never blindly retried. `quota_exhausted` sits here because the account
+ * allowance only refills on a longer clock: retrying inside the request, or
+ * repairing the prompt, cannot succeed. `unknown` is fatal: an unclassifiable failure could
  * hide an authentication or infrastructure problem, so routing it to an LLM
  * prompt repair (or retrying the same prompt) would only waste money.
  */
 const FATAL_TYPES: ReadonlySet<ImageGenerationFailureType> = new Set([
   "authentication",
   "invalid_request",
+  "quota_exhausted",
   "unknown",
 ]);
 

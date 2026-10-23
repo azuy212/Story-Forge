@@ -25,4 +25,12 @@ export enum AgentModel {
   ThumbnailQA = "ThumbnailQA",
   Publisher = "Publisher",
   ResolveProfile = "ResolveProfile",
+  // Story-Forge stickman storytelling pipeline (src/story/**). Distinct
+  // members so story prompts/models can be configured without touching the
+  // Shorts pipeline's agent-to-model mapping.
+  StoryAuthor = "StoryAuthor",
+  StoryVerifier = "StoryVerifier",
+  StoryScenePlanner = "StoryScenePlanner",
+  StoryCharacterDesigner = "StoryCharacterDesigner",
+  StoryVisualPlanner = "StoryVisualPlanner",
 }

@@ -1,0 +1,3433 @@
+{
+  "version": 1,
+  "jobId": "seasons-e2e-21oct",
+  "createdAt": "2026-10-21T07:28:28.103Z",
+  "updatedAt": "2026-10-21T08:12:34.343Z",
+  "input": {
+    "topic": "Why do we have seasons?",
+    "targetDurationSec": 150,
+    "language": "en",
+    "style": "stickman-history",
+    "jobId": "seasons-e2e-21oct",
+    "outputDir": "/tmp/opencode/story-e2e"
+  },
+  "config": {
+    "topic": "Why do we have seasons?",
+    "targetDurationSec": 150,
+    "language": "en",
+    "style": "stickman-history",
+    "jobId": "seasons-e2e-21oct",
+    "outputDir": "/tmp/opencode/story-e2e",
+    "wpm": 150,
+    "imageConcurrency": 1,
+    "sceneMinSec": 3,
+    "sceneTargetMinSec": 6,
+    "sceneTargetMaxSec": 12,
+    "sceneSoftMaxSec": 15,
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "sceneGapMs": 200,
+    "imageMinWidth": 1000,
+    "imageMinHeight": 540,
+    "imageMinAspect": 1.6,
+    "imageMaxAspect": 1.9,
+    "ttsMaxChars": 450,
+    "asrVerify": true,
+    "subtitleMaxCharsPerLine": 42,
+    "subtitleMinDurationMs": 800,
+    "crf": 19,
+    "preset": "medium"
+  },
+  "stages": {
+    "S1_input": {
+      "status": "done",
+      "fingerprint": "93e68f9d020dab06d5f886b5d7c1f4fc42b2f95438d3c848c44c9d8f7156d40b",
+      "startedAt": "2026-10-21T07:28:28.109Z",
+      "finishedAt": "2026-10-21T07:28:28.111Z",
+      "durationMs": 2,
+      "metrics": {
+        "wordBudget": 375,
+        "style": "stickman-history",
+        "stylePath": "/home/ali/projects/practice/Story-Forge-stickman/apps/orchestrator/prompts/story/style/stickman-history.json",
+        "grounded": false,
+        "unverified": true
+      }
+    },
+    "S2_story": {
+      "status": "done",
+      "fingerprint": "83a2fc713ece74b3f58113eba96480c51d87534ccb663def3fe0dc8183e7f92f",
+      "startedAt": "2026-10-21T07:28:28.112Z",
+      "finishedAt": "2026-10-21T07:29:02.322Z",
+      "durationMs": 34210
+    },
+    "S3_scenes": {
+      "status": "done",
+      "fingerprint": "34d7d1d890b33e8ea6e135bffe19f5255fb0fa593858e8b293af158651a6ad03",
+      "startedAt": "2026-10-21T07:29:02.323Z",
+      "finishedAt": "2026-10-21T07:29:13.670Z",
+      "durationMs": 11347,
+      "metrics": {
+        "method": "model",
+        "sceneCount": 15,
+        "sentenceCount": 36,
+        "estimatedDurationSec": 144.8,
+        "groupingIssues": []
+      }
+    },
+    "S4_visual_plan": {
+      "status": "done",
+      "fingerprint": "4c546bde3034b328a3af5e995fa18024a0b007908cb308276c1bf48ea41940a4",
+      "startedAt": "2026-10-21T07:29:13.671Z",
+      "finishedAt": "2026-10-21T07:29:56.135Z",
+      "durationMs": 42464,
+      "metrics": {
+        "charactersFingerprint": "822a78b9c0400426bd43c084157acfee54f375809f5bd505bd11a47f4a570a63",
+        "characterCount": 2
+      }
+    },
+    "S5_images": {
+      "status": "done",
+      "fingerprint": "e40324c356663d873b73b07af27c1fbc4eb2f56c758d88e893556e2d897007e8",
+      "startedAt": "2026-10-21T07:29:56.137Z",
+      "finishedAt": "2026-10-21T07:35:07.452Z",
+      "durationMs": 311315,
+      "metrics": {
+        "generated": 15,
+        "reused": 0,
+        "failed": 0
+      }
+    },
+    "S6_audio": {
+      "status": "done",
+      "fingerprint": "f89f13fc3818b1ed1b2e76f683bca4e7eb2ce1f3004a115b64df416f8177858b",
+      "startedAt": "2026-10-21T08:05:56.139Z",
+      "finishedAt": "2026-10-21T08:10:07.096Z",
+      "durationMs": 250957,
+      "metrics": {
+        "chunks": 15,
+        "durationSec": 126.72,
+        "voice": "narrator",
+        "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
+      }
+    },
+    "S7_align": {
+      "status": "done",
+      "fingerprint": "660b5730e8168f6ea6029abf52ae20216064e3ddce91575f468ada858f387a74",
+      "startedAt": "2026-10-21T08:10:07.107Z",
+      "finishedAt": "2026-10-21T08:10:13.826Z",
+      "durationMs": 6719,
+      "metrics": {
+        "chunkFingerprints": {
+          "1": "01d5a5f719661d2fc27bc8f17b4e5d04acf4bf6146be7f95d7f3eab73114d37c",
+          "2": "97a71ec2bd58bf5bec201442ae235fb21a19a1918b28aba007e68b0db7ba2ada",
+          "3": "7705bf6b64a1a89c3d91b4b3a5a3e003598690553e87d9da29d907c76e10cab3",
+          "4": "16f6d417100133472286943117a05b6bc747a1e92e2ab450560dc0b7bfe58d3f",
+          "5": "3fb85b27defe6093e74da6006e9778d4a88435bf4089fc8fdfb158b1cd1a7112",
+          "6": "29e0c7c7386d5709b98c2b8a6c3dae69f8d23a5b6cf8de5c691ee678a73c59ef",
+          "7": "6f0b65425e40bff83aeeec795dbacb58317b158415fbad85278727ff8f266167",
+          "8": "567f57270d198b0389520ae11cc2e9ebed72de23e02ef821cb664db81e55c8b4",
+          "9": "3f3f59bc54be27a22e45b007fed2517942ded95c4a1ed0ee7e8bca221ebfa297",
+          "10": "97b8116bcd0e92151a468d45886aba7e2d681628282b1cd6aa0aa913f80eb930",
+          "11": "c65f7a74747c08a1ffdc67c576ca04de2663b4d8ab8a47955b97ce7bcc73dc7a",
+          "12": "f1a32cfd9bd03c5c97c68f731bd00aa256bc932d717bd5e9bafd2769bd4cde9b",
+          "13": "3281404c8897dd003962f326483153239cf8cc1fdb2ff80717be5553b1672576",
+          "14": "56a79488be2f9e00b8ed7142dcbf8e6159a4893668e210609126df90a78bd25b",
+          "15": "db068600fc54856f5e1fb62a6721ee9dc9a039756e895a17cb5b04aa476deaf6"
+        },
+        "totalFrames": 3802,
+        "videoDurationSec": 126.733,
+        "audioDurationSec": 126.72,
+        "cues": 36,
+        "overallMatchRatio": 1
+      }
+    },
+    "S8_render": {
+      "status": "done",
+      "fingerprint": "d17744b93f16052dd8a9679f34f3ec50cf76fbd2e8a0ac630873e80457701942",
+      "startedAt": "2026-10-21T08:10:13.844Z",
+      "finishedAt": "2026-10-21T08:12:34.340Z",
+      "durationMs": 140495
+    }
+  },
+  "groundingSource": "model-knowledge",
+  "unverified": true,
+  "scenes": [
+    {
+      "sceneId": 1,
+      "sentenceIds": ["s1", "s2"],
+      "narration": "At noon, the stick's shadow was shorter than it had been last month. A child in the village had been marking the tip of that shadow with a pebble every week.",
+      "wordCount": 31,
+      "visualPurpose": "Show a village dirt yard at noon with a short stick casting a small shadow, and a child kneeling beside it placing a pebble at the shadow's tip, with earlier pebbles already in a row.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 1,
+        "action": "At midday a child kneels beside a short upright stick in a dirt yard, carefully setting a small pebble at the tip of its short shadow, with a row of earlier pebbles already lying along the ground.",
+        "characters": [
+          {
+            "id": "the_child",
+            "pose": "kneeling on one knee beside the stick, one hand extended down to place a pebble on the ground, body leaning slightly forward",
+            "expression": "focused and calm, brows gently lowered, mouth a small straight line"
+          }
+        ],
+        "setting": "a bare dirt yard in a quiet village at noon, a single wooden stick standing upright in the ground, bright midday sun, clear sky, low-walled houses in the far background",
+        "props": [
+          "a short upright wooden stick",
+          "a small dark shadow pointing away from the stick",
+          "a row of earlier pebbles along the ground",
+          "a single pebble in the child's hand"
+        ],
+        "lighting": "harsh bright midday sun, short crisp shadows, warm dusty daylight",
+        "composition": "wide 16:9 horizontal framing, high-angle shot looking down on the yard, the stick and kneeling child on the left-center, the pebble row stretching across the middle ground, lower edge of the frame kept calm and empty dirt for subtitles",
+        "metaphor": false
+      },
+      "imagePrompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: At midday a child kneels beside a short upright stick in a dirt yard, carefully setting a small pebble at the tip of its short shadow, with a row of earlier pebbles already lying along the ground.\n\nCharacters:\n- The child: A stick figure wearing a small round hat on its round head. Pose: kneeling on one knee beside the stick, one hand extended down to place a pebble on the ground, body leaning slightly forward. Expression: focused and calm, brows gently lowered, mouth a small straight line.\n\nSetting: a bare dirt yard in a quiet village at noon, a single wooden stick standing upright in the ground, bright midday sun, clear sky, low-walled houses in the far background\n\nKey props: a short upright wooden stick, a small dark shadow pointing away from the stick, a row of earlier pebbles along the ground, a single pebble in the child's hand\n\nLighting: harsh bright midday sun, short crisp shadows, warm dusty daylight\n\nComposition: wide 16:9 horizontal framing, high-angle shot looking down on the yard, the stick and kneeling child on the left-center, the pebble row stretching across the middle ground, lower edge of the frame kept calm and empty dirt for subtitles\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "64fe2eb678d724f87f1ce25b50dfeca33fb748eda25227ac512d2ff0659d5ac7",
+      "image": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/images/scene-001.png",
+        "prompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: At midday a child kneels beside a short upright stick in a dirt yard, carefully setting a small pebble at the tip of its short shadow, with a row of earlier pebbles already lying along the ground.\n\nCharacters:\n- The child: A stick figure wearing a small round hat on its round head. Pose: kneeling on one knee beside the stick, one hand extended down to place a pebble on the ground, body leaning slightly forward. Expression: focused and calm, brows gently lowered, mouth a small straight line.\n\nSetting: a bare dirt yard in a quiet village at noon, a single wooden stick standing upright in the ground, bright midday sun, clear sky, low-walled houses in the far background\n\nKey props: a short upright wooden stick, a small dark shadow pointing away from the stick, a row of earlier pebbles along the ground, a single pebble in the child's hand\n\nLighting: harsh bright midday sun, short crisp shadows, warm dusty daylight\n\nComposition: wide 16:9 horizontal framing, high-angle shot looking down on the yard, the stick and kneeling child on the left-center, the pebble row stretching across the middle ground, lower edge of the frame kept calm and empty dirt for subtitles\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "image-provider",
+        "attempts": 1,
+        "promptHash": "6d87909a3b60252c7b4074f198b3ddae5e86f7bd317e2cd71bc46b7fccd7eaa3",
+        "byteSize": 55508,
+        "width": 1024,
+        "height": 572,
+        "aspect": 1.79,
+        "luminanceVariance": 758.81,
+        "generatedAt": "2026-10-21T07:30:33.941Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/chunks/scene-001.wav",
+        "durationSec": 9.84,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/parts/scene-001-part01.wav",
+            "durationSec": 9.84,
+            "text": "At noon, the stick's shadow was shorter than it had been last month. A child in the village had been marking the tip of that shadow with a pebble every week.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
+          }
+        ],
+        "meanVolumeDb": -25.3,
+        "wordsPerMinute": 189,
+        "asrCoverage": 1,
+        "asrChecked": true
+      },
+      "timing": {
+        "start": 0,
+        "end": 10.033,
+        "startFrame": 0,
+        "endFrame": 301,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "At",
+            "start": 0.16,
+            "end": 0.24
+          },
+          {
+            "word": "noon,",
+            "start": 0.321,
+            "end": 0.681
+          },
+          {
+            "word": "the",
+            "start": 1.002,
+            "end": 1.122
+          },
+          {
+            "word": "stick's",
+            "start": 1.182,
+            "end": 1.543
+          },
+          {
+            "word": "shadow",
+            "start": 1.603,
+            "end": 2.004
+          },
+          {
+            "word": "was",
+            "start": 2.044,
+            "end": 2.164
+          },
+          {
+            "word": "shorter",
+            "start": 2.305,
+            "end": 2.705
+          },
+          {
+            "word": "than",
+            "start": 2.766,
+            "end": 2.926
+          },
+          {
+            "word": "it",
+            "start": 2.966,
+            "end": 3.006
+          },
+          {
+            "word": "had",
+            "start": 3.066,
+            "end": 3.166
+          },
+          {
+            "word": "been",
+            "start": 3.227,
+            "end": 3.427
+          },
+          {
+            "word": "last",
+            "start": 3.487,
+            "end": 3.768
+          },
+          {
+            "word": "month.",
+            "start": 3.868,
+            "end": 4.128
+          },
+          {
+            "word": "A",
+            "start": 4.99,
+            "end": 5.03
+          },
+          {
+            "word": "child",
+            "start": 5.09,
+            "end": 5.451
+          },
+          {
+            "word": "in",
+            "start": 5.491,
+            "end": 5.571
+          },
+          {
+            "word": "the",
+            "start": 5.591,
+            "end": 5.672
+          },
+          {
+            "word": "village",
+            "start": 5.712,
+            "end": 6.072
+          },
+          {
+            "word": "had",
+            "start": 6.233,
+            "end": 6.333
+          },
+          {
+            "word": "been",
+            "start": 6.373,
+            "end": 6.533
+          },
+          {
+            "word": "marking",
+            "start": 6.573,
+            "end": 6.954
+          },
+          {
+            "word": "the",
+            "start": 6.974,
+            "end": 7.074
+          },
+          {
+            "word": "tip",
+            "start": 7.135,
+            "end": 7.375
+          },
+          {
+            "word": "of",
+            "start": 7.435,
+            "end": 7.495
+          },
+          {
+            "word": "that",
+            "start": 7.535,
+            "end": 7.696
+          },
+          {
+            "word": "shadow",
+            "start": 7.776,
+            "end": 8.137
+          },
+          {
+            "word": "with",
+            "start": 8.177,
+            "end": 8.297
+          },
+          {
+            "word": "a",
+            "start": 8.357,
+            "end": 8.397
+          },
+          {
+            "word": "pebble",
+            "start": 8.457,
+            "end": 8.858
+          },
+          {
+            "word": "every",
+            "start": 9.038,
+            "end": 9.279
+          },
+          {
+            "word": "week.",
+            "start": 9.339,
+            "end": 9.6
+          }
+        ]
+      }
+    },
+    {
+      "sceneId": 2,
+      "sentenceIds": ["s3", "s4", "s5"],
+      "narration": "The pebbles made a curve across the dirt. Why did the sun climb so high in summer? Why did it sink so low in winter?",
+      "wordCount": 25,
+      "visualPurpose": "Show the row of pebbles curving across the dirt in an arc, with the child looking up at the sky, puzzled, asking why the sun climbs high in summer and sinks low in winter.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 2,
+        "action": "A long row of pebbles curves across bare dirt in a smooth arc, and the child stands beside it, tilting its head up toward the sky in a puzzled pause.",
+        "characters": [
+          {
+            "id": "the_child",
+            "pose": "standing upright beside the pebble arc, head tilted back toward the sky, one arm lifted with the finger pointing at the sun",
+            "expression": "puzzled, brows raised, mouth a small wavy line"
+          }
+        ],
+        "setting": "an open dry village field at midday, bare packed dirt, clear pale sky with no clouds",
+        "props": [
+          "a row of pebbles laid in a curved arc across the dirt",
+          "a bright sun high in the sky",
+          "a small round hat on the child"
+        ],
+        "lighting": "clear bright midday sunlight with soft shadows pooling under the pebbles",
+        "composition": "wide 16:9 horizontal framing, wide shot from ground level, the pebble arc sweeping from the lower left to the upper right, the child at the right third looking up toward the sun at the top, calm empty dirt across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: A long row of pebbles curves across bare dirt in a smooth arc, and the child stands beside it, tilting its head up toward the sky in a puzzled pause.\n\nCharacters:\n- The child: A stick figure wearing a small round hat on its round head. Pose: standing upright beside the pebble arc, head tilted back toward the sky, one arm lifted with the finger pointing at the sun. Expression: puzzled, brows raised, mouth a small wavy line.\n\nSetting: an open dry village field at midday, bare packed dirt, clear pale sky with no clouds\n\nKey props: a row of pebbles laid in a curved arc across the dirt, a bright sun high in the sky, a small round hat on the child\n\nLighting: clear bright midday sunlight with soft shadows pooling under the pebbles\n\nComposition: wide 16:9 horizontal framing, wide shot from ground level, the pebble arc sweeping from the lower left to the upper right, the child at the right third looking up toward the sun at the top, calm empty dirt across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "2624be4e17f9bcd354b94bebd5f234730e90143e7453284cf89d98a987596163",
+      "image": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/images/scene-002.png",
+        "prompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: A long row of pebbles curves across bare dirt in a smooth arc, and the child stands beside it, tilting its head up toward the sky in a puzzled pause.\n\nCharacters:\n- The child: A stick figure wearing a small round hat on its round head. Pose: standing upright beside the pebble arc, head tilted back toward the sky, one arm lifted with the finger pointing at the sun. Expression: puzzled, brows raised, mouth a small wavy line.\n\nSetting: an open dry village field at midday, bare packed dirt, clear pale sky with no clouds\n\nKey props: a row of pebbles laid in a curved arc across the dirt, a bright sun high in the sky, a small round hat on the child\n\nLighting: clear bright midday sunlight with soft shadows pooling under the pebbles\n\nComposition: wide 16:9 horizontal framing, wide shot from ground level, the pebble arc sweeping from the lower left to the upper right, the child at the right third looking up toward the sun at the top, calm empty dirt across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "image-provider",
+        "attempts": 1,
+        "promptHash": "d4154d0f3d474a85cf8df2d2a6449fc5cb55ffb793e409d5da675d94e3024f25",
+        "byteSize": 41102,
+        "width": 1024,
+        "height": 572,
+        "aspect": 1.79,
+        "luminanceVariance": 187.47,
+        "generatedAt": "2026-10-21T07:30:53.302Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/chunks/scene-002.wav",
+        "durationSec": 8.88,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/parts/scene-002-part01.wav",
+            "durationSec": 8.88,
+            "text": "The pebbles made a curve across the dirt. Why did the sun climb so high in summer? Why did it sink so low in winter?",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
+          }
+        ],
+        "meanVolumeDb": -25.1,
+        "wordsPerMinute": 168.9,
+        "asrCoverage": 1,
+        "asrChecked": true
+      },
+      "timing": {
+        "start": 10.033,
+        "end": 19.133,
+        "startFrame": 301,
+        "endFrame": 574,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "The",
+            "start": 10.133,
+            "end": 10.233
+          },
+          {
+            "word": "pebbles",
+            "start": 10.334,
+            "end": 10.775
+          },
+          {
+            "word": "made",
+            "start": 10.855,
+            "end": 11.055
+          },
+          {
+            "word": "a",
+            "start": 11.095,
+            "end": 11.115
+          },
+          {
+            "word": "curve",
+            "start": 11.236,
+            "end": 11.637
+          },
+          {
+            "word": "across",
+            "start": 11.697,
+            "end": 12.198
+          },
+          {
+            "word": "the",
+            "start": 12.278,
+            "end": 12.378
+          },
+          {
+            "word": "dirt.",
+            "start": 12.438,
+            "end": 12.779
+          },
+          {
+            "word": "Why",
+            "start": 13.701,
+            "end": 13.882
+          },
+          {
+            "word": "did",
+            "start": 13.922,
+            "end": 14.022
+          },
+          {
+            "word": "the",
+            "start": 14.062,
+            "end": 14.122
+          },
+          {
+            "word": "sun",
+            "start": 14.182,
+            "end": 14.423
+          },
+          {
+            "word": "climb",
+            "start": 14.483,
+            "end": 14.824
+          },
+          {
+            "word": "so",
+            "start": 14.904,
+            "end": 15.084
+          },
+          {
+            "word": "high",
+            "start": 15.145,
+            "end": 15.365
+          },
+          {
+            "word": "in",
+            "start": 15.425,
+            "end": 15.505
+          },
+          {
+            "word": "summer?",
+            "start": 15.586,
+            "end": 15.926
+          },
+          {
+            "word": "Why",
+            "start": 16.688,
+            "end": 16.868
+          },
+          {
+            "word": "did",
+            "start": 16.908,
+            "end": 17.049
+          },
+          {
+            "word": "it",
+            "start": 17.109,
+            "end": 17.189
+          },
+          {
+            "word": "sink",
+            "start": 17.309,
+            "end": 17.57
+          },
+          {
+            "word": "so",
+            "start": 17.65,
+            "end": 17.811
+          },
+          {
+            "word": "low",
+            "start": 17.871,
+            "end": 18.091
+          },
+          {
+            "word": "in",
+            "start": 18.131,
+            "end": 18.211
+          },
+          {
+            "word": "winter?",
+            "start": 18.312,
+            "end": 18.632
+          }
+        ]
+      }
+    },
+    {
+      "sceneId": 3,
+      "sentenceIds": ["s6", "s7"],
+      "narration": "The child asked a teacher one afternoon. She carried an orange and a lamp into the classroom.",
+      "wordCount": 17,
+      "visualPurpose": "Show the child standing before a teacher in a classroom while carrying an orange in one hand and a lit lamp in the other.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 3,
+        "action": "The child walks into the classroom and stops in front of the teacher, holding a round orange in one hand and a lit lamp in the other. The eye should go to the orange and lamp held up together.",
+        "characters": [
+          {
+            "id": "the_child",
+            "pose": "standing upright, one arm lifted holding an orange, the other arm holding a lit lamp at its side, body turned toward the teacher",
+            "expression": "curious, brows slightly raised, small open mouth"
+          },
+          {
+            "id": "the_teacher",
+            "pose": "standing behind a low wooden table, one hand open toward the child, body angled attentively",
+            "expression": "calm, attentive, brows relaxed, mouth gently curved"
+          }
+        ],
+        "setting": "the inside of a simple village schoolroom in the late afternoon, a plain wooden table and a bare wall with a window letting in dim golden light",
+        "props": [
+          "a round orange",
+          "a lit oil lamp with a small flame",
+          "a low wooden table",
+          "a window frame"
+        ],
+        "lighting": "warm late-afternoon light from the window mixed with the small yellow glow of the lamp",
+        "composition": "wide 16:9 horizontal framing, medium shot from the side of the room, the child on the left third holding up the orange and lamp, the teacher on the right third beside the table, the orange and lamp near the upper middle, calm open floor across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The child walks into the classroom and stops in front of the teacher, holding a round orange in one hand and a lit lamp in the other. The eye should go to the orange and lamp held up together.\n\nCharacters:\n- The child: A stick figure wearing a small round hat on its round head. Pose: standing upright, one arm lifted holding an orange, the other arm holding a lit lamp at its side, body turned toward the teacher. Expression: curious, brows slightly raised, small open mouth.\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: standing behind a low wooden table, one hand open toward the child, body angled attentively. Expression: calm, attentive, brows relaxed, mouth gently curved.\n\nSetting: the inside of a simple village schoolroom in the late afternoon, a plain wooden table and a bare wall with a window letting in dim golden light\n\nKey props: a round orange, a lit oil lamp with a small flame, a low wooden table, a window frame\n\nLighting: warm late-afternoon light from the window mixed with the small yellow glow of the lamp\n\nComposition: wide 16:9 horizontal framing, medium shot from the side of the room, the child on the left third holding up the orange and lamp, the teacher on the right third beside the table, the orange and lamp near the upper middle, calm open floor across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "7748e152708c59246063aa4dbb367ba2e9376343950c8b34ab315db1400122ca",
+      "image": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/images/scene-003.png",
+        "prompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The child walks into the classroom and stops in front of the teacher, holding a round orange in one hand and a lit lamp in the other. The eye should go to the orange and lamp held up together.\n\nCharacters:\n- The child: A stick figure wearing a small round hat on its round head. Pose: standing upright, one arm lifted holding an orange, the other arm holding a lit lamp at its side, body turned toward the teacher. Expression: curious, brows slightly raised, small open mouth.\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: standing behind a low wooden table, one hand open toward the child, body angled attentively. Expression: calm, attentive, brows relaxed, mouth gently curved.\n\nSetting: the inside of a simple village schoolroom in the late afternoon, a plain wooden table and a bare wall with a window letting in dim golden light\n\nKey props: a round orange, a lit oil lamp with a small flame, a low wooden table, a window frame\n\nLighting: warm late-afternoon light from the window mixed with the small yellow glow of the lamp\n\nComposition: wide 16:9 horizontal framing, medium shot from the side of the room, the child on the left third holding up the orange and lamp, the teacher on the right third beside the table, the orange and lamp near the upper middle, calm open floor across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "image-provider",
+        "attempts": 1,
+        "promptHash": "1303f254e59aa7316ff1e9b418f1acd1d86ddeb18485ec4e06060139a4e0c339",
+        "byteSize": 57384,
+        "width": 1024,
+        "height": 572,
+        "aspect": 1.79,
+        "luminanceVariance": 555.77,
+        "generatedAt": "2026-10-21T07:31:12.642Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/chunks/scene-003.wav",
+        "durationSec": 5.72,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/parts/scene-003-part01.wav",
+            "durationSec": 5.72,
+            "text": "The child asked a teacher one afternoon. She carried an orange and a lamp into the classroom.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
+          }
+        ],
+        "meanVolumeDb": -26.6,
+        "wordsPerMinute": 178.3,
+        "asrCoverage": 1,
+        "asrChecked": true
+      },
+      "timing": {
+        "start": 19.133,
+        "end": 25.033,
+        "startFrame": 574,
+        "endFrame": 751,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "The",
+            "start": 19.213,
+            "end": 19.314
+          },
+          {
+            "word": "child",
+            "start": 19.354,
+            "end": 19.675
+          },
+          {
+            "word": "asked",
+            "start": 19.795,
+            "end": 19.996
+          },
+          {
+            "word": "a",
+            "start": 20.076,
+            "end": 20.116
+          },
+          {
+            "word": "teacher",
+            "start": 20.177,
+            "end": 20.558
+          },
+          {
+            "word": "one",
+            "start": 20.678,
+            "end": 20.759
+          },
+          {
+            "word": "afternoon.",
+            "start": 20.839,
+            "end": 21.321
+          },
+          {
+            "word": "She",
+            "start": 21.863,
+            "end": 22.003
+          },
+          {
+            "word": "carried",
+            "start": 22.063,
+            "end": 22.404
+          },
+          {
+            "word": "an",
+            "start": 22.465,
+            "end": 22.525
+          },
+          {
+            "word": "orange",
+            "start": 22.665,
+            "end": 22.966
+          },
+          {
+            "word": "and",
+            "start": 23.067,
+            "end": 23.167
+          },
+          {
+            "word": "a",
+            "start": 23.207,
+            "end": 23.247
+          },
+          {
+            "word": "lamp",
+            "start": 23.308,
+            "end": 23.609
+          },
+          {
+            "word": "into",
+            "start": 23.749,
+            "end": 23.97
+          },
+          {
+            "word": "the",
+            "start": 23.99,
+            "end": 24.07
+          },
+          {
+            "word": "classroom.",
+            "start": 24.11,
+            "end": 24.632
+          }
+        ]
+      }
+    },
+    {
+      "sceneId": 4,
+      "sentenceIds": ["s8", "s9"],
+      "narration": "She pushed a pin through the orange, from the top to the bottom. That pin stood for the axis, an invisible line that Earth spins around.",
+      "wordCount": 26,
+      "visualPurpose": "Show a close view of a pin being pushed straight through the top and bottom of an orange, with the pin clearly marked as the invisible axis the orange spins around.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 4,
+        "action": "The teacher pushes a long metal pin straight down through the top of a large orange, and the pin's tip emerges at the bottom, so the pin stands upright as a clear vertical axis.",
+        "characters": [
+          {
+            "id": "the_teacher",
+            "pose": "leaning forward over a small table, one hand pressing the top of a long pin into the orange, the other hand steadying the orange from below",
+            "expression": "focused, brows lowered, mouth set in a calm line"
+          }
+        ],
+        "setting": "a simple wooden table in a quiet classroom corner, plain background, soft daytime indoor light",
+        "props": [
+          "a large round orange",
+          "a long thin metal pin pushed vertically through the orange",
+          "a small wooden table",
+          "a faint thin line extending past the top and bottom of the pin to show the axis"
+        ],
+        "lighting": "soft warm daylight from one side, gentle shadow under the orange",
+        "composition": "wide 16:9 horizontal framing, medium shot from slightly above the table, the orange and pin placed at the center third with the teacher's hands and upper body on the left, the pin standing perfectly vertical, plain background, calm empty area across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The teacher pushes a long metal pin straight down through the top of a large orange, and the pin's tip emerges at the bottom, so the pin stands upright as a clear vertical axis.\n\nCharacters:\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: leaning forward over a small table, one hand pressing the top of a long pin into the orange, the other hand steadying the orange from below. Expression: focused, brows lowered, mouth set in a calm line.\n\nSetting: a simple wooden table in a quiet classroom corner, plain background, soft daytime indoor light\n\nKey props: a large round orange, a long thin metal pin pushed vertically through the orange, a small wooden table, a faint thin line extending past the top and bottom of the pin to show the axis\n\nLighting: soft warm daylight from one side, gentle shadow under the orange\n\nComposition: wide 16:9 horizontal framing, medium shot from slightly above the table, the orange and pin placed at the center third with the teacher's hands and upper body on the left, the pin standing perfectly vertical, plain background, calm empty area across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "4764f359c2ed556e92e419a040158fe8743dfee122ec419d58cfd58b0d119ed2",
+      "image": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/images/scene-004.png",
+        "prompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The teacher pushes a long metal pin straight down through the top of a large orange, and the pin's tip emerges at the bottom, so the pin stands upright as a clear vertical axis.\n\nCharacters:\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: leaning forward over a small table, one hand pressing the top of a long pin into the orange, the other hand steadying the orange from below. Expression: focused, brows lowered, mouth set in a calm line.\n\nSetting: a simple wooden table in a quiet classroom corner, plain background, soft daytime indoor light\n\nKey props: a large round orange, a long thin metal pin pushed vertically through the orange, a small wooden table, a faint thin line extending past the top and bottom of the pin to show the axis\n\nLighting: soft warm daylight from one side, gentle shadow under the orange\n\nComposition: wide 16:9 horizontal framing, medium shot from slightly above the table, the orange and pin placed at the center third with the teacher's hands and upper body on the left, the pin standing perfectly vertical, plain background, calm empty area across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "image-provider",
+        "attempts": 1,
+        "promptHash": "e03a5bc3d288467c200b050be890cfc02d809a1a3ccd051adbedb13786acfa52",
+        "byteSize": 56470,
+        "width": 1024,
+        "height": 572,
+        "aspect": 1.79,
+        "luminanceVariance": 1007.28,
+        "generatedAt": "2026-10-21T07:31:32.058Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/chunks/scene-004.wav",
+        "durationSec": 9.48,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/parts/scene-004-part01.wav",
+            "durationSec": 9.48,
+            "text": "She pushed a pin through the orange, from the top to the bottom. That pin stood for the axis, an invisible line that Earth spins around.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
+          }
+        ],
+        "meanVolumeDb": -26.1,
+        "wordsPerMinute": 164.6,
+        "asrCoverage": 1,
+        "asrChecked": true
+      },
+      "timing": {
+        "start": 25.033,
+        "end": 34.733,
+        "startFrame": 751,
+        "endFrame": 1042,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "She",
+            "start": 25.173,
+            "end": 25.314
+          },
+          {
+            "word": "pushed",
+            "start": 25.394,
+            "end": 25.694
+          },
+          {
+            "word": "a",
+            "start": 25.755,
+            "end": 25.775
+          },
+          {
+            "word": "pin",
+            "start": 25.875,
+            "end": 26.215
+          },
+          {
+            "word": "through",
+            "start": 26.336,
+            "end": 26.596
+          },
+          {
+            "word": "the",
+            "start": 26.636,
+            "end": 26.737
+          },
+          {
+            "word": "orange,",
+            "start": 26.857,
+            "end": 27.178
+          },
+          {
+            "word": "from",
+            "start": 27.458,
+            "end": 27.618
+          },
+          {
+            "word": "the",
+            "start": 27.638,
+            "end": 27.739
+          },
+          {
+            "word": "top",
+            "start": 27.799,
+            "end": 28.16
+          },
+          {
+            "word": "to",
+            "start": 28.46,
+            "end": 28.56
+          },
+          {
+            "word": "the",
+            "start": 28.601,
+            "end": 28.681
+          },
+          {
+            "word": "bottom.",
+            "start": 28.721,
+            "end": 29.102
+          },
+          {
+            "word": "That",
+            "start": 29.783,
+            "end": 29.983
+          },
+          {
+            "word": "pin",
+            "start": 30.064,
+            "end": 30.364
+          },
+          {
+            "word": "stood",
+            "start": 30.444,
+            "end": 30.705
+          },
+          {
+            "word": "for",
+            "start": 30.745,
+            "end": 30.885
+          },
+          {
+            "word": "the",
+            "start": 30.905,
+            "end": 31.006
+          },
+          {
+            "word": "axis,",
+            "start": 31.186,
+            "end": 31.567
+          },
+          {
+            "word": "an",
+            "start": 31.867,
+            "end": 31.948
+          },
+          {
+            "word": "invisible",
+            "start": 31.988,
+            "end": 32.549
+          },
+          {
+            "word": "line",
+            "start": 32.609,
+            "end": 32.95
+          },
+          {
+            "word": "that",
+            "start": 32.99,
+            "end": 33.13
+          },
+          {
+            "word": "Earth",
+            "start": 33.25,
+            "end": 33.471
+          },
+          {
+            "word": "spins",
+            "start": 33.551,
+            "end": 33.892
+          },
+          {
+            "word": "around.",
+            "start": 33.952,
+            "end": 34.293
+          }
+        ]
+      }
+    },
+    {
+      "sceneId": 5,
+      "sentenceIds": ["s10", "s11"],
+      "narration": "Earth does not stand straight up as it travels around the sun. It leans over, tipped about twenty-three and a half degrees.",
+      "wordCount": 22,
+      "visualPurpose": "Show the orange tipped over on its pin at a visible lean, compared against a straight upright line, so the tilt of Earth is obvious.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [
+        "free ASR heard 82% of the script after one re-synthesis (missing: twenty-three, and, a, half)"
+      ],
+      "slots": {
+        "sceneId": 5,
+        "action": "A tilted orange sits on a thin upright pin, leaning clearly to one side beside a straight vertical line. The teacher points at the leaning orange, so the eye moves from the hand to the tilt.",
+        "characters": [
+          {
+            "id": "the_teacher",
+            "pose": "standing to the left, one arm extended toward the orange, index finger pointing at it, body turned slightly toward the pin",
+            "expression": "calm and focused, brows level, mouth a gentle straight line"
+          }
+        ],
+        "setting": "a plain indoor classroom space at midday, bare wall behind, a clean wooden table holding the demonstration",
+        "props": [
+          "an orange balanced on a thin upright pin",
+          "a straight vertical reference line drawn behind the orange",
+          "a small round lamp at the side of the table"
+        ],
+        "lighting": "soft warm lamp light falling across the orange, with a gentle shadow on the table",
+        "composition": "wide 16:9 horizontal framing, medium shot from the side at table height, teacher on the left third, the tilted orange on the center-right with the straight reference line just beside it, calm empty space across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: A tilted orange sits on a thin upright pin, leaning clearly to one side beside a straight vertical line. The teacher points at the leaning orange, so the eye moves from the hand to the tilt.\n\nCharacters:\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: standing to the left, one arm extended toward the orange, index finger pointing at it, body turned slightly toward the pin. Expression: calm and focused, brows level, mouth a gentle straight line.\n\nSetting: a plain indoor classroom space at midday, bare wall behind, a clean wooden table holding the demonstration\n\nKey props: an orange balanced on a thin upright pin, a straight vertical reference line drawn behind the orange, a small round lamp at the side of the table\n\nLighting: soft warm lamp light falling across the orange, with a gentle shadow on the table\n\nComposition: wide 16:9 horizontal framing, medium shot from the side at table height, teacher on the left third, the tilted orange on the center-right with the straight reference line just beside it, calm empty space across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "2545392556579d695b98e89063a1e84c7f7319aa272cc59a2cf46150372e04ce",
+      "image": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/images/scene-005.png",
+        "prompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: A tilted orange sits on a thin upright pin, leaning clearly to one side beside a straight vertical line. The teacher points at the leaning orange, so the eye moves from the hand to the tilt.\n\nCharacters:\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: standing to the left, one arm extended toward the orange, index finger pointing at it, body turned slightly toward the pin. Expression: calm and focused, brows level, mouth a gentle straight line.\n\nSetting: a plain indoor classroom space at midday, bare wall behind, a clean wooden table holding the demonstration\n\nKey props: an orange balanced on a thin upright pin, a straight vertical reference line drawn behind the orange, a small round lamp at the side of the table\n\nLighting: soft warm lamp light falling across the orange, with a gentle shadow on the table\n\nComposition: wide 16:9 horizontal framing, medium shot from the side at table height, teacher on the left third, the tilted orange on the center-right with the straight reference line just beside it, calm empty space across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "image-provider",
+        "attempts": 1,
+        "promptHash": "ae4df503a481023b002f1e1a3378c42bafcdcdd8a401d116e1dcd6bca1382ba4",
+        "byteSize": 53287,
+        "width": 1024,
+        "height": 572,
+        "aspect": 1.79,
+        "luminanceVariance": 1187.45,
+        "generatedAt": "2026-10-21T07:31:51.429Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/chunks/scene-005.wav",
+        "durationSec": 7.36,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/parts/scene-005-part01.wav",
+            "durationSec": 7.36,
+            "text": "Earth does not stand straight up as it travels around the sun. It leans over, tipped about twenty-three and a half degrees.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
+          }
+        ],
+        "meanVolumeDb": -26.1,
+        "wordsPerMinute": 179.3,
+        "asrCoverage": 0.818,
+        "asrMissing": ["twenty-three", "and", "a", "half"],
+        "resynthesized": true,
+        "asrChecked": true
+      },
+      "timing": {
+        "start": 34.733,
+        "end": 42.267,
+        "startFrame": 1042,
+        "endFrame": 1268,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "Earth",
+            "start": 34.853,
+            "end": 35.034
+          },
+          {
+            "word": "does",
+            "start": 35.094,
+            "end": 35.234
+          },
+          {
+            "word": "not",
+            "start": 35.295,
+            "end": 35.435
+          },
+          {
+            "word": "stand",
+            "start": 35.515,
+            "end": 35.776
+          },
+          {
+            "word": "straight",
+            "start": 35.856,
+            "end": 36.177
+          },
+          {
+            "word": "up",
+            "start": 36.277,
+            "end": 36.377
+          },
+          {
+            "word": "as",
+            "start": 36.458,
+            "end": 36.538
+          },
+          {
+            "word": "it",
+            "start": 36.598,
+            "end": 36.638
+          },
+          {
+            "word": "travels",
+            "start": 36.698,
+            "end": 37.039
+          },
+          {
+            "word": "around",
+            "start": 37.099,
+            "end": 37.34
+          },
+          {
+            "word": "the",
+            "start": 37.38,
+            "end": 37.46
+          },
+          {
+            "word": "sun.",
+            "start": 37.501,
+            "end": 37.761
+          },
+          {
+            "word": "It",
+            "start": 38.343,
+            "end": 38.423
+          },
+          {
+            "word": "leans",
+            "start": 38.483,
+            "end": 38.804
+          },
+          {
+            "word": "over,",
+            "start": 38.924,
+            "end": 39.125
+          },
+          {
+            "word": "tipped",
+            "start": 39.566,
+            "end": 39.847
+          },
+          {
+            "word": "about",
+            "start": 39.907,
+            "end": 40.128
+          },
+          {
+            "word": "twenty-three",
+            "start": 40.208,
+            "end": 40.789
+          },
+          {
+            "word": "and",
+            "start": 40.81,
+            "end": 40.89
+          },
+          {
+            "word": "a",
+            "start": 40.93,
+            "end": 40.95
+          },
+          {
+            "word": "half",
+            "start": 41.03,
+            "end": 41.231
+          },
+          {
+            "word": "degrees.",
+            "start": 41.291,
+            "end": 41.712
+          }
+        ]
+      }
+    },
+    {
+      "sceneId": 6,
+      "sentenceIds": ["s12", "s13", "s14"],
+      "narration": "A degree is a small unit for measuring how far something tips. The teacher placed the lamp in the middle of the room. The lamp stood for the sun.",
+      "wordCount": 29,
+      "visualPurpose": "Show a small angle marker on the tilted orange to suggest a degree of tilt, and the teacher setting a lamp in the middle of the room to represent the sun.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 6,
+        "action": "The teacher kneels in the middle of an empty room and sets a lit lamp on the floor at the centre. Nearby, a round orange sits tilted on a low stool, with a thin curved angle marker drawn beside it to show a small degree of tilt.",
+        "characters": [
+          {
+            "id": "the_teacher",
+            "pose": "kneeling beside the lamp, one hand resting on its base as it is set down, body leaning slightly forward",
+            "expression": "calm and focused, brows level, mouth a small neutral line"
+          }
+        ],
+        "setting": "the middle of a plain wooden room, bare floor, empty walls, daytime indoors with a soft window glow",
+        "props": [
+          "a lit oil lamp placed on the floor in the centre of the room",
+          "a round orange tilted slightly on a low wooden stool",
+          "a thin curved angle marker beside the orange showing a small tilt"
+        ],
+        "lighting": "warm lamp glow at the centre, soft dim daylight from a side window",
+        "composition": "wide 16:9 horizontal framing, medium-wide shot from the side at floor level, teacher on the right third kneeling by the lamp at the centre, tilted orange and its small angle marker on the left third, calm empty floor across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The teacher kneels in the middle of an empty room and sets a lit lamp on the floor at the centre. Nearby, a round orange sits tilted on a low stool, with a thin curved angle marker drawn beside it to show a small degree of tilt.\n\nCharacters:\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: kneeling beside the lamp, one hand resting on its base as it is set down, body leaning slightly forward. Expression: calm and focused, brows level, mouth a small neutral line.\n\nSetting: the middle of a plain wooden room, bare floor, empty walls, daytime indoors with a soft window glow\n\nKey props: a lit oil lamp placed on the floor in the centre of the room, a round orange tilted slightly on a low wooden stool, a thin curved angle marker beside the orange showing a small tilt\n\nLighting: warm lamp glow at the centre, soft dim daylight from a side window\n\nComposition: wide 16:9 horizontal framing, medium-wide shot from the side at floor level, teacher on the right third kneeling by the lamp at the centre, tilted orange and its small angle marker on the left third, calm empty floor across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "e060ecbbd6640203c069c6a6043f8bfff5c0339563a09511d363408ffb6fec6a",
+      "image": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/images/scene-006.png",
+        "prompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The teacher kneels in the middle of an empty room and sets a lit lamp on the floor at the centre. Nearby, a round orange sits tilted on a low stool, with a thin curved angle marker drawn beside it to show a small degree of tilt.\n\nCharacters:\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: kneeling beside the lamp, one hand resting on its base as it is set down, body leaning slightly forward. Expression: calm and focused, brows level, mouth a small neutral line.\n\nSetting: the middle of a plain wooden room, bare floor, empty walls, daytime indoors with a soft window glow\n\nKey props: a lit oil lamp placed on the floor in the centre of the room, a round orange tilted slightly on a low wooden stool, a thin curved angle marker beside the orange showing a small tilt\n\nLighting: warm lamp glow at the centre, soft dim daylight from a side window\n\nComposition: wide 16:9 horizontal framing, medium-wide shot from the side at floor level, teacher on the right third kneeling by the lamp at the centre, tilted orange and its small angle marker on the left third, calm empty floor across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "image-provider",
+        "attempts": 1,
+        "promptHash": "20b1860f5e5be233fa13b077f60e9bdd211ceedf01347cb798a00d2fe6a633b1",
+        "byteSize": 67003,
+        "width": 1024,
+        "height": 572,
+        "aspect": 1.79,
+        "luminanceVariance": 516.81,
+        "generatedAt": "2026-10-21T07:32:10.812Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/chunks/scene-006.wav",
+        "durationSec": 9.8,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/parts/scene-006-part01.wav",
+            "durationSec": 9.8,
+            "text": "A degree is a small unit for measuring how far something tips. The teacher placed the lamp in the middle of the room. The lamp stood for the sun.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
+          }
+        ],
+        "meanVolumeDb": -26.2,
+        "wordsPerMinute": 177.6,
+        "asrCoverage": 1,
+        "asrChecked": true
+      },
+      "timing": {
+        "start": 42.267,
+        "end": 52.267,
+        "startFrame": 1268,
+        "endFrame": 1568,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "A",
+            "start": 42.347,
+            "end": 42.387
+          },
+          {
+            "word": "degree",
+            "start": 42.427,
+            "end": 42.828
+          },
+          {
+            "word": "is",
+            "start": 42.988,
+            "end": 43.109
+          },
+          {
+            "word": "a",
+            "start": 43.149,
+            "end": 43.169
+          },
+          {
+            "word": "small",
+            "start": 43.249,
+            "end": 43.57
+          },
+          {
+            "word": "unit",
+            "start": 43.71,
+            "end": 43.95
+          },
+          {
+            "word": "for",
+            "start": 44.011,
+            "end": 44.151
+          },
+          {
+            "word": "measuring",
+            "start": 44.231,
+            "end": 44.692
+          },
+          {
+            "word": "how",
+            "start": 44.772,
+            "end": 44.973
+          },
+          {
+            "word": "far",
+            "start": 45.053,
+            "end": 45.313
+          },
+          {
+            "word": "something",
+            "start": 45.413,
+            "end": 45.754
+          },
+          {
+            "word": "tips.",
+            "start": 45.834,
+            "end": 46.195
+          },
+          {
+            "word": "The",
+            "start": 47.017,
+            "end": 47.097
+          },
+          {
+            "word": "teacher",
+            "start": 47.157,
+            "end": 47.478
+          },
+          {
+            "word": "placed",
+            "start": 47.538,
+            "end": 47.858
+          },
+          {
+            "word": "the",
+            "start": 47.898,
+            "end": 47.979
+          },
+          {
+            "word": "lamp",
+            "start": 48.039,
+            "end": 48.319
+          },
+          {
+            "word": "in",
+            "start": 48.54,
+            "end": 48.62
+          },
+          {
+            "word": "the",
+            "start": 48.64,
+            "end": 48.74
+          },
+          {
+            "word": "middle",
+            "start": 48.78,
+            "end": 49.041
+          },
+          {
+            "word": "of",
+            "start": 49.061,
+            "end": 49.121
+          },
+          {
+            "word": "the",
+            "start": 49.161,
+            "end": 49.261
+          },
+          {
+            "word": "room.",
+            "start": 49.301,
+            "end": 49.602
+          },
+          {
+            "word": "The",
+            "start": 50.384,
+            "end": 50.484
+          },
+          {
+            "word": "lamp",
+            "start": 50.544,
+            "end": 50.885
+          },
+          {
+            "word": "stood",
+            "start": 50.965,
+            "end": 51.205
+          },
+          {
+            "word": "for",
+            "start": 51.225,
+            "end": 51.325
+          },
+          {
+            "word": "the",
+            "start": 51.366,
+            "end": 51.446
+          },
+          {
+            "word": "sun.",
+            "start": 51.486,
+            "end": 51.726
+          }
+        ]
+      }
+    },
+    {
+      "sceneId": 7,
+      "sentenceIds": ["s15", "s16"],
+      "narration": "She walked the orange in a slow circle around the lamp. She kept the pin tipped the same way the whole time.",
+      "wordCount": 22,
+      "visualPurpose": "Show the teacher walking the tilted orange in a slow circle around the lamp, with the pin keeping the same slant throughout the path.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 7,
+        "action": "The teacher walks slowly around a lit lamp, holding an orange on a tilted pin out in front, with the pin's slant clearly held steady as the body moves along a circular path.",
+        "characters": [
+          {
+            "id": "the_teacher",
+            "pose": "mid-stride on a curved path, one arm extended forward holding a pin with an orange tilted at a steady angle, body turned slightly toward the lamp",
+            "expression": "calm and focused, brows level, mouth a gentle straight line"
+          }
+        ],
+        "setting": "a dim wooden room at night, the floor bare, a faint circular ring on the floor showing the path around the lamp",
+        "props": [
+          "a standing lamp with a warm flame at the center",
+          "an orange on a thin pin, tilted at a steady slant",
+          "a faint circular path on the floor around the lamp"
+        ],
+        "lighting": "warm lamp glow in a dark room, soft light falling outward from the center",
+        "composition": "wide 16:9 horizontal framing, high-angle shot looking down on the room, lamp at the center, the teacher walking the circle on the left side, the tilted orange clearly visible, calm dark floor across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The teacher walks slowly around a lit lamp, holding an orange on a tilted pin out in front, with the pin's slant clearly held steady as the body moves along a circular path.\n\nCharacters:\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: mid-stride on a curved path, one arm extended forward holding a pin with an orange tilted at a steady angle, body turned slightly toward the lamp. Expression: calm and focused, brows level, mouth a gentle straight line.\n\nSetting: a dim wooden room at night, the floor bare, a faint circular ring on the floor showing the path around the lamp\n\nKey props: a standing lamp with a warm flame at the center, an orange on a thin pin, tilted at a steady slant, a faint circular path on the floor around the lamp\n\nLighting: warm lamp glow in a dark room, soft light falling outward from the center\n\nComposition: wide 16:9 horizontal framing, high-angle shot looking down on the room, lamp at the center, the teacher walking the circle on the left side, the tilted orange clearly visible, calm dark floor across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "dbac9e39535a173a607b91ba53406f3b2b571bea513fca49ac30889509afec37",
+      "image": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/images/scene-007.png",
+        "prompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The teacher walks slowly around a lit lamp, holding an orange on a tilted pin out in front, with the pin's slant clearly held steady as the body moves along a circular path.\n\nCharacters:\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: mid-stride on a curved path, one arm extended forward holding a pin with an orange tilted at a steady angle, body turned slightly toward the lamp. Expression: calm and focused, brows level, mouth a gentle straight line.\n\nSetting: a dim wooden room at night, the floor bare, a faint circular ring on the floor showing the path around the lamp\n\nKey props: a standing lamp with a warm flame at the center, an orange on a thin pin, tilted at a steady slant, a faint circular path on the floor around the lamp\n\nLighting: warm lamp glow in a dark room, soft light falling outward from the center\n\nComposition: wide 16:9 horizontal framing, high-angle shot looking down on the room, lamp at the center, the teacher walking the circle on the left side, the tilted orange clearly visible, calm dark floor across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "image-provider",
+        "attempts": 1,
+        "promptHash": "ae63657327f8cb4e7e8584e6275ffd87320e5c7fe457114fac22d4dab009fe30",
+        "byteSize": 56414,
+        "width": 1024,
+        "height": 572,
+        "aspect": 1.79,
+        "luminanceVariance": 3490.82,
+        "generatedAt": "2026-10-21T07:32:30.187Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/chunks/scene-007.wav",
+        "durationSec": 6.08,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/parts/scene-007-part01.wav",
+            "durationSec": 6.08,
+            "text": "She walked the orange in a slow circle around the lamp. She kept the pin tipped the same way the whole time.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
+          }
+        ],
+        "meanVolumeDb": -27.2,
+        "wordsPerMinute": 217.1,
+        "asrCoverage": 1,
+        "asrChecked": true
+      },
+      "timing": {
+        "start": 52.267,
+        "end": 58.567,
+        "startFrame": 1568,
+        "endFrame": 1757,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "She",
+            "start": 52.428,
+            "end": 52.528
+          },
+          {
+            "word": "walked",
+            "start": 52.568,
+            "end": 52.809
+          },
+          {
+            "word": "the",
+            "start": 52.849,
+            "end": 52.949
+          },
+          {
+            "word": "orange",
+            "start": 53.03,
+            "end": 53.29
+          },
+          {
+            "word": "in",
+            "start": 53.33,
+            "end": 53.411
+          },
+          {
+            "word": "a",
+            "start": 53.431,
+            "end": 53.471
+          },
+          {
+            "word": "slow",
+            "start": 53.531,
+            "end": 53.812
+          },
+          {
+            "word": "circle",
+            "start": 53.872,
+            "end": 54.254
+          },
+          {
+            "word": "around",
+            "start": 54.294,
+            "end": 54.534
+          },
+          {
+            "word": "the",
+            "start": 54.575,
+            "end": 54.655
+          },
+          {
+            "word": "lamp.",
+            "start": 54.675,
+            "end": 54.956
+          },
+          {
+            "word": "She",
+            "start": 55.578,
+            "end": 55.698
+          },
+          {
+            "word": "kept",
+            "start": 55.738,
+            "end": 55.959
+          },
+          {
+            "word": "the",
+            "start": 55.979,
+            "end": 56.08
+          },
+          {
+            "word": "pin",
+            "start": 56.12,
+            "end": 56.36
+          },
+          {
+            "word": "tipped",
+            "start": 56.421,
+            "end": 56.722
+          },
+          {
+            "word": "the",
+            "start": 56.802,
+            "end": 56.902
+          },
+          {
+            "word": "same",
+            "start": 56.942,
+            "end": 57.163
+          },
+          {
+            "word": "way",
+            "start": 57.223,
+            "end": 57.384
+          },
+          {
+            "word": "the",
+            "start": 57.424,
+            "end": 57.504
+          },
+          {
+            "word": "whole",
+            "start": 57.544,
+            "end": 57.745
+          },
+          {
+            "word": "time.",
+            "start": 57.825,
+            "end": 58.126
+          }
+        ]
+      }
+    },
+    {
+      "sceneId": 8,
+      "sentenceIds": ["s17", "s18"],
+      "narration": "When the top leaned toward the lamp, that half got straighter light. Straighter light is packed into a smaller space, so that half feels warmer.",
+      "wordCount": 25,
+      "visualPurpose": "Show the top half of the orange tilted toward the lamp, with bright concentrated rays packed tightly onto that half, making it look warm.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 8,
+        "action": "The teacher tilts an orange toward a lamp so its top half faces the light, while thin bright rays strike that upper half in tight, parallel lines. The eye should settle on the lit top of the orange.",
+        "characters": [
+          {
+            "id": "the_teacher",
+            "pose": "both arms extended forward, hands cupping an orange tilted up toward a lamp on the left",
+            "expression": "focused, brows slightly raised, mouth open as if explaining"
+          }
+        ],
+        "setting": "a plain wooden table in a dim room at night, the teacher standing behind it, faint shadows on the wall",
+        "props": [
+          "a round orange tilted toward the light",
+          "a small oil lamp with a bright flame",
+          "straight parallel light rays striking the top half of the orange",
+          "a wooden table"
+        ],
+        "lighting": "warm concentrated lamp glow with tight, bright beams falling on the top half of the orange, the lower half in soft dim shadow",
+        "composition": "medium shot, wide 16:9 horizontal framing, lamp on the left third, orange centered with its top half toward the lamp, teacher on the right, calm dark table surface across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The teacher tilts an orange toward a lamp so its top half faces the light, while thin bright rays strike that upper half in tight, parallel lines. The eye should settle on the lit top of the orange.\n\nCharacters:\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: both arms extended forward, hands cupping an orange tilted up toward a lamp on the left. Expression: focused, brows slightly raised, mouth open as if explaining.\n\nSetting: a plain wooden table in a dim room at night, the teacher standing behind it, faint shadows on the wall\n\nKey props: a round orange tilted toward the light, a small oil lamp with a bright flame, straight parallel light rays striking the top half of the orange, a wooden table\n\nLighting: warm concentrated lamp glow with tight, bright beams falling on the top half of the orange, the lower half in soft dim shadow\n\nComposition: medium shot, wide 16:9 horizontal framing, lamp on the left third, orange centered with its top half toward the lamp, teacher on the right, calm dark table surface across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "3e038bc37294e21537f52f14e33bdf8ad82b3135be5b3197ffd59ed47e5fbb3e",
+      "image": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/images/scene-008.png",
+        "prompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The teacher tilts an orange toward a lamp so its top half faces the light, while thin bright rays strike that upper half in tight, parallel lines. The eye should settle on the lit top of the orange.\n\nCharacters:\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: both arms extended forward, hands cupping an orange tilted up toward a lamp on the left. Expression: focused, brows slightly raised, mouth open as if explaining.\n\nSetting: a plain wooden table in a dim room at night, the teacher standing behind it, faint shadows on the wall\n\nKey props: a round orange tilted toward the light, a small oil lamp with a bright flame, straight parallel light rays striking the top half of the orange, a wooden table\n\nLighting: warm concentrated lamp glow with tight, bright beams falling on the top half of the orange, the lower half in soft dim shadow\n\nComposition: medium shot, wide 16:9 horizontal framing, lamp on the left third, orange centered with its top half toward the lamp, teacher on the right, calm dark table surface across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "image-provider",
+        "attempts": 1,
+        "promptHash": "8250e2b54f7952db1f752ab54e1d88c704e928cf8ff769552d1c75c04a8c8cd2",
+        "byteSize": 69203,
+        "width": 1024,
+        "height": 572,
+        "aspect": 1.79,
+        "luminanceVariance": 2772.07,
+        "generatedAt": "2026-10-21T07:32:49.571Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/chunks/scene-008.wav",
+        "durationSec": 8.4,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/parts/scene-008-part01.wav",
+            "durationSec": 8.4,
+            "text": "When the top leaned toward the lamp, that half got straighter light. Straighter light is packed into a smaller space, so that half feels warmer.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
+          }
+        ],
+        "meanVolumeDb": -25,
+        "wordsPerMinute": 178.6,
+        "asrCoverage": 1,
+        "asrChecked": true
+      },
+      "timing": {
+        "start": 58.567,
+        "end": 67.167,
+        "startFrame": 1757,
+        "endFrame": 2015,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "When",
+            "start": 58.687,
+            "end": 58.828
+          },
+          {
+            "word": "the",
+            "start": 58.848,
+            "end": 58.928
+          },
+          {
+            "word": "top",
+            "start": 58.988,
+            "end": 59.309
+          },
+          {
+            "word": "leaned",
+            "start": 59.389,
+            "end": 59.63
+          },
+          {
+            "word": "toward",
+            "start": 59.67,
+            "end": 59.89
+          },
+          {
+            "word": "the",
+            "start": 59.91,
+            "end": 59.99
+          },
+          {
+            "word": "lamp,",
+            "start": 60.03,
+            "end": 60.351
+          },
+          {
+            "word": "that",
+            "start": 60.672,
+            "end": 60.872
+          },
+          {
+            "word": "half",
+            "start": 60.933,
+            "end": 61.133
+          },
+          {
+            "word": "got",
+            "start": 61.173,
+            "end": 61.354
+          },
+          {
+            "word": "straighter",
+            "start": 61.414,
+            "end": 61.795
+          },
+          {
+            "word": "light.",
+            "start": 61.835,
+            "end": 62.055
+          },
+          {
+            "word": "Straighter",
+            "start": 62.717,
+            "end": 63.098
+          },
+          {
+            "word": "light",
+            "start": 63.138,
+            "end": 63.338
+          },
+          {
+            "word": "is",
+            "start": 63.399,
+            "end": 63.459
+          },
+          {
+            "word": "packed",
+            "start": 63.519,
+            "end": 63.82
+          },
+          {
+            "word": "into",
+            "start": 63.84,
+            "end": 64.04
+          },
+          {
+            "word": "a",
+            "start": 64.08,
+            "end": 64.12
+          },
+          {
+            "word": "smaller",
+            "start": 64.2,
+            "end": 64.641
+          },
+          {
+            "word": "space,",
+            "start": 64.702,
+            "end": 65.062
+          },
+          {
+            "word": "so",
+            "start": 65.423,
+            "end": 65.524
+          },
+          {
+            "word": "that",
+            "start": 65.564,
+            "end": 65.704
+          },
+          {
+            "word": "half",
+            "start": 65.764,
+            "end": 66.045
+          },
+          {
+            "word": "feels",
+            "start": 66.085,
+            "end": 66.366
+          },
+          {
+            "word": "warmer.",
+            "start": 66.426,
+            "end": 66.767
+          }
+        ]
+      }
+    },
+    {
+      "sceneId": 9,
+      "sentenceIds": ["s19", "s20"],
+      "narration": "That half also had longer days, since the sun stayed up for more hours. That is summer.",
+      "wordCount": 17,
+      "visualPurpose": "Show the sunlit half of the orange with a long bright daylight band across it, suggesting many hours of sun, labeled by the moment as summer.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 9,
+        "action": "The teacher holds up a large orange beside a bright lamp, with the lit half turned toward the viewer and a long band of golden daylight spreading across it, showing the many hours of sun on that half.",
+        "characters": [
+          {
+            "id": "the_teacher",
+            "pose": "one arm raised holding the orange up to the lamp, the other hand open and gesturing toward the sunlit half",
+            "expression": "calm and content, mouth gently curved in a small smile, brows relaxed"
+          }
+        ],
+        "setting": "a bright open indoor schoolroom at midday, warm and clear, with a wooden table in the foreground",
+        "props": [
+          "a large orange held up in the light",
+          "a bright lamp standing on the table",
+          "a long golden band of light across the sunlit half of the orange",
+          "a wooden table"
+        ],
+        "lighting": "warm golden daylight glow, the sunlit half of the orange shining brightly against a softer background",
+        "composition": "wide 16:9 horizontal framing, medium shot from the side, teacher on the left third holding the orange at chest height, lamp and orange centered, calm empty table area across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The teacher holds up a large orange beside a bright lamp, with the lit half turned toward the viewer and a long band of golden daylight spreading across it, showing the many hours of sun on that half.\n\nCharacters:\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: one arm raised holding the orange up to the lamp, the other hand open and gesturing toward the sunlit half. Expression: calm and content, mouth gently curved in a small smile, brows relaxed.\n\nSetting: a bright open indoor schoolroom at midday, warm and clear, with a wooden table in the foreground\n\nKey props: a large orange held up in the light, a bright lamp standing on the table, a long golden band of light across the sunlit half of the orange, a wooden table\n\nLighting: warm golden daylight glow, the sunlit half of the orange shining brightly against a softer background\n\nComposition: wide 16:9 horizontal framing, medium shot from the side, teacher on the left third holding the orange at chest height, lamp and orange centered, calm empty table area across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "bae3d583e83189159d06fa64818c8c794882b06af528431cfcdaf8e21eb30233",
+      "image": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/images/scene-009.png",
+        "prompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The teacher holds up a large orange beside a bright lamp, with the lit half turned toward the viewer and a long band of golden daylight spreading across it, showing the many hours of sun on that half.\n\nCharacters:\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: one arm raised holding the orange up to the lamp, the other hand open and gesturing toward the sunlit half. Expression: calm and content, mouth gently curved in a small smile, brows relaxed.\n\nSetting: a bright open indoor schoolroom at midday, warm and clear, with a wooden table in the foreground\n\nKey props: a large orange held up in the light, a bright lamp standing on the table, a long golden band of light across the sunlit half of the orange, a wooden table\n\nLighting: warm golden daylight glow, the sunlit half of the orange shining brightly against a softer background\n\nComposition: wide 16:9 horizontal framing, medium shot from the side, teacher on the left third holding the orange at chest height, lamp and orange centered, calm empty table area across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "image-provider",
+        "attempts": 1,
+        "promptHash": "0816c3638e6ee814796d07eb3eaf6f4f49824153885be52cf6bcf9d7281ea499",
+        "byteSize": 80251,
+        "width": 1024,
+        "height": 572,
+        "aspect": 1.79,
+        "luminanceVariance": 975.37,
+        "generatedAt": "2026-10-21T07:33:08.969Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/chunks/scene-009.wav",
+        "durationSec": 5.4,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/parts/scene-009-part01.wav",
+            "durationSec": 5.4,
+            "text": "That half also had longer days, since the sun stayed up for more hours. That is summer.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
+          }
+        ],
+        "meanVolumeDb": -25.6,
+        "wordsPerMinute": 188.9,
+        "asrCoverage": 1,
+        "asrChecked": true
+      },
+      "timing": {
+        "start": 67.167,
+        "end": 72.767,
+        "startFrame": 2015,
+        "endFrame": 2183,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "That",
+            "start": 67.247,
+            "end": 67.408
+          },
+          {
+            "word": "half",
+            "start": 67.468,
+            "end": 67.729
+          },
+          {
+            "word": "also",
+            "start": 67.809,
+            "end": 68.07
+          },
+          {
+            "word": "had",
+            "start": 68.131,
+            "end": 68.291
+          },
+          {
+            "word": "longer",
+            "start": 68.331,
+            "end": 68.612
+          },
+          {
+            "word": "days,",
+            "start": 68.673,
+            "end": 69.074
+          },
+          {
+            "word": "since",
+            "start": 69.476,
+            "end": 69.676
+          },
+          {
+            "word": "the",
+            "start": 69.716,
+            "end": 69.797
+          },
+          {
+            "word": "sun",
+            "start": 69.857,
+            "end": 70.078
+          },
+          {
+            "word": "stayed",
+            "start": 70.118,
+            "end": 70.359
+          },
+          {
+            "word": "up",
+            "start": 70.419,
+            "end": 70.479
+          },
+          {
+            "word": "for",
+            "start": 70.519,
+            "end": 70.62
+          },
+          {
+            "word": "more",
+            "start": 70.66,
+            "end": 70.821
+          },
+          {
+            "word": "hours.",
+            "start": 70.861,
+            "end": 71.222
+          },
+          {
+            "word": "That",
+            "start": 71.563,
+            "end": 71.764
+          },
+          {
+            "word": "is",
+            "start": 71.824,
+            "end": 71.905
+          },
+          {
+            "word": "summer.",
+            "start": 71.985,
+            "end": 72.286
+          }
+        ]
+      }
+    },
+    {
+      "sceneId": 10,
+      "sentenceIds": ["s21", "s22", "s23", "s24"],
+      "narration": "On the far side of the circle, the top leaned away. Light arrived at a slant and spread thin over more ground. Days grew short and cool. That is winter.",
+      "wordCount": 30,
+      "visualPurpose": "Show the opposite side of the orange tipped away from the lamp, with light striking at a shallow slant and spreading thin across a wide area, under a dim cold scene for winter.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 10,
+        "action": "The teacher holds an orange tipped away from a lamp, so its far side leans back. Light from the lamp strikes the fruit at a shallow slant and spreads thinly across the surface and the table beside it.",
+        "characters": [
+          {
+            "id": "the_teacher",
+            "pose": "standing to the left, one arm extended with both hands tilting an orange away from the lamp",
+            "expression": "calm and serious, brows level, mouth a flat line"
+          }
+        ],
+        "setting": "a plain wooden table in a small room on a short, cold winter afternoon, dim grey light through a narrow window",
+        "props": [
+          "a round orange tilted away from the light",
+          "a lamp on the right casting a low, slanted beam",
+          "thin shafts of light spreading across the tabletop",
+          "a faint dark shadow stretching on the table"
+        ],
+        "lighting": "dim, cold, low-angled lamplight with pale grey winter daylight, soft and thin",
+        "composition": "wide 16:9 horizontal framing, medium shot from the side at table height, teacher and orange on the left third, lamp on the right, the tilted orange and slanted light lines at the centre, calm empty table surface across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The teacher holds an orange tipped away from a lamp, so its far side leans back. Light from the lamp strikes the fruit at a shallow slant and spreads thinly across the surface and the table beside it.\n\nCharacters:\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: standing to the left, one arm extended with both hands tilting an orange away from the lamp. Expression: calm and serious, brows level, mouth a flat line.\n\nSetting: a plain wooden table in a small room on a short, cold winter afternoon, dim grey light through a narrow window\n\nKey props: a round orange tilted away from the light, a lamp on the right casting a low, slanted beam, thin shafts of light spreading across the tabletop, a faint dark shadow stretching on the table\n\nLighting: dim, cold, low-angled lamplight with pale grey winter daylight, soft and thin\n\nComposition: wide 16:9 horizontal framing, medium shot from the side at table height, teacher and orange on the left third, lamp on the right, the tilted orange and slanted light lines at the centre, calm empty table surface across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "d7e9d21e917efe7cffb80e81edc373ecc406896143ed374ee375382422d156af",
+      "image": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/images/scene-010.png",
+        "prompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The teacher holds an orange tipped away from a lamp, so its far side leans back. Light from the lamp strikes the fruit at a shallow slant and spreads thinly across the surface and the table beside it.\n\nCharacters:\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: standing to the left, one arm extended with both hands tilting an orange away from the lamp. Expression: calm and serious, brows level, mouth a flat line.\n\nSetting: a plain wooden table in a small room on a short, cold winter afternoon, dim grey light through a narrow window\n\nKey props: a round orange tilted away from the light, a lamp on the right casting a low, slanted beam, thin shafts of light spreading across the tabletop, a faint dark shadow stretching on the table\n\nLighting: dim, cold, low-angled lamplight with pale grey winter daylight, soft and thin\n\nComposition: wide 16:9 horizontal framing, medium shot from the side at table height, teacher and orange on the left third, lamp on the right, the tilted orange and slanted light lines at the centre, calm empty table surface across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "image-provider",
+        "attempts": 1,
+        "promptHash": "82099056dfb1beba9ce9e94af7a488d38fafeac4bb713d0a0f321adb6ea9dd12",
+        "byteSize": 79217,
+        "width": 1024,
+        "height": 572,
+        "aspect": 1.79,
+        "luminanceVariance": 815.94,
+        "generatedAt": "2026-10-21T07:33:28.366Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/chunks/scene-010.wav",
+        "durationSec": 12.2,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/parts/scene-010-part01.wav",
+            "durationSec": 12.2,
+            "text": "On the far side of the circle, the top leaned away. Light arrived at a slant and spread thin over more ground. Days grew short and cool. That is winter.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
+          }
+        ],
+        "meanVolumeDb": -25.9,
+        "wordsPerMinute": 147.5,
+        "asrCoverage": 1,
+        "asrChecked": true
+      },
+      "timing": {
+        "start": 72.767,
+        "end": 85.167,
+        "startFrame": 2183,
+        "endFrame": 2555,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "On",
+            "start": 72.907,
+            "end": 72.987
+          },
+          {
+            "word": "the",
+            "start": 73.007,
+            "end": 73.108
+          },
+          {
+            "word": "far",
+            "start": 73.168,
+            "end": 73.428
+          },
+          {
+            "word": "side",
+            "start": 73.488,
+            "end": 73.749
+          },
+          {
+            "word": "of",
+            "start": 73.789,
+            "end": 73.849
+          },
+          {
+            "word": "the",
+            "start": 73.889,
+            "end": 73.969
+          },
+          {
+            "word": "circle,",
+            "start": 74.029,
+            "end": 74.39
+          },
+          {
+            "word": "the",
+            "start": 74.71,
+            "end": 74.79
+          },
+          {
+            "word": "top",
+            "start": 74.83,
+            "end": 75.171
+          },
+          {
+            "word": "leaned",
+            "start": 75.271,
+            "end": 75.511
+          },
+          {
+            "word": "away.",
+            "start": 75.552,
+            "end": 75.852
+          },
+          {
+            "word": "Light",
+            "start": 76.754,
+            "end": 76.974
+          },
+          {
+            "word": "arrived",
+            "start": 77.034,
+            "end": 77.435
+          },
+          {
+            "word": "at",
+            "start": 77.515,
+            "end": 77.595
+          },
+          {
+            "word": "a",
+            "start": 77.635,
+            "end": 77.675
+          },
+          {
+            "word": "slant",
+            "start": 77.755,
+            "end": 78.176
+          },
+          {
+            "word": "and",
+            "start": 78.496,
+            "end": 78.597
+          },
+          {
+            "word": "spread",
+            "start": 78.697,
+            "end": 78.997
+          },
+          {
+            "word": "thin",
+            "start": 79.077,
+            "end": 79.318
+          },
+          {
+            "word": "over",
+            "start": 79.378,
+            "end": 79.538
+          },
+          {
+            "word": "more",
+            "start": 79.598,
+            "end": 79.839
+          },
+          {
+            "word": "ground.",
+            "start": 79.879,
+            "end": 80.259
+          },
+          {
+            "word": "Days",
+            "start": 81.141,
+            "end": 81.441
+          },
+          {
+            "word": "grew",
+            "start": 81.501,
+            "end": 81.682
+          },
+          {
+            "word": "short",
+            "start": 81.762,
+            "end": 82.042
+          },
+          {
+            "word": "and",
+            "start": 82.142,
+            "end": 82.243
+          },
+          {
+            "word": "cool.",
+            "start": 82.323,
+            "end": 82.663
+          },
+          {
+            "word": "That",
+            "start": 83.585,
+            "end": 83.825
+          },
+          {
+            "word": "is",
+            "start": 84.045,
+            "end": 84.186
+          },
+          {
+            "word": "winter.",
+            "start": 84.306,
+            "end": 84.646
+          }
+        ]
+      }
+    },
+    {
+      "sceneId": 11,
+      "sentenceIds": ["s25", "s26", "s27"],
+      "narration": "The child stood very still, watching the orange turn. Then the child remembered the pebbles in the dirt. They curved up and down, following the sun's path across the sky.",
+      "wordCount": 30,
+      "visualPurpose": "Show the child standing still in the classroom watching the orange turn, then a flashback-style view of the curved pebble arc in the dirt that follows the sun's path across the sky.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 11,
+        "action": "The child stands perfectly still, arms at the sides, gazing toward a small orange turning slowly on a stick above a lit lamp. Beside the scene, a faint memory of pebbles laid in a rising and falling arc across the dirt floor shows the path of the sun.",
+        "characters": [
+          {
+            "id": "the_child",
+            "pose": "standing motionless, arms relaxed at the sides, body turned slightly toward the orange",
+            "expression": "calm and attentive, brows slightly raised, mouth closed in a soft line"
+          },
+          {
+            "id": "the_teacher",
+            "pose": "one hand holding a stick that turns the orange over the lamp, body slightly bent forward",
+            "expression": "patient and focused, brows level, small mouth curve"
+          }
+        ],
+        "setting": "a simple earthen classroom with packed dirt floor and mud walls, daylight from a small window, a wooden stand holding a lamp and the turning orange",
+        "props": [
+          "an orange on a thin stick",
+          "a lit oil lamp on a low wooden stand",
+          "a curved row of small pebbles in the dirt floor",
+          "a small window with soft daylight"
+        ],
+        "lighting": "warm lamp glow over the orange, soft pale window light falling across the packed dirt floor",
+        "composition": "wide 16:9 horizontal framing, medium-wide shot with the child standing left of center, the teacher and lamp on the right, the pebble arc curving across the middle band of the floor, calm open dirt across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The child stands perfectly still, arms at the sides, gazing toward a small orange turning slowly on a stick above a lit lamp. Beside the scene, a faint memory of pebbles laid in a rising and falling arc across the dirt floor shows the path of the sun.\n\nCharacters:\n- The child: A stick figure wearing a small round hat on its round head. Pose: standing motionless, arms relaxed at the sides, body turned slightly toward the orange. Expression: calm and attentive, brows slightly raised, mouth closed in a soft line.\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: one hand holding a stick that turns the orange over the lamp, body slightly bent forward. Expression: patient and focused, brows level, small mouth curve.\n\nSetting: a simple earthen classroom with packed dirt floor and mud walls, daylight from a small window, a wooden stand holding a lamp and the turning orange\n\nKey props: an orange on a thin stick, a lit oil lamp on a low wooden stand, a curved row of small pebbles in the dirt floor, a small window with soft daylight\n\nLighting: warm lamp glow over the orange, soft pale window light falling across the packed dirt floor\n\nComposition: wide 16:9 horizontal framing, medium-wide shot with the child standing left of center, the teacher and lamp on the right, the pebble arc curving across the middle band of the floor, calm open dirt across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "09e8c09b353046d76bebf70ff3c3ed8afa82ee3cd202da80466d9e8da60cec6e",
+      "image": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/images/scene-011.png",
+        "prompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The child stands perfectly still, arms at the sides, gazing toward a small orange turning slowly on a stick above a lit lamp. Beside the scene, a faint memory of pebbles laid in a rising and falling arc across the dirt floor shows the path of the sun.\n\nCharacters:\n- The child: A stick figure wearing a small round hat on its round head. Pose: standing motionless, arms relaxed at the sides, body turned slightly toward the orange. Expression: calm and attentive, brows slightly raised, mouth closed in a soft line.\n- The teacher: A stick figure wearing a wide sash across its chest. Pose: one hand holding a stick that turns the orange over the lamp, body slightly bent forward. Expression: patient and focused, brows level, small mouth curve.\n\nSetting: a simple earthen classroom with packed dirt floor and mud walls, daylight from a small window, a wooden stand holding a lamp and the turning orange\n\nKey props: an orange on a thin stick, a lit oil lamp on a low wooden stand, a curved row of small pebbles in the dirt floor, a small window with soft daylight\n\nLighting: warm lamp glow over the orange, soft pale window light falling across the packed dirt floor\n\nComposition: wide 16:9 horizontal framing, medium-wide shot with the child standing left of center, the teacher and lamp on the right, the pebble arc curving across the middle band of the floor, calm open dirt across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "image-provider",
+        "attempts": 1,
+        "promptHash": "fe4075502878abc0e3d9271ddbe609747674ad76c52ab13140336870096d5e7b",
+        "byteSize": 56975,
+        "width": 1024,
+        "height": 572,
+        "aspect": 1.79,
+        "luminanceVariance": 603.92,
+        "generatedAt": "2026-10-21T07:33:49.768Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/chunks/scene-011.wav",
+        "durationSec": 10.76,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/parts/scene-011-part01.wav",
+            "durationSec": 10.76,
+            "text": "The child stood very still, watching the orange turn. Then the child remembered the pebbles in the dirt. They curved up and down, following the sun's path across the sky.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
+          }
+        ],
+        "meanVolumeDb": -25.3,
+        "wordsPerMinute": 167.3,
+        "asrCoverage": 1,
+        "asrChecked": true
+      },
+      "timing": {
+        "start": 85.167,
+        "end": 96.133,
+        "startFrame": 2555,
+        "endFrame": 2884,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "The",
+            "start": 85.287,
+            "end": 85.367
+          },
+          {
+            "word": "child",
+            "start": 85.448,
+            "end": 85.908
+          },
+          {
+            "word": "stood",
+            "start": 86.049,
+            "end": 86.289
+          },
+          {
+            "word": "very",
+            "start": 86.389,
+            "end": 86.65
+          },
+          {
+            "word": "still,",
+            "start": 86.75,
+            "end": 87.131
+          },
+          {
+            "word": "watching",
+            "start": 87.511,
+            "end": 87.892
+          },
+          {
+            "word": "the",
+            "start": 87.932,
+            "end": 88.032
+          },
+          {
+            "word": "orange",
+            "start": 88.112,
+            "end": 88.433
+          },
+          {
+            "word": "turn.",
+            "start": 88.493,
+            "end": 88.854
+          },
+          {
+            "word": "Then",
+            "start": 89.295,
+            "end": 89.455
+          },
+          {
+            "word": "the",
+            "start": 89.495,
+            "end": 89.575
+          },
+          {
+            "word": "child",
+            "start": 89.615,
+            "end": 89.976
+          },
+          {
+            "word": "remembered",
+            "start": 90.036,
+            "end": 90.457
+          },
+          {
+            "word": "the",
+            "start": 90.477,
+            "end": 90.557
+          },
+          {
+            "word": "pebbles",
+            "start": 90.597,
+            "end": 90.918
+          },
+          {
+            "word": "in",
+            "start": 90.978,
+            "end": 91.038
+          },
+          {
+            "word": "the",
+            "start": 91.058,
+            "end": 91.138
+          },
+          {
+            "word": "dirt.",
+            "start": 91.158,
+            "end": 91.479
+          },
+          {
+            "word": "They",
+            "start": 91.92,
+            "end": 92.06
+          },
+          {
+            "word": "curved",
+            "start": 92.14,
+            "end": 92.541
+          },
+          {
+            "word": "up",
+            "start": 92.601,
+            "end": 92.661
+          },
+          {
+            "word": "and",
+            "start": 92.701,
+            "end": 92.801
+          },
+          {
+            "word": "down,",
+            "start": 92.861,
+            "end": 93.182
+          },
+          {
+            "word": "following",
+            "start": 93.322,
+            "end": 93.743
+          },
+          {
+            "word": "the",
+            "start": 93.783,
+            "end": 93.883
+          },
+          {
+            "word": "sun's",
+            "start": 93.943,
+            "end": 94.244
+          },
+          {
+            "word": "path",
+            "start": 94.304,
+            "end": 94.625
+          },
+          {
+            "word": "across",
+            "start": 94.685,
+            "end": 95.045
+          },
+          {
+            "word": "the",
+            "start": 95.105,
+            "end": 95.186
+          },
+          {
+            "word": "sky.",
+            "start": 95.246,
+            "end": 95.646
+          }
+        ]
+      }
+    },
+    {
+      "sceneId": 12,
+      "sentenceIds": ["s28", "s29"],
+      "narration": "Many people guess that the sun must move closer to Earth in summer. That guess is natural, but it is not the reason.",
+      "wordCount": 23,
+      "visualPurpose": "Show a figure guessing with a hand gesture that the sun moves closer to Earth in summer, with a gentle visual contrast suggesting the guess is mistaken.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 12,
+        "action": "The child stands in an open field and raises one hand, fingers pointing toward a large sun in the sky, as if guessing that it is drawing nearer. The other hand rests on the child's side, and a faint dotted path curves away from the sun toward the ground, hinting that the guess is off.",
+        "characters": [
+          {
+            "id": "the_child",
+            "pose": "one arm raised with the index finger pointing up toward the sun, other arm relaxed at the side, weight on one foot",
+            "expression": "curious and unsure, brows slightly raised, mouth a small open curve"
+          }
+        ],
+        "setting": "an open grassy field on a bright summer afternoon, clear sky, a low horizon line",
+        "props": [
+          "a large sun high in the sky",
+          "a faint dotted arc from the sun curving back toward the ground",
+          "a few tufts of grass"
+        ],
+        "lighting": "soft warm daylight with gentle brightness",
+        "composition": "wide 16:9 horizontal framing, medium shot of the child on the left third, sun in the upper right third, camera at eye level, calm open ground across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The child stands in an open field and raises one hand, fingers pointing toward a large sun in the sky, as if guessing that it is drawing nearer. The other hand rests on the child's side, and a faint dotted path curves away from the sun toward the ground, hinting that the guess is off.\n\nCharacters:\n- The child: A stick figure wearing a small round hat on its round head. Pose: one arm raised with the index finger pointing up toward the sun, other arm relaxed at the side, weight on one foot. Expression: curious and unsure, brows slightly raised, mouth a small open curve.\n\nSetting: an open grassy field on a bright summer afternoon, clear sky, a low horizon line\n\nKey props: a large sun high in the sky, a faint dotted arc from the sun curving back toward the ground, a few tufts of grass\n\nLighting: soft warm daylight with gentle brightness\n\nComposition: wide 16:9 horizontal framing, medium shot of the child on the left third, sun in the upper right third, camera at eye level, calm open ground across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "af66c45ef9cac75567007bb70da6dcfe77aaa150b3051fb2ab4fca0ca59bd8d4",
+      "image": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/images/scene-012.png",
+        "prompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The child stands in an open field and raises one hand, fingers pointing toward a large sun in the sky, as if guessing that it is drawing nearer. The other hand rests on the child's side, and a faint dotted path curves away from the sun toward the ground, hinting that the guess is off.\n\nCharacters:\n- The child: A stick figure wearing a small round hat on its round head. Pose: one arm raised with the index finger pointing up toward the sun, other arm relaxed at the side, weight on one foot. Expression: curious and unsure, brows slightly raised, mouth a small open curve.\n\nSetting: an open grassy field on a bright summer afternoon, clear sky, a low horizon line\n\nKey props: a large sun high in the sky, a faint dotted arc from the sun curving back toward the ground, a few tufts of grass\n\nLighting: soft warm daylight with gentle brightness\n\nComposition: wide 16:9 horizontal framing, medium shot of the child on the left third, sun in the upper right third, camera at eye level, calm open ground across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "image-provider",
+        "attempts": 1,
+        "promptHash": "66d751ce6d7129e7feb067c378f9956c639db21d86d9b86631bd44dc442cfb55",
+        "byteSize": 35780,
+        "width": 1024,
+        "height": 572,
+        "aspect": 1.79,
+        "luminanceVariance": 872.52,
+        "generatedAt": "2026-10-21T07:34:09.176Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/chunks/scene-012.wav",
+        "durationSec": 7.4,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/parts/scene-012-part01.wav",
+            "durationSec": 7.4,
+            "text": "Many people guess that the sun must move closer to Earth in summer. That guess is natural, but it is not the reason.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
+          }
+        ],
+        "meanVolumeDb": -25.7,
+        "wordsPerMinute": 186.5,
+        "asrCoverage": 1,
+        "asrChecked": true
+      },
+      "timing": {
+        "start": 96.133,
+        "end": 103.733,
+        "startFrame": 2884,
+        "endFrame": 3112,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "Many",
+            "start": 96.293,
+            "end": 96.514
+          },
+          {
+            "word": "people",
+            "start": 96.554,
+            "end": 96.855
+          },
+          {
+            "word": "guess",
+            "start": 96.915,
+            "end": 97.216
+          },
+          {
+            "word": "that",
+            "start": 97.256,
+            "end": 97.376
+          },
+          {
+            "word": "the",
+            "start": 97.416,
+            "end": 97.517
+          },
+          {
+            "word": "sun",
+            "start": 97.637,
+            "end": 97.938
+          },
+          {
+            "word": "must",
+            "start": 97.998,
+            "end": 98.179
+          },
+          {
+            "word": "move",
+            "start": 98.259,
+            "end": 98.459
+          },
+          {
+            "word": "closer",
+            "start": 98.54,
+            "end": 98.961
+          },
+          {
+            "word": "to",
+            "start": 99.021,
+            "end": 99.101
+          },
+          {
+            "word": "Earth",
+            "start": 99.221,
+            "end": 99.422
+          },
+          {
+            "word": "in",
+            "start": 99.482,
+            "end": 99.562
+          },
+          {
+            "word": "summer.",
+            "start": 99.642,
+            "end": 99.963
+          },
+          {
+            "word": "That",
+            "start": 100.585,
+            "end": 100.786
+          },
+          {
+            "word": "guess",
+            "start": 100.826,
+            "end": 101.066
+          },
+          {
+            "word": "is",
+            "start": 101.126,
+            "end": 101.227
+          },
+          {
+            "word": "natural,",
+            "start": 101.287,
+            "end": 101.748
+          },
+          {
+            "word": "but",
+            "start": 102.129,
+            "end": 102.27
+          },
+          {
+            "word": "it",
+            "start": 102.29,
+            "end": 102.33
+          },
+          {
+            "word": "is",
+            "start": 102.39,
+            "end": 102.47
+          },
+          {
+            "word": "not",
+            "start": 102.53,
+            "end": 102.711
+          },
+          {
+            "word": "the",
+            "start": 102.771,
+            "end": 102.871
+          },
+          {
+            "word": "reason.",
+            "start": 102.911,
+            "end": 103.232
+          }
+        ]
+      }
+    },
+    {
+      "sceneId": 13,
+      "sentenceIds": ["s30", "s31"],
+      "narration": "Earth is actually closest to the sun in early January, during northern winter. The tilt is the real reason.",
+      "wordCount": 19,
+      "visualPurpose": "Show Earth's orbit as an ellipse with the sun at one focus, with Earth marked close to the sun in early January, while the tilted axis is highlighted as the true cause of the seasons.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 13,
+        "action": "A wide elliptical orbit hangs in the dark, with a bright sun glowing at one focus and a small Earth drawn near the sun's side of the path. A tilted axis line through Earth stands out in bright contrast, showing the tilt as the cause.",
+        "characters": [],
+        "setting": "open dark space above a plain background, with the orbit ellipse as the only structure, no land or horizon",
+        "props": [
+          "a wide elliptical orbit line",
+          "a glowing sun at one focus of the ellipse",
+          "a small Earth sphere near the sun in early January position",
+          "a tilted axis line through Earth, highlighted with a bright outline",
+          "a faint arrow marking the direction of travel along the orbit"
+        ],
+        "lighting": "a warm golden glow from the sun against cool deep blue space, the tilted axis lit brighter than the rest",
+        "composition": "wide 16:9 horizontal framing, high-angle shot looking down on the orbital plane, ellipse stretched across the middle of the frame, sun on the left third, Earth on the near side of the path close to the sun, calm dark area across the bottom of the frame for subtitles",
+        "metaphor": false
+      },
+      "imagePrompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: A wide elliptical orbit hangs in the dark, with a bright sun glowing at one focus and a small Earth drawn near the sun's side of the path. A tilted axis line through Earth stands out in bright contrast, showing the tilt as the cause.\n\nCharacters:\n\n\nSetting: open dark space above a plain background, with the orbit ellipse as the only structure, no land or horizon\n\nKey props: a wide elliptical orbit line, a glowing sun at one focus of the ellipse, a small Earth sphere near the sun in early January position, a tilted axis line through Earth, highlighted with a bright outline, a faint arrow marking the direction of travel along the orbit\n\nLighting: a warm golden glow from the sun against cool deep blue space, the tilted axis lit brighter than the rest\n\nComposition: wide 16:9 horizontal framing, high-angle shot looking down on the orbital plane, ellipse stretched across the middle of the frame, sun on the left third, Earth on the near side of the path close to the sun, calm dark area across the bottom of the frame for subtitles\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "6e373218cb3f588c4594a7ad1ea560025ad3d70f131291542bc4c4a8c43db2cd",
+      "image": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/images/scene-013.png",
+        "prompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: A wide elliptical orbit hangs in the dark, with a bright sun glowing at one focus and a small Earth drawn near the sun's side of the path. A tilted axis line through Earth stands out in bright contrast, showing the tilt as the cause.\n\nCharacters:\n\n\nSetting: open dark space above a plain background, with the orbit ellipse as the only structure, no land or horizon\n\nKey props: a wide elliptical orbit line, a glowing sun at one focus of the ellipse, a small Earth sphere near the sun in early January position, a tilted axis line through Earth, highlighted with a bright outline, a faint arrow marking the direction of travel along the orbit\n\nLighting: a warm golden glow from the sun against cool deep blue space, the tilted axis lit brighter than the rest\n\nComposition: wide 16:9 horizontal framing, high-angle shot looking down on the orbital plane, ellipse stretched across the middle of the frame, sun on the left third, Earth on the near side of the path close to the sun, calm dark area across the bottom of the frame for subtitles\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "image-provider",
+        "attempts": 1,
+        "promptHash": "33f7cc44104ab13837e6582df9d36f0db9dd27356cd2d704981d63530aa63dbe",
+        "byteSize": 28952,
+        "width": 1024,
+        "height": 572,
+        "aspect": 1.79,
+        "luminanceVariance": 719.86,
+        "generatedAt": "2026-10-21T07:34:28.635Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/chunks/scene-013.wav",
+        "durationSec": 6.52,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/parts/scene-013-part01.wav",
+            "durationSec": 6.52,
+            "text": "Earth is actually closest to the sun in early January, during northern winter. The tilt is the real reason.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
+          }
+        ],
+        "meanVolumeDb": -24.8,
+        "wordsPerMinute": 174.8,
+        "asrCoverage": 1,
+        "asrChecked": true
+      },
+      "timing": {
+        "start": 103.733,
+        "end": 110.433,
+        "startFrame": 3112,
+        "endFrame": 3313,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "Earth",
+            "start": 104.973,
+            "end": 105.154
+          },
+          {
+            "word": "is",
+            "start": 105.214,
+            "end": 105.294
+          },
+          {
+            "word": "actually",
+            "start": 105.415,
+            "end": 105.736
+          },
+          {
+            "word": "closest",
+            "start": 105.816,
+            "end": 106.237
+          },
+          {
+            "word": "to",
+            "start": 106.257,
+            "end": 106.338
+          },
+          {
+            "word": "the",
+            "start": 106.378,
+            "end": 106.458
+          },
+          {
+            "word": "sun",
+            "start": 106.518,
+            "end": 106.779
+          },
+          {
+            "word": "in",
+            "start": 106.859,
+            "end": 106.939
+          },
+          {
+            "word": "early",
+            "start": 107.06,
+            "end": 107.341
+          },
+          {
+            "word": "January,",
+            "start": 107.381,
+            "end": 107.943
+          },
+          {
+            "word": "during",
+            "start": 108.183,
+            "end": 108.444
+          },
+          {
+            "word": "northern",
+            "start": 108.504,
+            "end": 108.885
+          },
+          {
+            "word": "winter.",
+            "start": 108.926,
+            "end": 109.226
+          },
+          {
+            "word": "The",
+            "start": 109.668,
+            "end": 109.768
+          },
+          {
+            "word": "tilt",
+            "start": 109.828,
+            "end": 110.109
+          },
+          {
+            "word": "is",
+            "start": 110.189,
+            "end": 110.27
+          },
+          {
+            "word": "the",
+            "start": 110.33,
+            "end": 110.43
+          },
+          {
+            "word": "real",
+            "start": 110.49,
+            "end": 110.711
+          },
+          {
+            "word": "reason.",
+            "start": 110.771,
+            "end": 111.092
+          }
+        ]
+      }
+    },
+    {
+      "sceneId": 14,
+      "sentenceIds": ["s32", "s33"],
+      "narration": "The tilt points the same way all year as Earth travels around. So each half takes its turn leaning toward the sun.",
+      "wordCount": 22,
+      "visualPurpose": "Show Earth at several points around its orbit with the tilted axis drawn parallel in every position, and the northern and southern halves each leaning toward the sun in turn.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 14,
+        "action": "Four Earth globes sit around a glowing sun on a wide orbit ring, each tilted the same way with its axis line kept parallel. In each position the half tilted toward the sun is marked with an arrow, showing the northern and southern halves taking turns.",
+        "characters": [],
+        "setting": "open dark space around a central sun, with a thin circular orbit path drawn around it",
+        "props": [
+          "a bright yellow sun at the center",
+          "a thin circular orbit ring",
+          "four small Earth globes spaced around the ring",
+          "parallel tilted axis lines through each globe, all pointing the same direction",
+          "short arrows marking the half of each globe leaning toward the sun",
+          "a dotted line showing the direction of travel along the orbit"
+        ],
+        "lighting": "a warm golden glow from the central sun, fading into deep blue-black space at the edges",
+        "composition": "wide 16:9 horizontal framing, high-angle shot looking down on the orbit so all four globes are visible at once, sun centered, globes spread left, right, top and near the bottom of the ring, with the lower edge of the frame kept calm and dark for subtitles",
+        "metaphor": false
+      },
+      "imagePrompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: Four Earth globes sit around a glowing sun on a wide orbit ring, each tilted the same way with its axis line kept parallel. In each position the half tilted toward the sun is marked with an arrow, showing the northern and southern halves taking turns.\n\nCharacters:\n\n\nSetting: open dark space around a central sun, with a thin circular orbit path drawn around it\n\nKey props: a bright yellow sun at the center, a thin circular orbit ring, four small Earth globes spaced around the ring, parallel tilted axis lines through each globe, all pointing the same direction, short arrows marking the half of each globe leaning toward the sun, a dotted line showing the direction of travel along the orbit\n\nLighting: a warm golden glow from the central sun, fading into deep blue-black space at the edges\n\nComposition: wide 16:9 horizontal framing, high-angle shot looking down on the orbit so all four globes are visible at once, sun centered, globes spread left, right, top and near the bottom of the ring, with the lower edge of the frame kept calm and dark for subtitles\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "42ed4c21cfe6481655477176d3a3d158be9896d11882a1827f771139d0e648b6",
+      "image": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/images/scene-014.png",
+        "prompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: Four Earth globes sit around a glowing sun on a wide orbit ring, each tilted the same way with its axis line kept parallel. In each position the half tilted toward the sun is marked with an arrow, showing the northern and southern halves taking turns.\n\nCharacters:\n\n\nSetting: open dark space around a central sun, with a thin circular orbit path drawn around it\n\nKey props: a bright yellow sun at the center, a thin circular orbit ring, four small Earth globes spaced around the ring, parallel tilted axis lines through each globe, all pointing the same direction, short arrows marking the half of each globe leaning toward the sun, a dotted line showing the direction of travel along the orbit\n\nLighting: a warm golden glow from the central sun, fading into deep blue-black space at the edges\n\nComposition: wide 16:9 horizontal framing, high-angle shot looking down on the orbit so all four globes are visible at once, sun centered, globes spread left, right, top and near the bottom of the ring, with the lower edge of the frame kept calm and dark for subtitles\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "image-provider",
+        "attempts": 1,
+        "promptHash": "b664d2cc6a3d82822043e7f3ce31ac92ba7c01ca11445d4eeb70dc8400f8ac2c",
+        "byteSize": 37146,
+        "width": 1024,
+        "height": 572,
+        "aspect": 1.79,
+        "luminanceVariance": 1799.27,
+        "generatedAt": "2026-10-21T07:34:48.050Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/chunks/scene-014.wav",
+        "durationSec": 7.04,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/parts/scene-014-part01.wav",
+            "durationSec": 7.04,
+            "text": "The tilt points the same way all year as Earth travels around. So each half takes its turn leaning toward the sun.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
+          }
+        ],
+        "meanVolumeDb": -26.1,
+        "wordsPerMinute": 187.5,
+        "asrCoverage": 1,
+        "asrChecked": true
+      },
+      "timing": {
+        "start": 110.433,
+        "end": 117.667,
+        "startFrame": 3313,
+        "endFrame": 3530,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "The",
+            "start": 111.667,
+            "end": 111.768
+          },
+          {
+            "word": "tilt",
+            "start": 111.828,
+            "end": 112.088
+          },
+          {
+            "word": "points",
+            "start": 112.169,
+            "end": 112.45
+          },
+          {
+            "word": "the",
+            "start": 112.51,
+            "end": 112.61
+          },
+          {
+            "word": "same",
+            "start": 112.67,
+            "end": 112.911
+          },
+          {
+            "word": "way",
+            "start": 112.971,
+            "end": 113.212
+          },
+          {
+            "word": "all",
+            "start": 113.432,
+            "end": 113.593
+          },
+          {
+            "word": "year",
+            "start": 113.653,
+            "end": 113.914
+          },
+          {
+            "word": "as",
+            "start": 113.974,
+            "end": 114.034
+          },
+          {
+            "word": "Earth",
+            "start": 114.114,
+            "end": 114.315
+          },
+          {
+            "word": "travels",
+            "start": 114.395,
+            "end": 114.796
+          },
+          {
+            "word": "around.",
+            "start": 114.816,
+            "end": 115.237
+          },
+          {
+            "word": "So",
+            "start": 115.779,
+            "end": 115.919
+          },
+          {
+            "word": "each",
+            "start": 116.04,
+            "end": 116.2
+          },
+          {
+            "word": "half",
+            "start": 116.26,
+            "end": 116.521
+          },
+          {
+            "word": "takes",
+            "start": 116.581,
+            "end": 116.802
+          },
+          {
+            "word": "its",
+            "start": 116.882,
+            "end": 116.982
+          },
+          {
+            "word": "turn",
+            "start": 117.043,
+            "end": 117.323
+          },
+          {
+            "word": "leaning",
+            "start": 117.384,
+            "end": 117.684
+          },
+          {
+            "word": "toward",
+            "start": 117.745,
+            "end": 117.985
+          },
+          {
+            "word": "the",
+            "start": 118.005,
+            "end": 118.086
+          },
+          {
+            "word": "sun.",
+            "start": 118.146,
+            "end": 118.346
+          }
+        ]
+      }
+    },
+    {
+      "sceneId": 15,
+      "sentenceIds": ["s34", "s35", "s36"],
+      "narration": "The child picked up the last pebble and smiled. Next week, the shadow would be a little longer. And now the child knew why.",
+      "wordCount": 24,
+      "visualPurpose": "Show the child smiling as they place the last pebble at the end of the curved row in the dirt, the shadow stick slightly longer, as the child understands the reason.",
+      "imagePromptWarnings": [],
+      "status": {
+        "prompt": "done",
+        "image": "done",
+        "audio": "done",
+        "transcript": "done",
+        "timing": "done"
+      },
+      "warnings": [],
+      "slots": {
+        "sceneId": 15,
+        "action": "The village child kneels in the dirt and sets the last pebble at the end of a curved row, smiling with understanding as a shadow stick casts a slightly longer shadow across the ground.",
+        "characters": [
+          {
+            "id": "the_child",
+            "pose": "kneeling on one knee, one hand placing a small pebble at the end of a curved row, the other hand resting on the ground",
+            "expression": "happy and satisfied, brows raised, mouth in a wide smile"
+          }
+        ],
+        "setting": "a dusty open ground outside a village in bright midday sun, a clear sky, no other people",
+        "props": [
+          "a curved row of small pebbles in the dirt",
+          "an upright wooden shadow stick",
+          "a long thin shadow stretching across the ground",
+          "a small round hat on the child"
+        ],
+        "lighting": "warm clear afternoon sunlight casting a soft, slightly lengthened shadow",
+        "composition": "wide 16:9 horizontal framing, high-angle shot looking down at the ground, the child kneeling on the left third, the curved pebble row sweeping through the middle, the shadow stick and its shadow on the right, calm open dirt across the bottom of the frame",
+        "metaphor": false
+      },
+      "imagePrompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The village child kneels in the dirt and sets the last pebble at the end of a curved row, smiling with understanding as a shadow stick casts a slightly longer shadow across the ground.\n\nCharacters:\n- The child: A stick figure wearing a small round hat on its round head. Pose: kneeling on one knee, one hand placing a small pebble at the end of a curved row, the other hand resting on the ground. Expression: happy and satisfied, brows raised, mouth in a wide smile.\n\nSetting: a dusty open ground outside a village in bright midday sun, a clear sky, no other people\n\nKey props: a curved row of small pebbles in the dirt, an upright wooden shadow stick, a long thin shadow stretching across the ground, a small round hat on the child\n\nLighting: warm clear afternoon sunlight casting a soft, slightly lengthened shadow\n\nComposition: wide 16:9 horizontal framing, high-angle shot looking down at the ground, the child kneeling on the left third, the curved pebble row sweeping through the middle, the shadow stick and its shadow on the right, calm open dirt across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+      "promptFingerprint": "63ac73012b2fa716c8e594ff397f57a89e36e5af25e5f1c19b366d37ed50cb5f",
+      "image": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/images/scene-015.png",
+        "prompt": "Strict stick-figure drawing. Every character is a stick figure: a round white head, a single-line body, single lines for arms and legs, no hands, no feet, no hair, and faces drawn with eyebrows and a mouth only. No clothing folds, fabric detail or shading on characters; distinguish each character with at most one flat silhouette cue (a hat shape, a cloak outline, a coloured sash).\n\nScene: The village child kneels in the dirt and sets the last pebble at the end of a curved row, smiling with understanding as a shadow stick casts a slightly longer shadow across the ground.\n\nCharacters:\n- The child: A stick figure wearing a small round hat on its round head. Pose: kneeling on one knee, one hand placing a small pebble at the end of a curved row, the other hand resting on the ground. Expression: happy and satisfied, brows raised, mouth in a wide smile.\n\nSetting: a dusty open ground outside a village in bright midday sun, a clear sky, no other people\n\nKey props: a curved row of small pebbles in the dirt, an upright wooden shadow stick, a long thin shadow stretching across the ground, a small round hat on the child\n\nLighting: warm clear afternoon sunlight casting a soft, slightly lengthened shadow\n\nComposition: wide 16:9 horizontal framing, high-angle shot looking down at the ground, the child kneeling on the left third, the curved pebble row sweeping through the middle, the shadow stick and its shadow on the right, calm open dirt across the bottom of the frame\n\nStyle constraints: hand-drawn black ink lines on a pale paper background, flat colour washes in the background only, desaturated muted colours with one warm accent, no shading or gradients on characters, no 3D, no photorealism, no text, no lettering, no captions, no signage the viewer must read, no watermarks, no signatures, no borders, no frames. Keep the lower third of the frame visually calm and uncluttered.\n\nWide 16:9 horizontal landscape composition (1920 by 1080). Do not return a square or portrait image.",
+        "provider": "image-provider",
+        "attempts": 1,
+        "promptHash": "64808b3ba97171c294a0df42ac31b433a655454ff8af1e57231ab5f3521925da",
+        "byteSize": 63565,
+        "width": 1024,
+        "height": 572,
+        "aspect": 1.79,
+        "luminanceVariance": 481.18,
+        "generatedAt": "2026-10-21T07:35:07.450Z"
+      },
+      "audio": {
+        "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/chunks/scene-015.wav",
+        "durationSec": 9.04,
+        "pieces": [
+          {
+            "path": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/parts/scene-015-part01.wav",
+            "durationSec": 9.04,
+            "text": "The child picked up the last pebble and smiled. Next week, the shadow would be a little longer. And now the child knew why.",
+            "providerFingerprint": "chatterbox-http-v4:http://localhost:8010:targetWpm=140"
+          }
+        ],
+        "meanVolumeDb": -26.5,
+        "wordsPerMinute": 159.3,
+        "asrCoverage": 1,
+        "asrChecked": true
+      },
+      "timing": {
+        "start": 117.667,
+        "end": 126.733,
+        "startFrame": 3530,
+        "endFrame": 3802,
+        "method": "measured"
+      },
+      "transcript": {
+        "matchRatio": 1,
+        "method": "aligned",
+        "words": [
+          {
+            "word": "The",
+            "start": 117.767,
+            "end": 117.867
+          },
+          {
+            "word": "child",
+            "start": 117.928,
+            "end": 118.308
+          },
+          {
+            "word": "picked",
+            "start": 118.389,
+            "end": 118.669
+          },
+          {
+            "word": "up",
+            "start": 118.789,
+            "end": 118.89
+          },
+          {
+            "word": "the",
+            "start": 118.93,
+            "end": 119.03
+          },
+          {
+            "word": "last",
+            "start": 119.07,
+            "end": 119.351
+          },
+          {
+            "word": "pebble",
+            "start": 119.431,
+            "end": 119.732
+          },
+          {
+            "word": "and",
+            "start": 119.772,
+            "end": 119.852
+          },
+          {
+            "word": "smiled.",
+            "start": 119.952,
+            "end": 120.453
+          },
+          {
+            "word": "Next",
+            "start": 121.235,
+            "end": 121.455
+          },
+          {
+            "word": "week,",
+            "start": 121.536,
+            "end": 121.776
+          },
+          {
+            "word": "the",
+            "start": 122.157,
+            "end": 122.237
+          },
+          {
+            "word": "shadow",
+            "start": 122.297,
+            "end": 122.638
+          },
+          {
+            "word": "would",
+            "start": 122.658,
+            "end": 122.798
+          },
+          {
+            "word": "be",
+            "start": 122.818,
+            "end": 122.939
+          },
+          {
+            "word": "a",
+            "start": 122.979,
+            "end": 122.999
+          },
+          {
+            "word": "little",
+            "start": 123.039,
+            "end": 123.259
+          },
+          {
+            "word": "longer.",
+            "start": 123.299,
+            "end": 123.66
+          },
+          {
+            "word": "And",
+            "start": 124.622,
+            "end": 124.723
+          },
+          {
+            "word": "now",
+            "start": 124.783,
+            "end": 125.023
+          },
+          {
+            "word": "the",
+            "start": 125.344,
+            "end": 125.444
+          },
+          {
+            "word": "child",
+            "start": 125.484,
+            "end": 125.845
+          },
+          {
+            "word": "knew",
+            "start": 125.905,
+            "end": 126.046
+          },
+          {
+            "word": "why.",
+            "start": 126.106,
+            "end": 126.426
+          }
+        ]
+      }
+    }
+  ],
+  "warnings": [],
+  "errors": [
+    "Rendered video failed validation: no_long_silence: 100.40s/1.08s, 124.76s/1.15s"
+  ],
+  "story": {
+    "title": "Why the Seasons Come Around",
+    "story": "At noon, the stick's shadow was shorter than it had been last month. A child in the village had been marking the tip of that shadow with a pebble every week. The pebbles made a curve across the dirt. Why did the sun climb so high in summer? Why did it sink so low in winter? The child asked a teacher one afternoon. She carried an orange and a lamp into the classroom. She pushed a pin through the orange, from the top to the bottom. That pin stood for the axis, an invisible line that Earth spins around. Earth does not stand straight up as it travels around the sun. It leans over, tipped about twenty-three and a half degrees. A degree is a small unit for measuring how far something tips. The teacher placed the lamp in the middle of the room. The lamp stood for the sun. She walked the orange in a slow circle around the lamp. She kept the pin tipped the same way the whole time. When the top leaned toward the lamp, that half got straighter light. Straighter light is packed into a smaller space, so that half feels warmer. That half also had longer days, since the sun stayed up for more hours. That is summer. On the far side of the circle, the top leaned away. Light arrived at a slant and spread thin over more ground. Days grew short and cool. That is winter. The child stood very still, watching the orange turn. Then the child remembered the pebbles in the dirt. They curved up and down, following the sun's path across the sky. Many people guess that the sun must move closer to Earth in summer. That guess is natural, but it is not the reason. Earth is actually closest to the sun in early January, during northern winter. The tilt is the real reason. The tilt points the same way all year as Earth travels around. So each half takes its turn leaning toward the sun. The child picked up the last pebble and smiled. Next week, the shadow would be a little longer. And now the child knew why.",
+    "wordCount": 362,
+    "lint": {
+      "passed": true,
+      "attempts": 1,
+      "sentenceCount": 36,
+      "wordCount": 362,
+      "averageSentenceWords": 10.1,
+      "maximumSentenceWords": 18,
+      "readingGrade": 3.6,
+      "wordBudgetTarget": 375,
+      "wordBudgetVariance": -0.035,
+      "issues": [],
+      "warnings": []
+    }
+  },
+  "claims": [
+    {
+      "claim": "Earth's axis is tilted about twenty-three and a half degrees.",
+      "status": "established",
+      "hedgeInNarration": false
+    },
+    {
+      "claim": "The tilt of Earth's axis, not distance from the sun, is the main cause of the seasons.",
+      "status": "established",
+      "hedgeInNarration": false
+    },
+    {
+      "claim": "When a hemisphere leans toward the sun, its sunlight is more direct and its days are longer, which is summer there.",
+      "status": "established",
+      "hedgeInNarration": false
+    },
+    {
+      "claim": "Earth is closest to the sun in early January, during northern winter.",
+      "status": "established",
+      "hedgeInNarration": false
+    },
+    {
+      "claim": "Many people guess that the sun moves closer to Earth in summer.",
+      "status": "established",
+      "hedgeInNarration": true
+    },
+    {
+      "claim": "A child in the village marked the shadow of a stick each week with a pebble.",
+      "status": "fiction",
+      "hedgeInNarration": true
+    },
+    {
+      "claim": "A teacher demonstrated the seasons with an orange, a pin and a lamp.",
+      "status": "fiction",
+      "hedgeInNarration": true
+    }
+  ],
+  "verification": {
+    "attempts": 1,
+    "issues": [
+      {
+        "kind": "other",
+        "description": "The ledger marks the village child with the weekly pebbles and the teacher's orange, pin and lamp demonstration as fiction, \"hedged in narration.\" The story narrates both as plain events (\"A child in the village had been marking...\", \"She carried an orange and a lamp into the classroom\") with no signal that they are invented. Because the video is for children, they could take the scene for a real event. Adding a clear cue, such as \"Imagine...\" or \"In this story...\", would match the ledger.",
+        "severity": "advisory"
+      }
+    ],
+    "blocking": [],
+    "notes": [
+      "The ledger marks the village child with the weekly pebbles and the teacher's orange, pin and lamp demonstration as fiction, \"hedged in narration.\" The story narrates both as plain events (\"A child in the village had been marking...\", \"She carried an orange and a lamp into the classroom\") with no signal that they are invented. Because the video is for children, they could take the scene for a real event. Adding a clear cue, such as \"Imagine...\" or \"In this story...\", would match the ledger."
+    ]
+  },
+  "characters": [
+    {
+      "id": "the_child",
+      "name": "The child",
+      "role": "the village child who tracks the shadow",
+      "kind": "individual",
+      "visualDescription": "A stick figure wearing a small round hat on its round head."
+    },
+    {
+      "id": "the_teacher",
+      "name": "The teacher",
+      "role": "the teacher who demonstrates with an orange and a lamp",
+      "kind": "individual",
+      "visualDescription": "A stick figure wearing a wide sash across its chest."
+    }
+  ],
+  "audio": {
+    "masterPath": "/tmp/opencode/story-e2e/seasons-e2e-21oct/audio/narration.wav",
+    "durationSec": 126.72,
+    "gapMs": 200,
+    "sampleRate": 48000
+  },
+  "transcriptPath": "/tmp/opencode/story-e2e/seasons-e2e-21oct/transcript.json",
+  "subtitles": {
+    "ass": "/tmp/opencode/story-e2e/seasons-e2e-21oct/subtitles.ass",
+    "srt": "/tmp/opencode/story-e2e/seasons-e2e-21oct/subtitles.srt",
+    "cueCount": 36,
+    "overallMatchRatio": 1
+  },
+  "render": {
+    "finalVideo": "/tmp/opencode/story-e2e/seasons-e2e-21oct/final.mp4",
+    "ffprobe": {
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "duration": 126.72,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "pixFmt": "yuv420p"
+    },
+    "validations": {
+      "passed": true,
+      "checks": [
+        {
+          "name": "video_stream",
+          "passed": true,
+          "detail": "h264 1920x1080 yuv420p",
+          "severity": "gate"
+        },
+        {
+          "name": "video_codec",
+          "passed": true,
+          "detail": "expected h264, got h264",
+          "severity": "gate"
+        },
+        {
+          "name": "pixel_format",
+          "passed": true,
+          "detail": "expected yuv420p, got yuv420p",
+          "severity": "gate"
+        },
+        {
+          "name": "resolution",
+          "passed": true,
+          "detail": "expected 1920x1080, got 1920x1080",
+          "severity": "gate"
+        },
+        {
+          "name": "frame_rate",
+          "passed": true,
+          "detail": "expected 30 fps, got 30",
+          "severity": "gate"
+        },
+        {
+          "name": "audio_stream",
+          "passed": true,
+          "detail": "aac",
+          "severity": "gate"
+        },
+        {
+          "name": "audio_codec",
+          "passed": true,
+          "detail": "expected aac, got aac",
+          "severity": "gate"
+        },
+        {
+          "name": "duration_matches_audio",
+          "passed": true,
+          "detail": "video 126.720s vs audio 126.720s",
+          "severity": "gate"
+        },
+        {
+          "name": "no_black_frames",
+          "passed": true,
+          "detail": "no interval longer than 0.35s (0 dark interval(s) seen)",
+          "severity": "gate"
+        },
+        {
+          "name": "no_long_silence",
+          "passed": true,
+          "detail": "no silence longer than 1s at -50 dB",
+          "severity": "gate"
+        },
+        {
+          "name": "scene_1_shows_source",
+          "passed": true,
+          "detail": "correlation 0.963 with its own source (floor 0.35); closest other scene 15 at 0.610 (margin 0.353, needs >= 0.02)",
+          "severity": "warning"
+        },
+        {
+          "name": "scene_1_subtitles_visible",
+          "passed": true,
+          "detail": "subtitle band difference 7.76% (>= 0.50%)",
+          "severity": "gate"
+        },
+        {
+          "name": "scene_4_shows_source",
+          "passed": true,
+          "detail": "correlation 0.976 with its own source (floor 0.35); closest other scene 12 at 0.502 (margin 0.474, needs >= 0.02)",
+          "severity": "warning"
+        },
+        {
+          "name": "scene_4_subtitles_visible",
+          "passed": true,
+          "detail": "subtitle band difference 4.82% (>= 0.50%)",
+          "severity": "gate"
+        },
+        {
+          "name": "scene_7_shows_source",
+          "passed": true,
+          "detail": "correlation 0.980 with its own source (floor 0.35); closest other scene 14 at 0.643 (margin 0.337, needs >= 0.02)",
+          "severity": "warning"
+        },
+        {
+          "name": "scene_7_subtitles_visible",
+          "passed": true,
+          "detail": "subtitle band difference 5.52% (>= 0.50%)",
+          "severity": "gate"
+        },
+        {
+          "name": "scene_9_shows_source",
+          "passed": true,
+          "detail": "correlation 0.949 with its own source (floor 0.35); closest other scene 10 at 0.678 (margin 0.271, needs >= 0.02)",
+          "severity": "warning"
+        },
+        {
+          "name": "scene_9_subtitles_visible",
+          "passed": true,
+          "detail": "subtitle band difference 5.18% (>= 0.50%)",
+          "severity": "gate"
+        },
+        {
+          "name": "scene_12_shows_source",
+          "passed": true,
+          "detail": "correlation 0.964 with its own source (floor 0.35); closest other scene 4 at 0.512 (margin 0.452, needs >= 0.02)",
+          "severity": "warning"
+        },
+        {
+          "name": "scene_12_subtitles_visible",
+          "passed": true,
+          "detail": "subtitle band difference 4.24% (>= 0.50%)",
+          "severity": "gate"
+        },
+        {
+          "name": "scene_15_shows_source",
+          "passed": true,
+          "detail": "correlation 0.979 with its own source (floor 0.35); closest other scene 1 at 0.618 (margin 0.361, needs >= 0.02)",
+          "severity": "warning"
+        },
+        {
+          "name": "scene_15_subtitles_visible",
+          "passed": true,
+          "detail": "subtitle band difference 3.46% (>= 0.50%)",
+          "severity": "gate"
+        }
+      ]
+    }
+  }
+}
